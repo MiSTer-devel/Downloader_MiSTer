@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Copyright (c) 2021 José Manuel Barroso Galindo <theypsilon@gmail.com>
+
+set -euo pipefail
+
+MISTER_IP=${MISTER_IP:-$(cat "mister.ip" | tr -d '[:space:]')}
+TEMP_SCRIPT="$(mktemp)"
+
+./src/build.sh > "${TEMP_SCRIPT}"
+chmod +x "${TEMP_SCRIPT}"
+
+if [ -f dont_download.ini ] ; then
+  sshpass -p 1 scp -o StrictHostKeyChecking=no dont_download.ini "root@${MISTER_IP}:/media/fat/downloader.ini"
+fi
+sshpass -p 1 scp -o StrictHostKeyChecking=no "${TEMP_SCRIPT}" "root@${MISTER_IP}:/media/fat/downloader.sh"
+sshpass -p 1 scp -o StrictHostKeyChecking=no downloader.sh "root@${MISTER_IP}:/media/fat/Scripts/downloader.sh"
+rm "${TEMP_SCRIPT}"
+
+echo "OK"

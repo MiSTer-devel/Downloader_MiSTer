@@ -1,0 +1,40 @@
+name: Build
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Install sharutils
+      run: sudo apt-get install sharutils
+
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.5'
+
+    - uses: actions/checkout@v2
+
+    - name: Unit Tests
+      run: cd src && python3 -m unittest discover -s test/unit
+
+    - name: Integration Tests
+      run: cd src && python3 -m unittest discover -s test/integration
+
+    - name: System Quick Tests
+      run: cd src && python3 -m unittest discover -s test/system/quick
+
+    - name: Build
+      run: ./src/build.sh > dont_download.sh
+
+    - name: Release
+      id: release
+      run: |
+        git config --global user.email "theypsilon@gmail.com"
+        git config --global user.name "The CI/CD Bot"
+        ./.github/release.sh
+
+    - name: System Slow Tests
+      if: steps.release.outputs.NEW_RELEASE == 'yes'
+      run: cd src && python3 -m unittest discover -s test/system/slow
