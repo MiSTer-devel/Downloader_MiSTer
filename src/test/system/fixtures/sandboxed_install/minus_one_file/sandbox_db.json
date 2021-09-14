@@ -1,0 +1,18 @@
+{
+    "db_files": [],
+    "db_id": "sandbox",
+    "db_url": "sandbox_db.json",
+    "files": {
+        "foo.txt": {
+            "delete": [],
+            "hash": "133af32b4894d9c5527cc5c91269ee28",
+            "size": 20,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/foo.txt"
+        }
+    },
+    "files_count": 1,
+    "folders": [],
+    "folders_count": 0,
+    "latest_zip_url": "https://github.com/MiSTer-devel/Distribution_MiSTer/archive/refs/heads/main.zip",
+    "time": "2021/08/13 21:35:02"
+}
