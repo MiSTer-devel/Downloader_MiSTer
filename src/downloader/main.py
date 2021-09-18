@@ -65,8 +65,8 @@ def main_internal(env, logger):
 
     db_gateway = DbGateway(config, file_service, logger)
     offline_importer = OfflineImporter(config, file_service, logger)
-    online_importer = OnlineImporter(config, file_service, make_downloader_factory(file_service, logger), logger)
-    linux_updater = LinuxUpdater(file_service, CurlSerialDownloader(config, file_service, logger), logger)
+    online_importer = OnlineImporter(config, file_service, make_downloader_factory(file_service, local_repository, logger), logger)
+    linux_updater = LinuxUpdater(file_service, CurlSerialDownloader(config, file_service, local_repository, logger), logger)
 
     exit_code = run_downloader(
         env,
@@ -86,9 +86,13 @@ def main_internal(env, logger):
     if needs_reboot:
         logger.print()
         logger.print("Rebooting in 10 seconds...")
-        time.sleep(5)
+        time.sleep(2)
         logger.close_logfile()
-        time.sleep(5)
+        time.sleep(4)
+        subprocess.run(['sync'], shell=False, stderr=subprocess.STDOUT)
+        time.sleep(4)
+        subprocess.run(['sync'], shell=False, stderr=subprocess.STDOUT)
+        time.sleep(30)
         subprocess.run(['reboot', 'now'], shell=False, stderr=subprocess.STDOUT)
 
     return exit_code

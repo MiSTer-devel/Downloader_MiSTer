@@ -50,8 +50,8 @@ class FileService:
         return Path(self._path(path)).touch()
 
     def move(self, source, target):
-        self.copy(source, target)
-        self._unlink(source, False)
+        os.makedirs(str(Path(self._path(target)).parent), exist_ok=True)
+        os.replace(self._path(source), self._path(target))
 
     def copy(self, source, target):
         return shutil.copyfile(self._path(source), self._path(target))
