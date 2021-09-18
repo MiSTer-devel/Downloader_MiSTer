@@ -28,49 +28,11 @@ from downloader.file_service import hash_file
 import subprocess
 
 
-class TestFullInstall(unittest.TestCase):
+class TestSmallDbInstall(unittest.TestCase):
 
-    def test_full_install_parallel(self):
-        print('test_full_install_parallel')
-        self.assertRunOk("test/system/fixtures/full_install/parallel.ini")
-
-    def test_full_install_serial(self):
-        print('test_full_install_serial')
-        self.assertRunOk("test/system/fixtures/full_install/serial.ini")
-        self.assertTrue(os.path.isfile('/tmp/delme_serial/MiSTer'))
-
-    def test_full_install_and_rerun(self):
-        print('test_full_install_and_rerun A)')
-        self.assertRunOk("test/system/fixtures/full_install/parallel.ini")
-
-        print('test_full_install_and_rerun B)')
-        self.assertRunOk("test/system/fixtures/full_install/parallel.ini")
-        self.assertTrue(os.path.isfile('/tmp/delme_parallel/MiSTer'))
-
-    def test_full_install_remove_local_store_and_rerun(self):
-        print('test_full_install_remove_local_store_and_rerun A)')
-        self.assertRunOk("test/system/fixtures/full_install/parallel.ini")
-
-        os.unlink('/tmp/delme_parallel/Scripts/.config/downloader/parallel.json.zip')
-
-        print('test_full_install_remove_local_store_and_rerun B)')
-        self.assertRunOk("test/system/fixtures/full_install/parallel.ini")
-        self.assertTrue(os.path.isfile('/tmp/delme_parallel/MiSTer'))
-
-    def test_full_install_remove_last_successful_run_corrupt_mister_and_rerun(self):
-        print('test_full_install_remove_last_successful_run_corrupt_mister_and_rerun A)')
-        self.assertRunOk("test/system/fixtures/full_install/parallel.ini")
-
-        os.unlink('/tmp/delme_parallel/Scripts/.config/downloader/parallel.last_successful_run')
-        with open('/tmp/delme_parallel/MiSTer', 'w') as f:
-            f.write('corrupt')
-        corrupt_hash = hash_file('/tmp/delme_parallel/MiSTer')
-
-        print('test_full_install_remove_last_successful_run_corrupt_mister_and_rerun B)')
-        self.assertRunOk("test/system/fixtures/full_install/parallel.ini")
-        correct_hash = hash_file('/tmp/delme_parallel/MiSTer')
-
-        self.assertNotEqual(correct_hash, corrupt_hash)
+    def test_small_db_parallel(self):
+        print('test_small_db_parallel')
+        self.assertRunOk("test/system/fixtures/small_db_install/small_db.ini")
 
     def assertRunOk(self, ini_path):
         config = ConfigReader(NoLogger(), default_env()).read_config(ini_path)

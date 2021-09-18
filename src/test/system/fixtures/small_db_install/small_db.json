@@ -1,0 +1,18 @@
+{
+    "db_files": [],
+    "db_id": "distribution_mister",
+    "db_url": "small_db.json",
+    "files": {
+        "MiSTer": {
+            "delete": [],
+            "hash": "1ebbd3e34237af26da5dc08a4e440464",
+            "size": 20,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/LICENSE"
+        }
+    },
+    "files_count": 1,
+    "folders": [],
+    "folders_count": 0,
+    "latest_zip_url": "https://github.com/MiSTer-devel/Distribution_MiSTer/archive/refs/heads/main.zip",
+    "time": "2021/08/13 21:35:02"
+}

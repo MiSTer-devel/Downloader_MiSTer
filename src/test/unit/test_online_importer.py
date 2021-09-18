@@ -19,7 +19,7 @@
 import unittest
 from downloader.config import default_config
 from downloader.other import empty_store
-from test.objects import db_empty_descr, file_boot_rom, boot_rom_descr, overwrite_file, file_mister_descr, file_a_descr, file_a_updated_descr, db_test_with_file, db_with_file, db_test_with_file_a_descr, file_a, file_MiSTer
+from test.objects import db_empty_descr, file_boot_rom, boot_rom_descr, overwrite_file, file_mister_descr, file_a_descr, file_a_updated_descr, db_test_with_file, db_with_file, db_test_with_file_a_descr, file_a, file_MiSTer, file_MiSTer_old
 from test.fakes import OnlineImporter
 
 
@@ -104,6 +104,7 @@ class TestOnlineImporter(unittest.TestCase):
     def test_download_dbs_contents___with_mister___needs_reboot(self):
         sut = OnlineImporter()
         store = empty_store()
+        sut.file_service.test_data.with_old_mister_binary()
 
         sut.add_db(db_test_with_file(file_MiSTer, file_mister_descr()), store)
         sut.download_dbs_contents(False)
@@ -111,6 +112,7 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertEqual(store['files'][file_MiSTer], file_mister_descr())
         self.assertReports(sut, [file_MiSTer], needs_reboot=True)
         self.assertTrue(sut.file_service.is_file(file_MiSTer))
+        self.assertTrue(sut.file_service.is_file(file_MiSTer_old))
 
     def test_download_dbs_contents___with_file_on_stored_erroring___store_deletes_file(self):
         sut = OnlineImporter()

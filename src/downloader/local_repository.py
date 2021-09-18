@@ -24,6 +24,7 @@ class LocalRepository:
         self._storage_path_value = None
         self._last_successful_run_value = None
         self._logfile_path_value = None
+        self._old_mister_path = None
 
     @property
     def _storage_path(self):
@@ -47,6 +48,13 @@ class LocalRepository:
             self._file_service.add_system_path(self._logfile_path_value)
         return self._logfile_path_value
 
+    @property
+    def old_mister_path(self):
+        if self._old_mister_path is None:
+            self._old_mister_path = 'Scripts/.config/downloader/MiSTer.old'
+            self._file_service.add_system_path(self._old_mister_path)
+        return self._old_mister_path
+
     def load_store(self):
         try:
             if self._file_service.is_file(self._storage_path):
@@ -66,4 +74,4 @@ class LocalRepository:
         self._file_service.touch(self._last_successful_run)
 
     def save_log_from_tmp(self, path):
-        self._file_service.move(path, self.logfile_path)
+        self._file_service.copy(path, self.logfile_path)

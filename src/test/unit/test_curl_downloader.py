@@ -59,16 +59,17 @@ class TestCurlDownloader(unittest.TestCase):
         self.assertDownloaded([file_menu_rbf])
 
     def test_download_mister_file___from_scratch_no_issues___stores_it_as_mister(self):
+        self.sut.file_service.test_data.with_old_mister_binary()
         self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_MiSTer, 'reboot': True, 'path': 'system'}, file_MiSTer)
         self.sut.download_files(False)
         self.assertDownloaded([file_MiSTer], [file_MiSTer], need_reboot=True)
         self.assertTrue(self.sut.file_service.is_file(file_MiSTer))
 
     def assertDownloaded(self, oks, run=None, errors=None, need_reboot=False):
-        self.assertEqual(self.sut.correctly_downloaded_files(), oks)
-        self.assertEqual(self.sut.errors(), errors if errors is not None else [])
-        self.assertEqual(self.sut.run_files(), run if run is not None else [])
-        self.assertEqual(self.sut.needs_reboot(), need_reboot)
+        self.assertEqual(oks, self.sut.correctly_downloaded_files())
+        self.assertEqual(errors if errors is not None else [], self.sut.errors())
+        self.assertEqual(run if run is not None else [], self.sut.run_files())
+        self.assertEqual(need_reboot, self.sut.needs_reboot())
 
     def download_one(self):
         self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_one}, file_one)

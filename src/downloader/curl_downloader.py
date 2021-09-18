@@ -24,16 +24,17 @@ import urllib.request
 import time
 
 
-def make_downloader_factory(file_service, logger):
-    return lambda config: CurlCustomParallelDownloader(config, file_service, logger) if config[
-        'parallel_update'] else CurlSerialDownloader(config, file_service, logger)
+def make_downloader_factory(file_service, local_repository, logger):
+    return lambda config: CurlCustomParallelDownloader(config, file_service, local_repository, logger) if config[
+        'parallel_update'] else CurlSerialDownloader(config, file_service, local_repository, logger)
 
 
 class CurlCommonDownloader:
-    def __init__(self, config, file_service, logger):
+    def __init__(self, config, file_service, local_repository, logger):
         self._config = config
         self._file_service = file_service
         self._logger = logger
+        self._local_repository = local_repository
         self._curl_list = {}
         self._errors = []
         self._http_oks = []
@@ -49,7 +50,7 @@ class CurlCommonDownloader:
         if self._file_service.is_file('MiSTer.new'):
             self._logger.print()
             self._logger.print('Copying new MiSTer binary:')
-            self._file_service.unlink('MiSTer')
+            self._file_service.move('MiSTer', self._local_repository.old_mister_path)
             self._file_service.move('MiSTer.new', 'MiSTer')
 
             if self._file_service.is_file('MiSTer'):
@@ -160,8 +161,8 @@ class CurlCommonDownloader:
 
 
 class CurlCustomParallelDownloader(CurlCommonDownloader):
-    def __init__(self, config, file_service, logger):
-        super().__init__(config, file_service, logger)
+    def __init__(self, config, file_service, local_repository, logger):
+        super().__init__(config, file_service, local_repository, logger)
         self._processes = []
         self._files = []
         self._acc_size = 0
@@ -220,8 +221,8 @@ class CurlCustomParallelDownloader(CurlCommonDownloader):
 
 
 class CurlSerialDownloader(CurlCommonDownloader):
-    def __init__(self, config, file_service, logger):
-        super().__init__(config, file_service, logger)
+    def __init__(self, config, file_service, local_repository, logger):
+        super().__init__(config, file_service, local_repository, logger)
 
     def _run(self, description, command, file):
         result = subprocess.run(shlex.split(command), shell=False, stderr=subprocess.STDOUT)

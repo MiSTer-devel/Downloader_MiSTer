@@ -16,6 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.curl_downloader import CurlCommonDownloader as ProductionCurlCommonDownloader
+from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from test.fake_file_service import FileService
 from test.fake_logger import NoLogger
 from test.objects import file_MiSTer, file_MiSTer_new
@@ -41,7 +42,7 @@ class CurlDownloader(ProductionCurlCommonDownloader):
     def __init__(self, config=None, file_service=None, problematic_files=None):
         config = config if config is not None else {'curl_ssl': '', 'downloader_retries': 3}
         self.file_service = FileService() if file_service is None else file_service
-        super().__init__(config, self.file_service, NoLogger())
+        super().__init__(config, self.file_service, ProductionLocalRepository(config, NoLogger(), self.file_service), NoLogger())
         self._run_files = []
         self._problematic_files = dict() if problematic_files is None else problematic_files
 
