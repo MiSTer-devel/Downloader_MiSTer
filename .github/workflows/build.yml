@@ -25,6 +25,9 @@ jobs:
     - name: System Quick Tests
       run: cd src && python3 -m unittest discover -s test/system/quick
 
+    - name: System Slow Tests
+      run: cd src && python3 -m unittest discover -s test/system/slow
+
     - name: Build
       run: ./src/build.sh > dont_download.sh
 
@@ -34,7 +37,3 @@ jobs:
         git config --global user.email "theypsilon@gmail.com"
         git config --global user.name "The CI/CD Bot"
         ./.github/release.sh
-
-    - name: System Slow Tests
-      if: steps.release.outputs.NEW_RELEASE == 'yes'
-      run: cd src && python3 -m unittest discover -s test/system/slow
