@@ -39,12 +39,18 @@ class OnlineImporter:
         for db, store in self._dbs:
             self._process_db_contents(db, store, full_resync)
 
+        deleted_folder = False
+
         for folder in sorted(self._stores_folders, key=len, reverse=True):
             if folder in self._dbs_folders:
                 continue
 
             if self._file_service.folder_has_items(folder):
                 continue
+
+            if not deleted_folder:
+                deleted_folder = True
+                self._logger.print()
 
             self._file_service.remove_folder(folder)
 
