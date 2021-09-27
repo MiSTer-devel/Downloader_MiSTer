@@ -27,18 +27,31 @@ class OnlineImporter:
         self._correctly_installed_files = []
         self._processed_files = {}
         self._needs_reboot = False
+        self._dbs_folders = None
+        self._stores_folders = None
 
     def add_db(self, db, store):
         self._dbs.append((db, store))
 
     def download_dbs_contents(self, full_resync):
+        self._dbs_folders = set()
+        self._stores_folders = set()
         for db, store in self._dbs:
             self._process_db_contents(db, store, full_resync)
+
+        for folder in sorted(self._stores_folders, key=len, reverse=True):
+            if folder in self._dbs_folders:
+                continue
+
+            if self._file_service.folder_has_items(folder):
+                continue
+
+            self._file_service.remove_folder(folder)
 
     def _process_db_contents(self, db, store, full_resync):
         self._print_db_header(db)
 
-        self._create_folders(db['folders'])
+        self._create_folders(db, store)
 
         first_run = len(store['files']) == 0
         self._remove_missing_files(store['files'], db['files'])
@@ -97,9 +110,13 @@ class OnlineImporter:
 
         return self._file_service.is_file(file_path)
 
-    def _create_folders(self, folder_list):
-        for folder in folder_list:
+    def _create_folders(self, db, store):
+        for folder in db['folders']:
             self._file_service.makedirs(folder)
+
+        self._dbs_folders = self._dbs_folders | set(db['folders'])
+        self._stores_folders = self._stores_folders | set(store['folders'])
+        store['folders'] = db['folders']
 
     def _remove_missing_files(self, store_files, db_files):
         files_to_delete = [f for f in store_files if f not in db_files]

@@ -30,7 +30,6 @@ from downloader.local_repository import LocalRepository
 
 
 class TestSandboxedInstall(unittest.TestCase):
-
     sandbox_ini = "test/system/fixtures/sandboxed_install/sandbox.ini"
     sandbox_db_json = 'test/system/fixtures/sandboxed_install/sandbox_db.json'
     tmp_delme = '/tmp/delme_sandbox/'
@@ -156,6 +155,51 @@ class TestSandboxedInstall(unittest.TestCase):
         self.assertNotEqual(baz_exists_before, baz_exists_after)
         self.assertFalse(offline_db_exists_after or baz_exists_after)
 
+    installed_folders = ['bar', 'bar/sub_bar', 'bar/sub_bar/sub_sub_bar', 'baz', 'foo', 'foo/sub_foo']
+    installed_system_folders = ['Scripts', 'Scripts/.config', 'Scripts/.config/downloader']
+
+    def test_sandbox_db___installs_expected_folders(self):
+        expected_local_store = local_store_files([('sandbox', {})])
+        expected_local_store['sandbox']['folders'] = ['foo', 'bar', 'foo/sub_foo', 'bar/sub_bar',
+                                                      'bar/sub_bar/sub_sub_bar', 'baz']
+        self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_folders/sandbox.ini', {
+            'local_store': expected_local_store,
+            'folders': self.installed_folders,
+            'system_folders': self.installed_system_folders
+        })
+
+    def test_sandbox_db___removes_installed_missing_folders(self):
+        self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_folders/sandbox.ini', {
+            'folders': self.installed_folders,
+            'system_folders': self.installed_system_folders
+        })
+
+        remaining_folders = ['bar', 'bar/sub_bar']
+        expected_local_store = local_store_files([('sandbox', {})])
+        expected_local_store['sandbox']['folders'] = remaining_folders
+        self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_less_folders/sandbox.ini', {
+            'local_store': expected_local_store,
+            'folders': remaining_folders,
+            'system_folders': self.installed_system_folders
+        })
+
+    def test_sandbox_db___removes_installed_missing_folders_except_when_they_contain_a_file(self):
+        self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_folders/sandbox.ini', {
+            'folders': self.installed_folders,
+            'system_folders': self.installed_system_folders
+        })
+
+        self.file_service.touch('foo/something')
+        self.file_service.makedirs('baz/something')
+
+        expected_local_store = local_store_files([('sandbox', {})])
+        expected_local_store['sandbox']['folders'] = ['bar', 'bar/sub_bar']
+        self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_less_folders/sandbox.ini', {
+            'local_store': expected_local_store,
+            'folders': ['bar', 'bar/sub_bar', 'baz', 'baz/something', 'foo'],
+            'system_folders': self.installed_system_folders
+        })
+
     def assertExecutesCorrectly(self, ini_path, expected=None):
         self.maxDiff = None
         exit_code = self.run_main(ini_path)
@@ -165,27 +209,36 @@ class TestSandboxedInstall(unittest.TestCase):
             return
 
         config = ConfigReader(NoLogger(), default_env()).read_config(ini_path)
+        self.file_service = FileService(config, NoLogger())
         counter = 0
         if 'local_store' in expected:
             counter += 1
-            actual_store = LocalRepository(config, NoLogger(), FileService(config, NoLogger())).load_store()
+            actual_store = LocalRepository(config, NoLogger(), self.file_service).load_store()
             self.assertEqual(actual_store, expected['local_store'])
 
         if 'files' in expected:
             counter += 1
-            self.assertEqual(self.find_all(config['base_path']), expected['files'])
+            self.assertEqual(self.find_all_files(config['base_path']), expected['files'])
 
         if 'files_count' in expected:
             counter += 1
-            self.assertEqual(len(self.find_all(config['base_path'])), expected['files_count'])
+            self.assertEqual(len(self.find_all_files(config['base_path'])), expected['files_count'])
 
         if 'system_files' in expected:
             counter += 1
-            self.assertEqual(self.find_all(config['base_system_path']), expected['system_files'])
+            self.assertEqual(self.find_all_files(config['base_system_path']), expected['system_files'])
 
         if 'system_files_count' in expected:
             counter += 1
-            self.assertEqual(len(self.find_all(config['base_path'])), expected['system_files_count'])
+            self.assertEqual(len(self.find_all_files(config['base_path'])), expected['system_files_count'])
+
+        if 'folders' in expected:
+            counter += 1
+            self.assertEqual(self.find_all_folders(config['base_path']), expected['folders'])
+
+        if 'system_folders' in expected:
+            counter += 1
+            self.assertEqual(self.find_all_folders(config['base_system_path']), expected['system_folders'])
 
         self.assertEqual(counter, len(expected))
 
@@ -201,15 +254,26 @@ class TestSandboxedInstall(unittest.TestCase):
             'DEFAULT_DB_ID': ''
         })
 
-    def find_all(self, directory):
-        return sorted(self._scan(directory), key=lambda t: t[0].lower())
+    def find_all_files(self, directory):
+        return sorted(self._scan_files(directory), key=lambda t: t[0].lower())
 
-    def _scan(self, directory):
+    def _scan_files(self, directory):
         for entry in os.scandir(directory):
             if entry.is_dir(follow_symlinks=False):
-                yield from self._scan(entry.path)
+                yield from self._scan_files(entry.path)
             else:
                 yield entry.path, hash_file(entry.path)
+
+    def find_all_folders(self, directory):
+        if not directory.endswith('/'):
+            directory = directory + '/'
+        return sorted(self._scan_folders(directory, directory), key=str.casefold)
+
+    def _scan_folders(self, directory, base):
+        for entry in os.scandir(directory):
+            if entry.is_dir(follow_symlinks=False):
+                yield from self._scan_folders(entry.path, base)
+                yield entry.path[len(base):]
 
 
 def cleanup(ini_path):

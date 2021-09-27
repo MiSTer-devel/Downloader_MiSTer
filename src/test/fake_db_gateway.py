@@ -25,3 +25,7 @@ class DbGateway:
             return None
 
         return self._dbs[db_uri]
+
+    @staticmethod
+    def with_single_db(db_id, descr):
+        return DbGateway({db_id: descr})

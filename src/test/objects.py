@@ -33,17 +33,52 @@ folder_a = 'a'
 db_test = 'test'
 file_one = 'one'
 hash_one = 'one'
+db_empty = 'empty'
 
 
 def file_test_json_zip_descr():
     return {'hash': file_test_json_zip, 'unzipped_json': db_test_with_file_a_descr()}
 
 
-def db_empty_descr():
+def db_test_being_empty_descr():
     return {
         'db_id': db_test,
         'db_files': [''],
         'files': {},
+        'folders': []
+    }
+
+
+def db_empty_with_linux_descr():
+    return {
+        'db_id': db_empty,
+        'db_files': [],
+        'files': [],
+        'folders': [],
+        'linux': {
+            "delete": [],
+            "hash": "d3b619c54c4727ab618bf108013f79d9",
+            "size": 83873790,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/SD-Installer-Win64_MiSTer/136d7d8ea24b1de2424574b2d31f527d6b3e3d39/release_20210711.rar",
+            "version": "210711"
+        }
+    }
+
+
+def db_empty_descr():
+    return {
+        'db_id': db_empty,
+        'db_files': [],
+        'files': [],
+        'folders': []
+    }
+
+
+def db_wrong_descr():
+    return {
+        'db_id': 'wrong',
+        'db_files': [],
+        'files': [],
         'folders': []
     }
 
@@ -112,6 +147,15 @@ def db_with_file(db_id, name_file, file):
             name_file: file
         },
         'folders': []
+    }
+
+
+def db_with_folders(db_id, folders):
+    return {
+        'db_id': db_id,
+        'db_files': [db_id + '.json.zip'],
+        'files': {},
+        'folders': folders
     }
 
 

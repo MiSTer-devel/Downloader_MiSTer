@@ -16,15 +16,21 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import test.objects
+import pathlib
 
 
 class TestDataFileService:
-    def __init__(self, files):
+    def __init__(self, files, folders):
         self._files = files
+        self._folders = folders
 
     def with_file(self, file, description):
         self._files.add(file, description)
         return self
+
+    def with_folders(self, folders):
+        for f in folders:
+            self._folders.add(f, True)
 
     def with_file_a(self, description=None):
         self._files.add(test.objects.file_a, description if description is not None else test.objects.file_a_descr())
@@ -44,10 +50,11 @@ class TestDataFileService:
 class FileService:
     def __init__(self):
         self._files = CaseInsensitiveDict()
+        self._folders = CaseInsensitiveDict()
 
     @property
     def test_data(self):
-        return TestDataFileService(self._files)
+        return TestDataFileService(self._files, self._folders)
 
     def add_system_path(self, path):
         pass
@@ -79,10 +86,19 @@ class FileService:
         return self._files.get(path)['hash']
 
     def makedirs(self, path):
-        pass
+        self._folders.add(path, True)
 
     def makedirs_parent(self, path):
-        pass
+        self._folders.add(str(pathlib.Path(path).parent), True)
+
+    def folder_has_items(self, _path):
+        return False
+
+    def folders(self):
+        return list(sorted(self._folders.keys()))
+
+    def remove_folder(self, path):
+        self._folders.pop(path)
 
     def curl_target_path(self, path):
         return path
@@ -119,3 +135,6 @@ class CaseInsensitiveDict:
 
     def pop(self, key):
         self._dict.pop(key.lower())
+
+    def keys(self):
+        return self._dict.keys()

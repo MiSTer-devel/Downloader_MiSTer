@@ -24,10 +24,12 @@ from downloader.config import ConfigReader as ProductionConfigReader
 from downloader.reboot_calculator import RebootCalculator as ProductionRebootCalculator
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from downloader.linux_updater import LinuxUpdater as ProductionLinuxUpdater
+from downloader.runner import Runner as ProductionRunner
+from test.fake_db_gateway import DbGateway
 from test.fake_file_service import FileService
 from test.fake_curl_downloader import CurlDownloader, TestDataCurlDownloader
 from test.fake_logger import NoLogger
-from test.objects import default_env
+from test.objects import default_env, db_empty
 
 
 class ConfigReader(ProductionConfigReader):
@@ -64,6 +66,49 @@ class RebootCalculator(ProductionRebootCalculator):
     def __init__(self, config=None, file_service=None):
         self.file_service = FileService() if file_service is None else file_service
         super().__init__(default_config() if config is None else config, NoLogger(), self.file_service)
+
+
+class Runner(ProductionRunner):
+    def __init__(self, env, config, db_gateway, file_service=None):
+        self.file_service = FileService() if file_service is None else file_service
+        super().__init__(env, config,
+                         NoLogger(),
+                         LocalRepository(file_service=self.file_service),
+                         db_gateway,
+                         OfflineImporter(file_service=self.file_service),
+                         OnlineImporter(file_service=self.file_service),
+                         LinuxUpdater(self.file_service),
+                         RebootCalculator(file_service=self.file_service))
+
+    @staticmethod
+    def with_single_empty_db(db_gateway=None):
+        return Runner(
+            {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
+            {'databases': [{
+                'db_url': db_empty,
+                'section': db_empty
+            }]},
+            DbGateway() if db_gateway is None else db_gateway,
+        )
+
+    @staticmethod
+    def with_single_db(db_id, db_descr):
+        return Runner(
+            {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
+            {'databases': [{
+                'db_url': db_id,
+                'section': db_id
+            }]},
+            DbGateway.with_single_db(db_id, db_descr),
+        )
+
+    @staticmethod
+    def with_no_dbs():
+        return Runner(
+            {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
+            {'databases': []},
+            DbGateway(),
+        )
 
 
 class LocalRepository(ProductionLocalRepository):

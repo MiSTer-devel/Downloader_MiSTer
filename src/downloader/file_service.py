@@ -65,6 +65,22 @@ class FileService:
     def makedirs_parent(self, path):
         return os.makedirs(str(Path(self._path(path)).parent), exist_ok=True)
 
+    def folder_has_items(self, path):
+        result = False
+        for _ in os.scandir(self._path(path)):
+            result = True
+        return result
+
+    def folders(self):
+        raise Exception('folders Not implemented')
+
+    def remove_folder(self, path):
+        if self._config['allow_delete'] != AllowDelete.ALL:
+            return
+
+        self._logger.print('Deleting empty folder %s' % path)
+        os.rmdir(self._path(path))
+
     def curl_target_path(self, path):
         return self._path(path)
 
