@@ -1,0 +1,27 @@
+{
+    "db_files": [],
+    "db_id": "repro_test",
+    "db_url": "",
+    "files": {
+        "MiSTer": {
+            "delete": [],
+            "hash": "f782dd65a0d548f7cda6eba1e2b05f36",
+            "path": "system",
+            "reboot": true,
+            "size": 1024,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Main_MiSTer/master/releases/MiSTer_20210305"
+        }
+    },
+    "files_count": 1,
+    "folders": [],
+    "folders_count": 0,
+    "latest_zip_url": "",
+    "time": "2021/08/13 21:35:02",
+    "linux": {
+        "delete": [],
+        "hash": "6196e02a4231edea18e90c611973bf7b",
+        "size": 83200,
+        "url": "https://raw.githubusercontent.com/MiSTer-devel/SD-Installer-Win64_MiSTer/master/release_20210906.7z",
+        "version": "210906"
+    }
+}

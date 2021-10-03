@@ -39,6 +39,7 @@ class TestConfigReader(unittest.TestCase):
             'downloader_process_limit': 300,
             'downloader_timeout': 300,
             'downloader_retries': 3,
+            'verbose': False,
             'databases': [{
                 'db_url': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
                 'section': 'distribution_mister',
@@ -69,6 +70,7 @@ class TestConfigReader(unittest.TestCase):
             'allow_delete': AllowDelete.OLD_RBF,
             'base_path': '/media/usb0/',
             'base_system_path': '/media/cifs/',
+            'verbose': True,
             'databases': [{
                 'db_url': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
                 'section': 'distribution_mister',

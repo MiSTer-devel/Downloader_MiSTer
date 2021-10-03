@@ -87,7 +87,7 @@ class Runner(ProductionRunner):
             {'databases': [{
                 'db_url': db_empty,
                 'section': db_empty
-            }]},
+            }], 'verbose': False, 'config_path': Path('')},
             DbGateway() if db_gateway is None else db_gateway,
         )
 
@@ -98,7 +98,7 @@ class Runner(ProductionRunner):
             {'databases': [{
                 'db_url': db_id,
                 'section': db_id
-            }]},
+            }], 'verbose': False, 'config_path': Path('')},
             DbGateway.with_single_db(db_id, db_descr),
         )
 
@@ -106,7 +106,7 @@ class Runner(ProductionRunner):
     def with_no_dbs():
         return Runner(
             {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
-            {'databases': []},
+            {'databases': [], 'verbose': False, 'config_path': Path('')},
             DbGateway(),
         )
 

@@ -4,16 +4,21 @@
 set -euo pipefail
 
 MISTER_IP=${MISTER_IP:-$(cat "mister.ip" | tr -d '[:space:]')}
+MISTER_PW=1
+if [ -f mister.pw ] ; then
+    MISTER_PW=$(cat "mister.pw" | tr -d '[:space:]')
+fi
+
 TEMP_SCRIPT="$(mktemp)"
 
 ./src/build.sh > "${TEMP_SCRIPT}"
 chmod +x "${TEMP_SCRIPT}"
 
 if [ -f dont_download.ini ] ; then
-  sshpass -p 1 scp -o StrictHostKeyChecking=no dont_download.ini "root@${MISTER_IP}:/media/fat/downloader.ini"
+  sshpass -p "${MISTER_PW}" scp -o StrictHostKeyChecking=no dont_download.ini "root@${MISTER_IP}:/media/fat/downloader.ini"
 fi
-sshpass -p 1 scp -o StrictHostKeyChecking=no "${TEMP_SCRIPT}" "root@${MISTER_IP}:/media/fat/downloader.sh"
-sshpass -p 1 scp -o StrictHostKeyChecking=no downloader.sh "root@${MISTER_IP}:/media/fat/Scripts/downloader.sh"
+sshpass -p "${MISTER_PW}" scp -o StrictHostKeyChecking=no "${TEMP_SCRIPT}" "root@${MISTER_IP}:/media/fat/downloader.sh"
+sshpass -p "${MISTER_PW}" scp -o StrictHostKeyChecking=no downloader.sh "root@${MISTER_IP}:/media/fat/Scripts/downloader.sh"
 rm "${TEMP_SCRIPT}"
 
 echo "OK"

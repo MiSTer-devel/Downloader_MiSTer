@@ -17,7 +17,6 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from downloader.main import make_runner
 from test.fakes import Runner, NoLogger
 from test.objects import db_empty_descr, db_empty_with_linux_descr, db_wrong_descr, db_empty
 
@@ -42,9 +41,3 @@ class TestRunner(unittest.TestCase):
     def test_run___database_not_fetched___returns_1(self):
         exit_code = Runner.with_single_empty_db().run()
         self.assertEqual(exit_code, 1)
-
-    def test_make_runner___with_proper_parameters___does_not_throw(self):
-        try:
-            make_runner({'DEFAULT_DB_URL': '', 'DEFAULT_DB_ID': '', 'ALLOW_REBOOT': 0, 'CURL_SSL': ''}, NoLogger(), '')
-        except TypeError:
-            self.fail('TypeError during make_runner, composition root failed!')

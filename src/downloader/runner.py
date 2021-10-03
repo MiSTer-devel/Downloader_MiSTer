@@ -18,6 +18,7 @@
 
 import datetime
 import time
+import json
 from .curl_downloader import make_downloader_factory, CurlSerialDownloader
 from .local_repository import LocalRepository
 from .linux_updater import LinuxUpdater
@@ -31,6 +32,10 @@ from .config import ConfigReader
 
 
 def make_runner(env, logger, ini_path):
+    logger.print('START!')
+    logger.print()
+    logger.print("Reading file: %s" % ini_path)
+
     config = ConfigReader(logger, env).read_config(ini_path)
     config['curl_ssl'] = env['CURL_SSL']
 
@@ -71,6 +76,14 @@ class Runner:
 
     def run(self):
         start = time.time()
+
+        if self._config['verbose']:
+            self._logger.enable_verbose_mode()
+
+        self._logger.debug('env: ' + json.dumps(self._env, indent=4))
+        config = self._config.copy()
+        config['config_path'] = str(config['config_path'])
+        self._logger.debug('config: ' + json.dumps(config, indent=4))
 
         local_store = self._local_repository.load_store()
         failed_dbs = []
@@ -120,12 +133,14 @@ class Runner:
         self._local_repository.save_store(local_store)
 
         if self._env['UPDATE_LINUX'] != 'false' and self._config.get('update_linux', True):
+            self._logger.debug('Running update_linux')
             self._linux_updater.update_linux()
             if self._env['UPDATE_LINUX'] == 'only' and not self._linux_updater.needs_reboot():
                 self._logger.print('Linux is already on the latest version.')
                 self._logger.print()
 
         if len(failed_dbs) > 0:
+            self._logger.debug('Length of failed_dbs: %d' % len(failed_dbs))
             return 1
 
         return 0

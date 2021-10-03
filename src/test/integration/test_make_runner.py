@@ -15,21 +15,16 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-import sys
+
+import unittest
+from downloader.main import make_runner
+from test.fakes import NoLogger
 
 
-class NoLogger:
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
-        pass
+class TestRunner(unittest.TestCase):
 
-    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
-        pass
-
-    def set_local_repository(self, local_repository):
-        pass
-
-    def enable_verbose_mode(self):
-        pass
-
-    def close_logfile(self):
-        pass
+    def test_make_runner___with_proper_parameters___does_not_throw(self):
+        try:
+            make_runner({'DEFAULT_DB_URL': '', 'DEFAULT_DB_ID': '', 'ALLOW_REBOOT': 0, 'CURL_SSL': ''}, NoLogger(), '')
+        except TypeError:
+            self.fail('TypeError during make_runner, composition root failed!')

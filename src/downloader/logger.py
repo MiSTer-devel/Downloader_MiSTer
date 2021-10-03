@@ -24,6 +24,10 @@ class Logger:
     def __init__(self):
         self._logfile = tempfile.NamedTemporaryFile('w', delete=False)
         self._local_repository = None
+        self._verbose_mode = False
+
+    def enable_verbose_mode(self):
+        self._verbose_mode = True
 
     def set_local_repository(self, local_repository):
         self._local_repository = local_repository
@@ -36,9 +40,12 @@ class Logger:
             self._local_repository = None
 
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
-        print(*args, sep=sep, end=end, file=file, flush=flush)
+        if not self._verbose_mode:
+            print(*args, sep=sep, end=end, file=file, flush=flush)
         self.debug(*args, sep=sep, end=end, flush=flush)
 
     def debug(self, *args, sep='', end='\n', flush=True):
         if self._logfile is not None:
             print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
+        if self._verbose_mode:
+            print(*args, sep=sep, end=end, file=sys.stdout, flush=flush)
