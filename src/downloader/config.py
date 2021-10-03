@@ -64,6 +64,7 @@ def default_config():
         'downloader_process_limit': 300,
         'downloader_timeout': 300,
         'downloader_retries': 3,
+        'verbose': False
     }
 
 
@@ -99,6 +100,7 @@ class ConfigReader:
                 result['allow_delete'] = AllowDelete(parser.get_int('allow_delete', result['allow_delete'].value))
                 result['allow_reboot'] = AllowReboot(parser.get_int('allow_reboot', result['allow_reboot'].value))
                 result['check_manually_deleted_files'] = parser.get_bool('check_manually_deleted_files', result['check_manually_deleted_files'])
+                result['verbose'] = parser.get_bool('verbose', result['verbose'])
                 result['parallel_update'] = parser.get_bool('parallel_update', result['parallel_update'])
                 result['update_linux'] = parser.get_bool('update_linux', result['update_linux'])
                 result['downloader_size_mb_limit'] = parser.get_int('downloader_size_mb_limit',

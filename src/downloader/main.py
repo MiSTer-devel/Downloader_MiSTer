@@ -29,7 +29,7 @@ from .runner import make_runner
 def main(env):
     logger = Logger()
     try:
-        exit_code = main_internal(env, logger)
+        exit_code = execute_runner(env, logger)
     except Exception as _:
         logger.print(traceback.format_exc())
         exit_code = 1
@@ -38,15 +38,8 @@ def main(env):
     return exit_code
 
 
-def main_internal(env, logger):
-    logger.print('START!')
-
-    ini_path = config_file_path(env['DOWNLOADER_LAUNCHER_PATH'])
-
-    logger.print()
-    logger.print("Reading file: %s" % ini_path)
-
-    runner = make_runner(env, logger, ini_path)
+def execute_runner(env, logger):
+    runner = make_runner(env, logger, config_file_path(env['DOWNLOADER_LAUNCHER_PATH']))
 
     exit_code = runner.run()
 

@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import subprocess
+import json
 
 
 class LinuxUpdater:
@@ -37,6 +38,7 @@ class LinuxUpdater:
 
         linux_descriptions_count = len(self._linux_descriptions)
         if linux_descriptions_count == 0:
+            self._logger.debug('linux_descriptions_count: 0')
             return
 
         if linux_descriptions_count > 1:
@@ -52,11 +54,14 @@ class LinuxUpdater:
         linux = description['args']
         linux_path = 'linux.7z'
 
+        self._logger.debug('linux: ' + json.dumps(linux, indent=4))
+
         current_linux_version = 'unknown'
         if self._file_service.is_file('/MiSTer.version'):
             current_linux_version = self._file_service.read_file_contents('/MiSTer.version')
 
         if current_linux_version == linux['version'][-6:]:
+            self._logger.debug('current_linux_version "%s" matches db linux: %s' % (current_linux_version, linux['version']))
             return
 
         self._logger.print('Linux will be updated from %s:' % description['id'])

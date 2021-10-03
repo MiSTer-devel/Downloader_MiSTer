@@ -31,9 +31,12 @@ class DbGateway:
         if not db_uri.startswith("http"):
             if not db_uri.startswith("/"):
                 db_uri = str(Path(db_uri).resolve())
+
+            self._logger.debug('Loading db from local path: %s' % db_uri)
             return self._file_service.load_db_from_file(db_uri)
 
         try:
+            self._logger.debug('Loading db from internet: %s' % db_uri)
             with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
                 run_successfully('curl %s --silent --show-error --fail --location -o %s %s' % (
                     self._config['curl_ssl'], tmp_file.name, db_uri), self._logger)
