@@ -41,11 +41,23 @@ class Logger:
 
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
         if not self._verbose_mode:
-            print(*args, sep=sep, end=end, file=file, flush=flush)
+            self._do_print(*args, sep=sep, end=end, file=file, flush=flush)
         self.debug(*args, sep=sep, end=end, flush=flush)
 
     def debug(self, *args, sep='', end='\n', flush=True):
         if self._logfile is not None:
-            print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
+            self._do_print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
         if self._verbose_mode:
-            print(*args, sep=sep, end=end, file=sys.stdout, flush=flush)
+            self._do_print(*args, sep=sep, end=end, file=sys.stdout, flush=flush)
+
+    @staticmethod
+    def _do_print(*args, sep, end, file, flush):
+        try:
+            print(*args, sep=sep, end=end, file=file, flush=flush)
+        except UnicodeEncodeError:
+            pack = []
+            for a in args:
+                pack.append(a.encode('utf8', 'surrogateescape'))
+            print(*pack, sep=sep, end=end, file=file, flush=flush)
+        except BaseException as error:
+            print('An unknown exception occurred during logging: %s' % str(error))
