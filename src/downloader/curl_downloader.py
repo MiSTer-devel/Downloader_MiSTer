@@ -83,7 +83,7 @@ class CurlCommonDownloader:
                 else:
                     self._logger.debug('%s: %s != %s' % (path, self._curl_list[path]['hash'], path_hash))
 
-            if first_run:
+            if first_run and 'delete' in self._curl_list[path]:
                 for delete in self._curl_list[path]['delete']:
                     self._file_service.clean_expression(delete)
 
