@@ -23,6 +23,7 @@ from pathlib import Path
 
 def empty_store():
     return {
+        'zips': {},
         'folders': [],
         'files': {},
         'offline_databases_imported': []
@@ -37,13 +38,20 @@ def format_files_message(file_list):
     alts = [file for file in any_mra_files if '/_alternatives/' in file.lower()]
     urls = [file for file in file_list if file[0:4].lower() == 'http']
 
-    printable = [Path(file).name for file in (rbfs + mras)] + urls
+    printable = None
+    if len(rbfs) + len(mras) > 100 and len(mras) > 0:
+        printable = [Path(file).name for file in rbfs] + urls
+        printable.append('MRAs')
+    else:
+        printable = [Path(file).name for file in (rbfs + mras)] + urls
+
     if len(alts) > 0:
         printable.append('MRA Alternatives')
 
     there_are_other_files = False
     if len(printable) == 0:
-        printable = file_list
+        printable = [Path(file).name for file in file_list[0:25]]
+        there_are_other_files = len(file_list) > len(printable)
     else:
         there_are_other_files = len(file_list) > (len(rbfs) + len(mras) + len(alts) + len(urls))
 

@@ -16,6 +16,9 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from .store_migrator import make_new_local_store
+
+
 class LocalRepository:
     def __init__(self, config, logger, file_service):
         self._config = config
@@ -55,15 +58,19 @@ class LocalRepository:
             self._file_service.add_system_path(self._old_mister_path)
         return self._old_mister_path
 
-    def load_store(self):
+    def load_store(self, store_migrator):
+        if not self._file_service.is_file(self._storage_path):
+            return make_new_local_store(store_migrator)
+
         try:
-            if self._file_service.is_file(self._storage_path):
-                return self._file_service.load_db_from_file(self._storage_path)
+            local_store = self._file_service.load_db_from_file(self._storage_path)
         except Exception as e:
             self._logger.debug(e)
             self._logger.print('Could not load storage')
+            return make_new_local_store(store_migrator)
 
-        return {}
+        store_migrator.migrate(local_store)
+        return local_store
 
     def has_last_successful_run(self):
         return self._file_service.is_file(self._last_successful_run)
@@ -75,3 +82,4 @@ class LocalRepository:
 
     def save_log_from_tmp(self, path):
         self._file_service.copy(path, self.logfile_path)
+

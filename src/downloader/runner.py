@@ -29,6 +29,7 @@ from .db_gateway import DbGateway
 from .other import format_files_message, empty_store
 from .online_importer import OnlineImporter
 from .config import ConfigReader
+from .store_migrator import StoreMigrator, migrations
 
 
 def make_runner(env, logger, ini_path):
@@ -58,12 +59,14 @@ def make_runner(env, logger, ini_path):
         offline_importer,
         online_importer,
         linux_updater,
-        RebootCalculator(config, logger, file_service)
+        RebootCalculator(config, logger, file_service),
+        StoreMigrator(migrations(), logger)
     )
 
 
 class Runner:
-    def __init__(self, env, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator):
+    def __init__(self, env, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, store_migrator):
+        self._store_migrator = store_migrator
         self._reboot_calculator = reboot_calculator
         self._linux_updater = linux_updater
         self._online_importer = online_importer
@@ -85,7 +88,7 @@ class Runner:
         config['config_path'] = str(config['config_path'])
         self._logger.debug('config: ' + json.dumps(config, indent=4))
 
-        local_store = self._local_repository.load_store()
+        local_store = self._local_repository.load_store(self._store_migrator)
         failed_dbs = []
 
         for db_description in self._config['databases']:
@@ -100,10 +103,10 @@ class Runner:
                 self._logger.print('Section %s doesn\'t match database id "%s"' % (db_description['section'], db['db_id']))
                 continue
 
-            if db['db_id'] not in local_store:
-                local_store[db['db_id']] = empty_store()
+            if db['db_id'] not in local_store['dbs']:
+                local_store['dbs'][db['db_id']] = empty_store()
 
-            store = local_store[db['db_id']]
+            store = local_store['dbs'][db['db_id']]
 
             self._offline_importer.add_db(db, store)
             self._online_importer.add_db(db, store)
@@ -114,12 +117,12 @@ class Runner:
             self._offline_importer.apply_offline_databases()
             full_resync = not self._local_repository.has_last_successful_run()
             self._online_importer.download_dbs_contents(full_resync)
-
+            self._local_repository.save_store(local_store)
             run_time = str(datetime.timedelta(seconds=time.time() - start))[0:-4]
 
             self._logger.print()
             self._logger.print('===========================')
-            self._logger.print('Downloader 1.0 (%s) by theypsilon. Run time: %ss' % (self._env['COMMIT'], run_time))
+            self._logger.print('Downloader 1.1 (%s) by theypsilon. Run time: %ss' % (self._env['COMMIT'], run_time))
             self._logger.print('Log: %s' % self._local_repository.logfile_path)
             self._logger.print()
             self._logger.print('Installed:')
@@ -128,9 +131,10 @@ class Runner:
 
             self._logger.print('Errors:')
             self._logger.print(format_files_message(self._online_importer.files_that_failed() + failed_dbs))
+        else:
+            self._local_repository.save_store(local_store)
 
         self._logger.print()
-        self._local_repository.save_store(local_store)
 
         if self._env['UPDATE_LINUX'] != 'false' and self._config.get('update_linux', True):
             self._logger.debug('Running update_linux')
