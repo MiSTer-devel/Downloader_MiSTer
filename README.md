@@ -62,8 +62,11 @@ downloader_retries = 3
 ### Roadmap
 
 - [x] Initial Release
-- [ ] [Cheats](https://gamehacking.org/mister/) fetching
-- [ ] First-run optimisations
+- [x] [Cheats](https://gamehacking.org/mister/) fetching
+- [x] First-run optimisations
 - [ ] Configurable custom download filters
 - [ ] Handle duplicated `games` folders through symlinks (*GBA* <-> *GBA2P*, and *GAMEBOY* <-> *GAMEBOY2P*)
 - [ ] Integration with *MiSTer* binary
+
+Check the [CHANGELOG](CHANGELOG.md) for more information about past releases.
+

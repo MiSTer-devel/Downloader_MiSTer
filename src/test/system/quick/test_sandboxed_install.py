@@ -27,6 +27,7 @@ from test.fakes import NoLogger
 from downloader.file_service import hash_file, FileService
 from downloader.main import main
 from downloader.local_repository import LocalRepository
+from downloader.store_migrator import StoreMigrator
 
 
 class TestSandboxedInstall(unittest.TestCase):
@@ -140,7 +141,7 @@ class TestSandboxedInstall(unittest.TestCase):
 
         db = load_json('test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox_db.json')
         expected_local_store = local_store_files([('sandbox', db['files'])])
-        expected_local_store['sandbox']['offline_databases_imported'] = ['93dd6727bc7ac342279912ad054cca64']
+        expected_local_store['dbs']['sandbox']['offline_databases_imported'] = ['7562384d51ee4d9fecdf960f189d8ae2']
 
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox.ini', {
             'local_store': expected_local_store,
@@ -160,7 +161,7 @@ class TestSandboxedInstall(unittest.TestCase):
 
     def test_sandbox_db___installs_expected_folders(self):
         expected_local_store = local_store_files([('sandbox', {})])
-        expected_local_store['sandbox']['folders'] = ['foo', 'bar', 'foo/sub_foo', 'bar/sub_bar',
+        expected_local_store['dbs']['sandbox']['folders'] = ['foo', 'bar', 'foo/sub_foo', 'bar/sub_bar',
                                                       'bar/sub_bar/sub_sub_bar', 'baz']
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_folders/sandbox.ini', {
             'local_store': expected_local_store,
@@ -176,7 +177,7 @@ class TestSandboxedInstall(unittest.TestCase):
 
         remaining_folders = ['bar', 'bar/sub_bar']
         expected_local_store = local_store_files([('sandbox', {})])
-        expected_local_store['sandbox']['folders'] = remaining_folders
+        expected_local_store['dbs']['sandbox']['folders'] = remaining_folders
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_less_folders/sandbox.ini', {
             'local_store': expected_local_store,
             'folders': remaining_folders,
@@ -193,7 +194,7 @@ class TestSandboxedInstall(unittest.TestCase):
         self.file_service.makedirs('baz/something')
 
         expected_local_store = local_store_files([('sandbox', {})])
-        expected_local_store['sandbox']['folders'] = ['bar', 'bar/sub_bar']
+        expected_local_store['dbs']['sandbox']['folders'] = ['bar', 'bar/sub_bar']
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_less_folders/sandbox.ini', {
             'local_store': expected_local_store,
             'folders': ['bar', 'bar/sub_bar', 'baz', 'baz/something', 'foo'],
@@ -213,7 +214,7 @@ class TestSandboxedInstall(unittest.TestCase):
         counter = 0
         if 'local_store' in expected:
             counter += 1
-            actual_store = LocalRepository(config, NoLogger(), self.file_service).load_store()
+            actual_store = LocalRepository(config, NoLogger(), self.file_service).load_store(StoreMigrator([], NoLogger()))
             self.assertEqual(actual_store, expected['local_store'])
 
         if 'files' in expected:
@@ -286,12 +287,16 @@ def cleanup(ini_path):
 
 def local_store_files(tuples):
     return {
-        store_id: {
-            'folders': [],
-            'files': files,
-            'offline_databases_imported': []
-        }
-        for store_id, files in tuples
+        'dbs': {
+            store_id: {
+                'folders': [],
+                'files': files,
+                'offline_databases_imported': [],
+                'zips': {}
+            }
+            for store_id, files in tuples
+        },
+        'migration_version': 0
     }
 
 

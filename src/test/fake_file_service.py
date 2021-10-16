@@ -117,7 +117,16 @@ class FileService:
         pass
 
     def load_db_from_file(self, path):
-        return self._files.get(path)['unzipped_json']
+        file_description = self._files.get(path)
+        unzipped_json = file_description['unzipped_json']
+        file_description.pop('unzipped_json')
+        return unzipped_json
+
+    def unzip_contents(self, file, target):
+        file_description = self._files.get(file)
+        for path, description in file_description['zipped_files'].items():
+            self._files.add(path, {'hash': description['hash']})
+        file_description.pop('zipped_files')
 
 
 class CaseInsensitiveDict:

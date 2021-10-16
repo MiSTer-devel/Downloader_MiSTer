@@ -85,14 +85,14 @@ class FileService:
         return self._path(path)
 
     def unlink(self, path):
+        verbose = not path.startswith('/tmp/')
         if self._config['allow_delete'] != AllowDelete.ALL:
-            if self._config['allow_delete'] == AllowDelete.OLD_RBF and (
-                    path[-4:].lower() == ".rbf" or path == 'MiSTer'):
-                return self._unlink(path, True)
+            if self._config['allow_delete'] == AllowDelete.OLD_RBF and path[-4:].lower() == ".rbf":
+                return self._unlink(path, verbose)
 
             return True
 
-        return self._unlink(path, True)
+        return self._unlink(path, verbose)
 
     def clean_expression(self, expr):
         if self._config['allow_delete'] != AllowDelete.ALL:
@@ -132,9 +132,15 @@ class FileService:
 
         zip_path = Path(self._path(path)).absolute()
 
-        run_successfully('cd /tmp/ && zip -qr -9 %s %s' % (zip_path, json_name), self._logger)
+        run_successfully('cd /tmp/ && zip -qr -0 %s %s' % (zip_path, json_name), self._logger)
 
         self._unlink(json_path, False)
+
+    def unzip_contents(self, file, path):
+        result = subprocess.run(['unzip', '-q', '-o', self._path(file), '-d', self._path(path)], shell=False, stderr=subprocess.STDOUT)
+        if result.returncode != 0:
+            raise Exception("Could not unzip %s: %s" % (file, result.returncode))
+        self._unlink(self._path(file), False)
 
     def _unlink(self, path, verbose):
         if verbose:

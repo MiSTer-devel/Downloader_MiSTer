@@ -2,6 +2,8 @@
     "db_files": [],
     "db_id": "sandbox",
     "db_url": "sandbox_db.json",
+    "base_files_url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/",
+    "zips": {},
     "files": {
         "foo.txt": {
             "delete": [],

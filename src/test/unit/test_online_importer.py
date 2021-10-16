@@ -308,6 +308,6 @@ class TestOnlineImporter(unittest.TestCase):
             errors = []
         if installed is None:
             installed = []
-        self.assertEqual(sut.correctly_installed_files(), installed)
-        self.assertEqual(sut.files_that_failed(), errors)
-        self.assertEqual(sut.needs_reboot(), needs_reboot)
+        self.assertEqual(installed, sut.correctly_installed_files())
+        self.assertEqual(errors, sut.files_that_failed())
+        self.assertEqual(needs_reboot, sut.needs_reboot())

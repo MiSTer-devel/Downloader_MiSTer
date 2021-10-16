@@ -69,15 +69,15 @@ class TestFileService(unittest.TestCase):
         self.assertTrue(self.sut().is_file(not_created_file))
         self.assertTrue(self.sut().is_file(empty_file))
 
-    def test_unlink_mister___when_allow_delete_only_rbf___deletes_it(self):
-        sut = self.sut({ 'allow_delete': AllowDelete.OLD_RBF, 'base_path': delme_dir, 'base_system_path': delme_dir })
+    def test_unlink_mister___when_allow_delete_only_rbf___keeps_it(self):
+        sut = self.sut({'allow_delete': AllowDelete.OLD_RBF, 'base_path': delme_dir, 'base_system_path': delme_dir})
 
         sut.makedirs_parent(mister_file)
         sut.touch(mister_file)
         self.assertTrue(sut.is_file(mister_file))
 
         sut.unlink(mister_file)
-        self.assertFalse(sut.is_file(mister_file))
+        self.assertTrue(sut.is_file(mister_file))
 
     def test_unlink_mister_file___when_allow_delete_none___doesnt_delete_it(self):
         sut = self.sut({ 'allow_delete': AllowDelete.NONE, 'base_path': delme_dir, 'base_system_path': delme_dir })

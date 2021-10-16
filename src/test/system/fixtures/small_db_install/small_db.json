@@ -2,6 +2,8 @@
     "db_files": [],
     "db_id": "distribution_mister",
     "db_url": "small_db.json",
+    "base_files_url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/",
+    "zips": {},
     "files": {
         "MiSTer": {
             "delete": [],

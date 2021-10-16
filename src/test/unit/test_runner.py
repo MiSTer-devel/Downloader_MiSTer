@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from test.fakes import Runner, NoLogger
+from test.fakes import Runner
 from test.objects import db_empty_descr, db_empty_with_linux_descr, db_wrong_descr, db_empty
 
 

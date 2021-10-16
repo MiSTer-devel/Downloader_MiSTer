@@ -64,6 +64,7 @@ def default_config():
         'downloader_process_limit': 300,
         'downloader_timeout': 300,
         'downloader_retries': 3,
+        'zip_file_count_threshold': 60,
         'verbose': False
     }
 

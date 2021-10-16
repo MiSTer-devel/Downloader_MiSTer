@@ -34,6 +34,12 @@ db_test = 'test'
 file_one = 'one'
 hash_one = 'one'
 db_empty = 'empty'
+cheats_folder_nes_zip_id = 'cheats_folder_nes'
+cheats_folder_nes_folders = ['Cheats/NES']
+cheats_folder_nes_file_path = 'Cheats/NES/10-Yard Fight (USA, Europe) [3D564757].zip'
+cheats_folder_nes_file_url = "http://Cheats/NES/10-Yard Fight (USA, Europe) [3D564757].zip"
+cheats_folder_nes_file_hash = "8c02595feff096a9dd160e559067f4f4"
+cheats_folder_nes_file_size = 1020
 
 
 def file_test_json_zip_descr():
@@ -45,7 +51,51 @@ def db_test_being_empty_descr():
         'db_id': db_test,
         'db_files': [''],
         'files': {},
-        'folders': []
+        'folders': [],
+        'base_files_url': '',
+        'zips': {}
+    }
+
+
+def cheats_folder_nes_zip_desc(zipped_files=None, unzipped_json=None, folders=None):
+    json = {
+        "base_files_url": "https://base_files_url",
+        "contents": [
+            "NES"
+        ],
+        "contents_file": {
+            "hash": "4d2bf07e5d567196d9c666f1816e86e6",
+            "size": 7316038,
+            "url": "https://contents_file"
+        },
+        "files_count": 1858,
+        "folders_count": 0,
+        "path": "Cheats/",
+        "raw_files_size": 6995290,
+        "source": "Cheats/NES",
+        "summary_file": {
+            "hash": "b5d85d1cd6f92d714ab74a997b97130d",
+            "size": 84460,
+            "url": "https://summary_file"
+        }
+    }
+    if zipped_files is not None:
+        json['contents_file']['zipped_files'] = zipped_files
+    if unzipped_json is not None:
+        json['summary_file']['unzipped_json'] = unzipped_json
+    if folders is not None:
+        json['folders'] = folders
+    return json
+
+
+def db_test_with_zips_descr(zips):
+    return {
+        'db_id': db_test,
+        'db_files': [''],
+        'files': {},
+        'folders': [],
+        'base_files_url': 'http://',
+        'zips': zips
     }
 
 
@@ -61,7 +111,9 @@ def db_empty_with_linux_descr():
             "size": 83873790,
             "url": "https://raw.githubusercontent.com/MiSTer-devel/SD-Installer-Win64_MiSTer/136d7d8ea24b1de2424574b2d31f527d6b3e3d39/release_20210711.rar",
             "version": "210711"
-        }
+        },
+        'base_files_url': '',
+        'zips': {}
     }
 
 
@@ -70,7 +122,9 @@ def db_empty_descr():
         'db_id': db_empty,
         'db_files': [],
         'files': [],
-        'folders': []
+        'folders': [],
+        'base_files_url': '',
+        'zips': {}
     }
 
 
@@ -79,7 +133,9 @@ def db_wrong_descr():
         'db_id': 'wrong',
         'db_files': [],
         'files': [],
-        'folders': []
+        'folders': [],
+        'base_files_url': '',
+        'zips': {}
     }
 
 
@@ -135,7 +191,9 @@ def db_test_with_file(name_file, file):
         'files': {
             name_file: file
         },
-        'folders': []
+        'folders': [],
+        'base_files_url': '',
+        'zips': {}
     }
 
 
@@ -146,7 +204,9 @@ def db_with_file(db_id, name_file, file):
         'files': {
             name_file: file
         },
-        'folders': []
+        'folders': [],
+        'base_files_url': '',
+        'zips': {}
     }
 
 
@@ -155,7 +215,9 @@ def db_with_folders(db_id, folders):
         'db_id': db_id,
         'db_files': [db_id + '.json.zip'],
         'files': {},
-        'folders': folders
+        'folders': folders,
+        'base_files_url': '',
+        'zips': {}
     }
 
 
@@ -166,7 +228,9 @@ def db_test_with_file_a_descr():
         'files': {
             file_a: file_a_descr()
         },
-        'folders': [folder_a]
+        'folders': [folder_a],
+        'base_files_url': '',
+        'zips': {}
     }
 
 

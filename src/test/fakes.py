@@ -25,6 +25,7 @@ from downloader.reboot_calculator import RebootCalculator as ProductionRebootCal
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from downloader.linux_updater import LinuxUpdater as ProductionLinuxUpdater
 from downloader.runner import Runner as ProductionRunner
+from downloader.store_migrator import StoreMigrator as ProductionStoreMigrator, migrations
 from test.fake_db_gateway import DbGateway
 from test.fake_file_service import FileService
 from test.fake_curl_downloader import CurlDownloader, TestDataCurlDownloader
@@ -41,9 +42,9 @@ class OnlineImporter(ProductionOnlineImporter):
     def __init__(self, downloader=None, config=None, file_service=None):
         self.file_service = FileService() if file_service is None else file_service
         self._problematic_files = dict()
-        config = default_config() if config is None else config
+        self.config = default_config() if config is None else config
         super().__init__(
-            config,
+            self.config,
             self.file_service,
             lambda c: CurlDownloader(c, self.file_service, self._problematic_files) if downloader is None else downloader,
             NoLogger())
@@ -68,6 +69,11 @@ class RebootCalculator(ProductionRebootCalculator):
         super().__init__(default_config() if config is None else config, NoLogger(), self.file_service)
 
 
+class StoreMigrator(ProductionStoreMigrator):
+    def __init__(self, maybe_migrations=None):
+        super().__init__(migrations() if maybe_migrations is None else maybe_migrations, NoLogger())
+
+
 class Runner(ProductionRunner):
     def __init__(self, env, config, db_gateway, file_service=None):
         self.file_service = FileService() if file_service is None else file_service
@@ -78,7 +84,8 @@ class Runner(ProductionRunner):
                          OfflineImporter(file_service=self.file_service),
                          OnlineImporter(file_service=self.file_service),
                          LinuxUpdater(self.file_service),
-                         RebootCalculator(file_service=self.file_service))
+                         RebootCalculator(file_service=self.file_service),
+                         StoreMigrator())
 
     @staticmethod
     def with_single_empty_db(db_gateway=None):
@@ -86,7 +93,9 @@ class Runner(ProductionRunner):
             {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
             {'databases': [{
                 'db_url': db_empty,
-                'section': db_empty
+                'section': db_empty,
+                'base_files_url': '',
+                'zips': {}
             }], 'verbose': False, 'config_path': Path('')},
             DbGateway() if db_gateway is None else db_gateway,
         )
@@ -97,7 +106,9 @@ class Runner(ProductionRunner):
             {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
             {'databases': [{
                 'db_url': db_id,
-                'section': db_id
+                'section': db_id,
+                'base_files_url': '',
+                'zips': {}
             }], 'verbose': False, 'config_path': Path('')},
             DbGateway.with_single_db(db_id, db_descr),
         )
@@ -131,3 +142,11 @@ class LinuxUpdater(ProductionLinuxUpdater):
     def _run_subprocesses(self, linux, linux_path):
         self.file_service.write_file_contents('/MiSTer.version', linux['version'])
         self.file_service.touch('/tmp/downloader_needs_reboot_after_linux_update')
+
+
+class Migration:
+    def __init__(self, version):
+        self.version = version
+
+    def migrate(self, local_store):
+        pass

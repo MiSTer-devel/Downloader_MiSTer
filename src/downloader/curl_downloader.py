@@ -40,9 +40,17 @@ class CurlCommonDownloader:
         self._http_oks = []
         self._correct_downloads = []
         self._needs_reboot = False
+        self._base_files_url = None
+        self._unpacked_zips = dict()
 
     def queue_file(self, file_description, file_path):
         self._curl_list[file_path] = file_description
+
+    def set_base_files_url(self, base_files_url):
+        self._base_files_url = base_files_url
+
+    def mark_unpacked_zip(self, zip_id, base_zips_url):
+        self._unpacked_zips[zip_id] = base_zips_url
 
     def download_files(self, first_run):
         self._download_files_internal(first_run)
@@ -50,7 +58,8 @@ class CurlCommonDownloader:
         if self._file_service.is_file('MiSTer.new'):
             self._logger.print()
             self._logger.print('Copying new MiSTer binary:')
-            self._file_service.move('MiSTer', self._local_repository.old_mister_path)
+            if self._file_service.is_file('MiSTer'):
+                self._file_service.move('MiSTer', self._local_repository.old_mister_path)
             self._file_service.move('MiSTer.new', 'MiSTer')
 
             if self._file_service.is_file('MiSTer'):
@@ -77,7 +86,10 @@ class CurlCommonDownloader:
             if self._file_service.is_file(path):
                 path_hash = self._file_service.hash(path)
                 if path_hash == self._curl_list[path]['hash']:
-                    self._logger.print('No changes: %s' % path)
+                    if 'zip_id' in self._curl_list[path] and self._curl_list[path]['zip_id'] in self._unpacked_zips:
+                        self._logger.print('Unpacked: %s' % path)
+                    else:
+                        self._logger.print('No changes: %s' % path)
                     self._correct_downloads.append(path)
                     continue
                 else:
@@ -133,6 +145,9 @@ class CurlCommonDownloader:
         self._logger.print(path)
         self._file_service.makedirs_parent(path)
 
+        if 'url' not in description:
+            description['url'] = self._url_from_path(path)
+
         url_domain = urlparse(description['url']).netloc
         url_parts = description['url'].split(url_domain)
 
@@ -143,6 +158,11 @@ class CurlCommonDownloader:
 
     def _command(self, target_path, url):
         return 'curl %s --show-error --fail --location -o "%s" "%s"' % (self._config['curl_ssl'], target_path, url)
+
+    def _url_from_path(self, path):
+        if self._base_files_url is None:
+            raise Exception('Trying to process %s, but no base_files_url filed has been provided to calculate the url.' % path)
+        return self._base_files_url + path
 
     def errors(self):
         return self._errors
