@@ -29,6 +29,12 @@ class TestRealisticMigrations(unittest.TestCase):
         sut.migrate(store)
         self.assertEqual(store, load_file('test/integration/fixtures/filled_store_vlast.json'))
 
+    def test_migrate___on_v1_filled_store___returns_expected_store(self):
+        store = load_file('test/integration/fixtures/filled_store_v1_with_zip.json')
+        sut = StoreMigrator()
+        sut.migrate(store)
+        self.assertEqual(store, load_file('test/integration/fixtures/filled_store_vlast_with_zip.json'))
+
 
 def load_file(path):
     with open(path) as f:

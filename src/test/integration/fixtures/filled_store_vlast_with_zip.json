@@ -1,0 +1,43 @@
+{
+  "dbs": {
+    "distribution_mister": {
+      "zips": {
+        "cheats_folder_gameboy": {
+          "base_files_url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/b97f3044bf75981be2382c54ecdc1258f7b0753d/",
+          "contents": [
+            "GameBoy"
+          ],
+          "contents_file": {
+            "hash": "fa447a50cbabfd4136ce1e12b48c0543",
+            "size": 5883166,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/fef1fe10cdef9eeae0d7b10ebd2c6034a9442601/cheats_folder_gameboy.zip"
+          },
+          "files_count": 1312,
+          "folders_count": 0,
+          "path": "Cheats/",
+          "raw_files_size": 5625862,
+          "source": "Cheats/GameBoy",
+          "summary_file": {
+            "hash": "0da0c0206c842cad4ba351097bca4b42",
+            "size": 60599,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/fef1fe10cdef9eeae0d7b10ebd2c6034a9442601/cheats_folder_gameboy_summary.json.zip"
+          },
+          "folders": {
+            "Cheats/GameBoy": {}
+          }
+        }
+      },
+      "folders": {
+        "Cheats": {}
+      },
+      "files": {
+        "Cheats/GameBoy/007 - The World Is Not Enough (USA, Europe) [E038E666].zip": {
+          "hash": "4a0cb3c526d5c4d00aab76037a85f597",
+          "size": 3231,
+          "zip_id": "cheats_folder_gameboy"
+        }
+      }
+    }
+  },
+  "migration_version": 2
+}
