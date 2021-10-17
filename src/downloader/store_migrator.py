@@ -42,7 +42,8 @@ def make_new_local_store(store_migrator):
 
 def migrations():
     return [
-        MigrationV1()
+        MigrationV1(),
+        MigrationV2()
     ]
 
 
@@ -61,13 +62,26 @@ class MigrationV1:
             local_store.pop(db_id)
         
         local_store['dbs'] = dbs
-        
 
         #
         # create 'zips' fields 
         #
         for db_id in local_store['dbs']:
             local_store['dbs'][db_id]['zips'] = dict()
+
+
+class MigrationV2:
+    version = 2
+
+    def migrate(self, local_store):
+
+        #
+        # 'folders' from list to dict
+        #
+        for db_id in local_store['dbs']:
+            local_store['dbs'][db_id]['folders'] = {folder: {} for folder in local_store['dbs'][db_id]['folders']}
+            for zip_id in local_store['dbs'][db_id]['zips']:
+                local_store['dbs'][db_id]['zips'][zip_id]['folders'] = {folder: {} for folder in local_store['dbs'][db_id]['zips'][zip_id]['folders']}
 
 
 class WrongMigrationException(Exception):

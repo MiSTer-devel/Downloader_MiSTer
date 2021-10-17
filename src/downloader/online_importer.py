@@ -55,6 +55,9 @@ class OnlineImporter:
             self._file_service.remove_folder(folder)
 
     def _process_db_contents(self, db, store, full_resync):
+        if isinstance(db['folders'], list): # TODO Remove conversion
+            db['folders'] = {folder: {} for folder in db['folders']}
+
         self._print_db_header(db)
 
         self._import_zip_summaries(db, store)
@@ -134,7 +137,7 @@ class OnlineImporter:
         if len(zip_ids_from_store) > 0:
             db['files'].update({path: fd for path, fd in store['files'].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids_from_store})
             for zip_id in zip_ids_from_store:
-                db['folders'].extend(store['zips'][zip_id]['folders'])
+                db['folders'].update(store['zips'][zip_id]['folders'])
 
         if len(zip_ids_to_download) > 0:
             summary_downloader = self._downloader_factory(self._config)
@@ -151,12 +154,14 @@ class OnlineImporter:
 
             for temp_zip in summary_downloader.correctly_downloaded_files():
                 summary = self._file_service.load_db_from_file(temp_zip)
+                if isinstance(summary['folders'], list): # TODO Remove conversion
+                    summary['folders'] = {folder: {} for folder in summary['folders']}
                 zip_id = zip_ids_by_temp_zip[temp_zip]
                 for file_path, file_description in summary['files'].items():
                     db['files'][file_path] = file_description
                     if file_path in store['files']:
                         store['files'][file_path] = file_description
-                db['folders'].extend(summary['folders'])
+                db['folders'].update(summary['folders'])
                 db['zips'][zip_id]['folders'] = summary['folders']
                 store['zips'][zip_id] = db['zips'][zip_id]
                 self._file_service.unlink(temp_zip)
@@ -164,7 +169,7 @@ class OnlineImporter:
             for temp_zip in summary_downloader.errors():
                 zip_id = zip_ids_by_temp_zip[temp_zip]
                 if zip_id in store['zips']:
-                    db['folders'].extend(store['zips'][zip_id]['folders'])
+                    db['folders'].update(store['zips'][zip_id]['folders'])
                     db['files'].update({path: fd for path, fd in store['files'].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids_from_store})
 
             self._files_that_failed.extend(summary_downloader.errors())

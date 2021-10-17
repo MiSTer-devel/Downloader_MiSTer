@@ -46,8 +46,9 @@ def make_runner(env, logger, ini_path):
     logger.set_local_repository(local_repository)
 
     db_gateway = DbGateway(config, file_service, logger)
-    offline_importer = OfflineImporter(config, file_service, logger)
-    online_importer = OnlineImporter(config, file_service, make_downloader_factory(file_service, local_repository, logger), logger)
+    downloader_factory = make_downloader_factory(file_service, local_repository, logger)
+    offline_importer = OfflineImporter(config, file_service, downloader_factory, logger)
+    online_importer = OnlineImporter(config, file_service, downloader_factory, logger)
     linux_updater = LinuxUpdater(file_service, CurlSerialDownloader(config, file_service, local_repository, logger), logger)
 
     return Runner(
