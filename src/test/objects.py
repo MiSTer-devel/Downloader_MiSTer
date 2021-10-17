@@ -88,14 +88,14 @@ def cheats_folder_nes_zip_desc(zipped_files=None, unzipped_json=None, folders=No
     return json
 
 
-def db_test_with_zips_descr(zips):
+def db_test_descr(zips=None, folders=None, files=None):
     return {
         'db_id': db_test,
         'db_files': [''],
-        'files': {},
-        'folders': [],
+        'files': files if files is not None else {},
+        'folders': folders if folders is not None else [],
         'base_files_url': 'http://',
-        'zips': zips
+        'zips': zips if zips is not None else {}
     }
 
 
