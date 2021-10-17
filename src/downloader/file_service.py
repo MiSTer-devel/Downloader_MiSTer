@@ -38,6 +38,9 @@ class FileService:
     def is_file(self, path):
         return os.path.isfile(self._path(path))
 
+    def is_folder(self, path):
+        return os.path.isdir(self._path(path))
+
     def read_file_contents(self, path):
         with open(self._path(path), 'r') as f:
             return f.read()

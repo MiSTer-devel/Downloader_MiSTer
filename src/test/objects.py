@@ -35,7 +35,7 @@ file_one = 'one'
 hash_one = 'one'
 db_empty = 'empty'
 cheats_folder_nes_zip_id = 'cheats_folder_nes'
-cheats_folder_nes_folders = ['Cheats/NES']
+cheats_folder_nes_folders = {'Cheats/NES': {}}
 cheats_folder_nes_file_path = 'Cheats/NES/10-Yard Fight (USA, Europe) [3D564757].zip'
 cheats_folder_nes_file_url = "http://Cheats/NES/10-Yard Fight (USA, Europe) [3D564757].zip"
 cheats_folder_nes_file_hash = "8c02595feff096a9dd160e559067f4f4"
@@ -51,7 +51,7 @@ def db_test_being_empty_descr():
         'db_id': db_test,
         'db_files': [''],
         'files': {},
-        'folders': [],
+        'folders': {},
         'base_files_url': '',
         'zips': {}
     }
@@ -88,12 +88,56 @@ def cheats_folder_nes_zip_desc(zipped_files=None, unzipped_json=None, folders=No
     return json
 
 
-def db_test_descr(zips=None, folders=None, files=None):
+def unzipped_json_with_cheats_folder_nes_file():
+    return {
+        'files': {
+            cheats_folder_nes_file_path: {
+                "hash": cheats_folder_nes_file_hash,
+                "size": cheats_folder_nes_file_size,
+                "zip_id": cheats_folder_nes_zip_id
+            },
+        },
+        "files_count": 1,
+        'folders': cheats_folder_nes_folders,
+        "folders_count": 1,
+    }
+
+
+def store_with_unzipped_cheats_folder_nes_files(url=True, folders=True, zip_id=True, zips=True, zip_folders=True, online_database_imported=None):
+    o = {
+        "files": {
+            cheats_folder_nes_file_path: {
+                'hash': cheats_folder_nes_file_hash,
+                'size': cheats_folder_nes_file_size,
+                'url': cheats_folder_nes_file_url,
+                'zip_id': cheats_folder_nes_zip_id
+            }
+        },
+        'folders': cheats_folder_nes_folders,
+        'offline_databases_imported': online_database_imported if online_database_imported is not None else [],
+        "zips": {
+            cheats_folder_nes_zip_id: cheats_folder_nes_zip_desc(folders=cheats_folder_nes_folders)
+        }
+    }
+    if not folders:
+        o.pop('folders')
+    if not url:
+        o['files'][cheats_folder_nes_file_path].pop('url')
+    if not zip_id:
+        o['files'][cheats_folder_nes_file_path].pop('zip_id')
+    if not zips:
+        o['zips'] = {}
+    if not zip_folders:
+        o['zips'][cheats_folder_nes_zip_id].pop('folders')
+    return o
+
+
+def db_test_descr(zips=None, folders=None, files=None, db_files=None):
     return {
         'db_id': db_test,
-        'db_files': [''],
+        'db_files': db_files if db_files is not None else [''],
         'files': files if files is not None else {},
-        'folders': folders if folders is not None else [],
+        'folders': folders if folders is not None else {},
         'base_files_url': 'http://',
         'zips': zips if zips is not None else {}
     }
@@ -104,7 +148,7 @@ def db_empty_with_linux_descr():
         'db_id': db_empty,
         'db_files': [],
         'files': [],
-        'folders': [],
+        'folders': {},
         'linux': {
             "delete": [],
             "hash": "d3b619c54c4727ab618bf108013f79d9",
@@ -122,7 +166,7 @@ def db_empty_descr():
         'db_id': db_empty,
         'db_files': [],
         'files': [],
-        'folders': [],
+        'folders': {},
         'base_files_url': '',
         'zips': {}
     }
@@ -133,7 +177,7 @@ def db_wrong_descr():
         'db_id': 'wrong',
         'db_files': [],
         'files': [],
-        'folders': [],
+        'folders': {},
         'base_files_url': '',
         'zips': {}
     }
@@ -191,7 +235,7 @@ def db_test_with_file(name_file, file):
         'files': {
             name_file: file
         },
-        'folders': [],
+        'folders': {},
         'base_files_url': '',
         'zips': {}
     }
@@ -204,7 +248,7 @@ def db_with_file(db_id, name_file, file):
         'files': {
             name_file: file
         },
-        'folders': [],
+        'folders': {},
         'base_files_url': '',
         'zips': {}
     }
@@ -228,7 +272,7 @@ def db_test_with_file_a_descr():
         'files': {
             file_a: file_a_descr()
         },
-        'folders': [folder_a],
+        'folders': {folder_a: {}},
         'base_files_url': '',
         'zips': {}
     }

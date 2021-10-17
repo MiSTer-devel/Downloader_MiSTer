@@ -24,7 +24,7 @@ from pathlib import Path
 def empty_store():
     return {
         'zips': {},
-        'folders': [],
+        'folders': {},
         'files': {},
         'offline_databases_imported': []
     }

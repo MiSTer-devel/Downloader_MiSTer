@@ -18,7 +18,7 @@
 
 import unittest
 from downloader.other import empty_store
-from test.objects import db_test_descr, cheats_folder_nes_folders, cheats_folder_nes_zip_desc, cheats_folder_nes_zip_id, cheats_folder_nes_file_path, cheats_folder_nes_file_url, cheats_folder_nes_file_hash, cheats_folder_nes_file_size
+from test.objects import db_test_descr, cheats_folder_nes_folders, cheats_folder_nes_zip_desc, cheats_folder_nes_zip_id, cheats_folder_nes_file_path, store_with_unzipped_cheats_folder_nes_files, unzipped_json_with_cheats_folder_nes_file, cheats_folder_nes_file_hash, cheats_folder_nes_file_size
 from test.fakes import OnlineImporter
 
 
@@ -62,7 +62,7 @@ class TestOnlineImporterWithZips(unittest.TestCase):
             'a_different_id': cheats_folder_nes_zip_desc(unzipped_json={
                 'files': {},
                 "files_count": 1,
-                'folders': [],
+                'folders': {},
                 "folders_count": 1,
             })
         }), store_with_unzipped_cheats_folder_nes_files())
@@ -71,9 +71,9 @@ class TestOnlineImporterWithZips(unittest.TestCase):
         self.assertEqual({
             "files": {},
             'offline_databases_imported': [],
-            "folders": [],
+            "folders": {},
             "zips": {
-                'a_different_id': cheats_folder_nes_zip_desc(folders=[])
+                'a_different_id': cheats_folder_nes_zip_desc(folders={})
             }
         }, store)
 
@@ -118,47 +118,3 @@ class TestOnlineImporterWithZips(unittest.TestCase):
         self.assertEqual(installed, self.sut.correctly_installed_files())
         self.assertEqual(errors, self.sut.files_that_failed())
         self.assertEqual(needs_reboot, self.sut.needs_reboot())
-
-
-def unzipped_json_with_cheats_folder_nes_file():
-    return {
-        'files': {
-            cheats_folder_nes_file_path: {
-                "hash": cheats_folder_nes_file_hash,
-                "size": cheats_folder_nes_file_size,
-                "zip_id": cheats_folder_nes_zip_id
-            },
-        },
-        "files_count": 1,
-        'folders': cheats_folder_nes_folders,
-        "folders_count": 1,
-    }
-
-
-def store_with_unzipped_cheats_folder_nes_files(url=True, folders=True, zip_id=True, zips=True, zip_folders=True):
-    o = {
-        "files": {
-            cheats_folder_nes_file_path: {
-                'hash': cheats_folder_nes_file_hash,
-                'size': cheats_folder_nes_file_size,
-                'url': cheats_folder_nes_file_url,
-                'zip_id': cheats_folder_nes_zip_id
-            }
-        },
-        'folders': cheats_folder_nes_folders,
-        'offline_databases_imported': [],
-        "zips": {
-            cheats_folder_nes_zip_id: cheats_folder_nes_zip_desc(folders=cheats_folder_nes_folders)
-        }
-    }
-    if not folders:
-        o.pop('folders')
-    if not url:
-        o['files'][cheats_folder_nes_file_path].pop('url')
-    if not zip_id:
-        o['files'][cheats_folder_nes_file_path].pop('zip_id')
-    if not zips:
-        o['zips'] = {}
-    if not zip_folders:
-        o['zips'][cheats_folder_nes_zip_id].pop('folders')
-    return o

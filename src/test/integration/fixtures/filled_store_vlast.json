@@ -2,10 +2,10 @@
   "dbs": {
     "distribution_mister": {
       "zips": {},
-      "folders": [
-        "Filters",
-        "Filters/Composite Blend"
-      ],
+      "folders": {
+        "Filters": {},
+        "Filters/Composite Blend": {}
+      },
       "files": {
         "Filters/Composite Blend/Comp_Blend_HV_025.txt": {
           "delete": [],
@@ -16,5 +16,5 @@
       }
     }
   },
-  "migration_version": 1
+  "migration_version": 2
 }

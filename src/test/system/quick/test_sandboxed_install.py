@@ -141,7 +141,7 @@ class TestSandboxedInstall(unittest.TestCase):
 
         db = load_json('test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox_db.json')
         expected_local_store = local_store_files([('sandbox', db['files'])])
-        expected_local_store['dbs']['sandbox']['offline_databases_imported'] = ['7562384d51ee4d9fecdf960f189d8ae2']
+        expected_local_store['dbs']['sandbox']['offline_databases_imported'] = ['ec63bd9a5cfc108cf13d516ebf605a7d']
 
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox.ini', {
             'local_store': expected_local_store,
@@ -156,13 +156,13 @@ class TestSandboxedInstall(unittest.TestCase):
         self.assertNotEqual(baz_exists_before, baz_exists_after)
         self.assertFalse(offline_db_exists_after or baz_exists_after)
 
-    installed_folders = ['bar', 'bar/sub_bar', 'bar/sub_bar/sub_sub_bar', 'baz', 'foo', 'foo/sub_foo']
-    installed_system_folders = ['Scripts', 'Scripts/.config', 'Scripts/.config/downloader']
+    installed_folders = {'bar': {}, 'bar/sub_bar': {}, 'bar/sub_bar/sub_sub_bar': {}, 'baz': {}, 'foo': {}, 'foo/sub_foo': {}}
+    installed_system_folders = {'Scripts': {}, 'Scripts/.config': {}, 'Scripts/.config/downloader': {}}
 
     def test_sandbox_db___installs_expected_folders(self):
         expected_local_store = local_store_files([('sandbox', {})])
-        expected_local_store['dbs']['sandbox']['folders'] = ['foo', 'bar', 'foo/sub_foo', 'bar/sub_bar',
-                                                      'bar/sub_bar/sub_sub_bar', 'baz']
+        expected_local_store['dbs']['sandbox']['folders'] = {'foo': {}, 'bar': {}, 'foo/sub_foo': {}, 'bar/sub_bar': {},
+                                                      'bar/sub_bar/sub_sub_bar': {}, 'baz': {}}
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_folders/sandbox.ini', {
             'local_store': expected_local_store,
             'folders': self.installed_folders,
@@ -175,7 +175,7 @@ class TestSandboxedInstall(unittest.TestCase):
             'system_folders': self.installed_system_folders
         })
 
-        remaining_folders = ['bar', 'bar/sub_bar']
+        remaining_folders = {'bar': {}, 'bar/sub_bar': {}}
         expected_local_store = local_store_files([('sandbox', {})])
         expected_local_store['dbs']['sandbox']['folders'] = remaining_folders
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_less_folders/sandbox.ini', {
@@ -194,10 +194,10 @@ class TestSandboxedInstall(unittest.TestCase):
         self.file_service.makedirs('baz/something')
 
         expected_local_store = local_store_files([('sandbox', {})])
-        expected_local_store['dbs']['sandbox']['folders'] = ['bar', 'bar/sub_bar']
+        expected_local_store['dbs']['sandbox']['folders'] = {'bar': {}, 'bar/sub_bar': {}}
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_less_folders/sandbox.ini', {
             'local_store': expected_local_store,
-            'folders': ['bar', 'bar/sub_bar', 'baz', 'baz/something', 'foo'],
+            'folders': {'bar': {}, 'bar/sub_bar': {}, 'baz': {}, 'baz/something': {}, 'foo': {}},
             'system_folders': self.installed_system_folders
         })
 
@@ -235,11 +235,11 @@ class TestSandboxedInstall(unittest.TestCase):
 
         if 'folders' in expected:
             counter += 1
-            self.assertEqual(self.find_all_folders(config['base_path']), expected['folders'])
+            self.assertEqual(self.find_all_folders(config['base_path']), sorted(list(expected['folders'])))
 
         if 'system_folders' in expected:
             counter += 1
-            self.assertEqual(self.find_all_folders(config['base_system_path']), expected['system_folders'])
+            self.assertEqual(self.find_all_folders(config['base_system_path']), sorted(list(expected['system_folders'])))
 
         self.assertEqual(counter, len(expected))
 
@@ -289,7 +289,7 @@ def local_store_files(tuples):
     return {
         'dbs': {
             store_id: {
-                'folders': [],
+                'folders': {},
                 'files': files,
                 'offline_databases_imported': [],
                 'zips': {}

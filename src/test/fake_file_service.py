@@ -62,6 +62,9 @@ class FileService:
     def is_file(self, path):
         return self._files.has(path)
 
+    def is_folder(self, path):
+        return True
+
     def read_file_contents(self, path):
         if not self._files.has(path):
             return 'unknown'

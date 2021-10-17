@@ -36,7 +36,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.download_dbs_contents(False)
 
         self.assertReportsNothing(sut)
-        self.assertEqual(store, empty_store())
+        self.assertEqualDict(store, empty_store())
 
     def test_download_dbs_contents___being_empty___does_nothing(self):
         sut = OnlineImporter()
@@ -50,7 +50,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.add_db(db_test_with_file_a_descr(), store)
         sut.download_dbs_contents(False)
 
-        self.assertEqual(store['files'][file_a], file_a_descr())
+        self.assertEqualDict(store['files'][file_a], file_a_descr())
         self.assertHasFolderA(store)
         self.assertReports(sut, [file_a])
         self.assertTrue(sut.file_service.is_file(file_a))
@@ -63,7 +63,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.add_db(db_test_with_file_a_descr(), store)
         sut.download_dbs_contents(False)
 
-        self.assertEqual(store['files'][file_a], file_a_descr())
+        self.assertEqualDict(store['files'][file_a], file_a_descr())
         self.assertHasFolderA(store)
         self.assertReportsNothing(sut)
         self.assertEqual(sut.file_service.hash(file_a), 'does_not_match')
@@ -76,7 +76,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.add_db(db_test_with_file_a_descr(), store)
         sut.download_dbs_contents(False)
 
-        self.assertEqual(store['files'][file_a], file_a_descr())
+        self.assertEqualDict(store['files'][file_a], file_a_descr())
         self.assertHasFolderA(store)
         self.assertReports(sut, [file_a])
         self.assertEqual(sut.file_service.hash(file_a), file_a)
@@ -88,7 +88,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.add_db(db_test_with_file_a_descr(), store)
         sut.download_dbs_contents(False)
 
-        self.assertEqual(store['files'][file_a], file_a_descr())
+        self.assertEqualDict(store['files'][file_a], file_a_descr())
         self.assertHasFolderA(store)
         self.assertReports(sut, [file_a])
         self.assertTrue(sut.file_service.is_file(file_a))
@@ -114,7 +114,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.add_db(db_test_with_file(file_MiSTer, file_mister_descr()), store)
         sut.download_dbs_contents(False)
 
-        self.assertEqual(store['files'][file_MiSTer], file_mister_descr())
+        self.assertEqualDict(store['files'][file_MiSTer], file_mister_descr())
         self.assertEmptyFolders(store)
         self.assertReports(sut, [file_MiSTer], needs_reboot=True)
         self.assertTrue(sut.file_service.is_file(file_MiSTer))
@@ -142,7 +142,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.add_db(db_with_file('bar', file_a, file_a_updated_descr()), store)
         sut.download_dbs_contents(False)
 
-        self.assertEqual(store['files'][file_a], file_a_descr())
+        self.assertEqualDict(store['files'][file_a], file_a_descr())
         self.assertEmptyFolders(store)
         self.assertReports(sut, [file_a])
         self.assertEqual(sut.file_service.hash(file_a), file_a_descr()['hash'])
@@ -269,7 +269,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.add_db(db_with_folders('db1', ['a', 'x', 'y']), store1)
         sut.download_dbs_contents(False)
 
-        self.assertEqual(store1['folders'], ['a', 'x', 'y'])
+        self.assertEqualDict(store1['folders'], ['a', 'x', 'y'])
         self.assertReportsNothing(sut)
         self.assertEqual(sut.file_service.folders(), ['a', 'x', 'y'])
 
@@ -285,20 +285,25 @@ class TestOnlineImporter(unittest.TestCase):
         sut.add_db(db_with_folders('db3', []), store3)
         sut.download_dbs_contents(False)
 
-        self.assertEqual(store1['folders'], ['a', 'x'])
-        self.assertEqual(store2['folders'], ['b'])
-        self.assertEqual(store3['folders'], [])
+        self.assertEqualDict(store1['folders'], ['a', 'x'])
+        self.assertEqualDict(store2['folders'], ['b'])
+        self.assertEqualDict(store3['folders'], [])
         self.assertReportsNothing(sut)
         self.assertEqual(sut.file_service.folders(), ['a', 'b', 'x'])
 
+    def assertEqualDict(self, store, o):
+        if isinstance(o, list):
+            o = {i: {} for i in o}
+        self.assertEqual(o, store)
+
     def assertEmptyFolders(self, store):
-        self.assertEqual(store['folders'], [])
+        self.assertEqualDict(store['folders'], [])
 
     def assertHasFolderA(self, store):
-        self.assertEqual(store['folders'], [folder_a])
+        self.assertEqualDict(store['folders'], [folder_a])
 
     def assertEmptyFiles(self, store):
-        self.assertEqual(store['files'], {})
+        self.assertEqualDict(store['files'], {})
 
     def assertReportsNothing(self, sut):
         self.assertReports(sut, [])

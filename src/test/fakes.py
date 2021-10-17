@@ -55,12 +55,18 @@ class OnlineImporter(ProductionOnlineImporter):
 
 
 class OfflineImporter(ProductionOfflineImporter):
-    def __init__(self, config=None, file_service=None):
+    def __init__(self, config=None, file_service=None, downloader=None):
         self.file_service = FileService() if file_service is None else file_service
+        self._problematic_files = dict()
         super().__init__(
             default_config() if config is None else config,
             self.file_service,
+            lambda c: CurlDownloader(c, self.file_service, self._problematic_files) if downloader is None else downloader,
             NoLogger())
+
+    @property
+    def downloader_test_data(self):
+        return TestDataCurlDownloader(self._problematic_files)
 
 
 class RebootCalculator(ProductionRebootCalculator):
