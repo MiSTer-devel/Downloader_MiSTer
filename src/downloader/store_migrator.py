@@ -81,7 +81,10 @@ class MigrationV2:
         for db_id in local_store['dbs']:
             local_store['dbs'][db_id]['folders'] = {folder: {} for folder in local_store['dbs'][db_id]['folders']}
             for zip_id in local_store['dbs'][db_id]['zips']:
-                local_store['dbs'][db_id]['zips'][zip_id]['folders'] = {folder: {} for folder in local_store['dbs'][db_id]['zips'][zip_id]['folders']}
+                if 'folders' in local_store['dbs'][db_id]['zips'][zip_id]:
+                    local_store['dbs'][db_id]['zips'][zip_id]['folders'] = {folder: {} for folder in local_store['dbs'][db_id]['zips'][zip_id]['folders']}
+                else:
+                    local_store['dbs'][db_id]['zips'][zip_id]['folders'] = {}
 
 
 class WrongMigrationException(Exception):
