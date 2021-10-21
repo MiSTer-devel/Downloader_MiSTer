@@ -23,6 +23,9 @@ class StoreMigrator:
 
     def migrate(self, local_store):
         current_version = local_store.get('migration_version', 0)
+        if current_version >= len(self._migrations):
+            return
+
         for i in range(current_version, len(self._migrations), 1):
             if (self._migrations[i].version - 1) != i:
                 raise WrongMigrationException('Migration error: (%s -1) != %s' % (self._migrations[i].version, i))
@@ -38,53 +41,6 @@ class StoreMigrator:
 
 def make_new_local_store(store_migrator):
     return {'dbs': {}, 'migration_version': store_migrator.latest_migration_version()}
-
-
-def migrations():
-    return [
-        MigrationV1(),
-        MigrationV2()
-    ]
-
-
-class MigrationV1:
-    version = 1
-
-    def migrate(self, local_store):
-
-        #
-        # create 'dbs' field
-        #
-        db_ids = list(local_store.keys())
-        dbs = dict()
-        for db_id in db_ids:
-            dbs[db_id] = local_store[db_id]
-            local_store.pop(db_id)
-        
-        local_store['dbs'] = dbs
-
-        #
-        # create 'zips' fields 
-        #
-        for db_id in local_store['dbs']:
-            local_store['dbs'][db_id]['zips'] = dict()
-
-
-class MigrationV2:
-    version = 2
-
-    def migrate(self, local_store):
-
-        #
-        # 'folders' from list to dict
-        #
-        for db_id in local_store['dbs']:
-            local_store['dbs'][db_id]['folders'] = {folder: {} for folder in local_store['dbs'][db_id]['folders']}
-            for zip_id in local_store['dbs'][db_id]['zips']:
-                if 'folders' in local_store['dbs'][db_id]['zips'][zip_id]:
-                    local_store['dbs'][db_id]['zips'][zip_id]['folders'] = {folder: {} for folder in local_store['dbs'][db_id]['zips'][zip_id]['folders']}
-                else:
-                    local_store['dbs'][db_id]['zips'][zip_id]['folders'] = {}
 
 
 class WrongMigrationException(Exception):
