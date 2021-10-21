@@ -35,7 +35,7 @@ file_one = 'one'
 hash_one = 'one'
 db_empty = 'empty'
 cheats_folder_nes_zip_id = 'cheats_folder_nes'
-cheats_folder_nes_folders = {'Cheats/NES': {}}
+cheats_folder_nes_folders = {'Cheats/NES': {"zip_id": cheats_folder_nes_zip_id}}
 cheats_folder_nes_file_path = 'Cheats/NES/10-Yard Fight (USA, Europe) [3D564757].zip'
 cheats_folder_nes_file_url = "http://Cheats/NES/10-Yard Fight (USA, Europe) [3D564757].zip"
 cheats_folder_nes_file_hash = "8c02595feff096a9dd160e559067f4f4"
@@ -57,12 +57,10 @@ def db_test_being_empty_descr():
     }
 
 
-def cheats_folder_nes_zip_desc(zipped_files=None, unzipped_json=None, folders=None):
+def zip_desc(contents, path, source, zipped_files=None, unzipped_json=None):
     json = {
         "base_files_url": "https://base_files_url",
-        "contents": [
-            "NES"
-        ],
+        "contents": contents,
         "contents_file": {
             "hash": "4d2bf07e5d567196d9c666f1816e86e6",
             "size": 7316038,
@@ -70,9 +68,9 @@ def cheats_folder_nes_zip_desc(zipped_files=None, unzipped_json=None, folders=No
         },
         "files_count": 1858,
         "folders_count": 0,
-        "path": "Cheats/",
+        "path": path,
         "raw_files_size": 6995290,
-        "source": "Cheats/NES",
+        "source": source,
         "summary_file": {
             "hash": "b5d85d1cd6f92d714ab74a997b97130d",
             "size": 84460,
@@ -83,8 +81,15 @@ def cheats_folder_nes_zip_desc(zipped_files=None, unzipped_json=None, folders=No
         json['contents_file']['zipped_files'] = zipped_files
     if unzipped_json is not None:
         json['summary_file']['unzipped_json'] = unzipped_json
-    if folders is not None:
-        json['folders'] = folders
+    return json
+
+
+def cheats_folder_nes_zip_desc(zipped_files=None, unzipped_json=None):
+    json = zip_desc(["NES"], "Cheats/", "Cheats/NES", zipped_files, unzipped_json)
+    if zipped_files is not None:
+        json['contents_file']['zipped_files'] = zipped_files
+    if unzipped_json is not None:
+        json['summary_file']['unzipped_json'] = unzipped_json
     return json
 
 
@@ -103,7 +108,7 @@ def unzipped_json_with_cheats_folder_nes_file():
     }
 
 
-def store_with_unzipped_cheats_folder_nes_files(url=True, folders=True, zip_id=True, zips=True, zip_folders=True, online_database_imported=None):
+def store_with_unzipped_cheats_folder_nes_files(url=True, folders=True, zip_id=True, zips=True, online_database_imported=None):
     o = {
         "files": {
             cheats_folder_nes_file_path: {
@@ -116,7 +121,7 @@ def store_with_unzipped_cheats_folder_nes_files(url=True, folders=True, zip_id=T
         'folders': cheats_folder_nes_folders,
         'offline_databases_imported': online_database_imported if online_database_imported is not None else [],
         "zips": {
-            cheats_folder_nes_zip_id: cheats_folder_nes_zip_desc(folders=cheats_folder_nes_folders)
+            cheats_folder_nes_zip_id: cheats_folder_nes_zip_desc()
         }
     }
     if not folders:
@@ -127,8 +132,6 @@ def store_with_unzipped_cheats_folder_nes_files(url=True, folders=True, zip_id=T
         o['files'][cheats_folder_nes_file_path].pop('zip_id')
     if not zips:
         o['zips'] = {}
-    if not zip_folders:
-        o['zips'][cheats_folder_nes_zip_id].pop('folders')
     return o
 
 
@@ -203,6 +206,17 @@ def file_a_descr():
     }
 
 
+def zipped_file_a_descr(zip_id, url=False):
+    o = {
+        "hash": file_a,
+        "size": 2915040,
+        "zip_id": zip_id
+    }
+    if url:
+        o["url"] = 'http://A'
+    return o
+
+
 def boot_rom_descr():
     return {
         "delete": [],
@@ -255,6 +269,8 @@ def db_with_file(db_id, name_file, file):
 
 
 def db_with_folders(db_id, folders):
+    if isinstance(folders, list):
+        folders = {f: {} for f in folders}
     return {
         'db_id': db_id,
         'db_files': [db_id + '.json.zip'],

@@ -55,7 +55,7 @@ class OfflineImporter:
 
         self._logger.print('Importing %s into the local store.' % db_file)
 
-        if isinstance(db['folders'], list): # TODO Remove conversion
+        if isinstance(db['folders'], list):  # TODO Remove conversion
             db['folders'] = {folder: {} for folder in db['folders']}
 
         self._import_folders(db['folders'], store['folders'])
@@ -94,14 +94,13 @@ class OfflineImporter:
 
         for temp_zip in summary_downloader.correctly_downloaded_files():
             summary = self._file_service.load_db_from_file(temp_zip)
-            if isinstance(summary['folders'], list): # TODO Remove conversion
+            if isinstance(summary['folders'], list):  # TODO Remove conversion
                 summary['folders'] = {folder: {} for folder in summary['folders']}
 
             zip_id = zip_ids_by_temp_zip[temp_zip]
 
             store['zips'][zip_id] = db['zips'][zip_id]
-            store['zips'][zip_id]['folders'] = {}
-            self._import_folders(summary['folders'], store['zips'][zip_id]['folders'])
+            self._import_folders(summary['folders'], store['folders'])
             self._import_files(summary['files'], store['files'])
             self._file_service.unlink(temp_zip)
 

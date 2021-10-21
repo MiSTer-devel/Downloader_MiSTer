@@ -25,7 +25,8 @@ from downloader.reboot_calculator import RebootCalculator as ProductionRebootCal
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from downloader.linux_updater import LinuxUpdater as ProductionLinuxUpdater
 from downloader.runner import Runner as ProductionRunner
-from downloader.store_migrator import StoreMigrator as ProductionStoreMigrator, migrations
+from downloader.store_migrator import StoreMigrator as ProductionStoreMigrator
+from downloader.migrations import migrations
 from test.fake_db_gateway import DbGateway
 from test.fake_file_service import FileService
 from test.fake_curl_downloader import CurlDownloader, TestDataCurlDownloader

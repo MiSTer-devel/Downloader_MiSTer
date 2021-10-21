@@ -23,11 +23,11 @@ import json
 from pathlib import Path
 from downloader.config import ConfigReader
 from test.objects import default_env
-from test.fakes import NoLogger
+from test.fakes import NoLogger, StoreMigrator
 from downloader.file_service import hash_file, FileService
 from downloader.main import main
 from downloader.local_repository import LocalRepository
-from downloader.store_migrator import StoreMigrator
+from downloader.store_migrator import make_new_local_store
 
 
 class TestSandboxedInstall(unittest.TestCase):
@@ -214,7 +214,7 @@ class TestSandboxedInstall(unittest.TestCase):
         counter = 0
         if 'local_store' in expected:
             counter += 1
-            actual_store = LocalRepository(config, NoLogger(), self.file_service).load_store(StoreMigrator([], NoLogger()))
+            actual_store = LocalRepository(config, NoLogger(), self.file_service).load_store(StoreMigrator())
             self.assertEqual(actual_store, expected['local_store'])
 
         if 'files' in expected:
@@ -286,18 +286,15 @@ def cleanup(ini_path):
 
 
 def local_store_files(tuples):
-    return {
-        'dbs': {
-            store_id: {
+    store = make_new_local_store(StoreMigrator())
+    for store_id, files in tuples:
+        store['dbs'][store_id] = {
                 'folders': {},
                 'files': files,
                 'offline_databases_imported': [],
                 'zips': {}
             }
-            for store_id, files in tuples
-        },
-        'migration_version': 0
-    }
+    return store
 
 
 def hashes(base_path, files):

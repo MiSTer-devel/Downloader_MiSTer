@@ -29,7 +29,8 @@ from .db_gateway import DbGateway
 from .other import format_files_message, empty_store
 from .online_importer import OnlineImporter
 from .config import ConfigReader
-from .store_migrator import StoreMigrator, migrations
+from .store_migrator import StoreMigrator
+from .migrations import migrations
 
 
 def make_runner(env, logger, ini_path):

@@ -38,15 +38,12 @@ class TestOfflineImporterWithZips(unittest.TestCase):
             })\
             .with_file(cheats_folder_nes_file_path, {"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size})
 
-        store = self.apply_db_test_with_file_a()
+        store = self.apply_db_test_with_cheats_folder_nes_zip()
 
         self.assertFalse(self.sut.file_service.is_file(file_test_json_zip))
+        self.assertEqual(store_with_unzipped_cheats_folder_nes_files(url=False, online_database_imported=[file_test_json_zip]), store)
 
-        expected = store_with_unzipped_cheats_folder_nes_files(url=False, online_database_imported=[file_test_json_zip])
-        expected['folders'] = {}
-        self.assertEqual(expected, store)
-
-    def apply_db_test_with_file_a(self):
+    def apply_db_test_with_cheats_folder_nes_zip(self):
         store = empty_store()
         self.sut.add_db(db_test_descr(zips=cheats_folder_nes_zip_desc(), db_files=[file_test_json_zip]), store)
         self.sut.apply_offline_databases()

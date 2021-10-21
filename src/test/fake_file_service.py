@@ -31,6 +31,7 @@ class TestDataFileService:
     def with_folders(self, folders):
         for f in folders:
             self._folders.add(f, True)
+        return self
 
     def with_file_a(self, description=None):
         self._files.add(test.objects.file_a, description if description is not None else test.objects.file_a_descr())

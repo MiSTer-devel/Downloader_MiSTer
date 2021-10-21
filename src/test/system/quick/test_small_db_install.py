@@ -24,7 +24,6 @@ from pathlib import Path
 from downloader.config import ConfigReader
 from test.objects import default_env
 from test.fakes import NoLogger
-from downloader.file_service import hash_file
 import subprocess
 
 
@@ -47,7 +46,7 @@ class TestSmallDbInstall(unittest.TestCase):
         subprocess.run(['chmod', '+x', tool], shell=False, stderr=subprocess.STDOUT)
         test_env = os.environ.copy()
         test_env['CURL_SSL'] = ''
-        result = subprocess.run([tool], stderr=subprocess.STDOUT,env=test_env)
+        result = subprocess.run([tool], stderr=subprocess.STDOUT, env=test_env)
         self.assertEqual(result.returncode, 0)
         self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/%s.json.zip" % (config['base_system_path'], stem)))
         os.unlink(tool)

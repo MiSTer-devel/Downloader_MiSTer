@@ -23,17 +23,32 @@ from test.fakes import StoreMigrator
 
 class TestRealisticMigrations(unittest.TestCase):
 
-    def test_migrate___on_v0_filled_store___returns_expected_store(self):
-        store = load_file('test/integration/fixtures/filled_store_v0.json')
-        sut = StoreMigrator()
-        sut.migrate(store)
-        self.assertEqual(store, load_file('test/integration/fixtures/filled_store_vlast.json'))
+    filled_store_v0 = 'test/integration/fixtures/filled_store_v0.json'
+    filled_store_vlast = 'test/integration/fixtures/filled_store_vlast.json'
 
-    def test_migrate___on_v1_filled_store___returns_expected_store(self):
-        store = load_file('test/integration/fixtures/filled_store_v1_with_zip.json')
-        sut = StoreMigrator()
-        sut.migrate(store)
-        self.assertEqual(store, load_file('test/integration/fixtures/filled_store_vlast_with_zip.json'))
+    filled_store_v1_with_zip = 'test/integration/fixtures/filled_store_v1_with_zip.json'
+    filled_store_vlast_with_zip = 'test/integration/fixtures/filled_store_vlast_with_zip.json'
+
+
+    def test_migrate___on_v0_filled_store___returns_expected_store(self):
+        store = load_file(self.filled_store_v0)
+        StoreMigrator().migrate(store)
+        self.assertEqual(store, load_file(self.filled_store_vlast))
+
+    def test_migrate___on_vlast_filled_store___returns_same_store(self):
+        store = load_file(self.filled_store_vlast)
+        StoreMigrator().migrate(store)
+        self.assertEqual(store, load_file(self.filled_store_vlast))
+
+    def test_migrate___on_v1_with_zip_filled_store___returns_expected_store(self):
+        store = load_file(self.filled_store_v1_with_zip)
+        StoreMigrator().migrate(store)
+        self.assertEqual(store, load_file(self.filled_store_vlast_with_zip))
+
+    def test_migrate___on_vlast_with_zip_filled_store___returns_same_store(self):
+        store = load_file(self.filled_store_vlast_with_zip)
+        StoreMigrator().migrate(store)
+        self.assertEqual(store, load_file(self.filled_store_vlast_with_zip))
 
 
 def load_file(path):
