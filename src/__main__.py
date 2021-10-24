@@ -23,6 +23,7 @@ from downloader.main import main
 if __name__ == '__main__':
     exit_code = main({
         'DOWNLOADER_LAUNCHER_PATH': os.getenv('DOWNLOADER_LAUNCHER_PATH', None),
+        'DOWNLOADER_INI_PATH': os.getenv('DOWNLOADER_INI_PATH', None),
         'CURL_SSL': os.getenv('CURL_SSL', '--cacert /etc/ssl/certs/cacert.pem'),
         'COMMIT': os.getenv('COMMIT', 'unknown'),
         'ALLOW_REBOOT': os.getenv('ALLOW_REBOOT', None),
