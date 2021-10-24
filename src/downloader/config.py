@@ -22,18 +22,25 @@ from pathlib import Path, PurePosixPath
 from .ini_parser import IniParser
 
 
-def config_file_path(original_executable):
+def config_file_path(env):
+    ini_path = env.get('DOWNLOADER_INI_PATH', None)
+    if ini_path is not None:
+        return ini_path
+
+    original_executable = env.get('DOWNLOADER_LAUNCHER_PATH', None)
     if original_executable is None:
         return '/media/fat/downloader.ini'
 
     executable_path = PurePosixPath(original_executable)
-    parent = str(executable_path.parent)
 
-    if original_executable[0] == '/' and executable_path.parents[0].name.lower() == 'scripts':
-        list_of_parents = [str(p.name) for p in reversed(executable_path.parents)]
-        parent = '/'.join(list_of_parents[0:-1])
+    list_of_parents = [str(p.name) for p in reversed(executable_path.parents) if p.name.lower() != 'scripts' and p.name != '']
 
-    return parent + '/' + executable_path.stem + '.ini'
+    if len(list_of_parents) == 0:
+        parents = ''
+    else:
+        parents = '/'.join(list_of_parents) + '/'
+
+    return ('/' if original_executable[0] == '/' else './') + parents + executable_path.stem + '.ini'
 
 
 @unique

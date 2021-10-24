@@ -39,7 +39,7 @@ def main(env):
 
 
 def execute_runner(env, logger):
-    runner = make_runner(env, logger, config_file_path(env['DOWNLOADER_LAUNCHER_PATH']))
+    runner = make_runner(env, logger, config_file_path(env))
 
     exit_code = runner.run()
 

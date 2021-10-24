@@ -23,16 +23,32 @@ from downloader.config import config_file_path
 class TestConfigFilePath(unittest.TestCase):
 
     def test_config_file_path___with_none___returns_downloader_ini(self):
-        self.assertEqual('/media/fat/downloader.ini', config_file_path(None))
+        self.assertEqual('/media/fat/downloader.ini', config_file_path(env(launcher_path=None)))
 
     def test_config_file_path___with_simple_relative_str___returns_str_ini(self):
-        self.assertEqual('./str.ini', config_file_path('str.sh'))
+        self.assertEqual('./str.ini', config_file_path(env(launcher_path='str.sh')))
 
     def test_config_file_path___with_complex_relative_str___returns_str_ini(self):
-        self.assertEqual('str/complex.ini', config_file_path('str/complex.sh'))
+        self.assertEqual('./str/complex.ini', config_file_path(env(launcher_path='str/complex.sh')))
 
     def test_config_file_path___with_long_custom_path___returns_downloader_ini(self):
-        self.assertEqual('/media/fat/custom/custom.ini', config_file_path('/media/fat/custom/custom.sh'))
+        self.assertEqual('/media/fat/custom/custom.ini', config_file_path(env(launcher_path='/media/fat/custom/custom.sh')))
 
     def test_config_file_path___with_long_scripts_path___returns_downloader_ini(self):
-        self.assertEqual('/media/fat/script.ini', config_file_path('/media/fat/Scripts/script.sh'))
+        self.assertEqual('/media/fat/script.ini', config_file_path(env(launcher_path='/media/fat/Scripts/script.sh')))
+
+    def test_config_file_path___with_relative_scripts_path___returns_relative_downloader_ini_without_scripts(self):
+        self.assertEqual('./downloader.ini', config_file_path(env(launcher_path='./Scripts/downloader.sh')))
+
+    def test_config_file_path___with_relative_media_fat_scripts_path___returns_relative_downloader_ini_without_scripts(self):
+        self.assertEqual('./media/fat/downloader.ini', config_file_path(env(launcher_path='./media/fat/Scripts/downloader.sh')))
+
+    def test_config_file_path___from_ini_path___returns_ini_path(self):
+        self.assertEqual('/media/fat/script.ini', config_file_path(env(launcher_path='/media/fat/Scripts/whatever.sh', ini_path='/media/fat/script.ini')))
+
+
+def env(launcher_path, ini_path=None):
+    return {
+        'DOWNLOADER_LAUNCHER_PATH': launcher_path,
+        'DOWNLOADER_INI_PATH': ini_path,
+    }
