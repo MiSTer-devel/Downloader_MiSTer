@@ -48,5 +48,5 @@ class TestSmallDbInstall(unittest.TestCase):
         test_env['CURL_SSL'] = ''
         result = subprocess.run([tool], stderr=subprocess.STDOUT, env=test_env)
         self.assertEqual(result.returncode, 0)
-        self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/%s.json.zip" % (config['base_system_path'], stem)))
+        self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json.zip" % config['base_system_path']))
         os.unlink(tool)

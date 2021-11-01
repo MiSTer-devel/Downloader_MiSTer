@@ -32,7 +32,7 @@ class LocalRepository:
     @property
     def _storage_path(self):
         if self._storage_path_value is None:
-            self._storage_path_value = 'Scripts/.config/downloader/%s.json.zip' % self._config['config_path'].stem
+            self._storage_path_value = 'Scripts/.config/downloader/downloader.json.zip'
             self._file_service.add_system_path(self._storage_path_value)
         return self._storage_path_value
 

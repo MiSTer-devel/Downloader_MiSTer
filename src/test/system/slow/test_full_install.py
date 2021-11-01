@@ -51,7 +51,7 @@ class TestFullInstall(unittest.TestCase):
         print('test_full_install_remove_local_store_and_rerun A)')
         self.assertRunOk("test/system/fixtures/full_install/parallel.ini")
 
-        os.unlink('/tmp/delme_parallel/Scripts/.config/downloader/parallel.json.zip')
+        os.unlink('/tmp/delme_parallel/Scripts/.config/downloader/downloader.json.zip')
 
         print('test_full_install_remove_local_store_and_rerun B)')
         self.assertRunOk("test/system/fixtures/full_install/parallel.ini")
@@ -87,5 +87,5 @@ class TestFullInstall(unittest.TestCase):
         test_env['CURL_SSL'] = ''
         result = subprocess.run([tool], stderr=subprocess.STDOUT,env=test_env)
         self.assertEqual(result.returncode, 0)
-        self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/%s.json.zip" % (config['base_system_path'], stem)))
+        self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json.zip" % config['base_system_path']))
         os.unlink(tool)
