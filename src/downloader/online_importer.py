@@ -45,6 +45,9 @@ class OnlineImporter:
             if folder in self._dbs_folders:
                 continue
 
+            if not self._file_service.is_folder(folder):
+                continue
+
             if self._file_service.folder_has_items(folder):
                 continue
 
