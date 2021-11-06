@@ -19,14 +19,12 @@
 import unittest
 from downloader.config import default_config
 from downloader.other import empty_store
-from test.objects import db_test_being_empty_descr, file_boot_rom, boot_rom_descr, overwrite_file, file_mister_descr, file_a_descr, file_a_updated_descr, db_test_with_file, db_with_file, db_test_with_file_a_descr, db_with_folders, file_a, folder_a, file_MiSTer, file_MiSTer_old
+from downloader.online_importer import InvalidDownloaderPath, invalid_folders, invalid_paths, no_distribution_mister_invalid_paths
+from test.objects import db_distribution_mister_with_file, db_test_being_empty_descr, file_boot_rom, boot_rom_descr, overwrite_file, file_mister_descr, file_mister_old_descr, file_a_descr, file_a_updated_descr, db_test_with_file, db_with_file, db_test_with_file_a_descr, db_with_folders, file_a, folder_a, file_MiSTer, file_MiSTer_old
 from test.fakes import OnlineImporter
 
 
 class TestOnlineImporter(unittest.TestCase):
-
-    def setUp(self) -> None:
-        self.sut = OnlineImporter()
 
     def test_download_dbs_contents___with_trivial_db___does_nothing(self):
         sut = OnlineImporter()
@@ -106,12 +104,12 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertReports(sut, [], errors=[file_a])
         self.assertFalse(sut.file_service.is_file(file_a))
 
-    def test_download_dbs_contents___with_mister___needs_reboot(self):
+    def test_download_distribution_mister___with_mister___needs_reboot(self):
         sut = OnlineImporter()
         store = empty_store()
         sut.file_service.test_data.with_old_mister_binary()
 
-        sut.add_db(db_test_with_file(file_MiSTer, file_mister_descr()), store)
+        sut.add_db(db_distribution_mister_with_file(file_MiSTer, file_mister_descr()), store)
         sut.download_dbs_contents(False)
 
         self.assertEqualDict(store['files'][file_MiSTer], file_mister_descr())
@@ -119,6 +117,20 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertReports(sut, [file_MiSTer], needs_reboot=True)
         self.assertTrue(sut.file_service.is_file(file_MiSTer))
         self.assertTrue(sut.file_service.is_file(file_MiSTer_old))
+
+    def test_download_test_db___with_mister___raises_invalid_downloader_path_exception(self):
+        sut = OnlineImporter()
+        store = empty_store()
+        sut.file_service.test_data.with_old_mister_binary()
+
+        sut.add_db(db_test_with_file(file_MiSTer, file_mister_descr()), store)
+        self.assertRaises(InvalidDownloaderPath, lambda: sut.download_dbs_contents(False))
+
+        self.assertEqualDict(store, empty_store())
+        self.assertEmptyFolders(store)
+        self.assertReportsNothing(sut)
+        self.assertTrue(sut.file_service.is_file(file_MiSTer))
+        self.assertFalse(sut.file_service.is_file(file_MiSTer_old))
 
     def test_download_dbs_contents___with_file_on_stored_erroring___store_deletes_file(self):
         sut = OnlineImporter()
@@ -291,6 +303,27 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertReportsNothing(sut)
         self.assertEqual(sut.file_service.folders(), ['a', 'b', 'x'])
 
+    def test_downloaded_single_db___with_invalid_files___raises_error(self):
+        invalids = [0, 'linux/file.txt', 'linux/something/something/file.txt', '../omg.txt', 'this/is/ok/../or/nope.txt', '/tmp/no', '.hidden'] + \
+                        ['%s/file.txt' % k for k in invalid_folders()] + \
+                        list(invalid_paths()) + \
+                        list(no_distribution_mister_invalid_paths())
+
+        for wrong_path in invalids:
+            with self.subTest(wrong_path):
+                self.assertRaises(InvalidDownloaderPath, lambda: self.downloaded_single_db(db_test_with_file(wrong_path, file_a_descr())))
+
+    def test_downloaded_single_db___with_invalid_folders___raises_error(self):
+        invalid_paths = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + invalid_folders()
+        for wrong_path in invalid_paths:
+            with self.subTest(wrong_path):
+                self.assertRaises(InvalidDownloaderPath, lambda: self.downloaded_single_db(db_with_folders('wrong_db', {wrong_path: {}})))
+
+    def downloaded_single_db(self, db, store=None, full_resync=False):
+        sut = OnlineImporter()
+        sut.add_db(db, store if store is not None else empty_store())
+        sut.download_dbs_contents(full_resync)
+
     def assertEqualDict(self, store, o):
         if isinstance(o, list):
             o = {i: {} for i in o}
@@ -311,8 +344,6 @@ class TestOnlineImporter(unittest.TestCase):
     def assertReports(self, sut, installed, errors=None, needs_reboot=False):
         if errors is None:
             errors = []
-        if installed is None:
-            installed = []
         self.assertEqual(installed, sut.correctly_installed_files())
         self.assertEqual(errors, sut.files_that_failed())
         self.assertEqual(needs_reboot, sut.needs_reboot())

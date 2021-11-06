@@ -18,6 +18,7 @@
 
 import unittest
 from pathlib import Path
+from downloader.constants import distribution_mister_db_id
 import copy
 
 file_test_json_zip = 'test.json.zip'
@@ -28,6 +29,7 @@ hash_menu_rbf = 'menu.rbf'
 file_MiSTer = 'MiSTer'
 file_MiSTer_old = 'Scripts/.config/downloader/MiSTer.old'
 hash_MiSTer = 'MiSTer.new'
+hash_MiSTer_old = 'something_old'
 file_MiSTer_new = 'MiSTer.new'
 folder_a = 'a'
 db_test = 'test'
@@ -53,7 +55,9 @@ def db_test_being_empty_descr():
         'files': {},
         'folders': {},
         'base_files_url': '',
-        'zips': {}
+        'zips': {},
+        'default_options': {},
+        'timestamp': 0
     }
 
 
@@ -142,7 +146,9 @@ def db_test_descr(zips=None, folders=None, files=None, db_files=None):
         'files': files if files is not None else {},
         'folders': folders if folders is not None else {},
         'base_files_url': 'http://',
-        'zips': zips if zips is not None else {}
+        'zips': zips if zips is not None else {},
+        'default_options': {},
+        'timestamp': 0
     }
 
 
@@ -150,7 +156,7 @@ def db_empty_with_linux_descr():
     return {
         'db_id': db_empty,
         'db_files': [],
-        'files': [],
+        'files': {},
         'folders': {},
         'linux': {
             "delete": [],
@@ -160,7 +166,9 @@ def db_empty_with_linux_descr():
             "version": "210711"
         },
         'base_files_url': '',
-        'zips': {}
+        'zips': {},
+        'default_options': {},
+        'timestamp': 0
     }
 
 
@@ -168,10 +176,12 @@ def db_empty_descr():
     return {
         'db_id': db_empty,
         'db_files': [],
-        'files': [],
+        'files': {},
         'folders': {},
         'base_files_url': '',
-        'zips': {}
+        'zips': {},
+        'default_options': {},
+        'timestamp': 0
     }
 
 
@@ -179,10 +189,12 @@ def db_wrong_descr():
     return {
         'db_id': 'wrong',
         'db_files': [],
-        'files': [],
+        'files': {},
         'folders': {},
         'base_files_url': '',
-        'zips': {}
+        'zips': {},
+        'default_options': {},
+        'timestamp': 0
     }
 
 
@@ -190,6 +202,17 @@ def file_mister_descr():
     return {
         "delete": [],
         "hash": hash_MiSTer,
+        "size": 2915040,
+        "url": "https://MiSTer",
+        "reboot": True,
+        "path": "system"
+    }
+
+
+def file_mister_old_descr():
+    return {
+        "delete": [],
+        "hash": hash_MiSTer_old,
         "size": 2915040,
         "url": "https://MiSTer",
         "reboot": True,
@@ -251,7 +274,24 @@ def db_test_with_file(name_file, file):
         },
         'folders': {},
         'base_files_url': '',
-        'zips': {}
+        'zips': {},
+        'default_options': {},
+        'timestamp': 0
+    }
+
+
+def db_distribution_mister_with_file(name_file, file):
+    return {
+        'db_id': distribution_mister_db_id,
+        'db_files': [file_test_json_zip],
+        'files': {
+            name_file: file
+        },
+        'folders': {},
+        'base_files_url': '',
+        'zips': {},
+        'default_options': {},
+        'timestamp': 0
     }
 
 
@@ -264,7 +304,9 @@ def db_with_file(db_id, name_file, file):
         },
         'folders': {},
         'base_files_url': '',
-        'zips': {}
+        'zips': {},
+        'default_options': {},
+        'timestamp': 0
     }
 
 
@@ -277,7 +319,9 @@ def db_with_folders(db_id, folders):
         'files': {},
         'folders': folders,
         'base_files_url': '',
-        'zips': {}
+        'zips': {},
+        'default_options': {},
+        'timestamp': 0
     }
 
 
@@ -290,12 +334,10 @@ def db_test_with_file_a_descr():
         },
         'folders': {folder_a: {}},
         'base_files_url': '',
-        'zips': {}
+        'zips': {},
+        'default_options': {},
+        'timestamp': 0
     }
-
-
-def not_found_sh():
-    return _not_file('not_found.sh')
 
 
 def not_found_ini():
@@ -311,5 +353,15 @@ def default_env():
     return {
         'DEFAULT_DB_URL': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
         'DEFAULT_DB_ID': 'distribution_mister',
-        'ALLOW_REBOOT': None
+        'ALLOW_REBOOT': None,
+        'DEBUG': 'false'
+    }
+
+
+def debug_env():
+    return {
+        'DEFAULT_DB_URL': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
+        'DEFAULT_DB_ID': 'distribution_mister',
+        'ALLOW_REBOOT': None,
+        'DEBUG': 'true'
     }

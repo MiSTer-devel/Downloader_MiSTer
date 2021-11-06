@@ -41,7 +41,7 @@ class TestDataFileService:
         self._files.add(test.objects.file_MiSTer, description if description is not None else test.objects.file_mister_descr())
 
     def with_old_mister_binary(self):
-        self.with_mister_binary({'hash': 'something_old'})
+        self.with_mister_binary({'hash': test.objects.hash_MiSTer_old})
 
     def with_test_json_zip(self, description=None):
         self._files.add(test.objects.file_test_json_zip, description if description is not None else test.objects.file_test_json_zip_descr())

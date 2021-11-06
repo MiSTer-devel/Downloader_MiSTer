@@ -22,7 +22,7 @@ import os
 import json
 from pathlib import Path
 from downloader.config import ConfigReader
-from test.objects import default_env
+from test.objects import debug_env
 from test.fakes import NoLogger, StoreMigrator
 from downloader.file_service import hash_file, FileService
 from downloader.main import main
@@ -141,7 +141,7 @@ class TestSandboxedInstall(unittest.TestCase):
 
         db = load_json('test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox_db.json')
         expected_local_store = local_store_files([('sandbox', db['files'])])
-        expected_local_store['dbs']['sandbox']['offline_databases_imported'] = ['ec63bd9a5cfc108cf13d516ebf605a7d']
+        expected_local_store['dbs']['sandbox']['offline_databases_imported'] = ['0627c397ac9d734dfdb86b9c8294eabe']
 
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox.ini', {
             'local_store': expected_local_store,
@@ -209,7 +209,7 @@ class TestSandboxedInstall(unittest.TestCase):
         if expected is None:
             return
 
-        config = ConfigReader(NoLogger(), default_env()).read_config(ini_path)
+        config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
         self.file_service = FileService(config, NoLogger())
         counter = 0
         if 'local_store' in expected:
@@ -252,7 +252,8 @@ class TestSandboxedInstall(unittest.TestCase):
             'ALLOW_REBOOT': None,
             'COMMIT': 'quick system test',
             'DEFAULT_DB_URL': '',
-            'DEFAULT_DB_ID': ''
+            'DEFAULT_DB_ID': '',
+            'DEBUG': 'true'
         })
 
     def find_all_files(self, directory):
@@ -278,7 +279,7 @@ class TestSandboxedInstall(unittest.TestCase):
 
 
 def cleanup(ini_path):
-    config = ConfigReader(NoLogger(), default_env()).read_config(ini_path)
+    config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
     shutil.rmtree(config['base_path'], ignore_errors=True)
     shutil.rmtree(config['base_system_path'], ignore_errors=True)
     Path(config['base_path']).mkdir(parents=True, exist_ok=True)

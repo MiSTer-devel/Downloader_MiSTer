@@ -113,14 +113,9 @@ class TestOnlineImporterWithZips(unittest.TestCase):
         self.assertReports([cheats_folder_nes_file_path])
         self.assertEqual(store_with_unzipped_cheats_folder_nes_files(zip_id=False, zips=False), store)
 
-    def assertReportsNothing(self):
-        self.assertReports([])
-
     def assertReports(self, installed, errors=None, needs_reboot=False):
         if errors is None:
             errors = []
-        if installed is None:
-            installed = []
         self.assertEqual(installed, self.sut.correctly_installed_files())
         self.assertEqual(errors, self.sut.files_that_failed())
         self.assertEqual(needs_reboot, self.sut.needs_reboot())

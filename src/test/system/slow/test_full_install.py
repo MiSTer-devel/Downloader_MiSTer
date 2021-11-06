@@ -22,7 +22,7 @@ import os
 import os.path
 from pathlib import Path
 from downloader.config import ConfigReader
-from test.objects import default_env
+from test.objects import debug_env
 from test.fakes import NoLogger
 from downloader.file_service import hash_file
 import subprocess
@@ -73,7 +73,7 @@ class TestFullInstall(unittest.TestCase):
         self.assertNotEqual(correct_hash, corrupt_hash)
 
     def assertRunOk(self, ini_path):
-        config = ConfigReader(NoLogger(), default_env()).read_config(ini_path)
+        config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
         shutil.rmtree(config['base_path'], ignore_errors=True)
         shutil.rmtree(config['base_system_path'], ignore_errors=True)
         mister_path = Path('%s/MiSTer' % config['base_system_path'])
@@ -85,7 +85,8 @@ class TestFullInstall(unittest.TestCase):
         subprocess.run(['chmod', '+x', tool], shell=False, stderr=subprocess.STDOUT)
         test_env = os.environ.copy()
         test_env['CURL_SSL'] = ''
-        result = subprocess.run([tool], stderr=subprocess.STDOUT,env=test_env)
+        test_env['DEBUG'] = 'true'
+        result = subprocess.run([tool], stderr=subprocess.STDOUT, env=test_env)
         self.assertEqual(result.returncode, 0)
         self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json.zip" % config['base_system_path']))
         os.unlink(tool)

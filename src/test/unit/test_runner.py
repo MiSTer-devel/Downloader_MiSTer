@@ -41,3 +41,23 @@ class TestRunner(unittest.TestCase):
     def test_run___database_not_fetched___returns_1(self):
         exit_code = Runner.with_single_empty_db().run()
         self.assertEqual(exit_code, 1)
+
+    def test_validate_db___with_correct_db___returns_true(self):
+        self.assertTrue(validate_db())
+
+    def test_validate_db___with_wrong_section___returns_false(self):
+        self.assertFalse(validate_db(db_description={'section': ''}))
+
+    def test_validate_db___with_wrong_db___returns_false(self):
+        self.assertFalse(validate_db(db="wrong"))
+
+    def test_validate_db___with_wrong_field___returns_false(self):
+        for field in ['db_id', 'base_files_url', 'db_files', 'files', 'folders', 'zips', 'default_options', 'timestamp']:
+            with self.subTest(field):
+                db = db_empty_descr()
+                db.pop(field)
+                self.assertFalse(validate_db(db))
+
+
+def validate_db(db=None, db_description=None):
+    return Runner.with_single_empty_db().validate_db(db_empty_descr() if db is None else db, {'section': db_empty} if db_description is None else db_description)

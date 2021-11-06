@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from downloader.config import AllowDelete, AllowReboot
+from downloader.config import AllowDelete, AllowReboot, InvalidConfigParameter
 from test.objects import not_found_ini
 from test.fakes import ConfigReader
 
@@ -77,6 +77,14 @@ class TestConfigReader(unittest.TestCase):
             }],
         })
 
+    def test_config_reader___with_invalid_base_path_ini___raises_invalid_config_parameter_exception(self):
+        self.assertRaises(InvalidConfigParameter,
+                          lambda: ConfigReader().read_config("test/integration/fixtures/invalid_base_path.ini"))
+
+    def test_config_reader___with_invalid_base_system_path_ini___raises_invalid_config_parameter_exception(self):
+        self.assertRaises(InvalidConfigParameter,
+                          lambda: ConfigReader().read_config("test/integration/fixtures/invalid_base_system_path.ini"))
+
     def test_config_reader___with_custom_mister_dbs_ini___returns_custom_fields_and_dbs(self):
         self.assertConfig("test/integration/fixtures/custom_mister_dbs.ini", {
             'update_linux': False,
@@ -114,7 +122,8 @@ class TestConfigReader(unittest.TestCase):
         }, ])
 
     def test_config_reader___with_db_and_random_empty_section_2___raises_exception(self):
-        self.assertRaises(Exception, lambda: self.databases("test/integration/fixtures/db_plus_random_empty_section.ini"))
+        self.assertRaises(Exception,
+                          lambda: self.databases("test/integration/fixtures/db_plus_random_empty_section.ini"))
 
     def assertConfig(self, path, config_vars):
         actual = ConfigReader().read_config(path)
