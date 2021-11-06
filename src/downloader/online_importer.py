@@ -278,7 +278,7 @@ def no_distribution_mister_invalid_paths():
 
 
 def invalid_paths():
-    return ('mister.ini', 'mister_alt.ini', 'mister_alt_1.ini', 'mister_alt_2.ini', 'mister_alt_3.ini', 'scripts/downloader.sh')
+    return ('mister.ini', 'mister_alt.ini', 'mister_alt_1.ini', 'mister_alt_2.ini', 'mister_alt_3.ini', 'scripts/downloader.sh', 'mister.new')
 
 
 def invalid_folders():
