@@ -137,19 +137,19 @@ Here is the format of the json DB file:
 
 The json file can be contained in a ZIP file. In that case, provide the URL of that file, which should end with the extension `*.json.zip`.
 
-### Important note about the Database ID
+## Important note about the Database ID
 
 It's very important to **NOT** change your database ID once you have published a collection for it. That ID is used by the downloader to track changes in files, and by changing it users could end up with duplicated files in the future, since name changes won't be detected. Also, you will bloat the local database of a user if you change this ID frequently, which would lead to a waste of space in the SD and to longer run times of the Downloader.
 
 Once you published a collection with a given database ID, please stick to it whenever you update that collection.
 
-### Restrictions
+## Restrictions
 
 1. The files and folders dictionary keys must be relative paths. They can not contain `..` nor be empty strings. They also can't point to common system folders, such as 'linux' or 'saves'. And finally, they can't be any system file such as: 'MiSTer', 'menu.rbf', 'MiSTer.ini' 
 
 2. Only fields documented here should be used.
 
-### Zip Formats (Optional)
+## Zip Formats (Optional)
 
 If you would like to use ZIPs for optimizing the downloader process, usually because your collection includes a very big amount of files (1000+), you may declare ZIPs in your database.
 
