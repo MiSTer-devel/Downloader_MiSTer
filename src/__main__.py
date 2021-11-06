@@ -19,6 +19,7 @@
 
 import os
 from downloader.main import main
+from downloader.constants import distribution_mister_db_id, distribution_mister_db_url
 
 if __name__ == '__main__':
     exit_code = main({
@@ -27,9 +28,10 @@ if __name__ == '__main__':
         'CURL_SSL': os.getenv('CURL_SSL', '--cacert /etc/ssl/certs/cacert.pem'),
         'COMMIT': os.getenv('COMMIT', 'unknown'),
         'ALLOW_REBOOT': os.getenv('ALLOW_REBOOT', None),
-        'UPDATE_LINUX': os.getenv('UPDATE_LINUX', 'true'),
-        'DEFAULT_DB_URL': os.getenv('DEFAULT_DB_URL', 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'),
-        'DEFAULT_DB_ID': os.getenv('DEFAULT_DB_ID', 'distribution_mister')
+        'UPDATE_LINUX': os.getenv('UPDATE_LINUX', 'true').lower(),
+        'DEFAULT_DB_URL': os.getenv('DEFAULT_DB_URL', distribution_mister_db_url),
+        'DEFAULT_DB_ID': os.getenv('DEFAULT_DB_ID', distribution_mister_db_id),
+        'DEBUG': os.getenv('DEBUG', 'false').lower()
     })
 
     exit(exit_code)

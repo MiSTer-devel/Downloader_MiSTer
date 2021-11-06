@@ -70,3 +70,9 @@ downloader_retries = 3
 
 Check the [CHANGELOG](CHANGELOG.md) for more information about past releases.
 
+### Custom Databases
+
+Custom databases give users the ability to download more file collections.
+
+Check the documentation [here](docs/custom-databases.md) for more information.
+

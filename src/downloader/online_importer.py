@@ -16,7 +16,10 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-class OnlineImporter:
+from .constants import distribution_mister_db_id
+
+
+class OnlineImporter:    
     def __init__(self, config, file_service, downloader_factory, logger):
         self._config = config
         self._file_service = file_service
@@ -71,6 +74,8 @@ class OnlineImporter:
         needed_zips = dict()
 
         for file_path in db['files']:
+            self._assert_valid_path(file_path, db['db_id'])
+
             if file_path in self._processed_files:
                 self._logger.print('DUPLICATED: %s' % file_path)
                 self._logger.print('Already been processed by database: %s' % self._processed_files[file_path])
@@ -116,6 +121,25 @@ class OnlineImporter:
         self._correctly_installed_files.extend(file_downloader.correctly_downloaded_files())
 
         self._needs_reboot = self._needs_reboot or file_downloader.needs_reboot()
+
+    def _assert_valid_path(self, path, db_id):
+        if not isinstance(path, str):
+            raise InvalidDownloaderPath("Path is not a string '%s', contact with the author of the database." % str(path))
+
+        if path == '' or path[0] == '/' or path[0] == '.' or path[0] == '\\':
+            raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
+
+        lower_path = path.lower()
+
+        if lower_path in invalid_paths():
+            raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
+        
+        if db_id != distribution_mister_db_id and lower_path in no_distribution_mister_invalid_paths():
+            raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
+
+        parts = lower_path.split('/')
+        if '..' in parts or len(parts) == 0 or parts[0] in invalid_folders():
+            raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
 
     def _is_first_run(self, store):
         return len(store['files']) == 0
@@ -216,6 +240,7 @@ class OnlineImporter:
 
     def _create_folders(self, db, store):
         for folder in db['folders']:
+            self._assert_valid_path(folder, db['db_id'])
             self._file_service.makedirs(folder)
 
         self._dbs_folders |= set(db['folders'])
@@ -242,3 +267,19 @@ class OnlineImporter:
 
     def needs_reboot(self):
         return self._needs_reboot
+
+
+class InvalidDownloaderPath(Exception):
+    pass
+
+
+def no_distribution_mister_invalid_paths():
+    return ('mister', 'menu.rbf')
+
+
+def invalid_paths():
+    return ('mister.ini', 'mister_alt.ini', 'mister_alt_1.ini', 'mister_alt_2.ini', 'mister_alt_3.ini', 'scripts/downloader.sh')
+
+
+def invalid_folders():
+    return ('linux', 'saves', 'savestates', 'screenshots')

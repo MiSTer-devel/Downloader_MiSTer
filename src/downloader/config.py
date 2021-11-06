@@ -103,8 +103,8 @@ class ConfigReader:
         for section in ini_config.sections():
             parser = IniParser(ini_config[section])
             if section.lower() == 'mister':
-                result['base_path'] = parser.get_string('base_path', result['base_path'])
-                result['base_system_path'] = parser.get_string('base_system_path', result['base_system_path'])
+                result['base_path'] = self._valid_base_path(parser.get_string('base_path', result['base_path']))
+                result['base_system_path'] = self._valid_base_path(parser.get_string('base_system_path', result['base_system_path']))
                 result['allow_delete'] = AllowDelete(parser.get_int('allow_delete', result['allow_delete'].value))
                 result['allow_reboot'] = AllowReboot(parser.get_int('allow_reboot', result['allow_reboot'].value))
                 result['check_manually_deleted_files'] = parser.get_bool('check_manually_deleted_files', result['check_manually_deleted_files'])
@@ -140,3 +140,18 @@ class ConfigReader:
             result['allow_reboot'] = AllowReboot(int(self._env['ALLOW_REBOOT']))
 
         return result
+
+    def _valid_base_path(self, path):
+        if self._env['DEBUG'] != 'true':
+            if path == '' or path[0] == '.' or path[0] == '\\':
+                raise InvalidConfigParameter("Invalid base path '%s', base paths should start with '/media/*/'" % path)
+
+            parts = path.lower().split('/')
+            if '..' in parts or len(parts) < 3 or parts[0] != '' or parts[1] != 'media':
+                raise InvalidConfigParameter("Invalid base path '%s', base paths should start with '/media/*/'" % path)
+        
+        return path
+
+
+class InvalidConfigParameter(Exception):
+    pass
