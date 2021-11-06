@@ -153,7 +153,7 @@ Once you published a collection with a given database ID, please stick to it whe
 
 If you would like to use ZIPs for optimizing the downloader process, usually because your collection includes a very big amount of files (1000+), you may declare ZIPs in your database.
 
-##### Expanding the zips field in the json DB file
+#### Expanding the zips field in the json DB file
 
 For that you would have to expand the `zips` field from your json DB file, with the following information:
 ```js
@@ -289,11 +289,11 @@ Additionally, you would have to prepare two extra files for each declared zip_id
 - The content file
 - The summary file
 
-##### The content file
+#### The content file
 
 This is the actual ZIP file containing all you would like to distribute within it. It must be a standard zip, containing files or folders. It will be unzipped as-is, within the folder specify by the field `path` in its respective zip_id section.
 
-##### The summary file
+#### The summary file
 
 This is a json file. It could be zipped or not. In case it's zipped, the URL should end with the extension `*.json.zip`.
 
