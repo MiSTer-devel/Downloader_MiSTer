@@ -332,7 +332,7 @@ This is the format of the zip summary json file:
           
             /**
              * [Optional] Download source (string). If missing, it will be calculated with:
-             *            (base_files_url + the key of the file)
+             *            (zip_id.base_files_url + the key of the file)
              */
             "url": "https://url_to_db/path/of/file1.rbf",
           
