@@ -30,25 +30,35 @@ def downloader_with_errors(errors):
 
 
 class TestDataCurlDownloader:
-    def __init__(self, problematic_files):
-        self._problematic_files = problematic_files
+    def __init__(self, fake_curl_downloader):
+        self._fake_curl_downloader = fake_curl_downloader
 
     def errors_at(self, file, tries=None):
-        self._problematic_files[file] = tries if tries is not None else 99
+        self._fake_curl_downloader._problematic_files[file] = tries if tries is not None else 99
+        return self
+
+    def brings_hash(self, file, hash_code):
+        self._fake_curl_downloader._actual_hashes[file] = hash_code
+        return self
+
+    def misses_file(self, file):
+        self._fake_curl_downloader._missing_files.add(file)
         return self
 
 
 class CurlDownloader(ProductionCurlCommonDownloader):
-    def __init__(self, config=None, file_service=None, problematic_files=None):
+    def __init__(self, config=None, file_service=None):
         config = config if config is not None else {'curl_ssl': '', 'downloader_retries': 3}
         self.file_service = FileService() if file_service is None else file_service
         super().__init__(config, self.file_service, ProductionLocalRepository(config, NoLogger(), self.file_service), NoLogger())
         self._run_files = []
-        self._problematic_files = dict() if problematic_files is None else problematic_files
+        self._problematic_files = dict()
+        self._actual_hashes = dict()
+        self._missing_files = set()
 
     @property
     def test_data(self):
-        return TestDataCurlDownloader(self._problematic_files)
+        return TestDataCurlDownloader(self)
 
     def _run(self, description, target_path, file):
         self._run_files.append(file)
@@ -57,7 +67,11 @@ class CurlDownloader(ProductionCurlCommonDownloader):
             self._problematic_files[file] -= 1
 
         if file not in self._problematic_files or self._problematic_files[file] <= 0:
-            self._file_service.test_data.with_file(file if file != file_MiSTer else file_MiSTer_new, description)
+            if file in self._actual_hashes:
+                description = description.copy()
+                description['hash'] = self._actual_hashes[file]
+            if file not in self._missing_files:
+                self._file_service.test_data.with_file(file if file != file_MiSTer else file_MiSTer_new, description)
             self._http_oks.append(file)
         else:
             self._errors.append(file)

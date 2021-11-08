@@ -44,6 +44,16 @@ class TestCurlDownloader(unittest.TestCase):
         self.download_one()
         self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
 
+    def test_download_files_one___from_scratch_no_matching_hash___return_errors(self):
+        self.sut.test_data.brings_hash(file_one, 'wrong')
+        self.download_one()
+        self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
+
+    def test_download_files_one___from_scratch_no_file_exists___return_errors(self):
+        self.sut.test_data.misses_file(file_one)
+        self.download_one()
+        self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
+
     def test_download_reboot_file___from_scratch_no_issues___needs_reboot(self):
         self.download_reboot()
         self.assertDownloaded([file_menu_rbf], [file_menu_rbf], need_reboot=True)

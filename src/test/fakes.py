@@ -40,34 +40,24 @@ class ConfigReader(ProductionConfigReader):
 
 
 class OnlineImporter(ProductionOnlineImporter):
-    def __init__(self, downloader=None, config=None, file_service=None):
+    def __init__(self, downloader_factory=None, config=None, file_service=None):
         self.file_service = FileService() if file_service is None else file_service
-        self._problematic_files = dict()
         self.config = default_config() if config is None else config
         super().__init__(
             self.config,
             self.file_service,
-            lambda c: CurlDownloader(c, self.file_service, self._problematic_files) if downloader is None else downloader,
+            (lambda c: CurlDownloader(c, self.file_service)) if downloader_factory is None else downloader_factory,
             NoLogger())
-
-    @property
-    def downloader_test_data(self):
-        return TestDataCurlDownloader(self._problematic_files)
 
 
 class OfflineImporter(ProductionOfflineImporter):
-    def __init__(self, config=None, file_service=None, downloader=None):
+    def __init__(self, downloader_factory=None, config=None, file_service=None):
         self.file_service = FileService() if file_service is None else file_service
-        self._problematic_files = dict()
         super().__init__(
             default_config() if config is None else config,
             self.file_service,
-            lambda c: CurlDownloader(c, self.file_service, self._problematic_files) if downloader is None else downloader,
+            (lambda c: CurlDownloader(c, self.file_service)) if downloader_factory is None else downloader_factory,
             NoLogger())
-
-    @property
-    def downloader_test_data(self):
-        return TestDataCurlDownloader(self._problematic_files)
 
 
 class RebootCalculator(ProductionRebootCalculator):
@@ -127,6 +117,18 @@ class Runner(ProductionRunner):
             {'databases': [], 'verbose': False, 'config_path': Path('')},
             DbGateway(),
         )
+
+
+class FactoryStub:
+    def __init__(self, instance):
+        self._instance = instance
+
+    def __call__(self, *args, **kwargs):
+        return self._instance
+
+    def has(self, func):
+        func(self._instance)
+        return self
 
 
 class LocalRepository(ProductionLocalRepository):

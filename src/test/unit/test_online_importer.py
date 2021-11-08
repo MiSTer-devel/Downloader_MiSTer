@@ -21,7 +21,7 @@ from downloader.config import default_config
 from downloader.other import empty_store
 from downloader.online_importer import InvalidDownloaderPath, invalid_folders, invalid_paths, no_distribution_mister_invalid_paths
 from test.objects import db_distribution_mister_with_file, db_test_being_empty_descr, file_boot_rom, boot_rom_descr, overwrite_file, file_mister_descr, file_mister_old_descr, file_a_descr, file_a_updated_descr, db_test_with_file, db_with_file, db_test_with_file_a_descr, db_with_folders, file_a, folder_a, file_MiSTer, file_MiSTer_old
-from test.fakes import OnlineImporter
+from test.fakes import OnlineImporter, CurlDownloader, FactoryStub
 
 
 class TestOnlineImporter(unittest.TestCase):
@@ -92,8 +92,7 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertTrue(sut.file_service.is_file(file_a))
 
     def test_download_dbs_contents___with_one_failed_file___just_reports_error(self):
-        sut = OnlineImporter()
-        sut.downloader_test_data.errors_at(file_a)
+        sut = OnlineImporter(FactoryStub(CurlDownloader()).has(lambda downloader: downloader.test_data.errors_at(file_a)))
         store = empty_store()
 
         sut.add_db(db_test_with_file_a_descr(), store)
@@ -133,9 +132,8 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertFalse(sut.file_service.is_file(file_MiSTer_old))
 
     def test_download_dbs_contents___with_file_on_stored_erroring___store_deletes_file(self):
-        sut = OnlineImporter()
+        sut = OnlineImporter(FactoryStub(CurlDownloader()).has(lambda downloader: downloader.test_data.errors_at(file_a)))
         sut.file_service.test_data.with_folders(['a'])
-        sut.downloader_test_data.errors_at(file_a)
         store = db_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file(file_a, file_a_updated_descr()), store)
