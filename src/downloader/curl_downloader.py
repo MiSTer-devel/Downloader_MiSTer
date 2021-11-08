@@ -102,33 +102,9 @@ class CurlCommonDownloader:
             self._download(path, self._curl_list[path])
 
         self._wait()
+        self._check_hashes()
 
         for retry in range(self._config['downloader_retries']):
-            if len(self._http_oks) > 0:
-                self._logger.print()
-                self._logger.print('Checking hashes...')
-
-                for path in self._http_oks:
-                    if not self._file_service.is_file(path if path != 'MiSTer' else 'MiSTer.new'):
-                        self._logger.print('Missing %s' % path)
-                        self._errors.append(path)
-                        continue
-
-                    path_hash = self._file_service.hash(path if path != 'MiSTer' else 'MiSTer.new')
-                    if path_hash != self._curl_list[path]['hash']:
-                        self._logger.print(
-                            'Bad hash on %s (%s != %s)' % (path, self._curl_list[path]['hash'], path_hash))
-                        self._errors.append(path)
-                        continue
-
-                    self._logger.print('+', end='', flush=True)
-                    self._correct_downloads.append(path)
-                    if self._curl_list[path].get('reboot', False):
-                        self._needs_reboot = True
-
-                self._logger.print()
-
-            self._http_oks = []
 
             if len(self._errors) == 0:
                 return
@@ -140,6 +116,36 @@ class CurlCommonDownloader:
                 self._download(path, self._curl_list[path])
 
             self._wait()
+            self._check_hashes()
+
+    def _check_hashes(self):
+        if len(self._http_oks) > 0:
+            self._logger.print()
+            self._logger.print('Checking hashes...')
+
+            for path in self._http_oks:
+                if not self._file_service.is_file(path if path != 'MiSTer' else 'MiSTer.new'):
+                    self._logger.print('~', end='', flush=True)
+                    self._logger.debug('Missing %s' % path)
+                    self._errors.append(path)
+                    continue
+
+                path_hash = self._file_service.hash(path if path != 'MiSTer' else 'MiSTer.new')
+                if path_hash != self._curl_list[path]['hash']:
+                    self._logger.print('~', end='', flush=True)
+                    self._logger.debug(
+                        'Bad hash on %s (%s != %s)' % (path, self._curl_list[path]['hash'], path_hash))
+                    self._errors.append(path)
+                    continue
+
+                self._logger.print('+', end='', flush=True)
+                self._correct_downloads.append(path)
+                if self._curl_list[path].get('reboot', False):
+                    self._needs_reboot = True
+
+            self._logger.print()
+
+        self._http_oks = []
 
     def _download(self, path, description):
         self._logger.print(path)
@@ -226,8 +232,9 @@ class CurlCustomParallelDownloader(CurlCommonDownloader):
                 for i, p in enumerate(self._processes):
                     if p is None:
                         continue
+                    self._logger.print('~', end='', flush=True)
+                    self._logger.debug('Timeout! %s' % self._files[i], flush=True)
                     self._errors.append(self._files[i])
-                    self._logger.print('Timeout! %s' % self._files[i], flush=True)
                 break
 
             time.sleep(1)
