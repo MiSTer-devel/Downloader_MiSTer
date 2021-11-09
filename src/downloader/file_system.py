@@ -36,6 +36,9 @@ class FileSystem:
     def temp_file(self):
         return tempfile.NamedTemporaryFile(delete=False).name
 
+    def resolve(self, path):
+        return str(Path(path).resolve())
+
     def add_system_path(self, path):
         self._system_paths.add(path)
 
