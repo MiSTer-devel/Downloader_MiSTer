@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from downloader.file_service import FileService
+from downloader.file_system import FileSystem
 from downloader.config import AllowDelete, default_config
 from test.fakes import NoLogger
 from pathlib import Path
@@ -28,10 +28,10 @@ not_created_file = '/tmp/opened_file'
 empty_file = '/tmp/empty_file'
 mister_file = 'MiSTer'
 rbf_file = 'MyCore.RBF'
-delme_dir = 'file_service_integration_delme'
+delme_dir = 'file_system_integration_delme'
 
 
-class TestFileService(unittest.TestCase):
+class TestFileSystem(unittest.TestCase):
 
     def setUp(self) -> None:
         Path(empty_file).touch()
@@ -119,21 +119,21 @@ class TestFileService(unittest.TestCase):
     def test_curl_path_x___after_add_system_path_x_with_system_path_b___returns_b_plus_x(self):
         sut = self.sut({'base_path': 'a', 'base_system_path': 'b'})
         sut.add_system_path('x')
-        self.assertEqual(sut.curl_target_path('x'), 'b/x')
+        self.assertEqual(sut.download_target_path('x'), 'b/x')
 
     def test_curl_path_x___with_system_path_a___returns_a_plus_x(self):
         sut = self.sut({'base_path': 'a', 'base_system_path': 'b'})
-        self.assertEqual(sut.curl_target_path('x'), 'a/x')
+        self.assertEqual(sut.download_target_path('x'), 'a/x')
 
     def test_curl_path_temp_x___always___returns_temp_plus_x(self):
-        self.assertEqual(self.sut().curl_target_path('/tmp/x'), '/tmp/x')
+        self.assertEqual(self.sut().download_target_path('/tmp/x'), '/tmp/x')
 
     def test_makedirs___on_missing_folder___creates_it(self):
         self.sut({'base_path': delme_dir}).makedirs('foo')
         self.assertTrue(os.path.isdir(delme_dir + '/foo'))
 
     def sut(self, config=None):
-        return FileService(default_config() if config is None else config, NoLogger())
+        return FileSystem(default_config() if config is None else config, NoLogger())
 
     def unlink(self, file):
         try:

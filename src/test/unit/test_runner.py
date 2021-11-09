@@ -51,6 +51,9 @@ class TestRunner(unittest.TestCase):
     def test_validate_db___with_wrong_db___returns_false(self):
         self.assertFalse(validate_db(db="wrong"))
 
+    def test_validate_db___with_none_db___returns_false(self):
+        self.assertFalse(Runner.with_single_empty_db().validate_db(None, {}))
+
     def test_validate_db___with_wrong_field___returns_false(self):
         for field in ['db_id', 'base_files_url', 'db_files', 'files', 'folders', 'zips', 'default_options', 'timestamp']:
             with self.subTest(field):
@@ -60,4 +63,4 @@ class TestRunner(unittest.TestCase):
 
 
 def validate_db(db=None, db_description=None):
-    return Runner.with_single_empty_db().validate_db(db_empty_descr() if db is None else db, {'section': db_empty} if db_description is None else db_description)
+    return Runner.with_single_empty_db().validate_db(db_empty_descr() if db is None else db, db_empty if db_description is None else db_description['section'])

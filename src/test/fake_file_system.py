@@ -15,11 +15,15 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+
 import test.objects
 import pathlib
 
 
-class TestDataFileService:
+fake_temp_file = '/tmp/temp_file'
+
+
+class TestDataFileSystem:
     def __init__(self, files, folders):
         self._files = files
         self._folders = folders
@@ -48,17 +52,20 @@ class TestDataFileService:
         return self
 
 
-class FileService:
+class FileSystem:
     def __init__(self):
         self._files = CaseInsensitiveDict()
         self._folders = CaseInsensitiveDict()
 
     @property
     def test_data(self):
-        return TestDataFileService(self._files, self._folders)
+        return TestDataFileSystem(self._files, self._folders)
 
     def add_system_path(self, path):
         pass
+
+    def temp_file(self):
+        return fake_temp_file
 
     def is_file(self, path):
         return self._files.has(path)
@@ -104,7 +111,7 @@ class FileService:
     def remove_folder(self, path):
         self._folders.pop(path)
 
-    def curl_target_path(self, path):
+    def download_target_path(self, path):
         return path
 
     def unlink(self, path):
@@ -120,7 +127,7 @@ class FileService:
     def save_json_on_zip(self, db, path):
         pass
 
-    def load_db_from_file(self, path):
+    def load_db_from_file(self, path, suffix=None):
         file_description = self._files.get(path)
         unzipped_json = file_description['unzipped_json']
         file_description.pop('unzipped_json')

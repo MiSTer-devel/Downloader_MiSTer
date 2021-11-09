@@ -24,13 +24,17 @@ import json
 from .other import run_stdout, run_successfully
 from .config import AllowDelete
 import subprocess
+import tempfile
 
 
-class FileService:
+class FileSystem:
     def __init__(self, config, logger):
         self._config = config
         self._logger = logger
         self._system_paths = set()
+
+    def temp_file(self):
+        return tempfile.NamedTemporaryFile(delete=False).name
 
     def add_system_path(self, path):
         self._system_paths.add(path)
@@ -84,7 +88,7 @@ class FileService:
         self._logger.print('Deleting empty folder %s' % path)
         os.rmdir(self._path(path))
 
-    def curl_target_path(self, path):
+    def download_target_path(self, path):
         return self._path(path)
 
     def unlink(self, path):
@@ -135,7 +139,7 @@ class FileService:
 
         zip_path = Path(self._path(path)).absolute()
 
-        run_successfully('cd /tmp/ && zip -qr -0 %s %s' % (zip_path, json_name), self._logger)
+        run_successfully('cd /tmp/ && zip -qr %s %s' % (zip_path, json_name), self._logger)
 
         self._unlink(json_path, False)
 

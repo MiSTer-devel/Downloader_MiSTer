@@ -24,7 +24,7 @@ from pathlib import Path
 from downloader.config import ConfigReader
 from test.objects import debug_env
 from test.fakes import NoLogger, StoreMigrator
-from downloader.file_service import hash_file, FileService
+from downloader.file_system import hash_file, FileSystem
 from downloader.main import main
 from downloader.local_repository import LocalRepository
 from downloader.store_migrator import make_new_local_store
@@ -190,8 +190,8 @@ class TestSandboxedInstall(unittest.TestCase):
             'system_folders': self.installed_system_folders
         })
 
-        self.file_service.touch('foo/something')
-        self.file_service.makedirs('baz/something')
+        self.file_system.touch('foo/something')
+        self.file_system.makedirs('baz/something')
 
         expected_local_store = local_store_files([('sandbox', {})])
         expected_local_store['dbs']['sandbox']['folders'] = {'bar': {}, 'bar/sub_bar': {}}
@@ -210,11 +210,11 @@ class TestSandboxedInstall(unittest.TestCase):
             return
 
         config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
-        self.file_service = FileService(config, NoLogger())
+        self.file_system = FileSystem(config, NoLogger())
         counter = 0
         if 'local_store' in expected:
             counter += 1
-            actual_store = LocalRepository(config, NoLogger(), self.file_service).load_store(StoreMigrator())
+            actual_store = LocalRepository(config, NoLogger(), self.file_system).load_store(StoreMigrator())
             self.assertEqual(actual_store, expected['local_store'])
 
         if 'files' in expected:

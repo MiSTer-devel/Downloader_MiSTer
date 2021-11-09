@@ -22,22 +22,75 @@ import sys
 from urllib.parse import quote, urlparse
 import urllib.request
 import time
+from abc import ABC, abstractmethod
+from .logger import SilentLogger
 
 
-def make_downloader_factory(file_service, local_repository, logger):
-    return lambda config: CurlCustomParallelDownloader(config, file_service, local_repository, logger) if config[
-        'parallel_update'] else CurlSerialDownloader(config, file_service, local_repository, logger)
+class FileDownloaderFactory(ABC):
+    @abstractmethod
+    def create(self, parallel_update, silent=False, hash_check=True):
+        """Created a Parallel or Serial File Downloader"""
 
 
-class CurlCommonDownloader:
-    def __init__(self, config, file_service, local_repository, logger):
+def make_file_downloader_factory(config, file_system, local_repository, logger):
+    return _FileDownloaderFactoryImpl(config, file_system, local_repository, logger)
+
+
+class _FileDownloaderFactoryImpl(FileDownloaderFactory):
+    def __init__(self, config, file_system, local_repository, logger):
         self._config = config
-        self._file_service = file_service
+        self._file_system = file_system
+        self._local_repository = local_repository
+        self._logger = logger
+
+    def create(self, parallel_update, silent=False, hash_check=True):
+        logger = SilentLogger(self._logger) if silent else self._logger
+        if parallel_update:
+            return _CurlCustomParallelDownloader(self._config, self._file_system, self._local_repository, logger, hash_check)
+        else:
+            return _CurlSerialDownloader(self._config, self._file_system, self._local_repository, logger, hash_check)
+
+
+class FileDownloader(ABC):
+    @abstractmethod
+    def queue_file(self, file_description, file_path):
+        """queues a file for downloading it later"""
+
+    @abstractmethod
+    def set_base_files_url(self, base_files_url):
+        """sets the base_files_url from a database"""
+
+    @abstractmethod
+    def mark_unpacked_zip(self, zip_id, base_zips_url):
+        """indicates that a zip is being used, useful for reporting"""
+
+    @abstractmethod
+    def download_files(self, first_run):
+        """download all the queued files"""
+
+    @abstractmethod
+    def errors(self):
+        """all files with errors"""
+
+    @abstractmethod
+    def correctly_downloaded_files(self):
+        """all correctly downloaded files"""
+
+    @abstractmethod
+    def needs_reboot(self):
+        """returns true if a file that needs reboot has been downloaded"""
+
+
+class CurlDownloaderAbstract(FileDownloader):
+    def __init__(self, config, file_system, local_repository, logger, hash_check):
+        self._config = config
+        self._file_system = file_system
         self._logger = logger
         self._local_repository = local_repository
+        self._hash_check = hash_check
         self._curl_list = {}
-        self._errors = []
-        self._http_oks = []
+        self._errors = _DownloadErrors(logger)
+        self._http_oks = _HttpOks()
         self._correct_downloads = []
         self._needs_reboot = False
         self._base_files_url = None
@@ -55,18 +108,18 @@ class CurlCommonDownloader:
     def download_files(self, first_run):
         self._download_files_internal(first_run)
 
-        if self._file_service.is_file('MiSTer.new'):
+        if self._file_system.is_file('MiSTer.new'):
             self._logger.print()
             self._logger.print('Copying new MiSTer binary:')
-            if self._file_service.is_file('MiSTer'):
-                self._file_service.move('MiSTer', self._local_repository.old_mister_path)
-            self._file_service.move('MiSTer.new', 'MiSTer')
+            if self._file_system.is_file('MiSTer'):
+                self._file_system.move('MiSTer', self._local_repository.old_mister_path)
+            self._file_system.move('MiSTer.new', 'MiSTer')
 
-            if self._file_service.is_file('MiSTer'):
+            if self._file_system.is_file('MiSTer'):
                 self._logger.print('New MiSTer binary copied.')
             else:
                 # This error message should never happen.
-                # If it happens it would be an unexpected case where file_service is not moving files correctly
+                # If it happens it would be an unexpected case where file_system is not moving files correctly
                 self._logger.print('CRITICAL ERROR!!! Could not restore the MiSTer binary!')
                 self._logger.print('Please manually rename the file MiSTer.new as MiSTer')
                 self._logger.print('Your system won\'nt be able to boot until you do so!')
@@ -81,10 +134,10 @@ class CurlCommonDownloader:
 
         for path in sorted(self._curl_list):
             if 'path' in self._curl_list[path] and self._curl_list[path]['path'] == 'system':
-                self._file_service.add_system_path(path)
+                self._file_system.add_system_path(path)
 
-            if self._file_service.is_file(path):
-                path_hash = self._file_service.hash(path)
+            if self._hash_check and self._file_system.is_file(path):
+                path_hash = self._file_system.hash(path)
                 if path_hash == self._curl_list[path]['hash']:
                     if 'zip_id' in self._curl_list[path] and self._curl_list[path]['zip_id'] in self._unpacked_zips:
                         self._logger.print('Unpacked: %s' % path)
@@ -97,7 +150,7 @@ class CurlCommonDownloader:
 
             if first_run and 'delete' in self._curl_list[path]:
                 for delete in self._curl_list[path]['delete']:
-                    self._file_service.clean_expression(delete)
+                    self._file_system.clean_expression(delete)
 
             self._download(path, self._curl_list[path])
 
@@ -106,50 +159,42 @@ class CurlCommonDownloader:
 
         for retry in range(self._config['downloader_retries']):
 
-            if len(self._errors) == 0:
+            if self._errors.none():
                 return
 
-            missing = self._errors
-            self._errors = []
-
-            for path in missing:
+            for path in self._errors.consume():
                 self._download(path, self._curl_list[path])
 
             self._wait()
             self._check_hashes()
 
     def _check_hashes(self):
-        if len(self._http_oks) > 0:
-            self._logger.print()
-            self._logger.print('Checking hashes...')
+        if self._http_oks.none():
+            return
 
-            for path in self._http_oks:
-                if not self._file_service.is_file(path if path != 'MiSTer' else 'MiSTer.new'):
-                    self._logger.print('~', end='', flush=True)
-                    self._logger.debug('Missing %s' % path)
-                    self._errors.append(path)
-                    continue
+        self._logger.print()
+        self._logger.print('Checking hashes...')
 
-                path_hash = self._file_service.hash(path if path != 'MiSTer' else 'MiSTer.new')
-                if path_hash != self._curl_list[path]['hash']:
-                    self._logger.print('~', end='', flush=True)
-                    self._logger.debug(
-                        'Bad hash on %s (%s != %s)' % (path, self._curl_list[path]['hash'], path_hash))
-                    self._errors.append(path)
-                    continue
+        for path in self._http_oks.consume():
+            if not self._file_system.is_file(path if path != 'MiSTer' else 'MiSTer.new'):
+                self._errors.add_debug_report(path, 'Missing %s' % path)
+                continue
 
-                self._logger.print('+', end='', flush=True)
-                self._correct_downloads.append(path)
-                if self._curl_list[path].get('reboot', False):
-                    self._needs_reboot = True
+            path_hash = self._file_system.hash(path if path != 'MiSTer' else 'MiSTer.new')
+            if self._hash_check and path_hash != self._curl_list[path]['hash']:
+                self._errors.add_debug_report(path, 'Bad hash on %s (%s != %s)' % (path, self._curl_list[path]['hash'], path_hash))
+                continue
 
-            self._logger.print()
+            self._logger.print('+', end='', flush=True)
+            self._correct_downloads.append(path)
+            if self._curl_list[path].get('reboot', False):
+                self._needs_reboot = True
 
-        self._http_oks = []
+        self._logger.print()
 
     def _download(self, path, description):
         self._logger.print(path)
-        self._file_service.makedirs_parent(path)
+        self._file_system.makedirs_parent(path)
 
         if 'url' not in description:
             description['url'] = self._url_from_path(path)
@@ -157,7 +202,7 @@ class CurlCommonDownloader:
         url_domain = urlparse(description['url']).netloc
         url_parts = description['url'].split(url_domain)
 
-        target_path = self._file_service.curl_target_path(path if path != 'MiSTer' else 'MiSTer.new')
+        target_path = self._file_system.download_target_path(path if path != 'MiSTer' else 'MiSTer.new')
         url = url_parts[0] + url_domain + urllib.parse.quote(url_parts[1])
 
         self._run(description, self._command(target_path, url), path)
@@ -171,7 +216,7 @@ class CurlCommonDownloader:
         return self._base_files_url + path
 
     def errors(self):
-        return self._errors
+        return self._errors.list()
 
     def correctly_downloaded_files(self):
         return self._correct_downloads
@@ -179,16 +224,18 @@ class CurlCommonDownloader:
     def needs_reboot(self):
         return self._needs_reboot
 
+    @abstractmethod
     def _wait(self):
-        raise NotImplementedError()
+        """"waits until all downloads are completed"""
 
+    @abstractmethod
     def _run(self, description, command, path):
-        raise NotImplementedError()
+        """"starts the downloading process"""
 
 
-class CurlCustomParallelDownloader(CurlCommonDownloader):
-    def __init__(self, config, file_service, local_repository, logger):
-        super().__init__(config, file_service, local_repository, logger)
+class _CurlCustomParallelDownloader(CurlDownloaderAbstract):
+    def __init__(self, config, file_system, local_repository, logger, hash_check):
+        super().__init__(config, file_system, local_repository, logger, hash_check)
         self._processes = []
         self._files = []
         self._acc_size = 0
@@ -222,19 +269,15 @@ class CurlCustomParallelDownloader(CurlCommonDownloader):
                     start = time.time()
                     self._logger.print('.', end='', flush=True)
                     if result == 0:
-                        self._http_oks.append(self._files[i])
+                        self._http_oks.add(self._files[i])
                     else:
-                        self._logger.print('~', end='', flush=True)
-                        self._logger.debug('Bad http code! %s: %s' % (result, self._files[i]), flush=True)
-                        self._errors.append(self._files[i])
+                        self._errors.add_debug_report(self._files[i], 'Bad http code! %s: %s' % (result, self._files[i]))
             end = time.time()
             if (end - start) > self._config['downloader_timeout']:
                 for i, p in enumerate(self._processes):
                     if p is None:
                         continue
-                    self._logger.print('~', end='', flush=True)
-                    self._logger.debug('Timeout! %s' % self._files[i], flush=True)
-                    self._errors.append(self._files[i])
+                    self._errors.add_debug_report(self._files[i], 'Timeout! %s' % self._files[i])
                 break
 
             time.sleep(1)
@@ -247,19 +290,60 @@ class CurlCustomParallelDownloader(CurlCommonDownloader):
         self._acc_size = 0
 
 
-class CurlSerialDownloader(CurlCommonDownloader):
-    def __init__(self, config, file_service, local_repository, logger):
-        super().__init__(config, file_service, local_repository, logger)
+class _CurlSerialDownloader(CurlDownloaderAbstract):
+    def __init__(self, config, file_system, local_repository, logger, hash_check):
+        super().__init__(config, file_system, local_repository, logger, hash_check)
 
     def _run(self, description, command, file):
         result = subprocess.run(shlex.split(command), shell=False, stderr=subprocess.STDOUT)
         if result.returncode == 0:
-            self._http_oks.append(file)
+            self._http_oks.add(file)
         else:
-            self._logger.print('Bad http code! %s: %s' % (result.returncode, file), flush=True)
-            self._errors.append(file)
+            self._errors.add_print_report(file, 'Bad http code! %s: %s' % (result.returncode, file))
 
         self._logger.print()
 
     def _wait(self):
         pass
+
+
+class _DownloadErrors:
+    def __init__(self, logger):
+        self._logger = logger
+        self._errors = []
+
+    def add_debug_report(self, path, message):
+        self._logger.print('~', end='', flush=True)
+        self._logger.debug(message, flush=True)
+        self._errors.append(path)
+
+    def add_print_report(self, path, message):
+        self._logger.print(message, flush=True)
+        self._errors.append(path)
+
+    def none(self):
+        return len(self._errors) == 0
+
+    def consume(self):
+        errors = self._errors
+        self._errors = []
+        return errors
+
+    def list(self):
+        return self._errors
+
+
+class _HttpOks:
+    def __init__(self):
+        self._oks = []
+
+    def add(self, path):
+        self._oks.append(path)
+
+    def consume(self):
+        oks = self._oks
+        self._oks = []
+        return oks
+
+    def none(self):
+        return len(self._oks) == 0

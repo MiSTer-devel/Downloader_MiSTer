@@ -21,10 +21,10 @@ import json
 
 
 class LinuxUpdater:
-    def __init__(self, file_service, downloader, logger):
-        self._downloader = downloader
+    def __init__(self, file_system, file_downloader_factory, logger):
+        self._file_downloader_factory = file_downloader_factory
         self._logger = logger
-        self._file_service = file_service
+        self._file_system = file_system
         self._linux_descriptions = []
 
     def add_db(self, db):
@@ -57,8 +57,8 @@ class LinuxUpdater:
         self._logger.debug('linux: ' + json.dumps(linux, indent=4))
 
         current_linux_version = 'unknown'
-        if self._file_service.is_file('/MiSTer.version'):
-            current_linux_version = self._file_service.read_file_contents('/MiSTer.version')
+        if self._file_system.is_file('/MiSTer.version'):
+            current_linux_version = self._file_system.read_file_contents('/MiSTer.version')
 
         if current_linux_version == linux['version'][-6:]:
             self._logger.debug('current_linux_version "%s" matches db linux: %s' % (current_linux_version, linux['version']))
@@ -69,21 +69,23 @@ class LinuxUpdater:
         self._logger.print('Latest linux version -> %s' % linux['version'][-6:])
         self._logger.print()
 
-        self._downloader.queue_file(linux, linux_path)
-        if not self._file_service.is_file('/media/fat/linux/7za'):
-            self._downloader.queue_file({
+        file_downloader = self._file_downloader_factory.create(parallel_update=False)
+
+        file_downloader.queue_file(linux, linux_path)
+        if not self._file_system.is_file('/media/fat/linux/7za'):
+            file_downloader.queue_file({
                 'delete': [],
                 'url': 'https://github.com/MiSTer-devel/SD-Installer-Win64_MiSTer/raw/master/7za.gz',
                 'hash': 'ed1ad5185fbede55cd7fd506b3c6c699',
                 'size': 465600
             }, '/media/fat/linux/7za.gz')
 
-        self._downloader.download_files(False)
+        file_downloader.download_files(False)
         self._logger.print()
 
-        if len(self._downloader.errors()) > 0:
+        if len(file_downloader.errors()) > 0:
             self._logger.print('Some error happened during the Linux download:')
-            for error in self._downloader.errors():
+            for error in file_downloader.errors():
                 self._logger.print(error)
 
             self._logger.print()
@@ -92,16 +94,16 @@ class LinuxUpdater:
         self._run_subprocesses(linux, linux_path)
 
     def _run_subprocesses(self, linux, linux_path):
-        if self._file_service.is_file('/media/fat/linux/7za.gz'):
+        if self._file_system.is_file('/media/fat/linux/7za.gz'):
             result = subprocess.run('gunzip "/media/fat/linux/7za.gz"', shell=True, stderr=subprocess.STDOUT)
-            self._file_service.unlink('/media/fat/linux/7za.gz')
+            self._file_system.unlink('/media/fat/linux/7za.gz')
             if result.returncode != 0:
                 self._logger.print('ERROR! Could not install 7z.')
                 self._logger.print('Error code: %d' % result.returncode)
                 self._logger.print()
                 return
 
-        if not self._file_service.is_file('/media/fat/linux/7za'):
+        if not self._file_system.is_file('/media/fat/linux/7za'):
             self._logger.print('ERROR! 7z is not present in the system.')
             self._logger.print('Aborting Linux update.')
             self._logger.print()
@@ -130,7 +132,7 @@ class LinuxUpdater:
                 fi
                 rm "{0}" > /dev/null 2>&1
                 exit $RET_CODE
-        '''.format(self._file_service.curl_target_path(linux_path)), shell=True, stderr=subprocess.STDOUT)
+        '''.format(self._file_system.download_target_path(linux_path)), shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
             self._logger.print('ERROR! Could not uncompress the linux installer.')
@@ -169,4 +171,4 @@ class LinuxUpdater:
             self._logger.print()
 
     def needs_reboot(self):
-        return self._file_service.is_file('/tmp/downloader_needs_reboot_after_linux_update')
+        return self._file_system.is_file('/tmp/downloader_needs_reboot_after_linux_update')

@@ -29,7 +29,7 @@ class TestOfflineImporterWithZips(unittest.TestCase):
         self.sut = OfflineImporter()
 
     def test_apply_offline_db_with_zips___when_a_zipped_file_is_present_with_correct_hash___adds_existing_a_file_to_the_store(self):
-        self.sut.file_service.test_data\
+        self.sut.file_system.test_data\
             .with_file(file_test_json_zip, {
                 'hash': file_test_json_zip,
                 'unzipped_json': db_test_descr(zips={
@@ -40,7 +40,7 @@ class TestOfflineImporterWithZips(unittest.TestCase):
 
         store = self.apply_db_test_with_cheats_folder_nes_zip()
 
-        self.assertFalse(self.sut.file_service.is_file(file_test_json_zip))
+        self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
         self.assertEqual(store_with_unzipped_cheats_folder_nes_files(url=False, online_database_imported=[file_test_json_zip]), store)
 
     def apply_db_test_with_cheats_folder_nes_zip(self):

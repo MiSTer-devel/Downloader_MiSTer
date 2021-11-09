@@ -17,14 +17,14 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from test.fake_curl_downloader import CurlDownloader
-from test.objects import file_menu_rbf, hash_menu_rbf, file_one, hash_one, file_MiSTer, hash_MiSTer, file_MiSTer_new
+from test.fake_file_downloader import FileDownloader
+from test.objects import file_menu_rbf, hash_menu_rbf, file_one, hash_one, file_MiSTer, hash_MiSTer
 
 
-class TestCurlDownloader(unittest.TestCase):
+class TestFileDownloader(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.sut = CurlDownloader()
+        self.sut = FileDownloader()
 
     def test_download_nothing___from_scratch_no_issues___nothing_downloaded_no_errors(self):
         self.sut.download_files(False)
@@ -45,7 +45,7 @@ class TestCurlDownloader(unittest.TestCase):
         self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
 
     def test_download_files_one___from_scratch_no_matching_hash___return_errors(self):
-        self.sut.test_data.brings_hash(file_one, 'wrong')
+        self.sut.test_data.brings_file(file_one, {'hash': 'wrong'})
         self.download_one()
         self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
 
@@ -59,21 +59,21 @@ class TestCurlDownloader(unittest.TestCase):
         self.assertDownloaded([file_menu_rbf], [file_menu_rbf], need_reboot=True)
 
     def test_download_reboot_file___update_no_issues___needs_reboot(self):
-        self.sut.file_service.test_data.with_file(file_menu_rbf, {'hash': 'old'})
+        self.sut.file_system.test_data.with_file(file_menu_rbf, {'hash': 'old'})
         self.download_reboot()
         self.assertDownloaded([file_menu_rbf], [file_menu_rbf], need_reboot=True)
 
     def test_download_reboot_file___no_changes_no_issues___no_need_to_reboot(self):
-        self.sut.file_service.test_data.with_file(file_menu_rbf, {'hash': hash_menu_rbf})
+        self.sut.file_system.test_data.with_file(file_menu_rbf, {'hash': hash_menu_rbf})
         self.download_reboot()
         self.assertDownloaded([file_menu_rbf])
 
     def test_download_mister_file___from_scratch_no_issues___stores_it_as_mister(self):
-        self.sut.file_service.test_data.with_old_mister_binary()
+        self.sut.file_system.test_data.with_old_mister_binary()
         self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_MiSTer, 'reboot': True, 'path': 'system'}, file_MiSTer)
         self.sut.download_files(False)
         self.assertDownloaded([file_MiSTer], [file_MiSTer], need_reboot=True)
-        self.assertTrue(self.sut.file_service.is_file(file_MiSTer))
+        self.assertTrue(self.sut.file_system.is_file(file_MiSTer))
 
     def assertDownloaded(self, oks, run=None, errors=None, need_reboot=False):
         self.assertEqual(oks, self.sut.correctly_downloaded_files())

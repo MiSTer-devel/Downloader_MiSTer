@@ -18,9 +18,28 @@
 
 import tempfile
 import sys
+from abc import ABC, abstractmethod
 
 
-class Logger:
+class Logger(ABC):
+    @abstractmethod
+    def set_local_repository(self, local_repository):
+        """"can find where to store anything after this method is called"""
+
+    @abstractmethod
+    def enable_verbose_mode(self):
+        """makes logs more verbose"""
+
+    @abstractmethod
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
+        """print always"""
+
+    @abstractmethod
+    def debug(self, *args, sep='', end='\n', flush=True):
+        """print only to debug target"""
+
+
+class FileLogger(Logger):
     def __init__(self):
         self._logfile = tempfile.NamedTemporaryFile('w', delete=False)
         self._local_repository = None
@@ -61,3 +80,21 @@ class Logger:
             print(*pack, sep=sep, end=end, file=file, flush=flush)
         except BaseException as error:
             print('An unknown exception occurred during logging: %s' % str(error))
+
+
+class SilentLogger(Logger):
+
+    def __init__(self, decorated_logger):
+        self._decorated_logger = decorated_logger
+
+    def set_local_repository(self, local_repository):
+        self._decorated_logger.set_local_repository(local_repository)
+
+    def enable_verbose_mode(self):
+        self._decorated_logger.enable_verbose_mode()
+
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
+        self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
+
+    def debug(self, *args, sep='', end='\n', flush=True):
+        self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)

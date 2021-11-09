@@ -24,7 +24,7 @@ from pathlib import Path
 from downloader.config import ConfigReader
 from test.objects import debug_env
 from test.fakes import NoLogger
-from downloader.file_service import hash_file
+from downloader.file_system import hash_file
 import subprocess
 
 

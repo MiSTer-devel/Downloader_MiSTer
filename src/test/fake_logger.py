@@ -15,10 +15,12 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+
 import sys
+from downloader.logger import Logger
 
 
-class NoLogger:
+class NoLogger(Logger):
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
         pass
 
@@ -29,7 +31,4 @@ class NoLogger:
         pass
 
     def enable_verbose_mode(self):
-        pass
-
-    def close_logfile(self):
         pass

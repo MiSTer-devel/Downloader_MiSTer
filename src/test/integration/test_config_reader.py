@@ -40,26 +40,26 @@ class TestConfigReader(unittest.TestCase):
             'downloader_timeout': 300,
             'downloader_retries': 3,
             'verbose': False,
-            'databases': [{
+            'databases': {'distribution_mister': {
                 'db_url': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
                 'section': 'distribution_mister',
-            }]
+            }}
         })
 
     def test_databases___with_single_db_ini___returns_single_db_only(self):
-        self.assertEqual(self.databases("test/integration/fixtures/single_db.ini"), [{
+        self.assertEqual(self.databases("test/integration/fixtures/single_db.ini"), {'Single': {
             'db_url': 'https://single.com',
             'section': 'Single',
-        }, ])
+        }})
 
     def test_databases___with_dobule_db_ini___returns_dobule_db_only(self):
-        self.assertEqual(self.databases("test/integration/fixtures/double_db.ini"), [{
+        self.assertEqual(self.databases("test/integration/fixtures/double_db.ini"), {'Single': {
             'db_url': 'https://single.com',
             'section': 'Single',
-        }, {
+        }, 'Double': {
             'db_url': 'https://double.com',
             'section': 'Double',
-        }])
+        }})
 
     def test_config_reader___with_custom_mister_ini___returns_custom_fields(self):
         self.assertConfig("test/integration/fixtures/custom_mister.ini", {
@@ -71,10 +71,10 @@ class TestConfigReader(unittest.TestCase):
             'base_path': '/media/usb0/',
             'base_system_path': '/media/cifs/',
             'verbose': True,
-            'databases': [{
+            'databases': {'distribution_mister': {
                 'db_url': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
                 'section': 'distribution_mister',
-            }],
+            }},
         })
 
     def test_config_reader___with_invalid_base_path_ini___raises_invalid_config_parameter_exception(self):
@@ -94,32 +94,33 @@ class TestConfigReader(unittest.TestCase):
             'allow_delete': AllowDelete.NONE,
             'base_path': '/media/usb1/',
             'base_system_path': '/media/usb2/',
-            'databases': [{
+            'databases': {'Single': {
                 'db_url': 'https://single.com',
                 'section': 'Single',
-            }, {
+            }, 'Double': {
                 'db_url': 'https://double.com',
                 'section': 'Double',
-            }],
+            }},
         })
 
     def test_config_reader___with_db_and_distrib_empty_section_1___returns_one_db_and_defult_distrib(self):
-        self.assertEqual(self.databases("test/integration/fixtures/db_plus_distrib_empty_section_1.ini"), [{
-            'db_url': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
-            'section': 'distribution_mister',
-        }, {
-            'db_url': 'https://one.com',
-            'section': 'One',
-        }, ])
+        self.assertEqual(self.databases("test/integration/fixtures/db_plus_distrib_empty_section_1.ini"),
+                         {'distribution_mister': {
+                             'db_url': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
+                             'section': 'distribution_mister',
+                         }, 'One': {
+                             'db_url': 'https://one.com',
+                             'section': 'One',
+                         }, })
 
     def test_config_reader___with_db_and_distrib_empty_section_2___returns_one_db_and_defult_distrib(self):
-        self.assertEqual(self.databases("test/integration/fixtures/db_plus_distrib_empty_section_2.ini"), [{
+        self.assertEqual(self.databases("test/integration/fixtures/db_plus_distrib_empty_section_2.ini"), {'One': {
             'db_url': 'https://one.com',
             'section': 'One',
-        }, {
+        }, 'distribution_mister': {
             'db_url': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
             'section': 'distribution_mister',
-        }, ])
+        }})
 
     def test_config_reader___with_db_and_random_empty_section_2___raises_exception(self):
         self.assertRaises(Exception,

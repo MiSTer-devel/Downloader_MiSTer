@@ -20,10 +20,10 @@ from .config import AllowDelete
 
 
 class OfflineImporter:
-    def __init__(self, config, file_service, downloader_factory, logger):
+    def __init__(self, config, file_system, file_downloader_factory, logger):
         self._config = config
-        self._file_service = file_service
-        self._downloader_factory = downloader_factory
+        self._file_system = file_system
+        self._file_downloader_factory = file_downloader_factory
         self._logger = logger
         self._dbs = []
 
@@ -36,16 +36,16 @@ class OfflineImporter:
                 self._update_store_from_offline_db(db['db_id'], db_file, store)
 
     def _update_store_from_offline_db(self, store_id, db_file, store):
-        if not self._file_service.is_file(db_file):
+        if not self._file_system.is_file(db_file):
             return
 
-        hash_db_file = self._file_service.hash(db_file)
+        hash_db_file = self._file_system.hash(db_file)
         if hash_db_file in store['offline_databases_imported']:
             self._remove_db_file(db_file)
             return
 
         self._logger.print()
-        db = self._file_service.load_db_from_file(db_file)
+        db = self._file_system.load_db_from_file(db_file)
 
         if store_id != db['db_id']:
             self._logger.print('WARNING! Stored id "%s", doesn\'t match Offline database id "%s" at %s' % (
@@ -78,7 +78,7 @@ class OfflineImporter:
             self._logger.print()
 
     def _update_from_zips(self, db, store):
-        summary_downloader = self._downloader_factory(self._config)
+        summary_downloader = self._file_downloader_factory.create(self._config['parallel_update'])
         zip_ids_by_temp_zip = dict()
 
         for zip_id in db['zips']:
@@ -93,7 +93,7 @@ class OfflineImporter:
         self._logger.print()
 
         for temp_zip in summary_downloader.correctly_downloaded_files():
-            summary = self._file_service.load_db_from_file(temp_zip)
+            summary = self._file_system.load_db_from_file(temp_zip)
             if isinstance(summary['folders'], list):  # TODO Remove conversion
                 summary['folders'] = {folder: {} for folder in summary['folders']}
 
@@ -102,14 +102,14 @@ class OfflineImporter:
             store['zips'][zip_id] = db['zips'][zip_id]
             self._import_folders(summary['folders'], store['folders'])
             self._import_files(summary['files'], store['files'])
-            self._file_service.unlink(temp_zip)
+            self._file_system.unlink(temp_zip)
 
         return summary_downloader.errors()
 
     def _import_files(self, files, store_files):
         for file_path, file_description in files.items():
-            if self._file_service.is_file(file_path) and \
-                    (file_description['hash'] == 'ignore' or self._file_service.hash(file_path) == file_description['hash']) and \
+            if self._file_system.is_file(file_path) and \
+                    (file_description['hash'] == 'ignore' or self._file_system.hash(file_path) == file_description['hash']) and \
                     file_path not in store_files:
                 store_files[file_path] = file_description
 
@@ -117,9 +117,9 @@ class OfflineImporter:
 
     def _import_folders(self, db_folders, store_folders):
         for folder_path, folder_description in db_folders.items():
-            if self._file_service.is_folder(folder_path) and folder_path not in store_folders:
+            if self._file_system.is_folder(folder_path) and folder_path not in store_folders:
                 store_folders[folder_path] = folder_description
 
     def _remove_db_file(self, db_file):
         if self._config['allow_delete'] == AllowDelete.ALL:
-            self._file_service.unlink(db_file)
+            self._file_system.unlink(db_file)

@@ -15,15 +15,16 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.curl_downloader import CurlCommonDownloader as ProductionCurlCommonDownloader
+
+from downloader.file_downloader import CurlDownloaderAbstract, FileDownloaderFactory as ProductionFileDownloaderFactory
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
-from test.fake_file_service import FileService
+from test.fake_file_system import FileSystem
 from test.fake_logger import NoLogger
 from test.objects import file_MiSTer, file_MiSTer_new
 
 
 def downloader_with_errors(errors):
-    downloader = CurlDownloader()
+    downloader = FileDownloader()
     for file_path in errors:
         downloader.test_data.errors_at(file_path)
     return downloader
@@ -37,8 +38,8 @@ class TestDataCurlDownloader:
         self._fake_curl_downloader._problematic_files[file] = tries if tries is not None else 99
         return self
 
-    def brings_hash(self, file, hash_code):
-        self._fake_curl_downloader._actual_hashes[file] = hash_code
+    def brings_file(self, file, description):
+        self._fake_curl_downloader._actual_description[file] = description
         return self
 
     def misses_file(self, file):
@@ -46,14 +47,14 @@ class TestDataCurlDownloader:
         return self
 
 
-class CurlDownloader(ProductionCurlCommonDownloader):
-    def __init__(self, config=None, file_service=None):
+class FileDownloader(CurlDownloaderAbstract):
+    def __init__(self, config=None, file_system=None):
         config = config if config is not None else {'curl_ssl': '', 'downloader_retries': 3}
-        self.file_service = FileService() if file_service is None else file_service
-        super().__init__(config, self.file_service, ProductionLocalRepository(config, NoLogger(), self.file_service), NoLogger())
+        self.file_system = FileSystem() if file_system is None else file_system
+        super().__init__(config, self.file_system, ProductionLocalRepository(config, NoLogger(), self.file_system), NoLogger(), True)
         self._run_files = []
         self._problematic_files = dict()
-        self._actual_hashes = dict()
+        self._actual_description = dict()
         self._missing_files = set()
 
     @property
@@ -67,14 +68,13 @@ class CurlDownloader(ProductionCurlCommonDownloader):
             self._problematic_files[file] -= 1
 
         if file not in self._problematic_files or self._problematic_files[file] <= 0:
-            if file in self._actual_hashes:
-                description = description.copy()
-                description['hash'] = self._actual_hashes[file]
+            if file in self._actual_description:
+                description = self._actual_description[file]
             if file not in self._missing_files:
-                self._file_service.test_data.with_file(file if file != file_MiSTer else file_MiSTer_new, description)
-            self._http_oks.append(file)
+                self._file_system.test_data.with_file(file if file != file_MiSTer else file_MiSTer_new, description)
+            self._http_oks.add(file)
         else:
-            self._errors.append(file)
+            self._errors.add_print_report(file, '')
 
     def _command(self, target_path, url):
         return target_path
@@ -84,3 +84,12 @@ class CurlDownloader(ProductionCurlCommonDownloader):
 
     def run_files(self):
         return self._run_files
+
+
+class FileDownloaderFactory(ProductionFileDownloaderFactory):
+    def __init__(self, config=None, file_system=None):
+        self._config = config
+        self._file_system = file_system
+
+    def create(self, parallel_update, silent=False, hash_check=True):
+        return FileDownloader(self._config, self._file_system)

@@ -57,7 +57,7 @@ class TestOnlineImporterWithZips(unittest.TestCase):
         self.assertEqual(store_with_unzipped_cheats_folder_nes_files(), store)
 
     def test_download_zipped_contents___on_existing_store_with_zips___removes_old_zip_id_and_inserts_new_one(self):
-        self.sut.file_service.test_data\
+        self.sut.file_system.test_data\
             .with_folders(cheats_folder_nes_folders)\
             .with_file(cheats_folder_nes_file_path, {"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size})
 
@@ -80,8 +80,8 @@ class TestOnlineImporterWithZips(unittest.TestCase):
             "folders": {different_folder: {"zip_id": different_zip_id}},
             "zips": {different_zip_id: zip_desc([different_folder], "./", different_folder)}
         }, store)
-        self.assertFalse(self.sut.file_service.is_file(cheats_folder_nes_file_path))
-        self.assertTrue(self.sut.file_service.is_file(file_a))
+        self.assertFalse(self.sut.file_system.is_file(cheats_folder_nes_file_path))
+        self.assertTrue(self.sut.file_system.is_file(file_a))
 
     def test_download_zipped_contents___with_already_downloaded_summary___restores_file_contained_in_summary(self):
         store = self.download_zipped_contents(db_test_descr(zips={
