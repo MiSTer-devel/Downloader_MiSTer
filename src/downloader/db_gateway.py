@@ -37,7 +37,7 @@ class DbGateway:
             db_url = description['db_url']
             if not db_url.startswith("http"):
                 if not db_url.startswith("/"):
-                    db_url = str(Path(db_url).resolve())
+                    db_url = self._file_system.resolve(db_url)
 
                 self._logger.debug('Loading db from local path: %s' % db_url)
                 dbs.append((section, self._file_system.load_db_from_file(db_url)))

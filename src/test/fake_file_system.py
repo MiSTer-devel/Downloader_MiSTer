@@ -18,7 +18,7 @@
 
 import test.objects
 import pathlib
-
+import os
 
 fake_temp_file = '/tmp/temp_file'
 
@@ -63,6 +63,9 @@ class FileSystem:
 
     def add_system_path(self, path):
         pass
+
+    def resolve(self, path):
+        return path
 
     def temp_file(self):
         return fake_temp_file
