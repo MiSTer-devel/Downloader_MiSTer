@@ -20,10 +20,10 @@ from .constants import distribution_mister_db_id
 
 
 class OnlineImporter:    
-    def __init__(self, config, file_service, downloader_factory, logger):
+    def __init__(self, config, file_system, file_downloader_factory, logger):
         self._config = config
-        self._file_service = file_service
-        self._downloader_factory = downloader_factory
+        self._file_system = file_system
+        self._file_downloader_factory = file_downloader_factory
         self._logger = logger
         self._dbs = []
         self._files_that_failed = []
@@ -48,17 +48,17 @@ class OnlineImporter:
             if folder in self._dbs_folders:
                 continue
 
-            if not self._file_service.is_folder(folder):
+            if not self._file_system.is_folder(folder):
                 continue
 
-            if self._file_service.folder_has_items(folder):
+            if self._file_system.folder_has_items(folder):
                 continue
 
             if not deleted_folder:
                 deleted_folder = True
                 self._logger.print()
 
-            self._file_service.remove_folder(folder)
+            self._file_system.remove_folder(folder)
 
     def _process_db_contents(self, db, store, full_resync):
         self._print_db_header(db)
@@ -69,7 +69,7 @@ class OnlineImporter:
 
         self._remove_missing_files(store['files'], db['files'])
 
-        file_downloader = self._downloader_factory(self._config)
+        file_downloader = self._file_downloader_factory.create(self._config['parallel_update'])
         file_downloader.set_base_files_url(db['base_files_url'])
         needed_zips = dict()
 
@@ -89,9 +89,10 @@ class OnlineImporter:
 
                 continue
 
-            if 'overwrite' in file_description and not file_description['overwrite'] and self._file_service.is_file(file_path):
-                self._logger.print('%s is already present, and is marked to not be overwritten.' % file_path)
-                self._logger.print('Delete the file first if you wish to update it.')
+            if 'overwrite' in file_description and not file_description['overwrite'] and self._file_system.is_file(file_path):
+                if self._file_system.hash(file_path) != file_description['hash']:
+                    self._logger.print('%s is already present, and is marked to not be overwritten.' % file_path)
+                    self._logger.print('Delete the file first if you wish to update it.')
                 continue
 
             self._processed_files[file_path] = db['db_id']
@@ -163,7 +164,7 @@ class OnlineImporter:
             db['folders'].update({path: fd for path, fd in store['folders'].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids_from_store})
 
         if len(zip_ids_to_download) > 0:
-            summary_downloader = self._downloader_factory(self._config)
+            summary_downloader = self._file_downloader_factory.create(self._config['parallel_update'])
             zip_ids_by_temp_zip = dict()
 
             for zip_id in zip_ids_to_download:
@@ -176,13 +177,13 @@ class OnlineImporter:
             self._logger.print()
 
             for temp_zip in summary_downloader.correctly_downloaded_files():
-                summary = self._file_service.load_db_from_file(temp_zip)
+                summary = self._file_system.load_db_from_file(temp_zip)
                 for file_path, file_description in summary['files'].items():
                     db['files'][file_path] = file_description
                     if file_path in store['files']:
                         store['files'][file_path] = file_description
                 db['folders'].update(summary['folders'])
-                self._file_service.unlink(temp_zip)
+                self._file_system.unlink(temp_zip)
 
             for temp_zip in summary_downloader.errors():
                 zip_id = zip_ids_by_temp_zip[temp_zip]
@@ -193,7 +194,7 @@ class OnlineImporter:
             self._files_that_failed.extend(summary_downloader.errors())
 
     def _import_zip_contents(self, db, store, needed_zips, file_downloader):
-        zip_downloader = self._downloader_factory(self._config)
+        zip_downloader = self._file_downloader_factory.create(self._config['parallel_update'])
         zip_ids_by_temp_zip = dict()
         for zip_id in needed_zips:
             zipped_files = needed_zips[zip_id]
@@ -214,8 +215,8 @@ class OnlineImporter:
                 path = db['zips'][zip_id]['path']
                 contents = ', '.join(db['zips'][zip_id]['contents'])
                 self._logger.print('Unpacking %s at %s' % (contents, 'the root' if path == './' else path))
-                self._file_service.unzip_contents(temp_zip, db['zips'][zip_id]['path'])
-                self._file_service.unlink(temp_zip)
+                self._file_system.unzip_contents(temp_zip, db['zips'][zip_id]['path'])
+                self._file_system.unlink(temp_zip)
                 file_downloader.mark_unpacked_zip(zip_id, db['zips'][zip_id]['base_files_url'])
                 store['zips'][zip_id] = db['zips'][zip_id]
             self._logger.print()
@@ -236,12 +237,12 @@ class OnlineImporter:
         if not self._config['check_manually_deleted_files']:
             return True
 
-        return self._file_service.is_file(file_path)
+        return self._file_system.is_file(file_path)
 
     def _create_folders(self, db, store):
         for folder in db['folders']:
             self._assert_valid_path(folder, db['db_id'])
-            self._file_service.makedirs(folder)
+            self._file_system.makedirs(folder)
 
         self._dbs_folders |= set(db['folders'])
         self._stores_folders |= set(store['folders'])
@@ -252,7 +253,7 @@ class OnlineImporter:
         files_to_delete = [f for f in store_files if f not in db_files]
 
         for file_path in files_to_delete:
-            self._file_service.unlink(file_path)
+            self._file_system.unlink(file_path)
             if file_path in store_files:
                 store_files.pop(file_path)
 

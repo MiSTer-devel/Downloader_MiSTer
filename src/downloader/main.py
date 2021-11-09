@@ -22,12 +22,12 @@ import subprocess
 import traceback
 
 from .config import config_file_path
-from .logger import Logger
+from .logger import FileLogger
 from .runner import make_runner
 
 
 def main(env):
-    logger = Logger()
+    logger = FileLogger()
     try:
         exit_code = execute_runner(env, logger)
     except Exception as _:

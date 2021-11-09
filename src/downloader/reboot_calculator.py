@@ -20,10 +20,10 @@ from .config import AllowReboot
 
 
 class RebootCalculator:
-    def __init__(self, config, logger, file_service):
+    def __init__(self, config, logger, file_system):
         self._config = config
         self._logger = logger
-        self._file_service = file_service
+        self._file_system = file_system
 
     def calc_needs_reboot(self, linux_needs_reboot, importer_needs_reboot):
 
@@ -44,7 +44,7 @@ class RebootCalculator:
             return True
 
         if should_reboot:
-            self._file_service.touch(mister_downloader_needs_reboot_file)
+            self._file_system.touch(mister_downloader_needs_reboot_file)
             if linux_needs_reboot:
                 self._logger.print('Linux has been updated! It is recommended to reboot your system now.')
             else:

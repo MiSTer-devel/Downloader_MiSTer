@@ -59,7 +59,7 @@ class AllowReboot(IntEnum):
 
 def default_config():
     return {
-        'databases': [],
+        'databases': {},
         'base_path': '/media/fat/',
         'base_system_path': '/media/fat/',
         'allow_delete': AllowDelete.ALL,
@@ -124,17 +124,17 @@ class ConfigReader:
             db_url = parser.get_string('db_url', default_db_url)
             if db_url is None:
                 raise Exception("Can't import db for section '%s' without an url field" % section)
-            result['databases'].append({
+            result['databases'][section] = {
                 'db_url': db_url,
                 'section': section
-            })
+            }
 
         if len(result['databases']) == 0:
             self._logger.print('Reading default db')
-            result['databases'].append({
+            result['databases'][default_db['section']] = {
                 'db_url': ini_config['DEFAULT'].get('db_url', default_db['db_url']),
                 'section': default_db['section']
-            })
+            }
 
         if self._env['ALLOW_REBOOT'] is not None:
             result['allow_reboot'] = AllowReboot(int(self._env['ALLOW_REBOOT']))

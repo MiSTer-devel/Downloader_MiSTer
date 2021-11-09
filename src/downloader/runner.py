@@ -19,12 +19,12 @@
 import datetime
 import time
 import json
-from .curl_downloader import make_downloader_factory, CurlSerialDownloader
+from .file_downloader import make_file_downloader_factory
 from .local_repository import LocalRepository
 from .linux_updater import LinuxUpdater
 from .reboot_calculator import RebootCalculator
 from .offline_importer import OfflineImporter
-from .file_service import FileService
+from .file_system import FileSystem
 from .db_gateway import DbGateway
 from .other import format_files_message, empty_store
 from .online_importer import OnlineImporter
@@ -41,16 +41,16 @@ def make_runner(env, logger, ini_path):
     config = ConfigReader(logger, env).read_config(ini_path)
     config['curl_ssl'] = env['CURL_SSL']
 
-    file_service = FileService(config, logger)
-    local_repository = LocalRepository(config, logger, file_service)
+    file_system = FileSystem(config, logger)
+    local_repository = LocalRepository(config, logger, file_system)
 
     logger.set_local_repository(local_repository)
 
-    db_gateway = DbGateway(config, file_service, logger)
-    downloader_factory = make_downloader_factory(file_service, local_repository, logger)
-    offline_importer = OfflineImporter(config, file_service, downloader_factory, logger)
-    online_importer = OnlineImporter(config, file_service, downloader_factory, logger)
-    linux_updater = LinuxUpdater(file_service, CurlSerialDownloader(config, file_service, local_repository, logger), logger)
+    file_downloader_factory = make_file_downloader_factory(config, file_system, local_repository, logger)
+    db_gateway = DbGateway(file_system, file_downloader_factory, logger)
+    offline_importer = OfflineImporter(config, file_system, file_downloader_factory, logger)
+    online_importer = OnlineImporter(config, file_system, file_downloader_factory, logger)
+    linux_updater = LinuxUpdater(file_system, file_downloader_factory, logger)
 
     return Runner(
         env,
@@ -61,7 +61,7 @@ def make_runner(env, logger, ini_path):
         offline_importer,
         online_importer,
         linux_updater,
-        RebootCalculator(config, logger, file_service),
+        RebootCalculator(config, logger, file_system),
         StoreMigrator(migrations(), logger)
     )
 
@@ -91,14 +91,12 @@ class Runner:
         self._logger.debug('config: ' + json.dumps(config, indent=4))
 
         local_store = self._local_repository.load_store(self._store_migrator)
-        failed_dbs = []
 
-        for db_description in self._config['databases']:
+        databases, failed_dbs = self._db_gateway.fetch_all(self._config['databases'])
 
-            db = self._db_gateway.fetch(db_description['db_url'])
-
-            if not self.validate_db(db, db_description):
-                failed_dbs.append(db_description['db_url'])
+        for section, db in databases:
+            if not self.validate_db(db, section):
+                failed_dbs.append(self._config['databases'][section]['db_url'])
                 continue
 
             if db['db_id'] not in local_store['dbs']:
@@ -150,7 +148,7 @@ class Runner:
     def needs_reboot(self):
         return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.needs_reboot())
 
-    def validate_db(self, db, db_description):
+    def validate_db(self, db, section):
         if db is None:
             self._logger.debug('ERROR: empty db.')
             return False
@@ -160,11 +158,11 @@ class Runner:
             return False
 
         if 'db_id' not in db or not isinstance(db['db_id'], str):
-            self._logger.print('ERROR: db for section "%s" does not have "db_id", contact the db maintainer.' % db_description['section'])
+            self._logger.print('ERROR: db for section "%s" does not have "db_id", contact the db maintainer.' % section)
             return False
 
-        if db['db_id'] != db_description['section']:
-            self._logger.print('ERROR: Section "%s" doesn\'t match database id "%s". Fix your INI file.' % (db_description['section'], db['db_id']))
+        if db['db_id'] != section:
+            self._logger.print('ERROR: Section "%s" doesn\'t match database id "%s". Fix your INI file.' % (section, db['db_id']))
             return False
 
         if 'zips' not in db or not isinstance(db['zips'], dict):

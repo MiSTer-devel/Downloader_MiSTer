@@ -16,34 +16,57 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import tempfile
 from pathlib import Path
-from .other import run_successfully
 
 
 class DbGateway:
-    def __init__(self, config, file_service, logger):
-        self._config = config
-        self._file_service = file_service
+    def __init__(self, file_system, file_downloader_factory, logger):
+        self._file_system = file_system
         self._logger = logger
+        self._file_downloader_factory = file_downloader_factory
 
-    def fetch(self, db_uri):
-        if not db_uri.startswith("http"):
-            if not db_uri.startswith("/"):
-                db_uri = str(Path(db_uri).resolve())
+    def fetch_all(self, descriptions):
 
-            self._logger.debug('Loading db from local path: %s' % db_uri)
-            return self._file_service.load_db_from_file(db_uri)
+        file_downloader = self._file_downloader_factory.create(parallel_update=True, silent=True, hash_check=False)
 
-        try:
-            self._logger.debug('Loading db from internet: %s' % db_uri)
-            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-                run_successfully('curl %s --silent --show-error --fail --location -o %s %s' % (
-                    self._config['curl_ssl'], tmp_file.name, db_uri), self._logger)
+        dbs = []
+        files = {}
+        errors = []
 
-                return self._file_service.load_db_from_file(tmp_file.name, Path(db_uri).suffix.lower())
+        for section, description in descriptions.items():
+            db_url = description['db_url']
+            if not db_url.startswith("http"):
+                if not db_url.startswith("/"):
+                    db_url = str(Path(db_url).resolve())
 
-        except Exception as e:
-            self._logger.debug(e)
-            self._logger.print('Could not load json from "%s"' % db_uri)
-            return None
+                self._logger.debug('Loading db from local path: %s' % db_url)
+                dbs.append((section, self._file_system.load_db_from_file(db_url)))
+            else:
+                temp = self._file_system.temp_file()
+                files[temp] = description
+                self._logger.debug('Loading db from url: %s' % db_url)
+                file_downloader.queue_file({"url": db_url, "hash": "ignore", "size": 0}, temp)
+
+        file_downloader.download_files(False)
+
+        correct_files = {files[file]['section']: file for file in file_downloader.correctly_downloaded_files()}
+
+        for section, description in descriptions.items():
+            if section in correct_files:
+                try:
+                    db = self._file_system.load_db_from_file(correct_files[section], Path(description['db_url']).suffix.lower())
+                    dbs.append((section, db))
+                except Exception as e:
+                    self._logger.debug(e)
+                    self._logger.print('Could not load json from "%s"' % description['db_url'])
+                    errors.append(description['db_url'])
+
+        for file in file_downloader.errors():
+            description = files[file]
+            self._logger.print('Could not download file from db_url: "%s"' % description['db_url'])
+            errors.append(description['db_url'])
+
+        for file in files:
+            self._file_system.unlink(file)
+
+        return dbs, errors

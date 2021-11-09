@@ -20,10 +20,10 @@ from .store_migrator import make_new_local_store
 
 
 class LocalRepository:
-    def __init__(self, config, logger, file_service):
+    def __init__(self, config, logger, file_system):
         self._config = config
         self._logger = logger
-        self._file_service = file_service
+        self._file_system = file_system
         self._storage_path_value = None
         self._last_successful_run_value = None
         self._logfile_path_value = None
@@ -33,7 +33,7 @@ class LocalRepository:
     def _storage_path(self):
         if self._storage_path_value is None:
             self._storage_path_value = 'Scripts/.config/downloader/downloader.json.zip'
-            self._file_service.add_system_path(self._storage_path_value)
+            self._file_system.add_system_path(self._storage_path_value)
         return self._storage_path_value
 
     @property
@@ -41,29 +41,29 @@ class LocalRepository:
         if self._last_successful_run_value is None:
             self._last_successful_run_value = 'Scripts/.config/downloader/%s.last_successful_run' % self._config[
                 'config_path'].stem
-            self._file_service.add_system_path(self._last_successful_run_value)
+            self._file_system.add_system_path(self._last_successful_run_value)
         return self._last_successful_run_value
 
     @property
     def logfile_path(self):
         if self._logfile_path_value is None:
             self._logfile_path_value = 'Scripts/.config/downloader/%s.log' % self._config['config_path'].stem
-            self._file_service.add_system_path(self._logfile_path_value)
+            self._file_system.add_system_path(self._logfile_path_value)
         return self._logfile_path_value
 
     @property
     def old_mister_path(self):
         if self._old_mister_path is None:
             self._old_mister_path = 'Scripts/.config/downloader/MiSTer.old'
-            self._file_service.add_system_path(self._old_mister_path)
+            self._file_system.add_system_path(self._old_mister_path)
         return self._old_mister_path
 
     def load_store(self, store_migrator):
-        if not self._file_service.is_file(self._storage_path):
+        if not self._file_system.is_file(self._storage_path):
             return make_new_local_store(store_migrator)
 
         try:
-            local_store = self._file_service.load_db_from_file(self._storage_path)
+            local_store = self._file_system.load_db_from_file(self._storage_path)
         except Exception as e:
             self._logger.debug(e)
             self._logger.print('Could not load storage')
@@ -73,13 +73,13 @@ class LocalRepository:
         return local_store
 
     def has_last_successful_run(self):
-        return self._file_service.is_file(self._last_successful_run)
+        return self._file_system.is_file(self._last_successful_run)
 
     def save_store(self, local_store):
-        self._file_service.makedirs_parent(self._storage_path)
-        self._file_service.save_json_on_zip(local_store, self._storage_path)
-        self._file_service.touch(self._last_successful_run)
+        self._file_system.makedirs_parent(self._storage_path)
+        self._file_system.save_json_on_zip(local_store, self._storage_path)
+        self._file_system.touch(self._last_successful_run)
 
     def save_log_from_tmp(self, path):
-        self._file_service.copy(path, self.logfile_path)
+        self._file_system.copy(path, self.logfile_path)
 
