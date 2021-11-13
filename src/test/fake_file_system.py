@@ -19,9 +19,8 @@
 import test.objects
 import pathlib
 
-from downloader.config import default_config
 from downloader.file_system import FileSystem as ProductionFileSystem
-from fake_logger import NoLogger
+from test.fake_logger import NoLogger
 
 fake_temp_file = '/tmp/temp_file'
 
