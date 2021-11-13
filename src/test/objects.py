@@ -220,12 +220,23 @@ def file_mister_old_descr():
     }
 
 
-def file_a_descr():
+def file_a_descr(delete=None):
     return {
-        "delete": [],
+        "delete": delete if delete is not None else [],
         "hash": file_a,
         "size": 2915040,
         "url": "https://one.rbf"
+    }
+
+
+def file_descr(delete=None, hash_code=None, size=None, url=None, reboot=None, path=None):
+    return {
+        "delete": delete if delete is not None else [],
+        "hash": hash_code if hash_code is not None else file_a,
+        "size": size if size is not None else 2915040,
+        "url": url if url is not None else "https://one.rbf",
+        "reboot": reboot if reboot is not None else False,
+        "path": path if path is not None else "common"
     }
 
 

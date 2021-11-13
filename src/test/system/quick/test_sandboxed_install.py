@@ -49,6 +49,13 @@ class TestSandboxedInstall(unittest.TestCase):
             'files': hashes(self.tmp_delme, db['files'])
         })
 
+    def test_sandbox_db_with_delete_previouss___installs_correctly(self):
+        db = load_json('test/system/fixtures/sandboxed_install/db_with_delete_previous/sandbox_db.json')
+        self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_delete_previous/sandbox.ini', {
+            'local_store': local_store_files([('sandbox', db['files'])]),
+            'files': hashes(self.tmp_delme, db['files'])
+        })
+
     def test_sandbox_db___installs_correctly__twice(self):
         db = load_json(self.sandbox_db_json)
         self.assertExecutesCorrectly(self.sandbox_ini)

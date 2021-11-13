@@ -18,7 +18,10 @@
 
 import test.objects
 import pathlib
-import os
+
+from downloader.config import default_config
+from downloader.file_system import FileSystem as ProductionFileSystem
+from fake_logger import NoLogger
 
 fake_temp_file = '/tmp/temp_file'
 
@@ -52,7 +55,11 @@ class TestDataFileSystem:
         return self
 
 
-class FileSystem:
+def make_production_filesystem(config):
+    return ProductionFileSystem(config, NoLogger())
+
+
+class FileSystem(ProductionFileSystem):
     def __init__(self):
         self._files = CaseInsensitiveDict()
         self._folders = CaseInsensitiveDict()
@@ -121,11 +128,8 @@ class FileSystem:
         if self._files.has(path):
             self._files.pop(path)
 
-    def clean_expression(self, expr):
-        if expr[-1:] == '*':
-            pass
-        else:
-            self.unlink(expr)
+    def delete_previous(self, file):
+        pass
 
     def save_json_on_zip(self, db, path):
         pass

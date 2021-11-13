@@ -71,7 +71,11 @@ class FileDownloader(CurlDownloaderAbstract):
             if file in self._actual_description:
                 description = self._actual_description[file]
             if file not in self._missing_files:
-                self._file_system.test_data.with_file(file if file != file_MiSTer else file_MiSTer_new, description)
+                actual_file = file if file != file_MiSTer else file_MiSTer_new
+                if isinstance(self._file_system, FileSystem):
+                    self._file_system.test_data.with_file(actual_file, description)
+                else:
+                    self._file_system.touch(actual_file)
             self._http_oks.add(file)
         else:
             self._errors.add_print_report(file, '')

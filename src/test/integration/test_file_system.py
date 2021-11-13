@@ -17,9 +17,8 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from downloader.file_system import FileSystem
+from test.fake_file_system import make_production_filesystem
 from downloader.config import AllowDelete, default_config
-from test.fakes import NoLogger
 from pathlib import Path
 import shutil
 import os
@@ -133,7 +132,7 @@ class TestFileSystem(unittest.TestCase):
         self.assertTrue(os.path.isdir(delme_dir + '/foo'))
 
     def sut(self, config=None):
-        return FileSystem(default_config() if config is None else config, NoLogger())
+        return make_production_filesystem(default_config() if config is None else config)
 
     def unlink(self, file):
         try:

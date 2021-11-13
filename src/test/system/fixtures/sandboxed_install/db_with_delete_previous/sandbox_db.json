@@ -1,0 +1,25 @@
+{
+    "db_files": [],
+    "db_id": "sandbox",
+    "db_url": "sandbox_db.json",
+    "base_files_url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/",
+    "zips": {},
+    "files": {
+        "first_core_20210101.rbf": {
+            "delete": ["first_core_*"],
+            "hash": "133af32b4894d9c5527cc5c91269ee28",
+            "size": 20,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/foo.txt"
+        },
+        "second_core_20210101.rbf": {
+            "delete_previous": true,
+            "hash": "133af32b4894d9c5527cc5c91269ee28",
+            "size": 20,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/foo.txt"
+        }
+    },
+    "folders": {},
+    "latest_zip_url": "https://github.com/MiSTer-devel/Distribution_MiSTer/archive/refs/heads/main.zip",
+    "timestamp": 0,
+    "default_options": {}
+}
