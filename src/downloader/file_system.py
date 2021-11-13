@@ -25,6 +25,7 @@ from .other import run_stdout, run_successfully
 from .config import AllowDelete
 import subprocess
 import tempfile
+import re
 
 
 class FileSystem:
@@ -104,16 +105,31 @@ class FileSystem:
 
         return self._unlink(path, verbose)
 
-    def clean_expression(self, expr):
+    def delete_previous(self, file):
         if self._config['allow_delete'] != AllowDelete.ALL:
             return True
 
-        if expr[-1:] == '*':
-            self._logger.debug('Cleaning %s ' % Path(expr).name, end='')
-            result = subprocess.run('rm "%s"*' % self._path(expr[0: -1]), shell=True, stderr=subprocess.DEVNULL)
-            return result.returncode == 0
-        else:
-            return self._unlink(expr, True)
+        regex = re.compile("^(.+_)[0-9]{8}([.][a-zA-Z0-9]+)$", )
+        m = regex.match(file)
+        if m is None:
+            return
+
+        g = m.groups()
+        if g is None:
+            return
+
+        start = g[0].lower()
+        ext = g[1].lower()
+
+        deleted = False
+        for child in Path(self._path(file)).parent.iterdir():
+            name = child.name.lower()
+            if name.startswith(start) and name.endswith(ext) and regex.match(name):
+                child.unlink()
+                deleted = True
+
+        if deleted:
+            self._logger.print('Deleted previous "%s"* files.' % start, end='')
 
     def load_db_from_file(self, path, suffix=None):
         path = self._path(path)

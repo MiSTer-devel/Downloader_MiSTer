@@ -65,7 +65,7 @@ class FileDownloader(ABC):
         """indicates that a zip is being used, useful for reporting"""
 
     @abstractmethod
-    def download_files(self, first_run):
+    def download_files(self,  first_run):
         """download all the queued files"""
 
     @abstractmethod
@@ -148,9 +148,13 @@ class CurlDownloaderAbstract(FileDownloader):
                 else:
                     self._logger.debug('%s: %s != %s' % (path, self._curl_list[path]['hash'], path_hash))
 
-            if first_run and 'delete' in self._curl_list[path]:
-                for delete in self._curl_list[path]['delete']:
-                    self._file_system.clean_expression(delete)
+            if first_run:
+                if 'delete' in self._curl_list[path]:
+                    for _ in self._curl_list[path]['delete']:
+                        self._file_system.delete_previous(path)
+                        break
+                elif 'delete_previous' in self._curl_list[path] and self._curl_list[path]['delete_previous']:
+                    self._file_system.delete_previous(path)
 
             self._download(path, self._curl_list[path])
 
