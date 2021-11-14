@@ -63,7 +63,7 @@ class LocalRepository:
             return make_new_local_store(store_migrator)
 
         try:
-            local_store = self._file_system.load_db_from_file(self._storage_path)
+            local_store = self._file_system.load_dict_from_file(self._storage_path)
         except Exception as e:
             self._logger.debug(e)
             self._logger.print('Could not load storage')

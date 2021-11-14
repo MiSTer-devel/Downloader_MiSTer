@@ -95,14 +95,10 @@ class Runner:
         databases, failed_dbs = self._db_gateway.fetch_all(self._config['databases'])
 
         for section, db in databases:
-            if not self.validate_db(db, section):
-                failed_dbs.append(self._config['databases'][section]['db_url'])
-                continue
+            if db.db_id not in local_store['dbs']:
+                local_store['dbs'][db.db_id] = empty_store()
 
-            if db['db_id'] not in local_store['dbs']:
-                local_store['dbs'][db['db_id']] = empty_store()
-
-            store = local_store['dbs'][db['db_id']]
+            store = local_store['dbs'][db.db_id]
 
             self._offline_importer.add_db(db, store)
             self._online_importer.add_db(db, store)
@@ -147,51 +143,3 @@ class Runner:
 
     def needs_reboot(self):
         return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.needs_reboot())
-
-    def validate_db(self, db, section):
-        if db is None:
-            self._logger.debug('ERROR: empty db.')
-            return False
-
-        if not isinstance(db, dict):
-            self._logger.debug('ERROR: db has incorrect format, contact the db maintainer if this error persists.')
-            return False
-
-        if 'db_id' not in db or not isinstance(db['db_id'], str):
-            self._logger.print('ERROR: db for section "%s" does not have "db_id", contact the db maintainer.' % section)
-            return False
-
-        db['db_id'] = db['db_id'].lower()
-        if db['db_id'] != section:
-            self._logger.print('ERROR: Section "%s" doesn\'t match database id "%s". Fix your INI file.' % (section, db['db_id']))
-            return False
-
-        if 'zips' not in db or not isinstance(db['zips'], dict):
-            self._logger.print('ERROR: db "%s" does not have "zips", contact the db maintainer.' % db['db_id'])
-            return False
-
-        if 'db_files' not in db or not isinstance(db['db_files'], list):
-            self._logger.print('ERROR: db "%s" does not have "db_files", contact the db maintainer.' % db['db_id'])
-            return False
-
-        if 'default_options' not in db or not isinstance(db['default_options'], dict):
-            self._logger.print('ERROR: db "%s" does not have "default_options", contact the db maintainer.' % db['db_id'])
-            return False
-
-        if 'timestamp' not in db or not isinstance(db['timestamp'], int):
-            self._logger.print('ERROR: db "%s" does not have "timestamp", contact the db maintainer.' % db['db_id'])
-            return False
-
-        if 'files' not in db or not isinstance(db['files'], dict):
-            self._logger.print('ERROR: db "%s" does not have "files", contact the db maintainer.' % db['db_id'])
-            return False
-        
-        if 'folders' not in db or not isinstance(db['folders'], dict):
-            self._logger.print('ERROR: db "%s" does not have "folders", contact the db maintainer.' % db['db_id'])
-            return False
-
-        if 'base_files_url' not in db or not isinstance(db['base_files_url'], str):
-            self._logger.print('ERROR: db "%s" does not have "base_files_url", contact the db maintainer.' % db['db_id'])
-            return False
-
-        return True

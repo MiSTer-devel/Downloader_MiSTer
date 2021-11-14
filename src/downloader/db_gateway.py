@@ -19,6 +19,8 @@
 from pathlib import Path
 from itertools import chain
 
+from downloader.db_entity import DbEntity, DbEntityValidationException
+
 
 class DbGateway:
     def __init__(self, file_system, file_downloader_factory, logger):
@@ -79,10 +81,12 @@ class DbGateway:
         for section, description in descriptions.items():
             if section in files_by_section:
                 try:
-                    db = self._file_system.load_db_from_file(files_by_section[section], Path(description['db_url']).suffix.lower())
-                    dbs.append((section, db))
+                    db_raw = self._file_system.load_dict_from_file(files_by_section[section], Path(description['db_url']).suffix.lower())
+                    dbs.append((section, DbEntity(db_raw, section)))
                 except Exception as e:
                     self._logger.debug(e)
+                    if isinstance(e, DbEntityValidationException):
+                        self._logger.print(str(e))
                     self._logger.print('Could not load json from "%s"' % description['db_url'])
                     errors.append(description['db_url'])
 

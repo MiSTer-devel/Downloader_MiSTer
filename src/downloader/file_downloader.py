@@ -135,6 +135,8 @@ class CurlDownloaderAbstract(FileDownloader):
         for path in sorted(self._curl_list):
             if 'path' in self._curl_list[path] and self._curl_list[path]['path'] == 'system':
                 self._file_system.add_system_path(path)
+                if path == 'MiSTer':
+                    self._file_system.add_system_path('MiSTer.new')
 
             if self._hash_check and self._file_system.is_file(path):
                 path_hash = self._file_system.hash(path)

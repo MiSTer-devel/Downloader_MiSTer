@@ -81,6 +81,7 @@ def run_stdout(command):
     result = subprocess.run(command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 
     if result.returncode != 0:
-        raise Exception("subprocess.run %s Return Code was '%d'" % (command, result.returncode))
+        raise Exception("subprocess.run %s Return Code was '%d'" % (command, result.returncode)
+                        + '\n' + result.stdout.decode() + '\n' + result.stderr.decode())
 
     return result.stdout.decode()
