@@ -132,7 +132,7 @@ class TestFileSystem(unittest.TestCase):
 
     def test_makedirs___on_missing_folder___creates_it(self):
         self.sut().makedirs('foo')
-        self.assertTrue(os.path.isdir(Path(self.tempdir.name) / 'foo'))
+        self.assertTrue(os.path.isdir(str(Path(self.tempdir.name) / 'foo')))
 
     def test_load_dict_from_file___on_plain_json___returns_json_dict(self):
         json_file = 'foo.json'
