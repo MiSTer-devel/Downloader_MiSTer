@@ -1,0 +1,16 @@
+{
+  "Distribution_Mister": {
+    "folders": [
+      "Filters",
+      "Filters/Composite Blend"
+    ],
+    "files": {
+      "Filters/Composite Blend/Comp_Blend_HV_025.txt": {
+        "delete": [],
+        "hash": "11ab1dc79acf4ff1d8182d3b667e921c",
+        "size": 792,
+        "url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/aa97439b93f98294c51a098a08e8e59fedb3d969/Filters/Composite Blend/Comp_Blend_HV_025.txt"
+      }
+    }
+  }
+}

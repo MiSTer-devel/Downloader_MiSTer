@@ -24,6 +24,7 @@ from test.fakes import StoreMigrator
 class TestRealisticMigrations(unittest.TestCase):
 
     filled_store_v0 = 'test/integration/fixtures/filled_store_v0.json'
+    filled_store_v0_with_uppercase_db_id = 'test/integration/fixtures/filled_store_v0_with_uppercase_db_id.json'
     filled_store_vlast = 'test/integration/fixtures/filled_store_vlast.json'
 
     filled_store_v1_with_zip = 'test/integration/fixtures/filled_store_v1_with_zip.json'
@@ -32,6 +33,11 @@ class TestRealisticMigrations(unittest.TestCase):
 
     def test_migrate___on_v0_filled_store___returns_expected_store(self):
         store = load_file(self.filled_store_v0)
+        StoreMigrator().migrate(store)
+        self.assertEqual(store, load_file(self.filled_store_vlast))
+
+    def test_migrate___on_v0_filled_store_with_uppercase_db_id___returns_expected_store(self):
+        store = load_file(self.filled_store_v0_with_uppercase_db_id)
         StoreMigrator().migrate(store)
         self.assertEqual(store, load_file(self.filled_store_vlast))
 

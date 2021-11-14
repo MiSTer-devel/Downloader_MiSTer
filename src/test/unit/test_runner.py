@@ -54,6 +54,14 @@ class TestRunner(unittest.TestCase):
     def test_validate_db___with_none_db___returns_false(self):
         self.assertFalse(Runner.with_single_empty_db().validate_db(None, {}))
 
+    def test_validate_db___with_correct_db___returns_true2(self):
+        db = {'db_id': 'BiG', 'base_files_url': '', 'db_files': [], 'files': {}, 'folders': {}, 'zips': {}, 'default_options': {}, 'timestamp': 0}
+        expected = {'db_id': 'big', 'base_files_url': '', 'db_files': [], 'files': {}, 'folders': {}, 'zips': {}, 'default_options': {}, 'timestamp': 0}
+
+        validate_db(db=db)
+
+        self.assertEqual(expected, db)
+
     def test_validate_db___with_wrong_field___returns_false(self):
         for field in ['db_id', 'base_files_url', 'db_files', 'files', 'folders', 'zips', 'default_options', 'timestamp']:
             with self.subTest(field):

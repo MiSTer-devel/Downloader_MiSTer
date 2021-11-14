@@ -16,16 +16,15 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from .migration_v1 import MigrationV1
-from .migration_v2 import MigrationV2
-from .migration_v3 import MigrationV3
-from .migration_v4 import MigrationV4
+class MigrationV4:
+    version = 4
 
+    def migrate(self, local_store):
 
-def migrations():
-    return [
-        MigrationV1(),
-        MigrationV2(),
-        MigrationV3(),
-        MigrationV4()
-    ]
+        #
+        # database ids to lowercase
+        #
+        wrong_ids = [db_id for db_id, store in local_store['dbs'].items() if db_id.lower() != db_id]
+
+        for db_id in wrong_ids:
+            local_store['dbs'][db_id.lower()] = local_store['dbs'].pop(db_id)

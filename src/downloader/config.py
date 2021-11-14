@@ -103,7 +103,9 @@ class ConfigReader:
 
         for section in ini_config.sections():
             parser = IniParser(ini_config[section])
-            if section.lower() == 'mister':
+
+            section_id = section.lower()
+            if section_id == 'mister':
                 result['base_path'] = self._valid_base_path(parser.get_string('base_path', result['base_path']))
                 result['base_system_path'] = self._valid_base_path(parser.get_string('base_system_path', result['base_system_path']))
                 result['allow_delete'] = AllowDelete(parser.get_int('allow_delete', result['allow_delete'].value))
@@ -121,13 +123,17 @@ class ConfigReader:
                 continue
 
             self._logger.print("Reading '%s' db section" % section)
-            default_db_url = default_db['db_url'] if section.lower() == default_db['section'].lower() else None
+            default_db_url = default_db['db_url'] if section_id == default_db['section'].lower() else None
             db_url = parser.get_string('db_url', default_db_url)
             if db_url is None:
-                raise Exception("Can't import db for section '%s' without an url field" % section)
-            result['databases'][section] = {
+                raise InvalidConfigParameter("Can't import db for section '%s' without an url field" % section)
+
+            if section_id in result['databases']:
+                raise InvalidConfigParameter("Can't import db for section '%s' twice" % section)
+
+            result['databases'][section_id] = {
                 'db_url': db_url,
-                'section': section
+                'section': section_id
             }
 
         if len(result['databases']) == 0:

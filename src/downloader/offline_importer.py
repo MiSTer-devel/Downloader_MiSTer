@@ -46,7 +46,12 @@ class OfflineImporter:
 
         self._logger.print()
         db = self._file_system.load_db_from_file(db_file)
+        if 'db_id' not in db:
+            self._logger.print('WARNING! db_id "%s", not found in Offline database at %s' % (store_id, db_file))
+            self._logger.print('Ignoring the offline database.')
+            return
 
+        db['db_id'] = db['db_id'].lower()
         if store_id != db['db_id']:
             self._logger.print('WARNING! Stored id "%s", doesn\'t match Offline database id "%s" at %s' % (
                 store_id, db['db_id'], db_file))

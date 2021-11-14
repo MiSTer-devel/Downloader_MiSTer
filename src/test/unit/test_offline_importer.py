@@ -63,7 +63,7 @@ class TestOfflineImporter(unittest.TestCase):
         self.assertFalse(file_a in store['files'])
         self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
 
-    def test_apply_offline_databases___always___adds_db_hash_to_offline_databases_imported(self):
+    def test_apply_offline_databases___always___adds_db_file_to_offline_databases_imported(self):
         self.sut.file_system.test_data.with_test_json_zip()
 
         store = self.apply_db_test_with_file_a()
@@ -91,6 +91,29 @@ class TestOfflineImporter(unittest.TestCase):
     def test_apply_offline_databases___when_db_id_does_not_match___does_nothing(self):
         self.sut.file_system.test_data\
             .with_test_json_zip({'hash': file_test_json_zip, 'unzipped_json': {'db_id': 'does_not_match'}})
+
+        store = self.apply_db_test_with_file_a()
+        self.assertTrue(file_test_json_zip not in store['offline_databases_imported'])
+        self.assertEqual(store, empty_store())
+        self.assertTrue(self.sut.file_system.is_file(file_test_json_zip))
+
+    def test_apply_offline_databases___when_db_id_is_uppercase___still_adds_db_file(self):
+        unzipped_json = db_test_with_file_a_descr()
+        unzipped_json['db_id'] = 'TEST'
+
+        self.sut.file_system.test_data\
+            .with_test_json_zip({'hash': file_test_json_zip, 'unzipped_json': unzipped_json})
+
+        store = self.apply_db_test_with_file_a()
+        self.assertTrue(file_test_json_zip in store['offline_databases_imported'])
+        self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
+
+    def test_apply_offline_databases___when_db_id_is_not_there___does_nothing(self):
+        unzipped_json = db_test_with_file_a_descr()
+        unzipped_json.pop('db_id')
+
+        self.sut.file_system.test_data\
+            .with_test_json_zip({'hash': file_test_json_zip, 'unzipped_json': unzipped_json})
 
         store = self.apply_db_test_with_file_a()
         self.assertTrue(file_test_json_zip not in store['offline_databases_imported'])
