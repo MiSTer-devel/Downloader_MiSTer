@@ -133,7 +133,7 @@ class FileSystem:
         if deleted:
             self._logger.print('Deleted previous "%s"* files.' % start)
 
-    def load_db_from_file(self, path, suffix=None):
+    def load_dict_from_file(self, path, suffix=None):
         path = self._path(path)
         if suffix is None:
             suffix = Path(path).suffix.lower()

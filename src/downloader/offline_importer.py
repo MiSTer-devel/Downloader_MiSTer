@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from .config import AllowDelete
+from .db_entity import DbEntity, DbEntityValidationException
 
 
 class OfflineImporter:
@@ -32,8 +33,8 @@ class OfflineImporter:
 
     def apply_offline_databases(self):
         for db, store in self._dbs:
-            for db_file in db['db_files']:
-                self._update_store_from_offline_db(db['db_id'], db_file, store)
+            for db_file in db.db_files:
+                self._update_store_from_offline_db(db.db_id, db_file, store)
 
     def _update_store_from_offline_db(self, store_id, db_file, store):
         if not self._file_system.is_file(db_file):
@@ -45,32 +46,28 @@ class OfflineImporter:
             return
 
         self._logger.print()
-        db = self._file_system.load_db_from_file(db_file)
-        if 'db_id' not in db:
-            self._logger.print('WARNING! db_id "%s", not found in Offline database at %s' % (store_id, db_file))
-            self._logger.print('Ignoring the offline database.')
-            return
-
-        db['db_id'] = db['db_id'].lower()
-        if store_id != db['db_id']:
-            self._logger.print('WARNING! Stored id "%s", doesn\'t match Offline database id "%s" at %s' % (
-                store_id, db['db_id'], db_file))
+        try:
+            db = DbEntity(self._file_system.load_dict_from_file(db_file), store_id)
+        except DbEntityValidationException as e:
+            self._logger.print('WARNING! Offline database "%s", could not be load from file %s' % (store_id, db_file))
+            self._logger.debug(e)
+            self._logger.print(str(e))
             self._logger.print('Ignoring the offline database.')
             return
 
         self._logger.print('Importing %s into the local store.' % db_file)
 
-        if isinstance(db['folders'], list):  # TODO Remove conversion
-            db['folders'] = {folder: {} for folder in db['folders']}
+        if isinstance(db.folders, list):  # TODO Remove conversion
+            db.folders = {folder: {} for folder in db.folders}
 
-        self._import_folders(db['folders'], store['folders'])
-        self._import_files(db['files'], store['files'])
+        self._import_folders(db.folders, store['folders'])
+        self._import_files(db.files, store['files'])
 
         errors = []
-        if len(db['zips']) > 0:
+        if len(db.zips) > 0:
             errors.extend(self._update_from_zips(db, store))
 
-        if len(db['files']) > 0:
+        if len(db.files) > 0:
             self._logger.print()
         self._logger.print()
 
@@ -86,11 +83,11 @@ class OfflineImporter:
         summary_downloader = self._file_downloader_factory.create(self._config['parallel_update'])
         zip_ids_by_temp_zip = dict()
 
-        for zip_id in db['zips']:
+        for zip_id in db.zips:
             temp_zip = '/tmp/%s.json.zip' % zip_id
             zip_ids_by_temp_zip[temp_zip] = zip_id
 
-            summary_downloader.queue_file(db['zips'][zip_id]['summary_file'], temp_zip)
+            summary_downloader.queue_file(db.zips[zip_id]['summary_file'], temp_zip)
 
         self._logger.print()
         self._logger.print()
@@ -98,13 +95,13 @@ class OfflineImporter:
         self._logger.print()
 
         for temp_zip in summary_downloader.correctly_downloaded_files():
-            summary = self._file_system.load_db_from_file(temp_zip)
+            summary = self._file_system.load_dict_from_file(temp_zip)
             if isinstance(summary['folders'], list):  # TODO Remove conversion
                 summary['folders'] = {folder: {} for folder in summary['folders']}
 
             zip_id = zip_ids_by_temp_zip[temp_zip]
 
-            store['zips'][zip_id] = db['zips'][zip_id]
+            store['zips'][zip_id] = db.zips[zip_id]
             self._import_folders(summary['folders'], store['folders'])
             self._import_files(summary['files'], store['files'])
             self._file_system.unlink(temp_zip)

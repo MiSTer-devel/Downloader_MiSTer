@@ -19,7 +19,8 @@
 import unittest
 import json
 from downloader.store_migrator import make_new_local_store, WrongMigrationException
-from test.fakes import StoreMigrator, Migration
+from test.fake_store_migrator import StoreMigrator
+from test.fake_migration import Migration
 
 
 class TestStoreMigratorFixture(unittest.TestCase):

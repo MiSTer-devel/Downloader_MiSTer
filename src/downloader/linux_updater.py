@@ -28,10 +28,10 @@ class LinuxUpdater:
         self._linux_descriptions = []
 
     def add_db(self, db):
-        if 'linux' in db:
+        if db.linux is not None:
             self._linux_descriptions.append({
-                'id': db['db_id'],
-                'args': db['linux']
+                'id': db.db_id,
+                'args': db.linux
             })
 
     def update_linux(self):

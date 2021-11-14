@@ -18,7 +18,7 @@
 
 import unittest
 import json
-from test.fakes import StoreMigrator
+from test.fake_store_migrator import StoreMigrator
 
 
 class TestRealisticMigrations(unittest.TestCase):

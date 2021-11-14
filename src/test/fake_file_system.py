@@ -15,6 +15,7 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+from typing import List
 
 import test.objects
 import pathlib
@@ -54,7 +55,7 @@ class TestDataFileSystem:
         return self
 
 
-def make_production_filesystem(config):
+def make_production_filesystem(config) -> ProductionFileSystem:
     return ProductionFileSystem(config, NoLogger())
 
 
@@ -62,13 +63,18 @@ class FileSystem(ProductionFileSystem):
     def __init__(self):
         self._files = CaseInsensitiveDict()
         self._folders = CaseInsensitiveDict()
+        self._system_paths = list()
 
     @property
-    def test_data(self):
+    def test_data(self) -> TestDataFileSystem:
         return TestDataFileSystem(self._files, self._folders)
 
+    @property
+    def system_paths(self) -> List[str]:
+        return self._system_paths.copy()
+
     def add_system_path(self, path):
-        pass
+        self._system_paths.append(path)
 
     def resolve(self, path):
         return path
@@ -133,7 +139,7 @@ class FileSystem(ProductionFileSystem):
     def save_json_on_zip(self, db, path):
         pass
 
-    def load_db_from_file(self, path, suffix=None):
+    def load_dict_from_file(self, path, suffix=None):
         file_description = self._files.get(path)
         unzipped_json = file_description['unzipped_json']
         file_description.pop('unzipped_json')

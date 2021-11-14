@@ -16,22 +16,13 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.db_gateway import DbGateway as ProductionDbGateway
+from downloader.config import default_config
+from downloader.reboot_calculator import RebootCalculator as ProductionRebootCalculator
 from test.fake_file_system import FileSystem
-from test.fake_file_downloader import FileDownloaderFactory
 from test.fake_logger import NoLogger
 
 
-class DbGateway(ProductionDbGateway):
-    def __init__(self, file_system=None, file_downloader_factory=None):
+class RebootCalculator(ProductionRebootCalculator):
+    def __init__(self, config=None, file_system=None):
         self.file_system = FileSystem() if file_system is None else file_system
-        super().__init__(
-            self.file_system,
-            FileDownloaderFactory(file_system=self.file_system) if file_downloader_factory is None else file_downloader_factory,
-            NoLogger())
-
-    @staticmethod
-    def with_single_db(db_id, descr) -> ProductionDbGateway:
-        db_gateway = DbGateway()
-        db_gateway.file_system.test_data.with_file(db_id, {'unzipped_json': descr})
-        return db_gateway
+        super().__init__(default_config() if config is None else config, NoLogger(), self.file_system)

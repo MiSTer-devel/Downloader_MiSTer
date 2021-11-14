@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from test.fakes import RebootCalculator
+from test.fake_reboot_calculator import RebootCalculator
 from test.fake_file_system import FileSystem
 from downloader.config import AllowReboot
 from downloader.reboot_calculator import mister_downloader_needs_reboot_file

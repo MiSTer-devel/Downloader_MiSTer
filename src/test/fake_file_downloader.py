@@ -16,18 +16,13 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.file_downloader import CurlDownloaderAbstract, FileDownloaderFactory as ProductionFileDownloaderFactory
+from typing import List
+
+from downloader.file_downloader import CurlDownloaderAbstract, FileDownloaderFactory as ProductionFileDownloaderFactory, FileDownloader as ProductionFileDownloader
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from test.fake_file_system import FileSystem
 from test.fake_logger import NoLogger
 from test.objects import file_MiSTer, file_MiSTer_new
-
-
-def downloader_with_errors(errors):
-    downloader = FileDownloader()
-    for file_path in errors:
-        downloader.test_data.errors_at(file_path)
-    return downloader
 
 
 class TestDataCurlDownloader:
@@ -51,17 +46,18 @@ class FileDownloader(CurlDownloaderAbstract):
     def __init__(self, config=None, file_system=None):
         config = config if config is not None else {'curl_ssl': '', 'downloader_retries': 3}
         self.file_system = FileSystem() if file_system is None else file_system
-        super().__init__(config, self.file_system, ProductionLocalRepository(config, NoLogger(), self.file_system), NoLogger(), True)
+        self.local_repository = ProductionLocalRepository(config, NoLogger(), self.file_system)
+        super().__init__(config, self.file_system, self.local_repository, NoLogger(), True)
         self._run_files = []
         self._problematic_files = dict()
         self._actual_description = dict()
         self._missing_files = set()
 
     @property
-    def test_data(self):
+    def test_data(self) -> TestDataCurlDownloader:
         return TestDataCurlDownloader(self)
 
-    def _run(self, description, target_path, file):
+    def _run(self, description, target_path: str, file: str) -> None:
         self._run_files.append(file)
 
         if file in self._problematic_files:
@@ -72,7 +68,7 @@ class FileDownloader(CurlDownloaderAbstract):
                 description = self._actual_description[file]
             if file not in self._missing_files:
                 actual_file = file if file != file_MiSTer else file_MiSTer_new
-                if isinstance(self._file_system, FileSystem):
+                if hasattr(self._file_system, 'test_data'):
                     self._file_system.test_data.with_file(actual_file, description)
                 else:
                     self._file_system.touch(actual_file)
@@ -80,13 +76,13 @@ class FileDownloader(CurlDownloaderAbstract):
         else:
             self._errors.add_print_report(file, '')
 
-    def _command(self, target_path, url):
+    def _command(self, target_path: str, url: str) -> str:
         return target_path
 
-    def _wait(self):
+    def _wait(self) -> None:
         pass
 
-    def run_files(self):
+    def run_files(self) -> List[str]:
         return self._run_files
 
 

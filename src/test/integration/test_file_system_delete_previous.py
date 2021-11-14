@@ -22,7 +22,7 @@ import os
 from downloader.config import default_config
 from downloader.other import empty_store
 from test.objects import db_test_with_file, file_descr
-from test.fakes import OnlineImporter
+from test.fake_online_importer import OnlineImporter
 from test.fake_file_system import make_production_filesystem
 
 

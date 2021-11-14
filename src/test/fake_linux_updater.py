@@ -16,22 +16,19 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.db_gateway import DbGateway as ProductionDbGateway
-from test.fake_file_system import FileSystem
+from downloader.config import default_config
+from downloader.linux_updater import LinuxUpdater as ProductionLinuxUpdater
 from test.fake_file_downloader import FileDownloaderFactory
+from test.fake_file_system import FileSystem
 from test.fake_logger import NoLogger
 
 
-class DbGateway(ProductionDbGateway):
-    def __init__(self, file_system=None, file_downloader_factory=None):
+class LinuxUpdater(ProductionLinuxUpdater):
+    def __init__(self, file_downloader_factory=None, file_system=None):
         self.file_system = FileSystem() if file_system is None else file_system
-        super().__init__(
-            self.file_system,
-            FileDownloaderFactory(file_system=self.file_system) if file_downloader_factory is None else file_downloader_factory,
-            NoLogger())
+        self.file_downloader_factory = FileDownloaderFactory(default_config(), self.file_system) if file_downloader_factory is None else file_downloader_factory
+        super().__init__(self.file_system, self.file_downloader_factory, NoLogger())
 
-    @staticmethod
-    def with_single_db(db_id, descr) -> ProductionDbGateway:
-        db_gateway = DbGateway()
-        db_gateway.file_system.test_data.with_file(db_id, {'unzipped_json': descr})
-        return db_gateway
+    def _run_subprocesses(self, linux, linux_path):
+        self.file_system.write_file_contents('/MiSTer.version', linux['version'])
+        self.file_system.touch('/tmp/downloader_needs_reboot_after_linux_update')

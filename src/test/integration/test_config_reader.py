@@ -19,7 +19,7 @@
 import unittest
 from downloader.config import AllowDelete, AllowReboot, InvalidConfigParameter
 from test.objects import not_found_ini
-from test.fakes import ConfigReader
+from test.fake_config_reader import ConfigReader
 
 
 class TestConfigReader(unittest.TestCase):

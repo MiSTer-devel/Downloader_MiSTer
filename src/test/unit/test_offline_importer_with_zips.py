@@ -20,7 +20,7 @@ import unittest
 from downloader.other import empty_store
 from test.objects import store_with_unzipped_cheats_folder_nes_files, file_test_json_zip, cheats_folder_nes_file_path, db_test_descr, cheats_folder_nes_zip_desc
 from test.objects import cheats_folder_nes_zip_id, cheats_folder_nes_file_hash, unzipped_json_with_cheats_folder_nes_file, cheats_folder_nes_file_size
-from test.fakes import OfflineImporter
+from test.fake_offline_importer import OfflineImporter
 
 
 class TestOfflineImporterWithZips(unittest.TestCase):
@@ -34,7 +34,7 @@ class TestOfflineImporterWithZips(unittest.TestCase):
                 'hash': file_test_json_zip,
                 'unzipped_json': db_test_descr(zips={
                     cheats_folder_nes_zip_id: cheats_folder_nes_zip_desc(unzipped_json=unzipped_json_with_cheats_folder_nes_file())
-                })
+                }).to_dict()
             })\
             .with_file(cheats_folder_nes_file_path, {"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size})
 

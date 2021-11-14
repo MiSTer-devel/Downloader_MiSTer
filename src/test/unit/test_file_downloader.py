@@ -75,6 +75,12 @@ class TestFileDownloader(unittest.TestCase):
         self.assertDownloaded([file_MiSTer], [file_MiSTer], need_reboot=True)
         self.assertTrue(self.sut.file_system.is_file(file_MiSTer))
 
+    def test_download_mister_file___from_scratch_no_issues___adds_the_three_mister_files_on_system_paths(self):
+        self.sut.file_system.test_data.with_old_mister_binary()
+        self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_MiSTer, 'reboot': True, 'path': 'system'}, file_MiSTer)
+        self.sut.download_files(False)
+        self.assertEqual(['MiSTer', 'MiSTer.new', self.sut.local_repository.old_mister_path], self.sut.file_system.system_paths)
+
     def assertDownloaded(self, oks, run=None, errors=None, need_reboot=False):
         self.assertEqual(oks, self.sut.correctly_downloaded_files())
         self.assertEqual(errors if errors is not None else [], self.sut.errors())

@@ -18,7 +18,8 @@
 
 import unittest
 from pathlib import Path
-from downloader.constants import distribution_mister_db_id
+from downloader.constants import distribution_mister_db_id, distribution_mister_db_url
+from test.fake_db_entity import DbEntity
 import copy
 
 file_test_json_zip = 'test.json.zip'
@@ -45,20 +46,11 @@ cheats_folder_nes_file_size = 1020
 
 
 def file_test_json_zip_descr():
-    return {'hash': file_test_json_zip, 'unzipped_json': db_test_with_file_a_descr()}
+    return {'hash': file_test_json_zip, 'unzipped_json': db_test_with_file_a_descr().to_dict()}
 
 
 def db_test_being_empty_descr():
-    return {
-        'db_id': db_test,
-        'db_files': [''],
-        'files': {},
-        'folders': {},
-        'base_files_url': '',
-        'zips': {},
-        'default_options': {},
-        'timestamp': 0
-    }
+    return db_entity(db_id=db_test)
 
 
 def zip_desc(contents, path, source, zipped_files=None, unzipped_json=None):
@@ -140,19 +132,37 @@ def store_with_unzipped_cheats_folder_nes_files(url=True, folders=True, zip_id=T
 
 
 def db_test_descr(zips=None, folders=None, files=None, db_files=None):
-    return {
-        'db_id': db_test,
-        'db_files': db_files if db_files is not None else [''],
+    return db_entity(
+        db_id=db_test,
+        db_files=db_files if db_files is not None else [''],
+        files=files if files is not None else {},
+        folders=folders if folders is not None else {},
+        base_files_url='http://',
+        zips=zips if zips is not None else {},
+        default_options={},
+        timestamp=0
+    )
+
+
+def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, default_options=None, timestamp=None, linux=None, header=None, section=None):
+    db_raw = {
+        'db_id': db_id if db_id is not None else db_test,
+        'db_files': db_files if db_files is not None else [],
         'files': files if files is not None else {},
         'folders': folders if folders is not None else {},
-        'base_files_url': 'http://',
+        'base_files_url': base_files_url if base_files_url is not None else '',
         'zips': zips if zips is not None else {},
-        'default_options': {},
-        'timestamp': 0
+        'default_options': default_options if default_options is not None else {},
+        'timestamp': timestamp if timestamp is not None else 0
     }
+    if linux is not None:
+        db_raw['linux'] = linux
+    if header is not None:
+        db_raw['header'] = header
+    return DbEntity(db_raw, section if section is not None else db_id if db_id is not None else db_test)
 
 
-def db_empty_with_linux_descr():
+def raw_db_empty_with_linux_descr():
     return {
         'db_id': db_empty,
         'db_files': [],
@@ -172,7 +182,7 @@ def db_empty_with_linux_descr():
     }
 
 
-def db_empty_descr():
+def raw_db_empty_descr():
     return {
         'db_id': db_empty,
         'db_files': [],
@@ -185,7 +195,7 @@ def db_empty_descr():
     }
 
 
-def db_wrong_descr():
+def raw_db_wrong_descr():
     return {
         'db_id': 'wrong',
         'db_files': [],
@@ -277,78 +287,37 @@ def file_a_updated_descr():
 
 
 def db_test_with_file(name_file, file):
-    return {
-        'db_id': db_test,
-        'db_files': [file_test_json_zip],
-        'files': {
-            name_file: file
-        },
-        'folders': {},
-        'base_files_url': '',
-        'zips': {},
-        'default_options': {},
-        'timestamp': 0
-    }
+    return db_entity(db_id=db_test, db_files=[file_test_json_zip], files={name_file: file})
 
 
 def db_distribution_mister_with_file(name_file, file):
-    return {
-        'db_id': distribution_mister_db_id,
-        'db_files': [file_test_json_zip],
-        'files': {
-            name_file: file
-        },
-        'folders': {},
-        'base_files_url': '',
-        'zips': {},
-        'default_options': {},
-        'timestamp': 0
-    }
+    return db_entity(db_id=distribution_mister_db_id, db_files=[file_test_json_zip], files={name_file: file})
 
 
 def db_with_file(db_id, name_file, file):
-    return {
-        'db_id': db_id,
-        'db_files': [db_id + '.json.zip'],
-        'files': {
-            name_file: file
-        },
-        'folders': {},
-        'base_files_url': '',
-        'zips': {},
-        'default_options': {},
-        'timestamp': 0
-    }
+    return db_entity(db_id=db_id, db_files=[db_id + '.json.zip'], files={name_file: file})
 
 
 def db_with_folders(db_id, folders):
     if isinstance(folders, list):
         folders = {f: {} for f in folders}
-    return {
-        'db_id': db_id,
-        'db_files': [db_id + '.json.zip'],
-        'files': {},
-        'folders': folders,
-        'base_files_url': '',
-        'zips': {},
-        'default_options': {},
-        'timestamp': 0
-    }
+    return db_entity(db_id=db_id, db_files=[db_id + '.json.zip'], folders=folders)
+
+
+def store_with_folders(db_id, folders):
+    return db_with_folders(db_id, folders).to_dict()
 
 
 def db_test_with_file_a_descr():
-    return {
-        'db_id': db_test,
-        'db_files': [file_test_json_zip],
-        'files': {
-            file_a: file_a_descr()
-        },
-        'folders': {folder_a: {}},
-        'base_files_url': '',
-        'zips': {},
-        'default_options': {},
-        'timestamp': 0
-    }
+    return db_entity(db_id=db_test, db_files=[file_test_json_zip], files={file_a: file_a_descr()}, folders={folder_a: {}})
+
+
+def store_test_with_file_a_descr():
+    return db_test_with_file_a_descr().to_dict()
+
+
+def store_test_with_file(file, description):
+    return db_test_with_file(file, description).to_dict()
 
 
 def not_found_ini():
@@ -362,8 +331,8 @@ def _not_file(file):
 
 def default_env():
     return {
-        'DEFAULT_DB_URL': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
-        'DEFAULT_DB_ID': 'distribution_mister',
+        'DEFAULT_DB_URL': distribution_mister_db_url,
+        'DEFAULT_DB_ID': distribution_mister_db_id,
         'ALLOW_REBOOT': None,
         'DEBUG': 'false'
     }
@@ -371,8 +340,8 @@ def default_env():
 
 def debug_env():
     return {
-        'DEFAULT_DB_URL': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
-        'DEFAULT_DB_ID': 'distribution_mister',
+        'DEFAULT_DB_URL': distribution_mister_db_url,
+        'DEFAULT_DB_ID': distribution_mister_db_id,
         'ALLOW_REBOOT': None,
         'DEBUG': 'true'
     }

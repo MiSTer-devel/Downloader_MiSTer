@@ -20,8 +20,12 @@ import unittest
 from downloader.config import default_config
 from downloader.other import empty_store
 from downloader.online_importer import InvalidDownloaderPath, invalid_folders, invalid_paths, no_distribution_mister_invalid_paths
-from test.objects import db_distribution_mister_with_file, db_test_being_empty_descr, file_boot_rom, boot_rom_descr, overwrite_file, file_mister_descr, file_mister_old_descr, file_a_descr, file_a_updated_descr, db_test_with_file, db_with_file, db_test_with_file_a_descr, db_with_folders, file_a, folder_a, file_MiSTer, file_MiSTer_old
-from test.fakes import OnlineImporter, FactoryStub
+from test.objects import store_with_folders, db_distribution_mister_with_file, db_test_being_empty_descr, file_boot_rom, \
+    boot_rom_descr, overwrite_file, file_mister_descr, file_mister_old_descr, file_a_descr, file_a_updated_descr, \
+    db_test_with_file, db_with_file, db_test_with_file_a_descr, db_with_folders, file_a, folder_a, file_MiSTer, \
+    file_MiSTer_old, store_test_with_file_a_descr, store_test_with_file
+from test.fake_online_importer import OnlineImporter
+from test.factory_stub import FactoryStub
 from test.fake_file_downloader import FileDownloader
 
 
@@ -57,7 +61,7 @@ class TestOnlineImporter(unittest.TestCase):
     def test_download_dbs_contents___with_existing_incorrect_file_but_correct_already_on_store___changes_nothing(self):
         sut = OnlineImporter()
         sut.file_system.test_data.with_file_a({'hash': 'does_not_match'})
-        store = db_test_with_file_a_descr()
+        store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a_descr(), store)
         sut.download_dbs_contents(False)
@@ -70,7 +74,7 @@ class TestOnlineImporter(unittest.TestCase):
     def test_download_dbs_contents___with_existing_incorrect_file_also_on_store___downloads_the_correct_one(self):
         sut = OnlineImporter()
         sut.file_system.test_data.with_file_a({'hash': 'does_not_match'})
-        store = db_test_with_file(file_a, {'hash': 'does_not_match'})
+        store = store_test_with_file(file_a, {'hash': 'does_not_match'})
 
         sut.add_db(db_test_with_file_a_descr(), store)
         sut.download_dbs_contents(False)
@@ -82,7 +86,7 @@ class TestOnlineImporter(unittest.TestCase):
 
     def test_download_dbs_contents___with_non_existing_one_file_already_on_store___installs_file_regardless(self):
         sut = OnlineImporter()
-        store = db_test_with_file_a_descr()
+        store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a_descr(), store)
         sut.download_dbs_contents(False)
@@ -135,7 +139,7 @@ class TestOnlineImporter(unittest.TestCase):
     def test_download_dbs_contents___with_file_on_stored_erroring___store_deletes_file(self):
         sut = OnlineImporter(FactoryStub(FileDownloader()).has(lambda fd: fd.test_data.errors_at(file_a)))
         sut.file_system.test_data.with_folders(['a'])
-        store = db_test_with_file_a_descr()
+        store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file(file_a, file_a_updated_descr()), store)
         sut.download_dbs_contents(False)
@@ -162,7 +166,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut = OnlineImporter()
         sut.file_system.test_data.with_file_a()
         sut.file_system.test_data.with_folders(['a'])
-        store = db_test_with_file_a_descr()
+        store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_being_empty_descr(), store)
         sut.download_dbs_contents(False)
@@ -175,7 +179,7 @@ class TestOnlineImporter(unittest.TestCase):
     def test_download_dbs_contents___when_file_is_already_there___does_nothing(self):
         sut = OnlineImporter()
         sut.file_system.test_data.with_file_a()
-        store = db_test_with_file_a_descr()
+        store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a_descr(), store)
         sut.download_dbs_contents(False)
@@ -186,7 +190,7 @@ class TestOnlineImporter(unittest.TestCase):
 
     def test_download_dbs_contents___when_downloaded_file_is_missing___downloads_it_again(self):
         sut = OnlineImporter()
-        store = db_test_with_file_a_descr()
+        store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a_descr(), store)
         sut.download_dbs_contents(False)
@@ -199,7 +203,7 @@ class TestOnlineImporter(unittest.TestCase):
         config = default_config()
         config['check_manually_deleted_files'] = False
         sut = OnlineImporter(config=config)
-        store = db_test_with_file_a_descr()
+        store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a_descr(), store)
         sut.download_dbs_contents(False)
@@ -275,7 +279,7 @@ class TestOnlineImporter(unittest.TestCase):
     def test_deleted_folders___when_db_1_has_a_b_c_and_store_1_has_a_x_y___should_delete_b_c_and_store_x_y(self):
         sut = OnlineImporter()
         sut.file_system.test_data.with_folders(['a', 'b', 'c'])
-        store1 = db_with_folders('db1', ['a', 'b', 'c'])
+        store1 = store_with_folders('db1', ['a', 'b', 'c'])
 
         sut.add_db(db_with_folders('db1', ['a', 'x', 'y']), store1)
         sut.download_dbs_contents(False)
@@ -287,9 +291,9 @@ class TestOnlineImporter(unittest.TestCase):
     def test_deleted_folders___when_db_1_has_a_b_c_and_store_1_has_a_x___and_db_2_has_b_and_store_2_is_empty__and_db_3_is_empty_and_store_3_has_z___should_delete_c_z_and_store_x(self):
         sut = OnlineImporter()
         sut.file_system.test_data.with_folders(['a', 'b', 'c', 'z'])
-        store1 = db_with_folders('db1', ['a', 'b', 'c'])
-        store2 = db_with_folders('db2', [])
-        store3 = db_with_folders('db3', ['z'])
+        store1 = store_with_folders('db1', ['a', 'b', 'c'])
+        store2 = store_with_folders('db2', [])
+        store3 = store_with_folders('db3', ['z'])
 
         sut.add_db(db_with_folders('db1', ['a', 'x']), store1)
         sut.add_db(db_with_folders('db2', ['b']), store2)

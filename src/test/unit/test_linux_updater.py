@@ -17,7 +17,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from test.fakes import LinuxUpdater, FactoryStub
+from test.factory_stub import FactoryStub
+from test.fake_linux_updater import LinuxUpdater
+from test.objects import db_entity
 from test.fake_file_downloader import FileDownloader
 
 
@@ -31,15 +33,15 @@ class TestLinuxUpdater(unittest.TestCase):
 
     def test_update_linux___no_linux_databases___no_need_to_reboot(self):
         linux_updater = LinuxUpdater()
-        linux_updater.add_db({'db_id': 'first'})
-        linux_updater.add_db({'db_id': 'second'})
+        linux_updater.add_db(db_entity(db_id='first'))
+        linux_updater.add_db(db_entity(db_id='second'))
         linux_updater.update_linux()
         self.assertFalse(linux_updater.needs_reboot())
         self.assertEqual(linux_updater.file_system.read_file_contents('/MiSTer.version'), "unknown")
 
     def test_update_linux___db_with_new_linux___has_new_version_and_needs_reboot(self):
         linux_updater = LinuxUpdater()
-        linux_updater.add_db({'db_id': 'new', 'linux': linux_description()})
+        linux_updater.add_db(db_entity(db_id='new', linux=linux_description()))
         linux_updater.update_linux()
         self.assertTrue(linux_updater.needs_reboot())
         self.assertEqual(linux_updater.file_system.read_file_contents('/MiSTer.version'), "210711")
@@ -47,23 +49,23 @@ class TestLinuxUpdater(unittest.TestCase):
     def test_update_linux___db_with_old_linux___has_old_version_and_no_need_to_reboot(self):
         linux_updater = LinuxUpdater()
         linux_updater.file_system.test_data.with_file('/MiSTer.version', {'content': "210711"})
-        linux_updater.add_db({'db_id': 'new', 'linux': linux_description()})
+        linux_updater.add_db(db_entity(db_id='new', linux=linux_description()))
         linux_updater.update_linux()
         self.assertFalse(linux_updater.needs_reboot())
         self.assertEqual(linux_updater.file_system.read_file_contents('/MiSTer.version'), "210711")
 
     def test_update_linux___dbs_with_different_new_linux___updates_first_linux_and_needs_reboot(self):
         linux_updater = LinuxUpdater()
-        linux_updater.add_db({'db_id': 'new_2', 'linux': linux_description_with_version("222222")})
-        linux_updater.add_db({'db_id': 'new_1', 'linux': linux_description_with_version("111111")})
-        linux_updater.add_db({'db_id': 'new_3', 'linux': linux_description_with_version("333333")})
+        linux_updater.add_db(db_entity(db_id='new_2', linux=linux_description_with_version("222222")))
+        linux_updater.add_db(db_entity(db_id='new_1', linux=linux_description_with_version("111111")))
+        linux_updater.add_db(db_entity(db_id='new_3', linux=linux_description_with_version("333333")))
         linux_updater.update_linux()
         self.assertTrue(linux_updater.needs_reboot())
         self.assertEqual(linux_updater.file_system.read_file_contents('/MiSTer.version'), "222222")
 
     def test_update_linux___new_linux_but_failed_download___no_need_to_reboot(self):
         linux_updater = LinuxUpdater(FactoryStub(FileDownloader()).has(lambda fd: fd.test_data.errors_at('linux.7z')))
-        linux_updater.add_db({'db_id': 'new', 'linux': linux_description()})
+        linux_updater.add_db(db_entity(db_id='new', linux=linux_description()))
         linux_updater.update_linux()
         self.assertFalse(linux_updater.needs_reboot())
         self.assertEqual(linux_updater.file_system.read_file_contents('/MiSTer.version'), "unknown")

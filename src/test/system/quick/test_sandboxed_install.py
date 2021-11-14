@@ -23,7 +23,8 @@ import json
 from pathlib import Path
 from downloader.config import ConfigReader
 from test.objects import debug_env
-from test.fakes import NoLogger, StoreMigrator
+from test.fake_logger import NoLogger
+from test.fake_store_migrator import StoreMigrator
 from downloader.file_system import hash_file, FileSystem
 from downloader.main import main
 from downloader.local_repository import LocalRepository

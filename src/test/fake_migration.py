@@ -16,15 +16,9 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import unittest
-from downloader.main import make_runner
-from test.fake_logger import NoLogger
+class Migration:
+    def __init__(self, version):
+        self.version = version
 
-
-class TestRunner(unittest.TestCase):
-
-    def test_make_runner___with_proper_parameters___does_not_throw(self):
-        try:
-            make_runner({'DEFAULT_DB_URL': '', 'DEFAULT_DB_ID': '', 'ALLOW_REBOOT': 0, 'CURL_SSL': ''}, NoLogger(), '')
-        except TypeError:
-            self.fail('TypeError during make_runner, composition root failed!')
+    def migrate(self, local_store):
+        pass
