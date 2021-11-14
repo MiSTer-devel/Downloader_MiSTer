@@ -161,6 +161,7 @@ class Runner:
             self._logger.print('ERROR: db for section "%s" does not have "db_id", contact the db maintainer.' % section)
             return False
 
+        db['db_id'] = db['db_id'].lower()
         if db['db_id'] != section:
             self._logger.print('ERROR: Section "%s" doesn\'t match database id "%s". Fix your INI file.' % (section, db['db_id']))
             return False
