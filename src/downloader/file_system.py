@@ -109,8 +109,10 @@ class FileSystem:
         if self._config['allow_delete'] != AllowDelete.ALL:
             return True
 
+        path = Path(self._path(file))
+
         regex = re.compile("^(.+_)[0-9]{8}([.][a-zA-Z0-9]+)$", )
-        m = regex.match(file)
+        m = regex.match(path.name)
         if m is None:
             return
 
@@ -122,14 +124,14 @@ class FileSystem:
         ext = g[1].lower()
 
         deleted = False
-        for child in Path(self._path(file)).parent.iterdir():
+        for child in path.parent.iterdir():
             name = child.name.lower()
             if name.startswith(start) and name.endswith(ext) and regex.match(name):
                 child.unlink()
                 deleted = True
 
         if deleted:
-            self._logger.print('Deleted previous "%s"* files.' % start, end='')
+            self._logger.print('Deleted previous "%s"* files.' % start)
 
     def load_db_from_file(self, path, suffix=None):
         path = self._path(path)

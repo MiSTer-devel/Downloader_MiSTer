@@ -18,6 +18,7 @@
 
 import unittest
 import tempfile
+import os
 from downloader.config import default_config
 from downloader.other import empty_store
 from test.objects import db_test_with_file, file_descr
@@ -26,6 +27,23 @@ from test.fake_file_system import make_production_filesystem
 
 
 class TestFileSystemDeletePrevious(unittest.TestCase):
+    ao486_new = '_Computer/ao486_20211010.rbf'
+    ao486_old = '_Computer/ao486_20201010.rbf'
+
+    def test_delete_previous_installing_new_ao486___with_existing_old_ao486___deletes_old_ao486(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            os.mkdir('%s/_Computer' % tempdir)
+
+            file_system = self.file_system(tempdir)
+            file_system.touch(self.ao486_old)
+
+            sut = OnlineImporter(file_system=file_system)
+            sut.add_db(db_test_with_file(self.ao486_new, file_descr(delete=[True])), empty_store())
+            sut.download_dbs_contents(False)
+
+            self.assertFalse(file_system.is_file(self.ao486_old))
+            self.assertTrue(file_system.is_file(self.ao486_new))
+
     mycore_1 = 'mycore_20210101.rbf'
     mycore_2 = 'mycore_20200101.rbf'
     mycore_3 = 'mycore_20210202.rbf'

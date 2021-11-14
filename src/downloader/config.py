@@ -99,6 +99,7 @@ class ConfigReader:
         except Exception as e:
             self._logger.debug(e)
             self._logger.print('Could not read ini file %s' % config_path)
+            raise e
 
         for section in ini_config.sections():
             parser = IniParser(ini_config[section])
