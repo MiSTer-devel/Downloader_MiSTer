@@ -18,7 +18,9 @@
 
 import unittest
 from downloader.other import empty_store
-from test.objects import db_test_descr, cheats_folder_nes_folders, cheats_folder_nes_zip_desc, cheats_folder_nes_zip_id, cheats_folder_nes_file_path, store_with_unzipped_cheats_folder_nes_files, unzipped_json_with_cheats_folder_nes_file, cheats_folder_nes_file_hash, cheats_folder_nes_file_size
+from test.objects import db_test_descr, cheats_folder_nes_folders, cheats_folder_nes_zip_desc, cheats_folder_nes_zip_id, \
+    cheats_folder_nes_file_path, store_with_unzipped_cheats_folder_nes_files, unzipped_json_with_cheats_folder_nes_file, \
+    cheats_folder_nes_file_hash, cheats_folder_nes_file_size, store_test_descr
 from test.objects import file_a, zipped_file_a_descr, zip_desc
 from test.fake_online_importer import OnlineImporter
 
@@ -112,6 +114,21 @@ class TestOnlineImporterWithZips(unittest.TestCase):
         ), store_with_unzipped_cheats_folder_nes_files())
         self.assertReports([cheats_folder_nes_file_path])
         self.assertEqual(store_with_unzipped_cheats_folder_nes_files(zip_id=False, zips=False), store)
+
+    def test_download_zip_summary___after_previous_summary_is_present_when_new_summary_is_found_with_no_file_changes___updates_summary_hash(self):
+        self.sut.file_system.test_data\
+            .with_folders(cheats_folder_nes_folders)\
+            .with_file(cheats_folder_nes_file_path, {"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size})
+
+        previous_store = store_with_unzipped_cheats_folder_nes_files(url=False)
+        expected_store = store_with_unzipped_cheats_folder_nes_files(url=False, summary_hash="something_new")
+
+        actual_store = self.download_zipped_contents(db_test_descr(zips={
+            cheats_folder_nes_zip_id: cheats_folder_nes_zip_desc(summary_hash="something_new", unzipped_json=unzipped_json_with_cheats_folder_nes_file())
+        }), previous_store)
+
+        self.assertReports([])
+        self.assertEqual(expected_store, actual_store)
 
     def assertReports(self, installed, errors=None, needs_reboot=False):
         if errors is None:

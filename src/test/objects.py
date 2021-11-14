@@ -53,13 +53,13 @@ def db_test_being_empty_descr():
     return db_entity(db_id=db_test)
 
 
-def zip_desc(contents, path, source, zipped_files=None, unzipped_json=None):
+def zip_desc(contents, path, source, zipped_files=None, unzipped_json=None, summary_hash=None, summary_size=None, contents_hash=None, contents_size=None):
     json = {
         "base_files_url": "https://base_files_url",
         "contents": contents,
         "contents_file": {
-            "hash": "4d2bf07e5d567196d9c666f1816e86e6",
-            "size": 7316038,
+            "hash": contents_hash if contents_hash is not None else "4d2bf07e5d567196d9c666f1816e86e6",
+            "size": contents_size if contents_size is not None else 7316038,
             "url": "https://contents_file"
         },
         "files_count": 1858,
@@ -68,8 +68,8 @@ def zip_desc(contents, path, source, zipped_files=None, unzipped_json=None):
         "raw_files_size": 6995290,
         "source": source,
         "summary_file": {
-            "hash": "b5d85d1cd6f92d714ab74a997b97130d",
-            "size": 84460,
+            "hash": summary_hash if summary_hash is not None else "b5d85d1cd6f92d714ab74a997b97130d",
+            "size": summary_size if summary_size is not None else 84460,
             "url": "https://summary_file"
         }
     }
@@ -80,8 +80,8 @@ def zip_desc(contents, path, source, zipped_files=None, unzipped_json=None):
     return json
 
 
-def cheats_folder_nes_zip_desc(zipped_files=None, unzipped_json=None):
-    json = zip_desc(["NES"], "Cheats/", "Cheats/NES", zipped_files, unzipped_json)
+def cheats_folder_nes_zip_desc(zipped_files=None, unzipped_json=None, summary_hash=None):
+    json = zip_desc(["NES"], "Cheats/", "Cheats/NES", summary_hash=summary_hash, zipped_files=zipped_files, unzipped_json=unzipped_json)
     if zipped_files is not None:
         json['contents_file']['zipped_files'] = zipped_files
     if unzipped_json is not None:
@@ -104,7 +104,7 @@ def unzipped_json_with_cheats_folder_nes_file():
     }
 
 
-def store_with_unzipped_cheats_folder_nes_files(url=True, folders=True, zip_id=True, zips=True, online_database_imported=None):
+def store_with_unzipped_cheats_folder_nes_files(url=True, folders=True, zip_id=True, zips=True, online_database_imported=None, summary_hash=None):
     o = {
         "files": {
             cheats_folder_nes_file_path: {
@@ -117,7 +117,7 @@ def store_with_unzipped_cheats_folder_nes_files(url=True, folders=True, zip_id=T
         'folders': cheats_folder_nes_folders,
         'offline_databases_imported': online_database_imported if online_database_imported is not None else [],
         "zips": {
-            cheats_folder_nes_zip_id: cheats_folder_nes_zip_desc()
+            cheats_folder_nes_zip_id: cheats_folder_nes_zip_desc(summary_hash=summary_hash)
         }
     }
     if not folders:
@@ -134,7 +134,7 @@ def store_with_unzipped_cheats_folder_nes_files(url=True, folders=True, zip_id=T
 def db_test_descr(zips=None, folders=None, files=None, db_files=None):
     return db_entity(
         db_id=db_test,
-        db_files=db_files if db_files is not None else [''],
+        db_files=db_files if db_files is not None else [],
         files=files if files is not None else {},
         folders=folders if folders is not None else {},
         base_files_url='http://',
@@ -142,6 +142,29 @@ def db_test_descr(zips=None, folders=None, files=None, db_files=None):
         default_options={},
         timestamp=0
     )
+
+
+def store_test_descr(zips=None, folders=None, files=None, db_files=None):
+    return db_to_store(db_entity(
+        db_id=db_test,
+        db_files=db_files if db_files is not None else [],
+        files=files if files is not None else {},
+        folders=folders if folders is not None else {},
+        base_files_url='http://',
+        zips=zips if zips is not None else {},
+        default_options={},
+        timestamp=0
+    ))
+
+
+def db_to_store(db):
+    raw_db = db.to_dict()
+    return {
+        "zips": raw_db["zips"],
+        "folders": raw_db["folders"],
+        "files": raw_db["files"],
+        "offline_databases_imported": []
+    }
 
 
 def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, default_options=None, timestamp=None, linux=None, header=None, section=None):
@@ -305,7 +328,7 @@ def db_with_folders(db_id, folders):
 
 
 def store_with_folders(db_id, folders):
-    return db_with_folders(db_id, folders).to_dict()
+    return db_to_store(db_with_folders(db_id, folders))
 
 
 def db_test_with_file_a_descr():
@@ -313,11 +336,11 @@ def db_test_with_file_a_descr():
 
 
 def store_test_with_file_a_descr():
-    return db_test_with_file_a_descr().to_dict()
+    return db_to_store(db_test_with_file_a_descr())
 
 
 def store_test_with_file(file, description):
-    return db_test_with_file(file, description).to_dict()
+    return db_to_store(db_test_with_file(file, description))
 
 
 def not_found_ini():

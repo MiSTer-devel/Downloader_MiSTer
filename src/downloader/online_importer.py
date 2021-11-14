@@ -100,7 +100,7 @@ class OnlineImporter:
             if 'zip_id' in file_description:
                 zip_id = file_description['zip_id']
                 if zip_id not in needed_zips:
-                     needed_zips[zip_id] = dict()
+                    needed_zips[zip_id] = dict()
                 needed_zips[zip_id][file_path] = file_description
     
             file_downloader.queue_file(file_description, file_path)
@@ -168,7 +168,7 @@ class OnlineImporter:
             zip_ids_by_temp_zip = dict()
 
             for zip_id in zip_ids_to_download:
-                temp_zip = '/tmp/%s.json.zip' % zip_id
+                temp_zip = '/tmp/%s_summary.json.zip' % zip_id
                 zip_ids_by_temp_zip[temp_zip] = zip_id
 
                 summary_downloader.queue_file(db.zips[zip_id]['summary_file'], temp_zip)
@@ -183,6 +183,11 @@ class OnlineImporter:
                     if file_path in store['files']:
                         store['files'][file_path] = file_description
                 db.folders.update(summary['folders'])
+
+                zip_id = zip_ids_by_temp_zip[temp_zip]
+                if zip_id in store['zips']:
+                    store['zips'][zip_id]['summary_file']['hash'] = db.zips[zip_id]['summary_file']['hash']
+
                 self._file_system.unlink(temp_zip)
 
             for temp_zip in summary_downloader.errors():
