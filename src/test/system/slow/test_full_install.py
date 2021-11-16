@@ -80,7 +80,6 @@ class TestFullInstall(unittest.TestCase):
         os.makedirs(str(mister_path.parent), exist_ok=True)
         mister_path.touch()
         tool = str(Path(ini_path).with_suffix('.sh'))
-        stem = Path(ini_path).stem
         subprocess.run('cd ..; ./src/build.sh > src/%s' % tool, shell=True, stderr=subprocess.STDOUT)
         subprocess.run(['chmod', '+x', tool], shell=False, stderr=subprocess.STDOUT)
         test_env = os.environ.copy()

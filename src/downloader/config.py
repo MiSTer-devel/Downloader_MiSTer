@@ -19,6 +19,8 @@
 import configparser
 from enum import IntEnum, unique
 from pathlib import Path, PurePosixPath
+
+from .constants import file_downloader_ini
 from .ini_parser import IniParser
 
 
@@ -29,7 +31,7 @@ def config_file_path(env):
 
     original_executable = env.get('DOWNLOADER_LAUNCHER_PATH', None)
     if original_executable is None:
-        return '/media/fat/downloader.ini'
+        return file_downloader_ini
 
     executable_path = PurePosixPath(original_executable)
 

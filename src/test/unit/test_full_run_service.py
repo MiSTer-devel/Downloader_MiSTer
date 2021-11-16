@@ -17,27 +17,27 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from test.fake_runner import Runner
+from test.fake_full_run_service import FullRunService
 from test.objects import raw_db_empty_descr, raw_db_empty_with_linux_descr, raw_db_wrong_descr, db_empty
 
 
-class TestRunner(unittest.TestCase):
-    def test_run___no_databases___returns_0(self):
-        exit_code = Runner.with_no_dbs().run()
+class TestFullRunService(unittest.TestCase):
+    def test_full_run___no_databases___returns_0(self):
+        exit_code = FullRunService.with_no_dbs().full_run()
         self.assertEqual(exit_code, 0)
 
-    def test_run___empty_databases___returns_0(self):
-        exit_code = Runner.with_single_db(db_empty, raw_db_empty_descr()).run()
+    def test_full_run___empty_databases___returns_0(self):
+        exit_code = FullRunService.with_single_db(db_empty, raw_db_empty_descr()).full_run()
         self.assertEqual(exit_code, 0)
 
-    def test_run___database_with_new_linux___returns_0(self):
-        exit_code = Runner.with_single_db(db_empty, raw_db_empty_with_linux_descr()).run()
+    def test_full_run___database_with_new_linux___returns_0(self):
+        exit_code = FullRunService.with_single_db(db_empty, raw_db_empty_with_linux_descr()).full_run()
         self.assertEqual(exit_code, 0)
 
-    def test_run___database_with_wrong_id___returns_1(self):
-        exit_code = Runner.with_single_db(db_empty, raw_db_wrong_descr()).run()
+    def test_full_run___database_with_wrong_id___returns_1(self):
+        exit_code = FullRunService.with_single_db(db_empty, raw_db_wrong_descr()).full_run()
         self.assertEqual(exit_code, 1)
 
-    def test_run___database_not_fetched___returns_1(self):
-        exit_code = Runner.with_single_empty_db().run()
+    def test_full_run___database_not_fetched___returns_1(self):
+        exit_code = FullRunService.with_single_empty_db().full_run()
         self.assertEqual(exit_code, 1)

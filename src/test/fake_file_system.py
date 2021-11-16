@@ -16,11 +16,12 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from typing import List
-
-import test.objects
 import pathlib
 
+from downloader.constants import file_MiSTer
 from downloader.file_system import FileSystem as ProductionFileSystem
+from test.objects import file_a, file_a_descr, file_mister_descr, hash_MiSTer_old, file_test_json_zip, \
+    file_test_json_zip_descr
 from test.fake_logger import NoLogger
 
 fake_temp_file = '/tmp/temp_file'
@@ -41,17 +42,17 @@ class TestDataFileSystem:
         return self
 
     def with_file_a(self, description=None):
-        self._files.add(test.objects.file_a, description if description is not None else test.objects.file_a_descr())
+        self._files.add(file_a, description if description is not None else file_a_descr())
         return self
 
     def with_mister_binary(self, description=None):
-        self._files.add(test.objects.file_MiSTer, description if description is not None else test.objects.file_mister_descr())
+        self._files.add(file_MiSTer, description if description is not None else file_mister_descr())
 
     def with_old_mister_binary(self):
-        self.with_mister_binary({'hash': test.objects.hash_MiSTer_old})
+        self.with_mister_binary({'hash': hash_MiSTer_old})
 
     def with_test_json_zip(self, description=None):
-        self._files.add(test.objects.file_test_json_zip, description if description is not None else test.objects.file_test_json_zip_descr())
+        self._files.add(file_test_json_zip, description if description is not None else file_test_json_zip_descr())
         return self
 
 
@@ -111,10 +112,10 @@ class FileSystem(ProductionFileSystem):
     def hash(self, path):
         return self._files.get(path)['hash']
 
-    def makedirs(self, path):
+    def make_dirs(self, path):
         self._folders.add(path, True)
 
-    def makedirs_parent(self, path):
+    def make_dirs_parent(self, path):
         self._folders.add(str(pathlib.Path(path).parent), True)
 
     def folder_has_items(self, _path):

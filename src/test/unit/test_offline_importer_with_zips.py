@@ -46,5 +46,5 @@ class TestOfflineImporterWithZips(unittest.TestCase):
     def apply_db_test_with_cheats_folder_nes_zip(self):
         store = empty_store()
         self.sut.add_db(db_test_descr(zips=cheats_folder_nes_zip_desc(), db_files=[file_test_json_zip]), store)
-        self.sut.apply_offline_databases()
+        self.sut.apply()
         return store

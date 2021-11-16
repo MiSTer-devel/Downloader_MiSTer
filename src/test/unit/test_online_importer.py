@@ -18,12 +18,13 @@
 
 import unittest
 from downloader.config import default_config
+from downloader.constants import file_MiSTer_old, file_MiSTer
 from downloader.other import empty_store
 from downloader.online_importer import InvalidDownloaderPath, invalid_folders, invalid_paths, no_distribution_mister_invalid_paths
 from test.objects import store_with_folders, db_distribution_mister_with_file, db_test_being_empty_descr, file_boot_rom, \
-    boot_rom_descr, overwrite_file, file_mister_descr, file_mister_old_descr, file_a_descr, file_a_updated_descr, \
-    db_test_with_file, db_with_file, db_test_with_file_a_descr, db_with_folders, file_a, folder_a, file_MiSTer, \
-    file_MiSTer_old, store_test_with_file_a_descr, store_test_with_file
+    boot_rom_descr, overwrite_file, file_mister_descr, file_a_descr, file_a_updated_descr, \
+    db_test_with_file, db_with_file, db_test_with_file_a_descr, db_with_folders, file_a, folder_a, \
+    store_test_with_file_a_descr, store_test_with_file
 from test.fake_online_importer import OnlineImporter
 from test.factory_stub import FactoryStub
 from test.fake_file_downloader import FileDownloader
@@ -36,14 +37,14 @@ class TestOnlineImporter(unittest.TestCase):
         store = empty_store()
 
         sut.add_db(db_test_being_empty_descr(), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertReportsNothing(sut)
         self.assertEqualDict(store, empty_store())
 
     def test_download_dbs_contents___being_empty___does_nothing(self):
         sut = OnlineImporter()
-        sut.download_dbs_contents(False)
+        sut.download(False)
         self.assertReportsNothing(sut)
 
     def test_download_dbs_contents___with_one_file___fills_store_with_that_file(self):
@@ -51,7 +52,7 @@ class TestOnlineImporter(unittest.TestCase):
         store = empty_store()
 
         sut.add_db(db_test_with_file_a_descr(), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEqualDict(store['files'][file_a], file_a_descr())
         self.assertHasFolderA(store)
@@ -64,7 +65,7 @@ class TestOnlineImporter(unittest.TestCase):
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a_descr(), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEqualDict(store['files'][file_a], file_a_descr())
         self.assertHasFolderA(store)
@@ -77,7 +78,7 @@ class TestOnlineImporter(unittest.TestCase):
         store = store_test_with_file(file_a, {'hash': 'does_not_match'})
 
         sut.add_db(db_test_with_file_a_descr(), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEqualDict(store['files'][file_a], file_a_descr())
         self.assertHasFolderA(store)
@@ -89,7 +90,7 @@ class TestOnlineImporter(unittest.TestCase):
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a_descr(), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEqualDict(store['files'][file_a], file_a_descr())
         self.assertHasFolderA(store)
@@ -101,7 +102,7 @@ class TestOnlineImporter(unittest.TestCase):
         store = empty_store()
 
         sut.add_db(db_test_with_file_a_descr(), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEmptyFiles(store)
         self.assertHasFolderA(store)
@@ -114,7 +115,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.file_system.test_data.with_old_mister_binary()
 
         sut.add_db(db_distribution_mister_with_file(file_MiSTer, file_mister_descr()), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEqualDict(store['files'][file_MiSTer], file_mister_descr())
         self.assertEmptyFolders(store)
@@ -128,7 +129,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.file_system.test_data.with_old_mister_binary()
 
         sut.add_db(db_test_with_file(file_MiSTer, file_mister_descr()), store)
-        self.assertRaises(InvalidDownloaderPath, lambda: sut.download_dbs_contents(False))
+        self.assertRaises(InvalidDownloaderPath, lambda: sut.download(False))
 
         self.assertEqualDict(store, empty_store())
         self.assertEmptyFolders(store)
@@ -136,13 +137,13 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertTrue(sut.file_system.is_file(file_MiSTer))
         self.assertFalse(sut.file_system.is_file(file_MiSTer_old))
 
-    def test_download_dbs_contents___with_file_on_stored_erroring___store_deletes_file(self):
+    def test_download_dbs_contents___with_stored_file_and_download_error___store_deletes_file(self):
         sut = OnlineImporter(FactoryStub(FileDownloader()).has(lambda fd: fd.test_data.errors_at(file_a)))
         sut.file_system.test_data.with_folders(['a'])
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file(file_a, file_a_updated_descr()), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEmptyFiles(store)
         self.assertEmptyFolders(store)
@@ -155,7 +156,7 @@ class TestOnlineImporter(unittest.TestCase):
 
         sut.add_db(db_with_file('test', file_a, file_a_descr()), store)
         sut.add_db(db_with_file('bar', file_a, file_a_updated_descr()), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEqualDict(store['files'][file_a], file_a_descr())
         self.assertEmptyFolders(store)
@@ -169,7 +170,7 @@ class TestOnlineImporter(unittest.TestCase):
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_being_empty_descr(), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEmptyFiles(store)
         self.assertEmptyFolders(store)
@@ -182,7 +183,7 @@ class TestOnlineImporter(unittest.TestCase):
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a_descr(), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertHasFolderA(store)
         self.assertReportsNothing(sut)
@@ -193,7 +194,7 @@ class TestOnlineImporter(unittest.TestCase):
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a_descr(), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertHasFolderA(store)
         self.assertReports(sut, [file_a])
@@ -206,7 +207,7 @@ class TestOnlineImporter(unittest.TestCase):
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a_descr(), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertHasFolderA(store)
         self.assertReportsNothing(sut)
@@ -218,7 +219,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.file_system.test_data.with_file(file_boot_rom, {"hash": "something_else"})
 
         sut.add_db(db_test_with_file(file_boot_rom, boot_rom_descr()), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEmptyFolders(store)
         self.assertReportsNothing(sut)
@@ -230,7 +231,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.file_system.test_data.with_file(file_boot_rom.upper(), {"hash": "something_else"})
 
         sut.add_db(db_test_with_file(file_boot_rom.lower(), boot_rom_descr()), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEmptyFolders(store)
         self.assertReportsNothing(sut)
@@ -243,7 +244,7 @@ class TestOnlineImporter(unittest.TestCase):
         store = empty_store()
 
         sut.add_db(db_test_with_file(file_a, overwrite_file(file_a_updated_descr(), True)), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEmptyFolders(store)
         self.assertReports(sut, [file_a])
@@ -256,7 +257,7 @@ class TestOnlineImporter(unittest.TestCase):
         store = empty_store()
 
         sut.add_db(db_test_with_file(file_a, overwrite_file(file_a_updated_descr(), False)), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEmptyFolders(store)
         self.assertReportsNothing(sut)
@@ -269,7 +270,7 @@ class TestOnlineImporter(unittest.TestCase):
         store = empty_store()
 
         sut.add_db(db_test_with_file(file_a, file_a_updated_descr()), store)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEmptyFolders(store)
         self.assertReports(sut, [file_a])
@@ -282,7 +283,7 @@ class TestOnlineImporter(unittest.TestCase):
         store1 = store_with_folders('db1', ['a', 'b', 'c'])
 
         sut.add_db(db_with_folders('db1', ['a', 'x', 'y']), store1)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEqualDict(store1['folders'], ['a', 'x', 'y'])
         self.assertReportsNothing(sut)
@@ -298,7 +299,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.add_db(db_with_folders('db1', ['a', 'x']), store1)
         sut.add_db(db_with_folders('db2', ['b']), store2)
         sut.add_db(db_with_folders('db3', []), store3)
-        sut.download_dbs_contents(False)
+        sut.download(False)
 
         self.assertEqualDict(store1['folders'], ['a', 'x'])
         self.assertEqualDict(store2['folders'], ['b'])
@@ -314,18 +315,13 @@ class TestOnlineImporter(unittest.TestCase):
 
         for wrong_path in invalids:
             with self.subTest(wrong_path):
-                self.assertRaises(InvalidDownloaderPath, lambda: self.downloaded_single_db(db_test_with_file(wrong_path, file_a_descr())))
+                self.assertRaises(InvalidDownloaderPath, lambda: downloaded_single_db(db_test_with_file(wrong_path, file_a_descr())))
 
     def test_downloaded_single_db___with_invalid_folders___raises_error(self):
-        invalid_paths = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + invalid_folders()
-        for wrong_path in invalid_paths:
+        invalids = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + invalid_folders()
+        for wrong_path in invalids:
             with self.subTest(wrong_path):
-                self.assertRaises(InvalidDownloaderPath, lambda: self.downloaded_single_db(db_with_folders('wrong_db', {wrong_path: {}})))
-
-    def downloaded_single_db(self, db, store=None, full_resync=False):
-        sut = OnlineImporter()
-        sut.add_db(db, store if store is not None else empty_store())
-        sut.download_dbs_contents(full_resync)
+                self.assertRaises(InvalidDownloaderPath, lambda: downloaded_single_db(db_with_folders('wrong_db', {wrong_path: {}})))
 
     def assertEqualDict(self, store, o):
         if isinstance(o, list):
@@ -350,3 +346,9 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertEqual(installed, sut.correctly_installed_files())
         self.assertEqual(errors, sut.files_that_failed())
         self.assertEqual(needs_reboot, sut.needs_reboot())
+
+
+def downloaded_single_db(db, store=None, full_resync=False):
+    sut = OnlineImporter()
+    sut.add_db(db, store if store is not None else empty_store())
+    sut.download(full_resync)

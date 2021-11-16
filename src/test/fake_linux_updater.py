@@ -17,6 +17,8 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import default_config
+from downloader.constants import file_downloader_needs_reboot_after_linux_update, file_MiSTer_version
+from downloader.importer_command import ImporterCommand
 from downloader.linux_updater import LinuxUpdater as ProductionLinuxUpdater
 from test.fake_file_downloader import FileDownloaderFactory
 from test.fake_file_system import FileSystem
@@ -27,8 +29,15 @@ class LinuxUpdater(ProductionLinuxUpdater):
     def __init__(self, file_downloader_factory=None, file_system=None):
         self.file_system = FileSystem() if file_system is None else file_system
         self.file_downloader_factory = FileDownloaderFactory(default_config(), self.file_system) if file_downloader_factory is None else file_downloader_factory
+        self._importer_command = ImporterCommand({})
         super().__init__(self.file_system, self.file_downloader_factory, NoLogger())
 
+    def add_db(self, db):
+        self._importer_command.add_db(db, {}, {})
+
+    def update(self):
+        self.update_linux(self._importer_command)
+
     def _run_subprocesses(self, linux, linux_path):
-        self.file_system.write_file_contents('/MiSTer.version', linux['version'])
-        self.file_system.touch('/tmp/downloader_needs_reboot_after_linux_update')
+        self.file_system.write_file_contents(file_MiSTer_version, linux['version'])
+        self.file_system.touch(file_downloader_needs_reboot_after_linux_update)

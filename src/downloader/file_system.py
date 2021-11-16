@@ -70,10 +70,10 @@ class FileSystem:
     def hash(self, path):
         return hash_file(self._path(path))
 
-    def makedirs(self, path):
+    def make_dirs(self, path):
         return os.makedirs(self._path(path), exist_ok=True)
 
-    def makedirs_parent(self, path):
+    def make_dirs_parent(self, path):
         return os.makedirs(str(Path(self._path(path)).parent), exist_ok=True)
 
     def folder_has_items(self, path):
@@ -138,19 +138,11 @@ class FileSystem:
         if suffix is None:
             suffix = Path(path).suffix.lower()
         if suffix == '.json':
-            return self._load_json(path)
+            return _load_json(path)
         elif suffix == '.zip':
-            return self._load_json_from_zip(path)
+            return _load_json_from_zip(path)
         else:
             raise Exception('File type "%s" not supported' % suffix)
-
-    def _load_json_from_zip(self, path):
-        json_str = run_stdout("unzip -p %s" % path)
-        return json.loads(json_str)
-
-    def _load_json(self, file_path):
-        with open(file_path, "r") as f:
-            return json.loads(f.read())
 
     def save_json_on_zip(self, db, path):
         json_name = Path(path).stem
@@ -176,7 +168,7 @@ class FileSystem:
         try:
             Path(self._path(path)).unlink()
             return True
-        except Exception as _:
+        except FileNotFoundError as _:
             return False
 
     def _path(self, path):
@@ -196,3 +188,13 @@ def hash_file(path):
             file_hash.update(chunk)
             chunk = f.read(8192)
         return file_hash.hexdigest()
+
+
+def _load_json_from_zip(path):
+    json_str = run_stdout("unzip -p %s" % path)
+    return json.loads(json_str)
+
+
+def _load_json(file_path):
+    with open(file_path, "r") as f:
+        return json.loads(f.read())

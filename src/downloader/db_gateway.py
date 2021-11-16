@@ -79,16 +79,17 @@ class DbGateway:
         dbs = []
         errors = []
         for section, description in descriptions.items():
-            if section in files_by_section:
-                try:
-                    db_raw = self._file_system.load_dict_from_file(files_by_section[section], Path(description['db_url']).suffix.lower())
-                    dbs.append((section, DbEntity(db_raw, section)))
-                except Exception as e:
-                    self._logger.debug(e)
-                    if isinstance(e, DbEntityValidationException):
-                        self._logger.print(str(e))
-                    self._logger.print('Could not load json from "%s"' % description['db_url'])
-                    errors.append(description['db_url'])
+            if section not in files_by_section:
+                continue
+            try:
+                db_raw = self._file_system.load_dict_from_file(files_by_section[section], Path(description['db_url']).suffix.lower())
+                dbs.append(DbEntity(db_raw, section))
+            except Exception as e:
+                self._logger.debug(e)
+                if isinstance(e, DbEntityValidationException):
+                    self._logger.print(str(e))
+                self._logger.print('Could not load json from "%s"' % description['db_url'])
+                errors.append(description['db_url'])
 
         return dbs, errors
 

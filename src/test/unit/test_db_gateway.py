@@ -56,7 +56,7 @@ def fetch_all(db_url, fs=None, factory=None):
     dbs, errors = DbGateway(file_system=fs, file_downloader_factory=factory).fetch_all(test_db(db_url))
     if len(dbs) == 0:
         return None
-    return dbs[0][1].to_dict()
+    return dbs[0].to_dict()
 
 
 def test_db(db_uri):

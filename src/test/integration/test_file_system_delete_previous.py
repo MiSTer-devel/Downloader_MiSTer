@@ -39,7 +39,7 @@ class TestFileSystemDeletePrevious(unittest.TestCase):
 
             sut = OnlineImporter(file_system=file_system)
             sut.add_db(db_test_with_file(self.ao486_new, file_descr(delete=[True])), empty_store())
-            sut.download_dbs_contents(False)
+            sut.download(False)
 
             self.assertFalse(file_system.is_file(self.ao486_old))
             self.assertTrue(file_system.is_file(self.ao486_new))
@@ -90,7 +90,7 @@ class TestFileSystemDeletePrevious(unittest.TestCase):
 
             sut = OnlineImporter(file_system=file_system)
             sut.add_db(db_test_with_file(menu_rbf, file_descr(delete=[True])), empty_store())
-            sut.download_dbs_contents(False)
+            sut.download(False)
 
             self.assertTrue(file_system.is_file(menu_rbf))
             self.assertTrue(file_system.is_file(other_menu_rbf))
@@ -110,7 +110,7 @@ class TestFileSystemDeletePrevious(unittest.TestCase):
     def run_delete_previous_on_mycore_3(self, file_system):
         sut = OnlineImporter(file_system=file_system)
         sut.add_db(db_test_with_file(self.mycore_3, file_descr(delete=[True])), empty_store())
-        sut.download_dbs_contents(False)
+        sut.download(False)
         self.assertTrue(file_system.is_file(self.mycore_3))
 
     def file_system(self, tempdir):

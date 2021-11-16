@@ -30,33 +30,38 @@ class TestRealisticMigrations(unittest.TestCase):
     filled_store_v1_with_zip = 'test/integration/fixtures/filled_store_v1_with_zip.json'
     filled_store_vlast_with_zip = 'test/integration/fixtures/filled_store_vlast_with_zip.json'
 
-
     def test_migrate___on_v0_filled_store___returns_expected_store(self):
-        store = load_file(self.filled_store_v0)
-        StoreMigrator().migrate(store)
-        self.assertEqual(store, load_file(self.filled_store_vlast))
+        self.assert_versions_change_as_expected(self.filled_store_v0, self.filled_store_vlast)
 
     def test_migrate___on_v0_filled_store_with_uppercase_db_id___returns_expected_store(self):
-        store = load_file(self.filled_store_v0_with_uppercase_db_id)
-        StoreMigrator().migrate(store)
-        self.assertEqual(store, load_file(self.filled_store_vlast))
+        self.assert_versions_change_as_expected(self.filled_store_v0_with_uppercase_db_id, self.filled_store_vlast)
 
     def test_migrate___on_vlast_filled_store___returns_same_store(self):
-        store = load_file(self.filled_store_vlast)
-        StoreMigrator().migrate(store)
-        self.assertEqual(store, load_file(self.filled_store_vlast))
+        self.assert_versions_stay_the_same(self.filled_store_vlast)
 
     def test_migrate___on_v1_with_zip_filled_store___returns_expected_store(self):
-        store = load_file(self.filled_store_v1_with_zip)
-        StoreMigrator().migrate(store)
-        self.assertEqual(store, load_file(self.filled_store_vlast_with_zip))
+        self.assert_versions_change_as_expected(self.filled_store_v1_with_zip, self.filled_store_vlast_with_zip)
 
     def test_migrate___on_vlast_with_zip_filled_store___returns_same_store(self):
-        store = load_file(self.filled_store_vlast_with_zip)
+        self.assert_versions_stay_the_same(self.filled_store_vlast_with_zip)
+
+    def assert_versions_change_as_expected(self, initial_file, expected_file):
+        store = load_file(initial_file)
         StoreMigrator().migrate(store)
-        self.assertEqual(store, load_file(self.filled_store_vlast_with_zip))
+        self.assertEqual(set_latest_migration_version(load_file(expected_file)), store)
+
+    def assert_versions_stay_the_same(self, file):
+        store = set_latest_migration_version(load_file(file))
+        StoreMigrator().migrate(store)
+        self.assertEqual(set_latest_migration_version(load_file(file)), store)
 
 
 def load_file(path):
     with open(path) as f:
         return json.load(f)
+
+
+def set_latest_migration_version(store):
+    result = store.copy()
+    result['migration_version'] = StoreMigrator().latest_migration_version()
+    return result

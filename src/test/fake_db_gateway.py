@@ -23,15 +23,15 @@ from test.fake_logger import NoLogger
 
 
 class DbGateway(ProductionDbGateway):
-    def __init__(self, file_system=None, file_downloader_factory=None):
+    def __init__(self, config=None, file_system=None, file_downloader_factory=None):
         self.file_system = FileSystem() if file_system is None else file_system
         super().__init__(
             self.file_system,
-            FileDownloaderFactory(file_system=self.file_system) if file_downloader_factory is None else file_downloader_factory,
+            FileDownloaderFactory(config=config, file_system=self.file_system) if file_downloader_factory is None else file_downloader_factory,
             NoLogger())
 
     @staticmethod
-    def with_single_db(db_id, descr) -> ProductionDbGateway:
-        db_gateway = DbGateway()
+    def with_single_db(db_id, descr, config=None) -> ProductionDbGateway:
+        db_gateway = DbGateway(config=config)
         db_gateway.file_system.test_data.with_file(db_id, {'unzipped_json': descr})
         return db_gateway

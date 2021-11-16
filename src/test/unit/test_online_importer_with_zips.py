@@ -20,7 +20,7 @@ import unittest
 from downloader.other import empty_store
 from test.objects import db_test_descr, cheats_folder_nes_folders, cheats_folder_nes_zip_desc, cheats_folder_nes_zip_id, \
     cheats_folder_nes_file_path, store_with_unzipped_cheats_folder_nes_files, unzipped_json_with_cheats_folder_nes_file, \
-    cheats_folder_nes_file_hash, cheats_folder_nes_file_size, store_test_descr
+    cheats_folder_nes_file_hash, cheats_folder_nes_file_size
 from test.objects import file_a, zipped_file_a_descr, zip_desc
 from test.fake_online_importer import OnlineImporter
 
@@ -32,7 +32,7 @@ class TestOnlineImporterWithZips(unittest.TestCase):
 
     def download_zipped_contents(self, db, store):
         self.sut.add_db(db, store)
-        self.sut.download_dbs_contents(False)
+        self.sut.download(False)
         return store
 
     def test_download_zipped_contents___from_summary_and_contents___installs_zipped_file(self):

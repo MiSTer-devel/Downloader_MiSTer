@@ -50,7 +50,7 @@ class TestSandboxedInstall(unittest.TestCase):
             'files': hashes(self.tmp_delme, db['files'])
         })
 
-    def test_sandbox_db_with_delete_previouss___installs_correctly(self):
+    def test_sandbox_db_with_delete_previous___installs_correctly(self):
         db = load_json('test/system/fixtures/sandboxed_install/db_with_delete_previous/sandbox_db.json')
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_delete_previous/sandbox.ini', {
             'local_store': local_store_files([('sandbox', db['files'])]),
@@ -164,13 +164,14 @@ class TestSandboxedInstall(unittest.TestCase):
         self.assertNotEqual(baz_exists_before, baz_exists_after)
         self.assertFalse(offline_db_exists_after or baz_exists_after)
 
-    installed_folders = {'bar': {}, 'bar/sub_bar': {}, 'bar/sub_bar/sub_sub_bar': {}, 'baz': {}, 'foo': {}, 'foo/sub_foo': {}}
+    installed_folders = {'bar': {}, 'bar/sub_bar': {}, 'bar/sub_bar/sub_sub_bar': {}, 'baz': {}, 'foo': {},
+                         'foo/sub_foo': {}}
     installed_system_folders = {'Scripts': {}, 'Scripts/.config': {}, 'Scripts/.config/downloader': {}}
 
     def test_sandbox_db___installs_expected_folders(self):
         expected_local_store = local_store_files([('sandbox', {})])
         expected_local_store['dbs']['sandbox']['folders'] = {'foo': {}, 'bar': {}, 'foo/sub_foo': {}, 'bar/sub_bar': {},
-                                                      'bar/sub_bar/sub_sub_bar': {}, 'baz': {}}
+                                                             'bar/sub_bar/sub_sub_bar': {}, 'baz': {}}
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_folders/sandbox.ini', {
             'local_store': expected_local_store,
             'folders': self.installed_folders,
@@ -199,7 +200,7 @@ class TestSandboxedInstall(unittest.TestCase):
         })
 
         self.file_system.touch('foo/something')
-        self.file_system.makedirs('baz/something')
+        self.file_system.make_dirs('baz/something')
 
         expected_local_store = local_store_files([('sandbox', {})])
         expected_local_store['dbs']['sandbox']['folders'] = {'bar': {}, 'bar/sub_bar': {}}
@@ -247,7 +248,8 @@ class TestSandboxedInstall(unittest.TestCase):
 
         if 'system_folders' in expected:
             counter += 1
-            self.assertEqual(self.find_all_folders(config['base_system_path']), sorted(list(expected['system_folders'])))
+            self.assertEqual(self.find_all_folders(config['base_system_path']),
+                             sorted(list(expected['system_folders'])))
 
         self.assertEqual(counter, len(expected))
 
@@ -298,11 +300,11 @@ def local_store_files(tuples):
     store = make_new_local_store(StoreMigrator())
     for store_id, files in tuples:
         store['dbs'][store_id] = {
-                'folders': {},
-                'files': files,
-                'offline_databases_imported': [],
-                'zips': {}
-            }
+            'folders': {},
+            'files': files,
+            'offline_databases_imported': [],
+            'zips': {}
+        }
     return store
 
 

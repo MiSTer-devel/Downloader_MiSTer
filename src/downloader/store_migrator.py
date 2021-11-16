@@ -15,6 +15,8 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+from abc import ABC, abstractmethod
+
 
 class StoreMigrator:
     def __init__(self, migration_list, logger):
@@ -45,3 +47,13 @@ def make_new_local_store(store_migrator):
 
 class WrongMigrationException(Exception):
     pass
+
+
+class MigrationBase(ABC):
+    @property
+    @abstractmethod
+    def version(self):
+        """Version of the migration object"""
+
+    def migrate(self, local_store):
+        """Migrate the local store"""

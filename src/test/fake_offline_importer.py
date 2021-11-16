@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import default_config
+from downloader.importer_command import ImporterCommand
 from downloader.offline_importer import OfflineImporter as ProductionOfflineImporter
 from test.fake_file_downloader import FileDownloaderFactory
 from test.fake_file_system import FileSystem
@@ -27,8 +28,14 @@ class OfflineImporter(ProductionOfflineImporter):
     def __init__(self, file_downloader_factory=None, config=None, file_system=None):
         self.file_system = FileSystem() if file_system is None else file_system
         self.config = default_config() if config is None else config
+        self._importer_command = ImporterCommand(self.config)
         super().__init__(
-            self.config,
             self.file_system,
             FileDownloaderFactory(self.config, self.file_system) if file_downloader_factory is None else file_downloader_factory,
             NoLogger())
+
+    def apply(self):
+        self.apply_offline_databases(self._importer_command)
+
+    def add_db(self, db, store, description=None):
+        self._importer_command.add_db(db, store, {} if description is None else description)

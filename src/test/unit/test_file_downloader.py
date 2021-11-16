@@ -17,8 +17,10 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
+
+from downloader.constants import file_MiSTer, file_MiSTer_new
 from test.fake_file_downloader import FileDownloader
-from test.objects import file_menu_rbf, hash_menu_rbf, file_one, hash_one, file_MiSTer, hash_MiSTer
+from test.objects import file_menu_rbf, hash_menu_rbf, file_one, hash_one, hash_MiSTer
 
 
 class TestFileDownloader(unittest.TestCase):
@@ -79,7 +81,7 @@ class TestFileDownloader(unittest.TestCase):
         self.sut.file_system.test_data.with_old_mister_binary()
         self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_MiSTer, 'reboot': True, 'path': 'system'}, file_MiSTer)
         self.sut.download_files(False)
-        self.assertEqual(['MiSTer', 'MiSTer.new', self.sut.local_repository.old_mister_path], self.sut.file_system.system_paths)
+        self.assertEqual([file_MiSTer, file_MiSTer_new, self.sut.local_repository.old_mister_path], self.sut.file_system.system_paths)
 
     def assertDownloaded(self, oks, run=None, errors=None, need_reboot=False):
         self.assertEqual(oks, self.sut.correctly_downloaded_files())

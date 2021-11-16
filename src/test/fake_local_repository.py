@@ -27,9 +27,10 @@ from test.fake_logger import NoLogger
 class LocalRepository(ProductionLocalRepository):
     def __init__(self, config=None, file_system=None):
         self.file_system = FileSystem() if file_system is None else file_system
-        super().__init__(self._config() if config is None else config, NoLogger(), self.file_system)
+        super().__init__(_config() if config is None else config, NoLogger(), self.file_system)
 
-    def _config(self):
-        config = default_config()
-        config['config_path'] = Path('')
-        return config
+
+def _config():
+    config = default_config()
+    config['config_path'] = Path('')
+    return config

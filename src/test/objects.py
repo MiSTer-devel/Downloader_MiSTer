@@ -18,7 +18,7 @@
 
 import unittest
 from pathlib import Path
-from downloader.constants import distribution_mister_db_id, distribution_mister_db_url
+from downloader.constants import distribution_mister_db_id, distribution_mister_db_url, file_MiSTer_new
 from test.fake_db_entity import DbEntity
 import copy
 
@@ -27,11 +27,8 @@ file_a = 'A'
 file_boot_rom = 'boot.rom'
 file_menu_rbf = 'menu.rbf'
 hash_menu_rbf = 'menu.rbf'
-file_MiSTer = 'MiSTer'
-file_MiSTer_old = 'Scripts/.config/downloader/MiSTer.old'
-hash_MiSTer = 'MiSTer.new'
+hash_MiSTer = file_MiSTer_new
 hash_MiSTer_old = 'something_old'
-file_MiSTer_new = 'MiSTer.new'
 folder_a = 'a'
 db_test = 'test'
 file_one = 'one'
@@ -40,8 +37,8 @@ db_empty = 'empty'
 cheats_folder_nes_zip_id = 'cheats_folder_nes'
 cheats_folder_nes_folders = {'Cheats/NES': {"zip_id": cheats_folder_nes_zip_id}}
 cheats_folder_nes_file_path = 'Cheats/NES/10-Yard Fight (USA, Europe) [3D564757].zip'
-cheats_folder_nes_file_url = "http://Cheats/NES/10-Yard Fight (USA, Europe) [3D564757].zip"
-cheats_folder_nes_file_hash = "8c02595feff096a9dd160e559067f4f4"
+cheats_folder_nes_file_url = "https://Cheats/NES/10-Yard Fight (USA, Europe) [3D564757].zip"
+cheats_folder_nes_file_hash = "8c02595fef1096a9dd160e559067f4f4"
 cheats_folder_nes_file_size = 1020
 
 
@@ -137,7 +134,7 @@ def db_test_descr(zips=None, folders=None, files=None, db_files=None):
         db_files=db_files if db_files is not None else [],
         files=files if files is not None else {},
         folders=folders if folders is not None else {},
-        base_files_url='http://',
+        base_files_url='https://',
         zips=zips if zips is not None else {},
         default_options={},
         timestamp=0
@@ -150,7 +147,7 @@ def store_test_descr(zips=None, folders=None, files=None, db_files=None):
         db_files=db_files if db_files is not None else [],
         files=files if files is not None else {},
         folders=folders if folders is not None else {},
-        base_files_url='http://',
+        base_files_url='https://',
         zips=zips if zips is not None else {},
         default_options={},
         timestamp=0
@@ -280,7 +277,7 @@ def zipped_file_a_descr(zip_id, url=False):
         "zip_id": zip_id
     }
     if url:
-        o["url"] = 'http://A'
+        o["url"] = 'https://A'
     return o
 
 

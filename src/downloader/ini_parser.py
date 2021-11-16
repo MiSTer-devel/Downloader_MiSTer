@@ -58,7 +58,7 @@ class IniParser:
 def to_int(n, default):
     try:
         return int(n)
-    except Exception as _:
+    except ValueError as _:
         if isinstance(default, Exception):
             raise default
         return default

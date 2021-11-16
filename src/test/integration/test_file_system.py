@@ -21,13 +21,14 @@ import tempfile
 import unittest
 import os
 from pathlib import Path
+
+from downloader.constants import file_MiSTer
 from test.fake_file_system import make_production_filesystem
 from downloader.config import AllowDelete, default_config
 
 not_created_file = '/tmp/opened_file'
 empty_file = '/tmp/empty_file'
 empty_file_hash = 'd41d8cd98f00b204e9800998ecf8427e'
-mister_file = 'MiSTer'
 rbf_file = 'MyCore.RBF'
 foo_bar_json = {"foo": "bar"}
 
@@ -74,27 +75,27 @@ class TestFileSystem(unittest.TestCase):
     def test_unlink_mister___when_allow_delete_only_rbf___keeps_it(self):
         sut = self.sut(self.default_test_config(allow_delete=AllowDelete.OLD_RBF))
 
-        sut.makedirs_parent(mister_file)
-        sut.touch(mister_file)
-        self.assertTrue(sut.is_file(mister_file))
+        sut.make_dirs_parent(file_MiSTer)
+        sut.touch(file_MiSTer)
+        self.assertTrue(sut.is_file(file_MiSTer))
 
-        sut.unlink(mister_file)
-        self.assertTrue(sut.is_file(mister_file))
+        sut.unlink(file_MiSTer)
+        self.assertTrue(sut.is_file(file_MiSTer))
 
-    def test_unlink_mister_file___when_allow_delete_none___doesnt_delete_it(self):
+    def test_unlink_file_MiSTer___when_allow_delete_none___doesnt_delete_it(self):
         sut = self.sut(self.default_test_config(allow_delete=AllowDelete.NONE))
 
-        sut.makedirs_parent(mister_file)
-        sut.touch(mister_file)
-        self.assertTrue(sut.is_file(mister_file))
+        sut.make_dirs_parent(file_MiSTer)
+        sut.touch(file_MiSTer)
+        self.assertTrue(sut.is_file(file_MiSTer))
 
-        sut.unlink(mister_file)
-        self.assertTrue(sut.is_file(mister_file))
+        sut.unlink(file_MiSTer)
+        self.assertTrue(sut.is_file(file_MiSTer))
 
     def test_unlink_rbf_file___when_allow_delete_only_rbf___deletes_it(self):
         sut = self.sut(self.default_test_config(allow_delete=AllowDelete.OLD_RBF))
 
-        sut.makedirs_parent(rbf_file)
+        sut.make_dirs_parent(rbf_file)
         sut.touch(rbf_file)
         self.assertTrue(sut.is_file(rbf_file))
 
@@ -104,7 +105,7 @@ class TestFileSystem(unittest.TestCase):
     def test_unlink_something_else___when_allow_delete_only_rbf___doesnt_delete_it(self):
         sut = self.sut(self.default_test_config(allow_delete=AllowDelete.OLD_RBF))
 
-        sut.makedirs_parent(empty_file)
+        sut.make_dirs_parent(empty_file)
         sut.touch(empty_file)
         self.assertTrue(sut.is_file(empty_file))
 
@@ -131,7 +132,7 @@ class TestFileSystem(unittest.TestCase):
         self.assertEqual(self.sut().download_target_path('/tmp/x'), '/tmp/x')
 
     def test_makedirs___on_missing_folder___creates_it(self):
-        self.sut().makedirs('foo')
+        self.sut().make_dirs('foo')
         self.assertTrue(os.path.isdir(str(Path(self.tempdir.name) / 'foo')))
 
     def test_load_dict_from_file___on_plain_json___returns_json_dict(self):

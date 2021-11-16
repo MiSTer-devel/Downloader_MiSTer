@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from .config import AllowReboot
+from .constants import file_mister_downloader_needs_reboot
 
 
 class RebootCalculator:
@@ -44,7 +45,7 @@ class RebootCalculator:
             return True
 
         if should_reboot:
-            self._file_system.touch(mister_downloader_needs_reboot_file)
+            self._file_system.touch(file_mister_downloader_needs_reboot)
             if linux_needs_reboot:
                 self._logger.print('Linux has been updated! It is recommended to reboot your system now.')
             else:
@@ -52,6 +53,3 @@ class RebootCalculator:
             self._logger.print()
 
         return False
-
-
-mister_downloader_needs_reboot_file = '/tmp/MiSTer_downloader_needs_reboot'

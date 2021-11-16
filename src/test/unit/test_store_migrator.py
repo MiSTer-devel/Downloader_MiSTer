@@ -17,7 +17,6 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-import json
 from downloader.store_migrator import make_new_local_store, WrongMigrationException
 from test.fake_store_migrator import StoreMigrator
 from test.fake_migration import Migration

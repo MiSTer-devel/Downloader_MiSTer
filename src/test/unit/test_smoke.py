@@ -17,7 +17,6 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-import __main__
 
 
 class TestSmoke(unittest.TestCase):

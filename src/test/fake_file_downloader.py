@@ -18,11 +18,12 @@
 
 from typing import List
 
-from downloader.file_downloader import CurlDownloaderAbstract, FileDownloaderFactory as ProductionFileDownloaderFactory, FileDownloader as ProductionFileDownloader
+from downloader.constants import file_MiSTer
+from downloader.file_downloader import CurlDownloaderAbstract, FileDownloaderFactory as ProductionFileDownloaderFactory
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from test.fake_file_system import FileSystem
 from test.fake_logger import NoLogger
-from test.objects import file_MiSTer, file_MiSTer_new
+from test.objects import file_MiSTer_new
 
 
 class TestDataCurlDownloader:

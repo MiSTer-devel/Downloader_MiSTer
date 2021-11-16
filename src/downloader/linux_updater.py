@@ -18,6 +18,7 @@
 
 import subprocess
 import json
+from .constants import file_downloader_needs_reboot_after_linux_update, file_MiSTer_version, file_Linux_7z
 
 
 class LinuxUpdater:
@@ -27,14 +28,15 @@ class LinuxUpdater:
         self._file_system = file_system
         self._linux_descriptions = []
 
-    def add_db(self, db):
-        if db.linux is not None:
-            self._linux_descriptions.append({
-                'id': db.db_id,
-                'args': db.linux
-            })
+    def update_linux(self, importer_command):
+        self._logger.debug('Running update_linux')
 
-    def update_linux(self):
+        for db, _, _ in importer_command.read_dbs():
+            if db.linux is not None:
+                self._linux_descriptions.append({
+                    'id': db.db_id,
+                    'args': db.linux
+                })
 
         linux_descriptions_count = len(self._linux_descriptions)
         if linux_descriptions_count == 0:
@@ -57,8 +59,8 @@ class LinuxUpdater:
         self._logger.debug('linux: ' + json.dumps(linux, indent=4))
 
         current_linux_version = 'unknown'
-        if self._file_system.is_file('/MiSTer.version'):
-            current_linux_version = self._file_system.read_file_contents('/MiSTer.version')
+        if self._file_system.is_file(file_MiSTer_version):
+            current_linux_version = self._file_system.read_file_contents(file_MiSTer_version)
 
         if current_linux_version == linux['version'][-6:]:
             self._logger.debug('current_linux_version "%s" matches db linux: %s' % (current_linux_version, linux['version']))
@@ -72,11 +74,11 @@ class LinuxUpdater:
         file_downloader = self._file_downloader_factory.create(parallel_update=False)
 
         file_downloader.queue_file(linux, linux_path)
-        if not self._file_system.is_file('/media/fat/linux/7za'):
+        if not self._file_system.is_file(file_Linux_7z):
             file_downloader.queue_file({
                 'delete': [],
                 'url': 'https://github.com/MiSTer-devel/SD-Installer-Win64_MiSTer/raw/master/7za.gz',
-                'hash': 'ed1ad5185fbede55cd7fd506b3c6c699',
+                'hash': 'ed1ad5185fb1de55cd7fd506b3c6c699',
                 'size': 465600
             }, '/media/fat/linux/7za.gz')
 
@@ -103,7 +105,7 @@ class LinuxUpdater:
                 self._logger.print()
                 return
 
-        if not self._file_system.is_file('/media/fat/linux/7za'):
+        if not self._file_system.is_file(file_Linux_7z):
             self._logger.print('ERROR! 7z is not present in the system.')
             self._logger.print('Aborting Linux update.')
             self._logger.print()
@@ -112,13 +114,13 @@ class LinuxUpdater:
         result = subprocess.run('''
                 sync
                 RET_CODE=
-                if /media/fat/linux/7za t "{0}" ; then
+                if {0} t "{1}" ; then
                     if [ -d /media/fat/linux.update ]
                     then
                         rm -R "/media/fat/linux.update" > /dev/null 2>&1
                     fi
                     mkdir "/media/fat/linux.update"
-                    if /media/fat/linux/7za x -y "{0}" files/linux/* -o"/media/fat/linux.update" ; then
+                    if {0} x -y "{1}" files/linux/* -o"/media/fat/linux.update" ; then
                         RET_CODE=0
                     else
                         rm -R "/media/fat/linux.update" > /dev/null 2>&1
@@ -127,12 +129,12 @@ class LinuxUpdater:
                         RET_CODE=101
                     fi
                 else
-                    echo "Downloaded installer 7z is broken, deleting {0}"
+                    echo "Downloaded installer 7z is broken, deleting {1}"
                     RET_CODE=102
                 fi
-                rm "{0}" > /dev/null 2>&1
+                rm "{1}" > /dev/null 2>&1
                 exit $RET_CODE
-        '''.format(self._file_system.download_target_path(linux_path)), shell=True, stderr=subprocess.STDOUT)
+        '''.format(file_Linux_7z, self._file_system.download_target_path(linux_path)), shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
             self._logger.print('ERROR! Could not uncompress the linux installer.')
@@ -171,4 +173,4 @@ class LinuxUpdater:
             self._logger.print()
 
     def needs_reboot(self):
-        return self._file_system.is_file('/tmp/downloader_needs_reboot_after_linux_update')
+        return self._file_system.is_file(file_downloader_needs_reboot_after_linux_update)

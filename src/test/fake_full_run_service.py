@@ -18,7 +18,8 @@
 
 from pathlib import Path
 
-from downloader.runner import Runner as ProductionRunner
+from downloader.config import default_config
+from downloader.full_run_service import FullRunService as ProductionFullRunService
 from test.fake_db_gateway import DbGateway
 from test.fake_file_system import FileSystem
 from test.fake_linux_updater import LinuxUpdater
@@ -31,12 +32,12 @@ from test.fake_store_migrator import StoreMigrator
 from test.objects import db_empty
 
 
-class Runner(ProductionRunner):
+class FullRunService(ProductionFullRunService):
     def __init__(self, env, config, db_gateway, file_system=None):
         self.file_system = FileSystem() if file_system is None else file_system
         super().__init__(env, config,
                          NoLogger(),
-                         LocalRepository(file_system=self.file_system),
+                         LocalRepository(config=config, file_system=self.file_system),
                          db_gateway,
                          OfflineImporter(file_system=self.file_system),
                          OnlineImporter(file_system=self.file_system),
@@ -45,37 +46,51 @@ class Runner(ProductionRunner):
                          StoreMigrator())
 
     @staticmethod
-    def with_single_empty_db() -> ProductionRunner:
-        db_gateway = DbGateway()
-        db_gateway.file_system.test_data.with_file(db_empty, {'unzipped_json': {}})
-        return Runner(
-            {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
-            {'databases': {db_empty: {
+    def with_single_empty_db() -> ProductionFullRunService:
+        config = default_config()
+        config.update({'databases': {db_empty: {
                 'db_url': db_empty,
                 'section': db_empty,
                 'base_files_url': '',
                 'zips': {}
-            }}, 'verbose': False, 'config_path': Path('')},
+            }}, 'verbose': False, 'config_path': Path('')})
+
+        db_gateway = DbGateway(config)
+        db_gateway.file_system.test_data.with_file(db_empty, {'unzipped_json': {}})
+
+        return FullRunService(
+            {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
+            config,
             db_gateway,
         )
 
     @staticmethod
-    def with_single_db(db_id, db_descr) -> ProductionRunner:
-        return Runner(
+    def with_single_db(db_id, db_descr) -> ProductionFullRunService:
+        config = default_config()
+        config.update({
+                'databases': {
+                    db_id: {
+                        'db_url': db_id,
+                        'section': db_id,
+                        'base_files_url': '',
+                        'zips': {}
+                    }
+                },
+                'verbose': False,
+                'config_path': Path('')
+            })
+        return FullRunService(
             {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
-            {'databases': {db_id: {
-                'db_url': db_id,
-                'section': db_id,
-                'base_files_url': '',
-                'zips': {}
-            }}, 'verbose': False, 'config_path': Path('')},
-            DbGateway.with_single_db(db_id, db_descr),
+            config,
+            DbGateway.with_single_db(db_id, db_descr, config=config),
         )
 
     @staticmethod
-    def with_no_dbs() -> ProductionRunner:
-        return Runner(
+    def with_no_dbs() -> ProductionFullRunService:
+        config = default_config()
+        config.update({'databases': {}, 'verbose': False, 'config_path': Path('')})
+        return FullRunService(
             {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
-            {'databases': {}, 'verbose': False, 'config_path': Path('')},
-            DbGateway(),
+            config,
+            DbGateway(config),
         )

@@ -17,14 +17,14 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from downloader.main import make_runner
+from downloader.full_run_service_factory import make_full_run_service
 from test.fake_logger import NoLogger
 
 
-class TestRunner(unittest.TestCase):
+class TestFullRunServiceFactory(unittest.TestCase):
 
-    def test_make_runner___with_proper_parameters___does_not_throw(self):
+    def test_make_full_run_service___with_proper_parameters___does_not_throw(self):
         try:
-            make_runner({'DEFAULT_DB_URL': '', 'DEFAULT_DB_ID': '', 'ALLOW_REBOOT': 0, 'CURL_SSL': ''}, NoLogger(), '')
+            make_full_run_service({'DEFAULT_DB_URL': '', 'DEFAULT_DB_ID': '', 'ALLOW_REBOOT': 0, 'CURL_SSL': ''}, NoLogger(), '')
         except TypeError:
-            self.fail('TypeError during make_runner, composition root failed!')
+            self.fail('TypeError during make_full_run_service, composition root failed!')

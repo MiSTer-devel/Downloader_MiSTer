@@ -78,7 +78,7 @@ class TestOfflineImporter(unittest.TestCase):
         store = empty_store()
         store['offline_databases_imported'].append(file_test_json_zip)
         self.sut.add_db(db_test_with_file_a_descr(), store)
-        self.sut.apply_offline_databases()
+        self.sut.apply()
         self.assertFalse(file_a in store['files'])
         self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
 
@@ -123,5 +123,5 @@ class TestOfflineImporter(unittest.TestCase):
     def apply_db_test_with_file_a(self):
         store = empty_store()
         self.sut.add_db(db_test_with_file_a_descr(), store)
-        self.sut.apply_offline_databases()
+        self.sut.apply()
         return store

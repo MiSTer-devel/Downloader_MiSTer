@@ -20,7 +20,7 @@ class FactoryStub:
     def __init__(self, instance):
         self._instance = instance
 
-    def create(self, *args, **kwargs):
+    def create(self, *_, **__):
         return self._instance
 
     def has(self, func):
