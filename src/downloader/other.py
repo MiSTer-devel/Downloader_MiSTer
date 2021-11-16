@@ -19,6 +19,7 @@
 
 import subprocess
 from pathlib import Path
+from .constants import file_MiSTer
 
 
 def empty_store():
@@ -33,7 +34,7 @@ def empty_store():
 def format_files_message(file_list):
     any_mra_files = [file for file in file_list if file[-4:].lower() == '.mra']
 
-    rbfs = [file for file in file_list if file[-4:].lower() == '.rbf' or file == 'MiSTer']
+    rbfs = [file for file in file_list if file[-4:].lower() == '.rbf' or file == file_MiSTer]
     mras = [file for file in any_mra_files if '/_alternatives/' not in file.lower()]
     alts = [file for file in any_mra_files if '/_alternatives/' in file.lower()]
     urls = [file for file in file_list if file[0:4].lower() == 'http']

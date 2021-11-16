@@ -21,22 +21,26 @@ from .db_entity import DbEntity, DbEntityValidationException
 
 
 class OfflineImporter:
+    def __init__(self, file_system, file_downloader_factory, logger):
+        self._file_system = file_system
+        self._file_downloader_factory = file_downloader_factory
+        self._logger = logger
+
+    def apply_offline_databases(self, importer_command):
+        for db, store, config in importer_command.read_dbs():
+            for db_file in db.db_files:
+                sub = _SubOfflineImporter(config, self._file_system, self._file_downloader_factory, self._logger)
+                sub.update_store_from_offline_db(db.db_id, db_file, store)
+
+
+class _SubOfflineImporter:
     def __init__(self, config, file_system, file_downloader_factory, logger):
         self._config = config
         self._file_system = file_system
         self._file_downloader_factory = file_downloader_factory
         self._logger = logger
-        self._dbs = []
 
-    def add_db(self, db, store):
-        self._dbs.append((db, store))
-
-    def apply_offline_databases(self):
-        for db, store in self._dbs:
-            for db_file in db.db_files:
-                self._update_store_from_offline_db(db.db_id, db_file, store)
-
-    def _update_store_from_offline_db(self, store_id, db_file, store):
+    def update_store_from_offline_db(self, store_id, db_file, store):
         if not self._file_system.is_file(db_file):
             return
 
@@ -56,9 +60,6 @@ class OfflineImporter:
             return
 
         self._logger.print('Importing %s into the local store.' % db_file)
-
-        if isinstance(db.folders, list):  # TODO Remove conversion
-            db.folders = {folder: {} for folder in db.folders}
 
         self._import_folders(db.folders, store['folders'])
         self._import_files(db.files, store['files'])
@@ -96,8 +97,6 @@ class OfflineImporter:
 
         for temp_zip in summary_downloader.correctly_downloaded_files():
             summary = self._file_system.load_dict_from_file(temp_zip)
-            if isinstance(summary['folders'], list):  # TODO Remove conversion
-                summary['folders'] = {folder: {} for folder in summary['folders']}
 
             zip_id = zip_ids_by_temp_zip[temp_zip]
 

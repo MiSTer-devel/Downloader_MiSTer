@@ -15,7 +15,7 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-
+from .constants import file_MiSTer_old, file_downloader_storage, file_downloader_log, file_downloader_last_successful_run
 from .store_migrator import make_new_local_store
 
 
@@ -32,14 +32,14 @@ class LocalRepository:
     @property
     def _storage_path(self):
         if self._storage_path_value is None:
-            self._storage_path_value = 'Scripts/.config/downloader/downloader.json.zip'
+            self._storage_path_value = file_downloader_storage
             self._file_system.add_system_path(self._storage_path_value)
         return self._storage_path_value
 
     @property
     def _last_successful_run(self):
         if self._last_successful_run_value is None:
-            self._last_successful_run_value = 'Scripts/.config/downloader/%s.last_successful_run' % self._config[
+            self._last_successful_run_value = file_downloader_last_successful_run % self._config[
                 'config_path'].stem
             self._file_system.add_system_path(self._last_successful_run_value)
         return self._last_successful_run_value
@@ -47,14 +47,14 @@ class LocalRepository:
     @property
     def logfile_path(self):
         if self._logfile_path_value is None:
-            self._logfile_path_value = 'Scripts/.config/downloader/%s.log' % self._config['config_path'].stem
+            self._logfile_path_value = file_downloader_log % self._config['config_path'].stem
             self._file_system.add_system_path(self._logfile_path_value)
         return self._logfile_path_value
 
     @property
     def old_mister_path(self):
         if self._old_mister_path is None:
-            self._old_mister_path = 'Scripts/.config/downloader/MiSTer.old'
+            self._old_mister_path = file_MiSTer_old
             self._file_system.add_system_path(self._old_mister_path)
         return self._old_mister_path
 
@@ -76,7 +76,7 @@ class LocalRepository:
         return self._file_system.is_file(self._last_successful_run)
 
     def save_store(self, local_store):
-        self._file_system.makedirs_parent(self._storage_path)
+        self._file_system.make_dirs_parent(self._storage_path)
         self._file_system.save_json_on_zip(local_store, self._storage_path)
         self._file_system.touch(self._last_successful_run)
 

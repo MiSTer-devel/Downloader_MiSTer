@@ -23,13 +23,14 @@ import traceback
 
 from .config import config_file_path
 from .logger import FileLogger
-from .runner import make_runner
+from .full_run_service_factory import make_full_run_service
 
 
 def main(env):
     logger = FileLogger()
+    # noinspection PyBroadException
     try:
-        exit_code = execute_runner(env, logger)
+        exit_code = execute_full_run(env, logger)
     except Exception as _:
         logger.print(traceback.format_exc())
         exit_code = 1
@@ -38,10 +39,10 @@ def main(env):
     return exit_code
 
 
-def execute_runner(env, logger):
-    runner = make_runner(env, logger, config_file_path(env))
+def execute_full_run(env, logger):
+    runner = make_full_run_service(env, logger, config_file_path(env))
 
-    exit_code = runner.run()
+    exit_code = runner.full_run()
 
     if runner.needs_reboot():
         logger.print()

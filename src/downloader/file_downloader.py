@@ -23,6 +23,8 @@ from urllib.parse import quote, urlparse
 import urllib.request
 import time
 from abc import ABC, abstractmethod
+
+from .constants import file_MiSTer, file_MiSTer_new
 from .logger import SilentLogger
 
 
@@ -108,14 +110,14 @@ class CurlDownloaderAbstract(FileDownloader):
     def download_files(self, first_run):
         self._download_files_internal(first_run)
 
-        if self._file_system.is_file('MiSTer.new'):
+        if self._file_system.is_file(file_MiSTer_new):
             self._logger.print()
             self._logger.print('Copying new MiSTer binary:')
-            if self._file_system.is_file('MiSTer'):
-                self._file_system.move('MiSTer', self._local_repository.old_mister_path)
-            self._file_system.move('MiSTer.new', 'MiSTer')
+            if self._file_system.is_file(file_MiSTer):
+                self._file_system.move(file_MiSTer, self._local_repository.old_mister_path)
+            self._file_system.move(file_MiSTer_new, file_MiSTer)
 
-            if self._file_system.is_file('MiSTer'):
+            if self._file_system.is_file(file_MiSTer):
                 self._logger.print('New MiSTer binary copied.')
             else:
                 # This error message should never happen.
@@ -135,8 +137,8 @@ class CurlDownloaderAbstract(FileDownloader):
         for path in sorted(self._curl_list):
             if 'path' in self._curl_list[path] and self._curl_list[path]['path'] == 'system':
                 self._file_system.add_system_path(path)
-                if path == 'MiSTer':
-                    self._file_system.add_system_path('MiSTer.new')
+                if path == file_MiSTer:
+                    self._file_system.add_system_path(file_MiSTer_new)
 
             if self._hash_check and self._file_system.is_file(path):
                 path_hash = self._file_system.hash(path)
@@ -182,11 +184,11 @@ class CurlDownloaderAbstract(FileDownloader):
         self._logger.print('Checking hashes...')
 
         for path in self._http_oks.consume():
-            if not self._file_system.is_file(path if path != 'MiSTer' else 'MiSTer.new'):
+            if not self._file_system.is_file(path if path != file_MiSTer else file_MiSTer_new):
                 self._errors.add_debug_report(path, 'Missing %s' % path)
                 continue
 
-            path_hash = self._file_system.hash(path if path != 'MiSTer' else 'MiSTer.new')
+            path_hash = self._file_system.hash(path if path != file_MiSTer else file_MiSTer_new)
             if self._hash_check and path_hash != self._curl_list[path]['hash']:
                 self._errors.add_debug_report(path, 'Bad hash on %s (%s != %s)' % (path, self._curl_list[path]['hash'], path_hash))
                 continue
@@ -200,7 +202,7 @@ class CurlDownloaderAbstract(FileDownloader):
 
     def _download(self, path, description):
         self._logger.print(path)
-        self._file_system.makedirs_parent(path)
+        self._file_system.make_dirs_parent(path)
 
         if 'url' not in description:
             description['url'] = self._url_from_path(path)
@@ -208,7 +210,7 @@ class CurlDownloaderAbstract(FileDownloader):
         url_domain = urlparse(description['url']).netloc
         url_parts = description['url'].split(url_domain)
 
-        target_path = self._file_system.download_target_path(path if path != 'MiSTer' else 'MiSTer.new')
+        target_path = self._file_system.download_target_path(path if path != file_MiSTer else file_MiSTer_new)
         url = url_parts[0] + url_domain + urllib.parse.quote(url_parts[1])
 
         self._run(description, self._command(target_path, url), path)

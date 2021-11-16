@@ -15,22 +15,21 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from .store_migrator import MigrationBase
 
+class ImporterCommand:
+    def __init__(self, config):
+        self._config = config
+        self._parameters = []
 
-class MigrationV3(MigrationBase):
-    version = 3
+    def add_db(self, db, store, description):
+        config = self._config
 
-    def migrate(self, local_store):
+        if 'options' in description:
+            config = config.copy()
+            config.update(description['options'])
 
-        #
-        # move 'folders' from zips to upper level
-        #
-        for db in local_store['dbs'].values():
-            for zip_id, zip_description in db['zips'].items():
-                if 'folders' not in zip_description:
-                    continue
-                for folder_path, folder_description in zip_description['folders'].items():
-                    db['folders'][folder_path] = folder_description
-                    db['folders'][folder_path]['zip_id'] = zip_id
-                zip_description.pop('folders')
+        self._parameters.append((db, store, config))
+        return self
+
+    def read_dbs(self):
+        return self._parameters

@@ -33,7 +33,7 @@ class DbEntity:
 
         if self.db_id != section.lower():
             raise DbEntityValidationException(
-                'ERROR: Section "%s" doesn\'t match database id "%s". Fix your INI file.' % (section,  self.db_id))
+                'ERROR: Section "%s" does not match database id "%s". Fix your INI file.' % (section,  self.db_id))
 
         if 'zips' not in db_raw or not isinstance(db_raw['zips'], dict):
             raise DbEntityValidationException('ERROR: db "%s" does not have "zips", contact the db maintainer.' % self.db_id)

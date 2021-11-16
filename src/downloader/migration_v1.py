@@ -15,8 +15,10 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+from .store_migrator import MigrationBase
 
-class MigrationV1:
+
+class MigrationV1(MigrationBase):
     version = 1
 
     def migrate(self, local_store):

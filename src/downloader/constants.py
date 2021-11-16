@@ -16,5 +16,25 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+# Pre-selected database
 distribution_mister_db_url = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'
 distribution_mister_db_id = 'distribution_mister'
+
+# Firmware files
+file_MiSTer = 'MiSTer'
+file_MiSTer_new = 'MiSTer.new'
+file_MiSTer_old = 'Scripts/.config/downloader/MiSTer.old'
+
+# Downloader files
+file_downloader_storage = 'Scripts/.config/downloader/downloader.json.zip'
+file_downloader_last_successful_run = 'Scripts/.config/downloader/%s.last_successful_run'
+file_downloader_log = 'Scripts/.config/downloader/%s.log'
+file_downloader_ini = '/media/fat/downloader.ini'
+
+# Linux Update files
+file_MiSTer_version = '/MiSTer.version'
+file_Linux_7z = '/media/fat/linux/7za'
+
+# Reboot files
+file_downloader_needs_reboot_after_linux_update = '/tmp/downloader_needs_reboot_after_linux_update'
+file_mister_downloader_needs_reboot = '/tmp/MiSTer_downloader_needs_reboot'
