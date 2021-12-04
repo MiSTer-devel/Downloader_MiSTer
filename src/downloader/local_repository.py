@@ -15,8 +15,8 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from .constants import file_MiSTer_old, file_downloader_storage, file_downloader_log, file_downloader_last_successful_run
-from .store_migrator import make_new_local_store
+from downloader.constants import file_MiSTer_old, file_downloader_storage, file_downloader_log, file_downloader_last_successful_run
+from downloader.store_migrator import make_new_local_store
 
 
 class LocalRepository:

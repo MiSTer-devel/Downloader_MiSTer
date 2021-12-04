@@ -16,8 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from .config import AllowDelete
-from .db_entity import DbEntity, DbEntityValidationException
+from downloader.config import AllowDelete
+from downloader.db_entity import DbEntity, DbEntityValidationException
 
 
 class OfflineImporter:

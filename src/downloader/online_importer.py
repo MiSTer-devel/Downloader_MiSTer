@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from .constants import distribution_mister_db_id
+from downloader.constants import distribution_mister_db_id
 
 
 class _Session:
@@ -29,7 +29,7 @@ class _Session:
         self.stores_folders = None
 
 
-class OnlineImporter:    
+class OnlineImporter:
     def __init__(self, file_system, file_downloader_factory, logger):
         self._file_system = file_system
         self._file_downloader_factory = file_downloader_factory
@@ -120,8 +120,9 @@ class _SubOnlineImporter:
             if 'zip_id' in file_description:
                 zip_id = file_description['zip_id']
                 if zip_id not in needed_zips:
-                    needed_zips[zip_id] = dict()
-                needed_zips[zip_id][file_path] = file_description
+                    needed_zips[zip_id] = {'files': {}, 'total_size': 0}
+                needed_zips[zip_id]['files'][file_path] = file_description
+                needed_zips[zip_id]['total_size'] += file_description['size']
 
             file_downloader.queue_file(file_description, file_path)
 
@@ -175,8 +176,7 @@ class _SubOnlineImporter:
         zip_ids_to_download = []
 
         for zip_id in db.zips:
-            if zip_id in store['zips'] and store['zips'][zip_id]['summary_file']['hash'] == \
-                    db.zips[zip_id]['summary_file']['hash']:
+            if zip_id in store['zips'] and store['zips'][zip_id]['summary_file']['hash'] == db.zips[zip_id]['summary_file']['hash']:
                 zip_ids_from_store.append(zip_id)
             else:
                 zip_ids_to_download.append(zip_id)
@@ -228,9 +228,13 @@ class _SubOnlineImporter:
         zip_ids_by_temp_zip = dict()
         for zip_id in needed_zips:
             zipped_files = needed_zips[zip_id]
-            if len(zipped_files) < self._config['zip_file_count_threshold']:
-                for file_path in zipped_files:
-                    file_downloader.queue_file(zipped_files[file_path], file_path)
+
+            less_file_count = len(zipped_files['files']) < self._config['zip_file_count_threshold']
+            less_accumulated_mbs = zipped_files['total_size'] < (1000 * 1000 * self._config['zip_accumulated_mb_threshold'])
+
+            if less_file_count and less_accumulated_mbs:
+                for file_path in zipped_files['files']:
+                    file_downloader.queue_file(zipped_files['files'][file_path], file_path)
                 store['zips'][zip_id] = db.zips[zip_id]
             else:
                 temp_zip = '/tmp/%s_contents.zip' % zip_id

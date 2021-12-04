@@ -18,7 +18,7 @@
 
 import subprocess
 import json
-from .constants import file_downloader_needs_reboot_after_linux_update, file_MiSTer_version, file_Linux_7z
+from downloader.constants import file_downloader_needs_reboot_after_linux_update, file_MiSTer_version, file_Linux_7z
 
 
 class LinuxUpdater:

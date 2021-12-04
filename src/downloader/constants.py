@@ -23,7 +23,7 @@ distribution_mister_db_id = 'distribution_mister'
 # Firmware files
 file_MiSTer = 'MiSTer'
 file_MiSTer_new = 'MiSTer.new'
-file_MiSTer_old = 'Scripts/.config/downloader/MiSTer.old'
+file_MiSTer_old = '.MiSTer.old'
 
 # Downloader files
 file_downloader_storage = 'Scripts/.config/downloader/downloader.json.zip'

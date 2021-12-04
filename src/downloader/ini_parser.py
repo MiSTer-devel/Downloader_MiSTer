@@ -54,6 +54,9 @@ class IniParser:
         else:
             return default
 
+    def has(self, key):
+        return self._ini_args.get(key) is not None
+
 
 def to_int(n, default):
     try:

@@ -15,27 +15,20 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from .store_migrator import MigrationBase
+
+from downloader.store_migrator import MigrationBase
 
 
-class MigrationV1(MigrationBase):
-    version = 1
+class MigrationV5(MigrationBase):
+    def __init__(self, file_system):
+        self._file_system = file_system
+
+    version = 5
 
     def migrate(self, local_store):
+        """remove old mister from old location in case it exists"""
 
-        #
-        # create 'dbs' field
-        #
-        db_ids = list(local_store.keys())
-        dbs = dict()
-        for db_id in db_ids:
-            dbs[db_id] = local_store[db_id]
-            local_store.pop(db_id)
+        file_MiSTer_old = 'Scripts/.config/downloader/MiSTer.old'
 
-        local_store['dbs'] = dbs
-
-        #
-        # create 'zips' fields
-        #
-        for db_id in local_store['dbs']:
-            local_store['dbs'][db_id]['zips'] = dict()
+        if self._file_system.is_file(file_MiSTer_old):
+            self._file_system.unlink(file_MiSTer_old)

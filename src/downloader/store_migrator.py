@@ -15,6 +15,7 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+
 from abc import ABC, abstractmethod
 
 

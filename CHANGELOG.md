@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Version 1.3 - 2021-12-04
+
+### Added
+- Support for **database-scoped default options**: Custom databases can now redefine the default option values that will apply to them.
+- Support for **database-scoped options**: Users can now also define options that apply only to a given database.
+
+More info for both additions can be found [here](https://github.com/theypsilon/Downloader_MiSTer/blob/main/docs/custom-databases.md#default-options).
+### Changed
+- Storing changes on zip summary hash. This avoids wasting time downloading an unnecessary file in some runs.
+- Better compression method for the local store. Saves some space in the SD, while the added run time is negligible.
+- Better validation of `downloader.ini` file.
+- The download of the database json files is now done in parallel, which is a bit faster.
+- Old mister file is now saved in the root of the SD as `.MiSTer.old`. This prevents an error that affected some users of the **cifs** script.
+- Fixing hash validation errors getting ignored in some cases.
+- Other minor fixes and optimizations.
+
 ## Version 1.2 - 2021-11-06
 
 ### Added
