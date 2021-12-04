@@ -98,7 +98,7 @@ class TestOfflineImporter(unittest.TestCase):
         self.assertTrue(self.sut.file_system.is_file(file_test_json_zip))
 
     def test_apply_offline_databases___when_db_id_is_uppercase___still_adds_db_file(self):
-        unzipped_json = db_test_with_file_a_descr().to_dict()
+        unzipped_json = db_test_with_file_a_descr().testable
         unzipped_json['db_id'] = 'TEST'
 
         self.sut.file_system.test_data\
@@ -109,7 +109,7 @@ class TestOfflineImporter(unittest.TestCase):
         self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
 
     def test_apply_offline_databases___when_db_id_is_not_there___does_nothing(self):
-        unzipped_json = db_test_with_file_a_descr().to_dict()
+        unzipped_json = db_test_with_file_a_descr().testable
         unzipped_json.pop('db_id')
 
         self.sut.file_system.test_data\

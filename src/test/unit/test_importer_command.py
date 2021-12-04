@@ -15,13 +15,20 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+
 import unittest
 
-from downloader.importer_command import ImporterCommand
-
+from downloader.db_options import DbOptionsKind, DbOptions
+from downloader.importer_command import ImporterCommand as ProductionImporterCommand
+from test.objects import db_entity
 
 nil = {}
 config = {'x': 'y'}
+config_with_options = {"downloader_retries": 42}
+empty_config = {}
+db = db_entity()
+db_with_options = db_entity(default_options={'downloader_retries': 1})
+ini_options = DbOptions({'downloader_retries': 8}, kind=DbOptionsKind.INI_SECTION)
 
 
 class TestImporterCommand(unittest.TestCase):
@@ -31,16 +38,64 @@ class TestImporterCommand(unittest.TestCase):
 
     def test_read_dbs___after_adding_no_options___returns_original_config(self):
         actual = ImporterCommand(config)\
-            .add_db(nil, nil, nil)\
-            .add_db(nil, nil, nil)\
+            .add_db(db, nil, nil)\
+            .add_db(db, nil, nil)\
             .read_dbs()
 
-        self.assertEqual([(nil, nil, config), (nil, nil, config)], actual)
+        self.assert_config(config, actual[0])
+        self.assert_config(config, actual[1])
 
     def test_read_dbs___after_adding_different_options___returns_corresponding_original_config_variants(self):
         actual = ImporterCommand(config)\
-            .add_db(nil, nil, {'options': {'a': 'b'}})\
-            .add_db(nil, nil, {'options': {'c': 'd'}})\
+            .add_db(db, nil, {'options': DbOptions({'base_path': 'b'}, kind=DbOptionsKind.INI_SECTION)})\
+            .add_db(db, nil, {'options': DbOptions({'parallel_update': False}, kind=DbOptionsKind.INI_SECTION)})\
             .read_dbs()
 
-        self.assertEqual([(nil, nil, {'a': 'b', 'x': 'y'}), (nil, nil, {'c': 'd', 'x': 'y'})], actual)
+        self.assert_config({'base_path': 'b', 'x': 'y'}, actual[0])
+        self.assert_config({'parallel_update': False, 'x': 'y'}, actual[1])
+
+    def test_read_dbs___with_config_options___returns_config_with_options(self):
+        actual = ImporterCommand(config_with_options)\
+            .add_db(db, nil, nil)\
+            .read_dbs()[0]
+
+        self.assert_config(config_with_options, actual)
+
+    def test_read_dbs___with_ini_options___returns_ini_options(self):
+        actual = ImporterCommand(config_with_options)\
+            .add_db(db, nil, {'options': ini_options})\
+            .read_dbs()
+
+        self.assert_config(ini_options.testable, actual[0])
+
+    def test_read_dbs___with_db_options___returns_db_options(self):
+        actual = ImporterCommand(empty_config)\
+            .add_db(db_with_options, nil, nil)\
+            .read_dbs()[0]
+
+        self.assert_config(db_with_options.default_options.testable, actual)
+
+    def test_read_dbs___with_config_and_db_options___returns_config_with_options(self):
+        actual = ImporterCommand(config_with_options)\
+            .add_db(db_with_options, nil, nil)\
+            .read_dbs()[0]
+
+        self.assert_config(config_with_options, actual)
+
+    def test_read_dbs___with_config_db_and_ini_options___returns_ini_options(self):
+        actual = ImporterCommand(config_with_options)\
+            .add_db(db_with_options, nil, {'options': ini_options})\
+            .read_dbs()[0]
+
+        self.assert_config(ini_options.testable, actual)
+
+    def assert_command(self, expected_db, expected_store, expected_config, actual):
+        self.assertEqual((expected_db, expected_store, expected_config), actual)
+
+    def assert_config(self, expected_config, actual):
+        self.assertEqual(expected_config, actual[2], "config")
+
+
+class ImporterCommand(ProductionImporterCommand):
+    def __init__(self, input_config):
+        super().__init__(input_config, list(input_config))

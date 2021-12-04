@@ -18,14 +18,13 @@
 
 import os
 import hashlib
-from pathlib import Path
 import shutil
 import json
-from .other import run_stdout, run_successfully
-from .config import AllowDelete
 import subprocess
 import tempfile
 import re
+from pathlib import Path
+from downloader.config import AllowDelete
 
 
 class FileSystem:
@@ -152,7 +151,7 @@ class FileSystem:
 
         zip_path = Path(self._path(path)).absolute()
 
-        run_successfully('cd /tmp/ && zip -qr %s %s' % (zip_path, json_name), self._logger)
+        _run_successfully('cd /tmp/ && zip -qr %s %s' % (zip_path, json_name), self._logger)
 
         self._unlink(json_path, False)
 
@@ -172,6 +171,9 @@ class FileSystem:
             return False
 
     def _path(self, path):
+        if os.name == 'nt' and path.startswith('C:\\'):
+            return path
+
         if path[0] == '/':
             return path
 
@@ -191,10 +193,35 @@ def hash_file(path):
 
 
 def _load_json_from_zip(path):
-    json_str = run_stdout("unzip -p %s" % path)
+    json_str = _run_stdout("unzip -p %s" % path)
     return json.loads(json_str)
 
 
 def _load_json(file_path):
     with open(file_path, "r") as f:
         return json.loads(f.read())
+
+
+def _run_successfully(command, logger):
+    result = subprocess.run(command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+
+    stdout = result.stdout.decode()
+    stderr = result.stderr.decode()
+    if stdout.strip():
+        logger.print(stdout)
+
+    if stderr.strip():
+        logger.print(stderr)
+
+    if result.returncode != 0:
+        raise Exception("subprocess.run %s Return Code was '%d'" % (command, result.returncode))
+
+
+def _run_stdout(command):
+    result = subprocess.run(command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+
+    if result.returncode != 0:
+        raise Exception("subprocess.run %s Return Code was '%d'" % (command, result.returncode)
+                        + '\n' + result.stdout.decode() + '\n' + result.stderr.decode())
+
+    return result.stdout.decode()

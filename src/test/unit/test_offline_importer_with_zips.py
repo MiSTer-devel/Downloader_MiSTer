@@ -34,7 +34,7 @@ class TestOfflineImporterWithZips(unittest.TestCase):
                 'hash': file_test_json_zip,
                 'unzipped_json': db_test_descr(zips={
                     cheats_folder_nes_zip_id: cheats_folder_nes_zip_desc(unzipped_json=unzipped_json_with_cheats_folder_nes_file())
-                }).to_dict()
+                }).testable
             })\
             .with_file(cheats_folder_nes_file_path, {"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size})
 

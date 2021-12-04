@@ -48,6 +48,7 @@ def make_full_run_service(env, logger, ini_path):
     offline_importer = OfflineImporter(file_system, file_downloader_factory, logger)
     online_importer = OnlineImporter(file_system, file_downloader_factory, logger)
     linux_updater = LinuxUpdater(file_system, file_downloader_factory, logger)
+    store_migrator = StoreMigrator(migrations(file_system), logger)
 
     return FullRunService(
         env,
@@ -59,5 +60,5 @@ def make_full_run_service(env, logger, ini_path):
         online_importer,
         linux_updater,
         RebootCalculator(config, logger, file_system),
-        StoreMigrator(migrations(), logger)
+        store_migrator
     )

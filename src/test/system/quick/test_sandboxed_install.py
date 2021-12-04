@@ -22,7 +22,7 @@ import os
 import json
 from pathlib import Path
 from downloader.config import ConfigReader
-from test.objects import debug_env
+from test.objects import debug_env, default_base_path
 from test.fake_logger import NoLogger
 from test.fake_store_migrator import StoreMigrator
 from downloader.file_system import hash_file, FileSystem
@@ -49,6 +49,11 @@ class TestSandboxedInstall(unittest.TestCase):
             'local_store': local_store_files([('sandbox', db['files'])]),
             'files': hashes(self.tmp_delme, db['files'])
         })
+
+    def test_sandbox_db_with_single_db___runs_correctly(self):
+        single_db_sandbox_ini = 'test/system/fixtures/sandboxed_install/single_db/sandbox.ini'
+        cleanup(single_db_sandbox_ini)
+        self.assertExecutesCorrectly(single_db_sandbox_ini)
 
     def test_sandbox_db_with_delete_previous___installs_correctly(self):
         db = load_json('test/system/fixtures/sandboxed_install/db_with_delete_previous/sandbox_db.json')
@@ -224,34 +229,33 @@ class TestSandboxedInstall(unittest.TestCase):
         if 'local_store' in expected:
             counter += 1
             actual_store = LocalRepository(config, NoLogger(), self.file_system).load_store(StoreMigrator())
-            self.assertEqual(actual_store, expected['local_store'])
+            self.assertEqual(expected['local_store'], actual_store)
 
         if 'files' in expected:
             counter += 1
-            self.assertEqual(self.find_all_files(config['base_path']), expected['files'])
+            self.assertEqual(expected['files'], self.find_all_files(config['base_path']))
 
         if 'files_count' in expected:
             counter += 1
-            self.assertEqual(len(self.find_all_files(config['base_path'])), expected['files_count'])
+            self.assertEqual(expected['files_count'], len(self.find_all_files(config['base_path'])))
 
         if 'system_files' in expected:
             counter += 1
-            self.assertEqual(self.find_all_files(config['base_system_path']), expected['system_files'])
+            self.assertEqual(expected['system_files'], self.find_all_files(config['base_system_path']))
 
         if 'system_files_count' in expected:
             counter += 1
-            self.assertEqual(len(self.find_all_files(config['base_path'])), expected['system_files_count'])
+            self.assertEqual(expected['system_files_count'], len(self.find_all_files(config['base_path'])))
 
         if 'folders' in expected:
             counter += 1
-            self.assertEqual(self.find_all_folders(config['base_path']), sorted(list(expected['folders'])))
+            self.assertEqual(sorted(list(expected['folders'])), self.find_all_folders(config['base_path']))
 
         if 'system_folders' in expected:
             counter += 1
-            self.assertEqual(self.find_all_folders(config['base_system_path']),
-                             sorted(list(expected['system_folders'])))
+            self.assertEqual(sorted(list(expected['system_folders'])), self.find_all_folders(config['base_system_path']))
 
-        self.assertEqual(counter, len(expected))
+        self.assertEqual(len(expected), counter)
 
     @staticmethod
     def run_main(ini_path):
@@ -263,7 +267,9 @@ class TestSandboxedInstall(unittest.TestCase):
             'COMMIT': 'quick system test',
             'DEFAULT_DB_URL': '',
             'DEFAULT_DB_ID': '',
-            'DEBUG': 'true'
+            'DEFAULT_BASE_PATH': default_base_path,
+            'DEBUG': 'true',
+            'FAIL_ON_FILE_ERROR': 'true'
         })
 
     def find_all_files(self, directory):

@@ -17,6 +17,8 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
+
+from downloader.config import default_config
 from downloader.db_entity import DbEntityValidationException
 from test.fake_db_entity import DbEntity
 from test.objects import raw_db_empty_descr, db_empty
@@ -24,27 +26,32 @@ from test.objects import raw_db_empty_descr, db_empty
 
 class TestDbEntity(unittest.TestCase):
 
-    def test_validate_raw_db___with_correct_props___returns_db(self):
+    def test_construct_db_entity___with_correct_props___returns_db(self):
         self.assertIsNotNone(DbEntity(raw_db_empty_descr(), db_empty))
 
-    def test_validate_raw_db___with_wrong_section___raises_db_entity_validation_exception(self):
+    def test_construct_db_entity___with_wrong_section___raises_db_entity_validation_exception(self):
         self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db_empty_descr(), 'different section'))
 
-    def test_validate_raw_db___with_wrong_db___raises_db_entity_validation_exception(self):
+    def test_construct_db_entity___with_wrong_db___raises_db_entity_validation_exception(self):
         self.assertRaises(DbEntityValidationException, lambda: DbEntity("wrong", db_empty))
 
-    def test_validate_raw_db___with_none_db___raises_db_entity_validation_exception(self):
+    def test_construct_db_entity___with_none_db___raises_db_entity_validation_exception(self):
         self.assertRaises(DbEntityValidationException, lambda: DbEntity(None, db_empty))
 
-    def test_validate_raw_db___with_correct_props_but_uppercase_db_id___returns_db_with_lowercase_id(self):
+    def test_construct_db_entity___with_correct_props_but_uppercase_db_id___returns_db_with_lowercase_id(self):
         raw_db = {'db_id': 'BiG', 'base_files_url': '', 'db_files': [], 'files': {}, 'folders': {}, 'zips': {}, 'default_options': {}, 'timestamp': 0}
         expected = {'db_id': 'big', 'base_files_url': '', 'db_files': [], 'files': {}, 'folders': {}, 'zips': {}, 'default_options': {}, 'timestamp': 0}
 
-        self.assertEqual(DbEntity(expected, 'big').to_json(), DbEntity(raw_db, 'bIg').to_json())
+        self.assertEqual(DbEntity(expected, 'big').testable, DbEntity(raw_db, 'bIg').testable)
 
-    def test_validate_db___with_wrong_field___raises_db_entity_validation_exception(self):
+    def test_construct_db_entity___with_wrong_field___raises_db_entity_validation_exception(self):
         for field in ['db_id', 'base_files_url', 'db_files', 'files', 'folders', 'zips', 'default_options', 'timestamp']:
             with self.subTest(field):
                 raw_db = raw_db_empty_descr()
                 raw_db.pop(field)
                 self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
+
+    def test_construct_db_entity___with_wrong_options___raises_db_entity_validation_exception(self):
+        raw_db = raw_db_empty_descr()
+        raw_db['default_options'] = {'base_path': default_config()['base_path']}
+        self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))

@@ -15,22 +15,17 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from .store_migrator import MigrationBase
+
+from downloader.store_migrator import MigrationBase
 
 
-class MigrationV3(MigrationBase):
-    version = 3
+class MigrationV4(MigrationBase):
+    version = 4
 
     def migrate(self, local_store):
+        """database ids to lowercase"""
 
-        #
-        # move 'folders' from zips to upper level
-        #
-        for db in local_store['dbs'].values():
-            for zip_id, zip_description in db['zips'].items():
-                if 'folders' not in zip_description:
-                    continue
-                for folder_path, folder_description in zip_description['folders'].items():
-                    db['folders'][folder_path] = folder_description
-                    db['folders'][folder_path]['zip_id'] = zip_id
-                zip_description.pop('folders')
+        wrong_ids = [db_id for db_id, store in local_store['dbs'].items() if db_id.lower() != db_id]
+
+        for db_id in wrong_ids:
+            local_store['dbs'][db_id.lower()] = local_store['dbs'].pop(db_id)

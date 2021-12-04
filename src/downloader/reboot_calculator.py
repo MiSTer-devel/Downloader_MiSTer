@@ -16,8 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from .config import AllowReboot
-from .constants import file_mister_downloader_needs_reboot
+from downloader.config import AllowReboot
+from downloader.constants import file_mister_downloader_needs_reboot
 
 
 class RebootCalculator:

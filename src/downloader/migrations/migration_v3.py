@@ -16,24 +16,20 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-class ImporterCommand:
-    def __init__(self, config, user_defined_options):
-        self._config = config
-        self._user_defined_options = user_defined_options
-        self._parameters = []
+from downloader.store_migrator import MigrationBase
 
-    def add_db(self, db, store, description):
-        config = self._config.copy()
 
-        for key, option in db.default_options.items():
-            if key not in self._user_defined_options:
-                config[key] = option
+class MigrationV3(MigrationBase):
+    version = 3
 
-        if 'options' in description:
-            description['options'].apply_to_config(config)
+    def migrate(self, local_store):
+        """move 'folders' from zips to upper level"""
 
-        self._parameters.append((db, store, config))
-        return self
-
-    def read_dbs(self):
-        return self._parameters
+        for db in local_store['dbs'].values():
+            for zip_id, zip_description in db['zips'].items():
+                if 'folders' not in zip_description:
+                    continue
+                for folder_path, folder_description in zip_description['folders'].items():
+                    db['folders'][folder_path] = folder_description
+                    db['folders'][folder_path]['zip_id'] = zip_id
+                zip_description.pop('folders')

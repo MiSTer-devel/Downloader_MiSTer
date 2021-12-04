@@ -16,7 +16,7 @@ cd src
 
 find downloader -type f -iname "*.py" -print0 | while IFS= read -r -d '' file ; do pin_metadata "${file}" ; done
 pin_metadata __main__.py
-zip -q -0 -D -X -A "${TEMP_ZIP1}" __main__.py downloader/*.py
+zip -q -0 -D -X -A -r "${TEMP_ZIP1}" __main__.py downloader -x "*/__pycache__/*"
 pin_metadata "${TEMP_ZIP1}"
 echo '#!/usr/bin/env python3' | cat - "${TEMP_ZIP1}" > "${TEMP_ZIP2}"
 pin_metadata "${TEMP_ZIP2}"

@@ -15,7 +15,9 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-import json
+
+from downloader.db_options import DbOptionsKind, DbOptions, DbOptionsValidationException
+from downloader.other import test_only
 
 
 class DbEntity:
@@ -36,49 +38,56 @@ class DbEntity:
                 'ERROR: Section "%s" does not match database id "%s". Fix your INI file.' % (section,  self.db_id))
 
         if 'zips' not in db_raw or not isinstance(db_raw['zips'], dict):
-            raise DbEntityValidationException('ERROR: db "%s" does not have "zips", contact the db maintainer.' % self.db_id)
+            self._raise_not_field('zips')
         self.zips = db_raw['zips']
 
         if 'db_files' not in db_raw or not isinstance(db_raw['db_files'], list):
-            raise DbEntityValidationException('ERROR: db "%s" does not have "db_files", contact the db maintainer.' % self.db_id)
+            self._raise_not_field('db_files')
         self.db_files = db_raw['db_files']
 
         if 'default_options' not in db_raw or not isinstance(db_raw['default_options'], dict):
-            raise DbEntityValidationException(
-                'ERROR: db "%s" does not have "default_options", contact the db maintainer.' % self.db_id)
-        self.default_options = db_raw['default_options']
+            self._raise_not_field('default_options')
+        self.default_options = self._create_default_options(db_raw['default_options'])
 
         if 'timestamp' not in db_raw or not isinstance(db_raw['timestamp'], int):
-            raise DbEntityValidationException('ERROR: db "%s" does not have "timestamp", contact the db maintainer.' % self.db_id)
+            self._raise_not_field('timestamp')
         self.timestamp = db_raw['timestamp']
 
         if 'files' not in db_raw or not isinstance(db_raw['files'], dict):
-            raise DbEntityValidationException('ERROR: db "%s" does not have "files", contact the db maintainer.' % self.db_id)
+            self._raise_not_field('files')
         self.files = db_raw['files']
 
         if 'folders' not in db_raw or not isinstance(db_raw['folders'], dict):
-            raise DbEntityValidationException('ERROR: db "%s" does not have "folders", contact the db maintainer.' % self.db_id)
+            self._raise_not_field('folders')
         self.folders = db_raw['folders']
 
         if 'base_files_url' not in db_raw or not isinstance(db_raw['base_files_url'], str):
-            raise DbEntityValidationException(
-                'ERROR: db "%s" does not have "base_files_url", contact the db maintainer.' % self.db_id)
+            self._raise_not_field('base_files_url')
         self.base_files_url = db_raw['base_files_url']
 
         self.linux = db_raw['linux'] if 'linux' in db_raw and isinstance(db_raw['linux'], dict) else None
 
         self.header = db_raw['header'] if 'header' in db_raw and isinstance(db_raw['header'], list) else None
 
-    def to_json(self):
-        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+    def _create_default_options(self, options):
+        try:
+            return DbOptions(options, kind=DbOptionsKind.DEFAULT_OPTIONS)
+        except DbOptionsValidationException as e:
+            raise DbEntityValidationException('ERROR: db "%s" has invalid default options [%s], contact the db maintainer.' % (self.db_id, e.fields_to_string()))
 
-    def to_dict(self):
-        result = json.loads(self.to_json())
+    @property
+    @test_only
+    def testable(self):
+        result = self.__dict__.copy()
+        result['default_options'] = result['default_options'].testable
         if result['linux'] is None:
             result.pop('linux')
         if result['header'] is None:
             result.pop('header')
         return result
+
+    def _raise_not_field(self, field):
+        raise DbEntityValidationException('ERROR: db "%s" does not have "%s", contact the db maintainer.' % (self.db_id, field))
 
 
 class DbEntityValidationException(Exception):

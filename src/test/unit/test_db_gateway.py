@@ -29,20 +29,20 @@ fs_db_path = 'this_is_my_uri.json.zip'
 
 class TestDbGateway(unittest.TestCase):
     def test_fetch_all___db_with_working_http_uri___returns_expected_db(self):
-        db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().to_dict()}
+        db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
 
         fs = FileSystem()
         factory = FactoryStub(FileDownloader(file_system=fs)).has(lambda fd: fd.test_data.brings_file(fake_temp_file, db_description))
 
-        self.assertEqual(db_test_descr().to_dict(), fetch_all(http_db_url, fs, factory))
+        self.assertEqual(db_test_descr().testable, fetch_all(http_db_url, fs, factory))
 
     def test_fetch_all___db_with_fs_path___returns_expected_db(self):
-        db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().to_dict()}
+        db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
 
         fs = FileSystem()
         fs.test_data.with_file(fs_db_path, db_description)
 
-        self.assertEqual(db_test_descr().to_dict(), fetch_all(fs_db_path, fs))
+        self.assertEqual(db_test_descr().testable, fetch_all(fs_db_path, fs))
 
     def test_fetch_all___db_with_wrong_downloaded_file___returns_none(self):
         self.assertEqual(None, fetch_all(http_db_url))
@@ -56,7 +56,7 @@ def fetch_all(db_url, fs=None, factory=None):
     dbs, errors = DbGateway(file_system=fs, file_downloader_factory=factory).fetch_all(test_db(db_url))
     if len(dbs) == 0:
         return None
-    return dbs[0].to_dict()
+    return dbs[0].testable
 
 
 def test_db(db_uri):

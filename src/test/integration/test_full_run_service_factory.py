@@ -25,6 +25,6 @@ class TestFullRunServiceFactory(unittest.TestCase):
 
     def test_make_full_run_service___with_proper_parameters___does_not_throw(self):
         try:
-            make_full_run_service({'DEFAULT_DB_URL': '', 'DEFAULT_DB_ID': '', 'ALLOW_REBOOT': 0, 'CURL_SSL': ''}, NoLogger(), '')
+            make_full_run_service({'DEFAULT_DB_URL': '', 'DEFAULT_DB_ID': '', 'ALLOW_REBOOT': 0, 'CURL_SSL': '', 'DEFAULT_BASE_PATH': None}, NoLogger(), '')
         except TypeError:
             self.fail('TypeError during make_full_run_service, composition root failed!')

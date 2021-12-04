@@ -9,3 +9,17 @@ python3 -m unittest discover -s test/unit
 echo
 echo "Integration Tests:"
 python3 -m unittest discover -s test/integration
+echo
+echo "System Quick Tests:"
+python3 -m unittest discover -s test/system/quick
+echo
+
+if [[ "${1:-}" != "--slow" ]] && [[ "${1:-}" != "-s" ]] ; then
+    echo "Done. For running all system tests do: ${0} --slow"
+    exit 0
+fi
+
+echo "System Slow Tests:"
+python3 -m unittest discover -s test/system/slow
+echo
+echo "Done"

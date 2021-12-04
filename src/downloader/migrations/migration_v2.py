@@ -15,17 +15,16 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from .store_migrator import MigrationBase
+
+from downloader.store_migrator import MigrationBase
 
 
 class MigrationV2(MigrationBase):
     version = 2
 
     def migrate(self, local_store):
+        """convert 'folders' from list to dict"""
 
-        #
-        # convert 'folders' from list to dict
-        #
         for db_id in local_store['dbs']:
             local_store['dbs'][db_id]['folders'] = {folder: {} for folder in local_store['dbs'][db_id]['folders']}
             for zip_id in local_store['dbs'][db_id]['zips']:

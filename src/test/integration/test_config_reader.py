@@ -17,8 +17,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
+import configparser
 from downloader.config import AllowDelete, AllowReboot, InvalidConfigParameter
-from test.objects import not_found_ini
+from test.objects import not_found_ini, db_options, default_base_path
 from test.fake_config_reader import ConfigReader
 
 
@@ -33,8 +34,8 @@ class TestConfigReader(unittest.TestCase):
             'allow_reboot': AllowReboot.ALWAYS,
             'allow_delete': AllowDelete.ALL,
             'check_manually_deleted_files': True,
-            'base_path': '/media/fat/',
-            'base_system_path': '/media/fat/',
+            'base_path': default_base_path,
+            'base_system_path': default_base_path,
             'downloader_size_mb_limit': 100,
             'downloader_process_limit': 300,
             'downloader_timeout': 300,
@@ -46,17 +47,33 @@ class TestConfigReader(unittest.TestCase):
             }}
         })
 
+    def test_config_reader___when_wrong_ini_file___returns_default_values(self):
+        self.assertRaises(configparser.Error, lambda: self.assertConfig("test/integration/fixtures/wrong_ini_file.ini", {}))
+
     def test_databases___with_single_db_ini___returns_single_db_only(self):
-        self.assertEqual(self.databases("test/integration/fixtures/single_db.ini"), {'single': {
+        self.assertEqual(databases("test/integration/fixtures/single_db.ini"), {'single': {
             'db_url': 'https://single.com',
             'section': 'single',
         }})
 
+    def test_databases___with_single_db_ini_with_correct_options___returns_single_db_only_with_all_options(self):
+        self.assertEqual(databases("test/integration/fixtures/single_db_with_correct_options.ini"), {'single': {
+            'db_url': 'https://single.com',
+            'options': db_options().testable,
+            'section': 'single',
+        }})
+
+    def test_databases___with_single_db_ini_with_incorrect_base_path___raises_invalid_config_parameter(self):
+        self.assertRaises(InvalidConfigParameter, lambda: databases("test/integration/fixtures/single_db_with_incorrect_base_path.ini"))
+
+    def test_databases___with_single_db_ini_with_incorrect_downloader_timeout___raises_invalid_config_parameter(self):
+        self.assertRaises(InvalidConfigParameter, lambda: databases("test/integration/fixtures/single_db_with_incorrect_downloader_timeout.ini"))
+
     def test_databases___with_repeated_db_ini___raises_invalid_config_parameter_exception(self):
-        self.assertRaises(InvalidConfigParameter, lambda: self.databases("test/integration/fixtures/repeated_db.ini"))
+        self.assertRaises(InvalidConfigParameter, lambda: databases("test/integration/fixtures/repeated_db.ini"))
 
     def test_databases___with_dobule_db_ini___returns_dobule_db_only(self):
-        self.assertEqual(self.databases("test/integration/fixtures/double_db.ini"), {'single': {
+        self.assertEqual(databases("test/integration/fixtures/double_db.ini"), {'single': {
             'db_url': 'https://single.com',
             'section': 'single',
         }, 'double': {
@@ -107,7 +124,7 @@ class TestConfigReader(unittest.TestCase):
         })
 
     def test_config_reader___with_db_and_distrib_empty_section_1___returns_one_db_and_defult_distrib(self):
-        self.assertEqual(self.databases("test/integration/fixtures/db_plus_distrib_empty_section_1.ini"),
+        self.assertEqual(databases("test/integration/fixtures/db_plus_distrib_empty_section_1.ini"),
                          {'distribution_mister': {
                              'db_url': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
                              'section': 'distribution_mister',
@@ -117,7 +134,7 @@ class TestConfigReader(unittest.TestCase):
                          }, })
 
     def test_config_reader___with_db_and_distrib_empty_section_2___returns_one_db_and_defult_distrib(self):
-        self.assertEqual(self.databases("test/integration/fixtures/db_plus_distrib_empty_section_2.ini"), {'one': {
+        self.assertEqual(databases("test/integration/fixtures/db_plus_distrib_empty_section_2.ini"), {'one': {
             'db_url': 'https://one.com',
             'section': 'one',
         }, 'distribution_mister': {
@@ -127,7 +144,7 @@ class TestConfigReader(unittest.TestCase):
 
     def test_config_reader___with_db_and_random_empty_section_2___raises_exception(self):
         self.assertRaises(Exception,
-                          lambda: self.databases("test/integration/fixtures/db_plus_random_empty_section.ini"))
+                          lambda: databases("test/integration/fixtures/db_plus_random_empty_section.ini"))
 
     def assertConfig(self, path, config_vars):
         actual = ConfigReader().read_config(path)
@@ -145,7 +162,15 @@ class TestConfigReader(unittest.TestCase):
 
         self.assertGreater(vars_count, 0, "No valid config_vars have been provided.")
         self.assertEqual(len(config_vars), vars_count, "Some config_vars were misspelled.")
-        self.assertEqual(actual, expected)
+        self.assertEqual(expected, actual)
 
-    def databases(self, path):
-        return ConfigReader().read_config(path)['databases']
+
+def databases(path):
+    return {k: testable(v) for k, v in (ConfigReader().read_config(path)['databases'].items())}
+
+
+def testable(db):
+    if 'options' in db:
+        db['options'] = db['options'].testable
+
+    return db

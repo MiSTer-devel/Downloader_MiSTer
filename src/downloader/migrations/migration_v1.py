@@ -15,18 +15,25 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from .store_migrator import MigrationBase
+
+from downloader.store_migrator import MigrationBase
 
 
-class MigrationV4(MigrationBase):
-    version = 4
+class MigrationV1(MigrationBase):
+    version = 1
 
     def migrate(self, local_store):
+        """create 'dbs' field"""
 
-        #
-        # database ids to lowercase
-        #
-        wrong_ids = [db_id for db_id, store in local_store['dbs'].items() if db_id.lower() != db_id]
+        db_ids = list(local_store.keys())
+        dbs = dict()
+        for db_id in db_ids:
+            dbs[db_id] = local_store[db_id]
+            local_store.pop(db_id)
 
-        for db_id in wrong_ids:
-            local_store['dbs'][db_id.lower()] = local_store['dbs'].pop(db_id)
+        local_store['dbs'] = dbs
+
+        """create 'zips' fields"""
+
+        for db_id in local_store['dbs']:
+            local_store['dbs'][db_id]['zips'] = dict()

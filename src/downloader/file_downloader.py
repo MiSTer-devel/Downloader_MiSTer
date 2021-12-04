@@ -24,8 +24,8 @@ import urllib.request
 import time
 from abc import ABC, abstractmethod
 
-from .constants import file_MiSTer, file_MiSTer_new
-from .logger import SilentLogger
+from downloader.constants import file_MiSTer, file_MiSTer_new
+from downloader.logger import SilentLogger
 
 
 class FileDownloaderFactory(ABC):
@@ -257,8 +257,10 @@ class _CurlCustomParallelDownloader(CurlDownloaderAbstract):
         self._processes.append(result)
         self._files.append(file)
 
-        if self._acc_size > (1000 * 1000 * self._config['downloader_size_mb_limit']) or len(self._processes) > \
-                self._config['downloader_process_limit']:
+        more_accumulated_size_than_limit = self._acc_size > (1000 * 1000 * self._config['downloader_size_mb_limit'])
+        more_processes_than_limit = len(self._processes) > self._config['downloader_process_limit']
+
+        if more_accumulated_size_than_limit or more_processes_than_limit:
             self._wait()
 
     def _wait(self):

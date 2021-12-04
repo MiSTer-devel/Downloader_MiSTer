@@ -17,9 +17,11 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import subprocess
+import sys
+if 'unittest' in sys.modules.keys():
+    import inspect
 from pathlib import Path
-from .constants import file_MiSTer
+from downloader.constants import file_MiSTer
 
 
 def empty_store():
@@ -63,26 +65,23 @@ def format_files_message(file_list):
     return 'none.' if message == '' else message
 
 
-def run_successfully(command, logger):
-    result = subprocess.run(command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-
-    stdout = result.stdout.decode()
-    stderr = result.stderr.decode()
-    if stdout.strip():
-        logger.print(stdout)
-
-    if stderr.strip():
-        logger.print(stderr)
-
-    if result.returncode != 0:
-        raise Exception("subprocess.run %s Return Code was '%d'" % (command, result.returncode))
+_calling_test_only = False
 
 
-def run_stdout(command):
-    result = subprocess.run(command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+def test_only(func):
+    def wrapper(*args, **kwargs):
+        if 'unittest' not in sys.modules.keys():
+            raise Exception('Function "%s" can only be used during "unittest" runs.' % func.__name__)
 
-    if result.returncode != 0:
-        raise Exception("subprocess.run %s Return Code was '%d'" % (command, result.returncode)
-                        + '\n' + result.stdout.decode() + '\n' + result.stderr.decode())
+        stack = inspect.stack()
+        frame = stack[1]
+        global _calling_test_only
+        if not _calling_test_only and 'test' not in list(Path(frame.filename).parts):
+            raise Exception('Function "%s" can only be called directly from a test file.' % func.__name__)
 
-    return result.stdout.decode()
+        _calling_test_only = True
+        result = func(*args, **kwargs)
+        _calling_test_only = False
+        return result
+
+    return wrapper

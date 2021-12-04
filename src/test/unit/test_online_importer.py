@@ -36,16 +36,11 @@ class TestOnlineImporter(unittest.TestCase):
         sut = OnlineImporter()
         store = empty_store()
 
-        sut.add_db(db_test_being_empty_descr(), store)
-        sut.download(False)
-
-        self.assertReportsNothing(sut)
+        self.assertReportsNothing(sut.add_db(db_test_being_empty_descr(), store).download(False))
         self.assertEqualDict(store, empty_store())
 
     def test_download_dbs_contents___being_empty___does_nothing(self):
-        sut = OnlineImporter()
-        sut.download(False)
-        self.assertReportsNothing(sut)
+        self.assertReportsNothing(OnlineImporter().download(False))
 
     def test_download_dbs_contents___with_one_file___fills_store_with_that_file(self):
         sut = OnlineImporter()

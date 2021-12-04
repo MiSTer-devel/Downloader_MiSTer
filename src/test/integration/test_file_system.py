@@ -23,11 +23,12 @@ import os
 from pathlib import Path
 
 from downloader.constants import file_MiSTer
+from test.objects import temp_name
 from test.fake_file_system import make_production_filesystem
 from downloader.config import AllowDelete, default_config
 
-not_created_file = '/tmp/opened_file'
-empty_file = '/tmp/empty_file'
+not_created_file = temp_name() + '_opened_file'
+empty_file = temp_name() + '_empty_file'
 empty_file_hash = 'd41d8cd98f00b204e9800998ecf8427e'
 rbf_file = 'MyCore.RBF'
 foo_bar_json = {"foo": "bar"}

@@ -18,9 +18,11 @@
 
 from downloader.migrations import migrations
 from downloader.store_migrator import StoreMigrator as ProductionStoreMigrator
+from test.fake_file_system import FileSystem
 from test.fake_logger import NoLogger
 
 
 class StoreMigrator(ProductionStoreMigrator):
-    def __init__(self, maybe_migrations=None):
-        super().__init__(migrations() if maybe_migrations is None else maybe_migrations, NoLogger())
+    def __init__(self, maybe_migrations=None, file_system=None):
+        self.file_system = FileSystem() if file_system is None else file_system
+        super().__init__(migrations(self.file_system) if maybe_migrations is None else maybe_migrations, NoLogger())

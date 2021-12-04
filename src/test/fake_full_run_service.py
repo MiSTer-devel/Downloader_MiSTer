@@ -48,18 +48,25 @@ class FullRunService(ProductionFullRunService):
     @staticmethod
     def with_single_empty_db() -> ProductionFullRunService:
         config = default_config()
-        config.update({'databases': {db_empty: {
-                'db_url': db_empty,
-                'section': db_empty,
-                'base_files_url': '',
-                'zips': {}
-            }}, 'verbose': False, 'config_path': Path('')})
+        config.update({
+            'databases': {
+                db_empty: {
+                    'db_url': db_empty,
+                    'section': db_empty,
+                    'base_files_url': '',
+                    'zips': {}
+                }
+            },
+            'verbose': False,
+            'config_path': Path(''),
+            'user_defined_options': []
+        })
 
         db_gateway = DbGateway(config)
         db_gateway.file_system.test_data.with_file(db_empty, {'unzipped_json': {}})
 
         return FullRunService(
-            {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
+            {'COMMIT': 'test', 'UPDATE_LINUX': 'false', 'FAIL_ON_FILE_ERROR': 'true'},
             config,
             db_gateway,
         )
@@ -77,10 +84,11 @@ class FullRunService(ProductionFullRunService):
                     }
                 },
                 'verbose': False,
+                'user_defined_options': [],
                 'config_path': Path('')
             })
         return FullRunService(
-            {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
+            {'COMMIT': 'test', 'UPDATE_LINUX': 'false', 'FAIL_ON_FILE_ERROR': 'true'},
             config,
             DbGateway.with_single_db(db_id, db_descr, config=config),
         )
@@ -88,9 +96,9 @@ class FullRunService(ProductionFullRunService):
     @staticmethod
     def with_no_dbs() -> ProductionFullRunService:
         config = default_config()
-        config.update({'databases': {}, 'verbose': False, 'config_path': Path('')})
+        config.update({'databases': {}, 'verbose': False, 'config_path': Path(''), 'user_defined_options': []})
         return FullRunService(
-            {'COMMIT': 'test', 'UPDATE_LINUX': 'false'},
+            {'COMMIT': 'test', 'UPDATE_LINUX': 'false', 'FAIL_ON_FILE_ERROR': 'true'},
             config,
             DbGateway(config),
         )

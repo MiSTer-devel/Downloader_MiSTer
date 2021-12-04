@@ -21,9 +21,9 @@ import time
 import subprocess
 import traceback
 
-from .config import config_file_path
-from .logger import FileLogger
-from .full_run_service_factory import make_full_run_service
+from downloader.config import config_file_path
+from downloader.logger import FileLogger
+from downloader.full_run_service_factory import make_full_run_service
 
 
 def main(env):

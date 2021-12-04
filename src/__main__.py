@@ -31,7 +31,9 @@ if __name__ == '__main__':
         'UPDATE_LINUX': os.getenv('UPDATE_LINUX', 'true').lower(),
         'DEFAULT_DB_URL': os.getenv('DEFAULT_DB_URL', distribution_mister_db_url),
         'DEFAULT_DB_ID': os.getenv('DEFAULT_DB_ID', distribution_mister_db_id),
-        'DEBUG': os.getenv('DEBUG', 'false').lower()
+        'DEFAULT_BASE_PATH': os.getenv('DEFAULT_BASE_PATH', None),
+        'DEBUG': os.getenv('DEBUG', 'false').lower(),
+        'FAIL_ON_FILE_ERROR': os.getenv('FAIL_ON_FILE_ERROR', 'false')
     })
 
     exit(exit_code)

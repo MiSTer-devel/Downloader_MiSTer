@@ -22,16 +22,34 @@ import os
 import os.path
 from pathlib import Path
 from downloader.config import ConfigReader
-from test.objects import debug_env
+from downloader.constants import file_mister_downloader_needs_reboot
+from test.objects import debug_env, default_base_path
 from test.fake_logger import NoLogger
 import subprocess
 
 
 class TestSmallDbInstall(unittest.TestCase):
 
-    def test_small_db_parallel(self):
-        print('test_small_db_parallel')
-        self.assertRunOk("test/system/fixtures/small_db_install/small_db.ini")
+    def setUp(self) -> None:
+        try:
+            Path(file_mister_downloader_needs_reboot).unlink()
+        except FileNotFoundError as _:
+            pass
+
+    def test_small_db_1(self):
+        print('test_small_db_1')
+        self.assertRunOk("test/system/fixtures/small_db_install/small_db_1.ini")
+        self.assertTrue(os.path.isfile(file_mister_downloader_needs_reboot))
+
+    def test_small_db_2(self):
+        print('test_small_db_2')
+        self.assertRunOk("test/system/fixtures/small_db_install/small_db_2.ini")
+        self.assertFalse(os.path.isfile(file_mister_downloader_needs_reboot))
+
+    def test_small_db_3(self):
+        print('test_small_db_3')
+        self.assertRunOk("test/system/fixtures/small_db_install/small_db_3.ini")
+        self.assertFalse(os.path.isfile(file_mister_downloader_needs_reboot))
 
     def assertRunOk(self, ini_path):
         config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
@@ -46,6 +64,8 @@ class TestSmallDbInstall(unittest.TestCase):
         test_env = os.environ.copy()
         test_env['CURL_SSL'] = ''
         test_env['DEBUG'] = 'true'
+        test_env['FAIL_ON_FILE_ERROR'] = 'true'
+        test_env['DEFAULT_BASE_PATH'] = default_base_path
         result = subprocess.run([tool], stderr=subprocess.STDOUT, env=test_env)
         self.assertEqual(result.returncode, 0)
         self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json.zip" % config['base_system_path']))

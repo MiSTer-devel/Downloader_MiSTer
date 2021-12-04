@@ -42,22 +42,6 @@ Here is the format of the json DB file:
         // TO BE DOCUMENTED
     ],
   
-  
-    /**
-     * [Mandatory] Can be empty
-     */
-    "default_options": {
-        // TO BE DOCUMENTED
-    },
-  
-  
-    /**
-     * [Mandatory] Can be empty
-     */
-    "zips": {
-        // TO BE DOCUMENTED
-    },
-  
     /**
      * [Mandatory] Files to be downloaded
      */
@@ -108,7 +92,7 @@ Here is the format of the json DB file:
         "path/of/file_n.rbf": {
             "hash": "a4e99951f5033590e583afd1a66cb650",
             "size": 34234,
-        }
+        },
     },
   
   
@@ -128,7 +112,22 @@ Here is the format of the json DB file:
           * ... Same for other folders ...
           */
         "folder/path_n/": {}
-    }
+    },
+    
+    /**
+     * [Mandatory] Can be empty
+     */
+    "default_options": {
+        // Documented in the "Default Options" section of this page.
+    },
+  
+  
+    /**
+     * [Mandatory] Can be empty
+     */
+    "zips": {
+        // TO BE DOCUMENTED
+    },
 }
 ```
 
@@ -145,3 +144,42 @@ Once you published a collection with a given database ID, please stick to it whe
 1. The files and folders dictionary keys must be relative paths. They can not contain `..` nor be empty strings. They also can't point to common system folders, such as 'linux' or 'saves'. And finally, they can't be any system file such as: 'MiSTer', 'menu.rbf', 'MiSTer.ini' 
 
 2. Only fields documented here should be used.
+
+### Default Options
+
+_NOTE:_ First, I would like to remind you that the **global options** and their default values are documented [here](https://github.com/MiSTer-devel/Downloader_MiSTer#options).
+
+Databases can redefine the default option values that will apply to them. If they do so, these new default values will overshadow the global default values shown in that page linked above. You may refer to these definitions as "**database-scoped default options**" as opposed to "**global default options**".
+
+The options whose default values can be redefined as **database-scoped default options** are:
+- parallel_update
+- update_linux
+- downloader_size_mb_limit
+- downloader_process_limit
+- downloader_timeout
+- downloader_retries
+
+Since we are talking about default options, I'd like to remind that the default option values are only considered when users don't modify that value for that given option in the `downloader.ini` file.
+
+This is an example of how you would define **database-scoped default options** in the database file. In this case, only the default value of the option "_parallel_update_" will be changed:
+```js
+    "default_options": {
+        /**
+        * [Optional] Parallel Update (boolean). Should files be downloaded in parallel?
+         *           If missing, the global default value will be used.
+        */
+        "parallel_update": false
+    },
+```
+
+Additionally, users can define option values affecting only a concrete database. They will do it like this:
+
+```ini
+[your_section_id]
+db_url = 'https://url_to_db.json.zip'
+parallel_update = true
+```
+
+These option definitions are known as **database-scoped options**.
+
+Continuing the previous example, a user with that section in their `downloader.ini` file will make sure that he will always download files in parallel for that database, regardless of what the `default_options` field defines in the respective database file.

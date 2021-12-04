@@ -35,28 +35,35 @@ class TestOnlineImporterWithZips(unittest.TestCase):
         self.sut.download(False)
         return store
 
-    def test_download_zipped_contents___from_summary_and_contents___installs_zipped_file(self):
+    def test_download_zipped_cheats_folder_nes___from_summary_and_contents_when_file_count_threshold_is_surpassed___installs_from_zip_content(self):
         self.sut.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
+        store = self.download_zipped_cheats_folder_nes(from_zip_content=True)
+        self.assertEqual(store_with_unzipped_cheats_folder_nes_files(url=False), store)
 
-        store = self.download_zipped_contents(db_test_descr(zips={
-            cheats_folder_nes_zip_id: cheats_folder_nes_zip_desc(zipped_files={
+    def test_download_zipped_cheats_folder_nes___from_summary_and_contents_when_accumulated_mb_threshold_is_surpassed___installs_from_zip_content(self):
+        self.sut.config['zip_accumulated_mb_threshold'] = 0  # This will cause to unzip the contents
+        store = self.download_zipped_cheats_folder_nes(from_zip_content=True)
+        self.assertEqual(store_with_unzipped_cheats_folder_nes_files(url=False), store)
+
+    def test_download_zipped_cheats_folder_nes___from_summary_but_no_contents_because_thresholds_are_not_surpassed___installs_from_url(self):
+        store = self.download_zipped_cheats_folder_nes(from_zip_content=False)
+        self.assertEqual(store_with_unzipped_cheats_folder_nes_files(url=True), store)
+
+    def download_zipped_cheats_folder_nes(self, from_zip_content):
+        zipped_files = {
                 cheats_folder_nes_file_path: {
                     "hash": cheats_folder_nes_file_hash,
                     "size": cheats_folder_nes_file_size
                 }
-            }, unzipped_json=unzipped_json_with_cheats_folder_nes_file())
-        }), empty_store())
+            } if from_zip_content else None
 
-        self.assertReports([cheats_folder_nes_file_path])
-        self.assertEqual(store_with_unzipped_cheats_folder_nes_files(url=False), store)
-
-    def test_download_zipped_contents___from_summary_but_standard_download___downloads_file_from_summary(self):
         store = self.download_zipped_contents(db_test_descr(zips={
-            cheats_folder_nes_zip_id: cheats_folder_nes_zip_desc(unzipped_json=unzipped_json_with_cheats_folder_nes_file())
+            cheats_folder_nes_zip_id: cheats_folder_nes_zip_desc(zipped_files=zipped_files, unzipped_json=unzipped_json_with_cheats_folder_nes_file())
         }), empty_store())
 
         self.assertReports([cheats_folder_nes_file_path])
-        self.assertEqual(store_with_unzipped_cheats_folder_nes_files(), store)
+
+        return store
 
     def test_download_zipped_contents___on_existing_store_with_zips___removes_old_zip_id_and_inserts_new_one(self):
         self.sut.file_system.test_data\

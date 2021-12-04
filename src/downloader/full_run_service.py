@@ -20,8 +20,8 @@ import datetime
 import time
 import json
 
-from .importer_command import ImporterCommand
-from .other import format_files_message, empty_store
+from downloader.importer_command import ImporterCommand
+from downloader.other import format_files_message, empty_store
 
 
 class FullRunService:
@@ -49,7 +49,7 @@ class FullRunService:
 
         databases, failed_dbs = self._db_gateway.fetch_all(self._config['databases'])
 
-        importer_command = ImporterCommand(self._config)
+        importer_command = ImporterCommand(self._config, self._config['user_defined_options'])
         for db in databases:
             if db.db_id not in local_store['dbs']:
                 local_store['dbs'][db.db_id] = empty_store()
@@ -83,6 +83,11 @@ class FullRunService:
             self._logger.print('Linux is already on the latest version.')
             self._logger.print()
 
+        if self._env['FAIL_ON_FILE_ERROR'] == 'true' and len(self._online_importer.files_that_failed()) > 0:
+            self._logger.debug('Length of files_that_failed: %d' % len(self._online_importer.files_that_failed()))
+            self._logger.debug('Length of failed_dbs: %d' % len(failed_dbs))
+            return 1
+
         if len(failed_dbs) > 0:
             self._logger.debug('Length of failed_dbs: %d' % len(failed_dbs))
             return 1
@@ -93,14 +98,14 @@ class FullRunService:
         self._logger.debug('env: ' + json.dumps(self._env, indent=4))
         config = self._config.copy()
         config['config_path'] = str(config['config_path'])
-        self._logger.debug('config: ' + json.dumps(config, indent=4))
+        self._logger.debug('config: ' + json.dumps(config, default=lambda o: o.__dict__, indent=4))
 
     def _display_summary(self, installed_files, failed_files, start_time):
         run_time = str(datetime.timedelta(seconds=time.time() - start_time))[0:-4]
 
         self._logger.print()
         self._logger.print('===========================')
-        self._logger.print('Downloader 1.2 (%s) by theypsilon. Run time: %ss' % (self._env['COMMIT'], run_time))
+        self._logger.print('Downloader 1.3 (%s) by theypsilon. Run time: %ss' % (self._env['COMMIT'], run_time))
         self._logger.print('Log: %s' % self._local_repository.logfile_path)
         self._logger.print()
         self._logger.print('Installed:')

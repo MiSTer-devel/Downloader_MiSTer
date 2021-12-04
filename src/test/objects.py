@@ -19,8 +19,10 @@
 import unittest
 from pathlib import Path
 from downloader.constants import distribution_mister_db_id, distribution_mister_db_url, file_MiSTer_new
+from downloader.db_options import DbOptions, DbOptionsKind
 from test.fake_db_entity import DbEntity
 import copy
+import tempfile
 
 file_test_json_zip = 'test.json.zip'
 file_a = 'A'
@@ -43,11 +45,16 @@ cheats_folder_nes_file_size = 1020
 
 
 def file_test_json_zip_descr():
-    return {'hash': file_test_json_zip, 'unzipped_json': db_test_with_file_a_descr().to_dict()}
+    return {'hash': file_test_json_zip, 'unzipped_json': db_test_with_file_a_descr().testable}
 
 
 def db_test_being_empty_descr():
     return db_entity(db_id=db_test)
+
+
+def temp_name():
+    with tempfile.NamedTemporaryFile() as temp:
+        return temp.name
 
 
 def zip_desc(contents, path, source, zipped_files=None, unzipped_json=None, summary_hash=None, summary_size=None, contents_hash=None, contents_size=None):
@@ -155,7 +162,7 @@ def store_test_descr(zips=None, folders=None, files=None, db_files=None):
 
 
 def db_to_store(db):
-    raw_db = db.to_dict()
+    raw_db = db.testable
     return {
         "zips": raw_db["zips"],
         "folders": raw_db["folders"],
@@ -226,6 +233,23 @@ def raw_db_wrong_descr():
         'default_options': {},
         'timestamp': 0
     }
+
+
+def db_options(kind=None, base_path=None, parallel_update=None, update_linux=None, downloader_size_mb_limit=None, downloader_process_limit=None, downloader_timeout=None, downloader_retries=None):
+    raw_db_options = {
+        'parallel_update': False if parallel_update is None else parallel_update,
+        'update_linux': False if update_linux is None else update_linux,
+        'downloader_size_mb_limit': 5 if downloader_size_mb_limit is None else downloader_size_mb_limit,
+        'downloader_process_limit': 3 if downloader_process_limit is None else downloader_process_limit,
+        'downloader_timeout': 1 if downloader_timeout is None else downloader_timeout,
+        'downloader_retries': 100 if downloader_retries is None else downloader_retries,
+    }
+    kind = DbOptionsKind.INI_SECTION if kind is None else kind
+    if base_path is not None:
+        raw_db_options['base_path'] = base_path
+    elif kind == DbOptionsKind.INI_SECTION:
+        raw_db_options['base_path'] = '/media/usb0/'
+    return DbOptions(raw_db_options, kind)
 
 
 def file_mister_descr():
@@ -349,19 +373,20 @@ def _not_file(file):
     return file
 
 
+default_base_path = '/tmp/default_base_path/'
+
+
 def default_env():
     return {
         'DEFAULT_DB_URL': distribution_mister_db_url,
         'DEFAULT_DB_ID': distribution_mister_db_id,
+        'DEFAULT_BASE_PATH': default_base_path,
         'ALLOW_REBOOT': None,
         'DEBUG': 'false'
     }
 
 
 def debug_env():
-    return {
-        'DEFAULT_DB_URL': distribution_mister_db_url,
-        'DEFAULT_DB_ID': distribution_mister_db_id,
-        'ALLOW_REBOOT': None,
-        'DEBUG': 'true'
-    }
+    env = default_env()
+    env['DEBUG'] = 'true'
+    return env

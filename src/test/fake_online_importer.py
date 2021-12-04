@@ -28,7 +28,7 @@ class OnlineImporter(ProductionOnlineImporter):
     def __init__(self, file_downloader_factory=None, config=None, file_system=None):
         self.file_system = FileSystem() if file_system is None else file_system
         self.config = default_config() if config is None else config
-        self._importer_command = ImporterCommand(self.config)
+        self._importer_command = ImporterCommand(self.config, [])
         super().__init__(
             self.file_system,
             FileDownloaderFactory(self.config, self.file_system) if file_downloader_factory is None else file_downloader_factory,
@@ -36,6 +36,8 @@ class OnlineImporter(ProductionOnlineImporter):
 
     def download(self, full_resync):
         self.download_dbs_contents(self._importer_command, full_resync)
+        return self
 
     def add_db(self, db, store, description=None):
         self._importer_command.add_db(db, store, {} if description is None else description)
+        return self
