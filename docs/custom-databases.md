@@ -172,7 +172,7 @@ This is an example of how you would define **database-scoped default options** i
     },
 ```
 
-Additionally, users can define option values affecting only a concrete database. They will do it like this:
+Additionally, users can define option values affecting only a specific database. They will do it like this:
 
 ```ini
 [your_section_id]
