@@ -26,8 +26,9 @@ class DbGateway(ProductionDbGateway):
     def __init__(self, config=None, file_system=None, file_downloader_factory=None):
         self.file_system = FileSystem() if file_system is None else file_system
         super().__init__(
+            config,
             self.file_system,
-            FileDownloaderFactory(config=config, file_system=self.file_system) if file_downloader_factory is None else file_downloader_factory,
+            FileDownloaderFactory(file_system=self.file_system) if file_downloader_factory is None else file_downloader_factory,
             NoLogger())
 
     @staticmethod

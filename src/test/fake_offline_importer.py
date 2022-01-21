@@ -31,7 +31,7 @@ class OfflineImporter(ProductionOfflineImporter):
         self._importer_command = ImporterCommand(self.config, [])
         super().__init__(
             self.file_system,
-            FileDownloaderFactory(self.config, self.file_system) if file_downloader_factory is None else file_downloader_factory,
+            FileDownloaderFactory(self.file_system) if file_downloader_factory is None else file_downloader_factory,
             NoLogger())
 
     def apply(self):

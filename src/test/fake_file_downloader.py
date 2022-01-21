@@ -18,12 +18,11 @@
 
 from typing import List
 
-from downloader.constants import file_MiSTer
 from downloader.file_downloader import CurlDownloaderAbstract, FileDownloaderFactory as ProductionFileDownloaderFactory
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
+from downloader.target_path_repository import TargetPathRepository
 from test.fake_file_system import FileSystem
 from test.fake_logger import NoLogger
-from test.objects import file_MiSTer_new
 
 
 class TestDataCurlDownloader:
@@ -45,10 +44,10 @@ class TestDataCurlDownloader:
 
 class FileDownloader(CurlDownloaderAbstract):
     def __init__(self, config=None, file_system=None):
-        config = config if config is not None else {'curl_ssl': '', 'downloader_retries': 3}
+        config = config if config is not None else {'curl_ssl': '', 'downloader_retries': 3, 'url_safe_characters': {}}
         self.file_system = FileSystem() if file_system is None else file_system
         self.local_repository = ProductionLocalRepository(config, NoLogger(), self.file_system)
-        super().__init__(config, self.file_system, self.local_repository, NoLogger(), True)
+        super().__init__(config, self.file_system, self.local_repository, NoLogger(), True, TargetPathRepository(config, self.file_system))
         self._run_files = []
         self._problematic_files = dict()
         self._actual_description = dict()
@@ -68,11 +67,11 @@ class FileDownloader(CurlDownloaderAbstract):
             if file in self._actual_description:
                 description = self._actual_description[file]
             if file not in self._missing_files:
-                actual_file = file if file != file_MiSTer else file_MiSTer_new
                 if hasattr(self._file_system, 'test_data'):
-                    self._file_system.test_data.with_file(actual_file, description)
+                    self._file_system.test_data.with_file(target_path, description)
                 else:
-                    self._file_system.touch(actual_file)
+                    self._file_system.write_file_contents(target_path, 'This is a test file.') # Generates a file with hash: test.objects.hash_real_test_file
+
             self._http_oks.add(file)
         else:
             self._errors.add_print_report(file, '')
@@ -88,9 +87,8 @@ class FileDownloader(CurlDownloaderAbstract):
 
 
 class FileDownloaderFactory(ProductionFileDownloaderFactory):
-    def __init__(self, config=None, file_system=None):
-        self._config = config
+    def __init__(self, file_system=None):
         self._file_system = file_system
 
-    def create(self, parallel_update, silent=False, hash_check=True):
-        return FileDownloader(self._config, self._file_system)
+    def create(self, config, parallel_update, silent=False, hash_check=True):
+        return FileDownloader(config, self._file_system)

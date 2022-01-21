@@ -15,17 +15,17 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from typing import List
+from typing import List, Set
 import pathlib
 
 from downloader.constants import file_MiSTer
 from downloader.file_system import FileSystem as ProductionFileSystem
 from test.objects import file_a, file_a_descr, file_mister_descr, hash_MiSTer_old, file_test_json_zip, \
-    file_test_json_zip_descr
+    file_test_json_zip_descr, folder_a
 from test.fake_logger import NoLogger
 
 fake_temp_file = '/tmp/temp_file'
-
+first_fake_temp_file = '/tmp/temp_file0'
 
 class TestDataFileSystem:
     def __init__(self, files, folders):
@@ -41,9 +41,12 @@ class TestDataFileSystem:
             self._folders.add(f, True)
         return self
 
+    def with_folder_a(self):
+        return self.with_folders([folder_a])
+
     def with_file_a(self, description=None):
         self._files.add(file_a, description if description is not None else file_a_descr())
-        return self
+        return self.with_folder_a()
 
     def with_mister_binary(self, description=None):
         self._files.add(file_MiSTer, description if description is not None else file_mister_descr())
@@ -60,11 +63,23 @@ def make_production_filesystem(config) -> ProductionFileSystem:
     return ProductionFileSystem(config, NoLogger())
 
 
+class FakeTempFile:
+    def __init__(self, name):
+        self.name = name
+
+    def close(self):
+        pass
+
 class FileSystem(ProductionFileSystem):
-    def __init__(self):
+    def __init__(self, target_path_prefix=''):
         self._files = CaseInsensitiveDict()
         self._folders = CaseInsensitiveDict()
         self._system_paths = list()
+        self._removed_files = list()
+        self._removed_folders = list()
+        self._current_temp_file_index = 0
+        self._target_path_prefix = target_path_prefix
+        self._historic_paths = set()
 
     @property
     def test_data(self) -> TestDataFileSystem:
@@ -74,6 +89,18 @@ class FileSystem(ProductionFileSystem):
     def system_paths(self) -> List[str]:
         return self._system_paths.copy()
 
+    @property
+    def removed_files(self) -> List[str]:
+        return self._removed_files
+
+    @property
+    def removed_folders(self) -> List[str]:
+        return self._removed_folders
+
+    @property
+    def historic_paths(self) -> Set[str]:
+        return self._historic_paths
+
     def add_system_path(self, path):
         self._system_paths.append(path)
 
@@ -81,13 +108,16 @@ class FileSystem(ProductionFileSystem):
         return path
 
     def temp_file(self):
-        return fake_temp_file
+        result = fake_temp_file + str(self._current_temp_file_index)
+        self._current_temp_file_index += 1
+        self._historic_paths.add(result)
+        return FakeTempFile(result)
 
     def is_file(self, path):
         return self._files.has(path)
 
     def is_folder(self, path):
-        return True
+        return self._folders.has(path)
 
     def read_file_contents(self, path):
         if not self._files.has(path):
@@ -98,16 +128,23 @@ class FileSystem(ProductionFileSystem):
         if not self._files.has(path):
             self._files.add(path, {})
         self._files.get(path)['content'] = content
+        self._historic_paths.add(path)
 
     def touch(self, path):
         self._files.add(path, {'hash': path})
+        self._historic_paths.add(path)
 
     def move(self, source, target):
-        self._files.add(target, {'hash': target})
+        description = self._files.get(source)
+        self._files.add(target, description)
         self._files.pop(source)
+        self._historic_paths.add(source)
+        self._historic_paths.add(target)
 
     def copy(self, source, target):
         self._files.add(target, self._files.get(source))
+        self._historic_paths.add(source)
+        self._historic_paths.add(target)
 
     def hash(self, path):
         return self._files.get(path)['hash']
@@ -118,7 +155,15 @@ class FileSystem(ProductionFileSystem):
     def make_dirs_parent(self, path):
         self._folders.add(str(pathlib.Path(path).parent), True)
 
-    def folder_has_items(self, _path):
+    def folder_has_items(self, path):
+        path = path.lower()
+        for folder in self._folders.keys():
+            if folder != path and folder.startswith(path):
+                return True
+        path = path + '/'
+        for file in self._files.keys():
+            if file.startswith(path):
+                return True
         return False
 
     def folders(self):
@@ -126,13 +171,17 @@ class FileSystem(ProductionFileSystem):
 
     def remove_folder(self, path):
         self._folders.pop(path)
+        self._removed_folders.append(path)
 
     def download_target_path(self, path):
-        return path
+        if path.startswith('/tmp/'):
+            return path
+        return self._target_path_prefix + path
 
     def unlink(self, path):
         if self._files.has(path):
             self._files.pop(path)
+            self._removed_files.append(path)
 
     def delete_previous(self, file):
         pass
@@ -148,8 +197,10 @@ class FileSystem(ProductionFileSystem):
 
     def unzip_contents(self, file, target):
         file_description = self._files.get(file)
-        for path, description in file_description['zipped_files'].items():
-            self._files.add(path, {'hash': description['hash']})
+        for path in file_description['zipped_files']['folders']:
+            self._folders.add(path, {})
+        for path, description in file_description['zipped_files']['files'].items():
+            self._files.add(path, description)
         file_description.pop('zipped_files')
 
 

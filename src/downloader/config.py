@@ -76,6 +76,8 @@ def default_config():
         'downloader_retries': 3,
         'zip_file_count_threshold': 60,
         'zip_accumulated_mb_threshold': 100,
+        'filter': None,
+        'url_safe_characters': {},
         'verbose': False
     }
 
@@ -171,6 +173,10 @@ class ConfigReader:
             options['downloader_timeout'] = parser.get_int('downloader_timeout', None)
         if parser.has('downloader_retries'):
             options['downloader_retries'] = parser.get_int('downloader_retries', None)
+        if parser.has('filter'):
+            options['filter'] = parser.get_string('filter', None)
+        if parser.has('url_safe_characters'):
+            options['url_safe_characters'] = self._make_url_safe_characters_directory(parser.get_str_list('url_safe_characters', []))
 
         try:
             return DbOptions(options, kind=DbOptionsKind.INI_SECTION)
@@ -191,6 +197,8 @@ class ConfigReader:
         mister['downloader_process_limit'] = parser.get_int('downloader_process_limit', result['downloader_process_limit'])
         mister['downloader_timeout'] = parser.get_int('downloader_timeout', result['downloader_timeout'])
         mister['downloader_retries'] = parser.get_int('downloader_retries', result['downloader_retries'])
+        mister['filter'] = parser.get_string('filter', result['filter'])
+        mister['url_safe_characters'] = self._make_url_safe_characters_directory(parser.get_str_list('url_safe_characters', []))
 
         user_defined = []
         for key in mister:
@@ -200,6 +208,21 @@ class ConfigReader:
         mister['user_defined_options'] = user_defined
 
         result.update(mister)
+
+    def _make_url_safe_characters_directory(self, url_safe_characters_array):
+        result = {}
+        for part in url_safe_characters_array:
+            position = part.find(':')
+            if position == -1:
+                self._logger.print("ERROR: Character ':' has not been found!")
+                raise InvalidConfigParameter("url_safe_characters part '%s' has wrong format" % part)
+
+            domain = part[0:position]
+            safe_characters = part[position:]
+
+            result[domain] = safe_characters
+
+        return result
 
     def _default_db_config(self):
         return {

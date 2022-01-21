@@ -141,7 +141,7 @@ class TestFileSystem(unittest.TestCase):
         self.sut().write_file_contents(json_file, json.dumps(foo_bar_json))
         self.assertEqual(foo_bar_json.copy(), self.sut().load_dict_from_file(json_file))
 
-    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux")
+    @unittest.skipIf(sys.platform.startswith("win"), "requires Linux")
     def test_load_dict_from_file___on_zipped_json___returns_json_dict(self):
         zip_file = 'foo.json.zip'
         self.sut().save_json_on_zip(foo_bar_json.copy(), zip_file)

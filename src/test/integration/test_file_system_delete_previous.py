@@ -21,7 +21,7 @@ import tempfile
 import os
 from downloader.config import default_config
 from downloader.other import empty_store
-from test.objects import db_test_with_file, file_descr
+from test.objects import db_test_with_file, file_descr, hash_real_test_file
 from test.fake_online_importer import OnlineImporter
 from test.fake_file_system import make_production_filesystem
 
@@ -36,9 +36,10 @@ class TestFileSystemDeletePrevious(unittest.TestCase):
 
             file_system = self.file_system(tempdir)
             file_system.touch(self.ao486_old)
+            store = empty_store()
 
             sut = OnlineImporter(file_system=file_system)
-            sut.add_db(db_test_with_file(self.ao486_new, file_descr(delete=[True])), empty_store())
+            sut.add_db(db_test_with_file(self.ao486_new, file_descr(delete=[True], hash_code=hash_real_test_file)), store)
             sut.download(False)
 
             self.assertFalse(file_system.is_file(self.ao486_old))
@@ -109,7 +110,7 @@ class TestFileSystemDeletePrevious(unittest.TestCase):
 
     def run_delete_previous_on_mycore_3(self, file_system):
         sut = OnlineImporter(file_system=file_system)
-        sut.add_db(db_test_with_file(self.mycore_3, file_descr(delete=[True])), empty_store())
+        sut.add_db(db_test_with_file(self.mycore_3, file_descr(delete=[True], hash_code=hash_real_test_file)), empty_store())
         sut.download(False)
         self.assertTrue(file_system.is_file(self.mycore_3))
 

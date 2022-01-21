@@ -19,14 +19,17 @@
 import unittest
 
 from downloader.constants import file_MiSTer, file_MiSTer_new
+from downloader.target_path_repository import downloader_in_progress_postfix
+from test.fake_file_system import FileSystem
 from test.fake_file_downloader import FileDownloader
-from test.objects import file_menu_rbf, hash_menu_rbf, file_one, hash_one, hash_MiSTer
+from test.objects import file_menu_rbf, hash_menu_rbf, file_one, hash_one, hash_MiSTer, hash_big, file_big, \
+    hash_updated_big
 
 
 class TestFileDownloader(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.sut = FileDownloader()
+        self.sut = FileDownloader(file_system=FileSystem(target_path_prefix='installed/'))
 
     def test_download_nothing___from_scratch_no_issues___nothing_downloaded_no_errors(self):
         self.sut.download_files(False)
@@ -40,6 +43,16 @@ class TestFileDownloader(unittest.TestCase):
         self.sut.test_data.errors_at(file_one, 2)
         self.download_one()
         self.assertDownloaded([file_one], [file_one, file_one])
+
+    def test_download_big_file___when_big_file_already_present_with_different_hash___gets_downloaded_through_a_downloader_in_progress_file_and_then_correctly_installed(self):
+        installed_file = 'installed/' + file_big
+        downloader_in_progress_file = installed_file + downloader_in_progress_postfix
+        self.sut.file_system.test_data.with_file(installed_file, {'hash': hash_big})
+
+        self.download_big_file(hash_updated_big)
+        self.assertEqual(hash_updated_big, self.sut.file_system.hash(installed_file))
+        self.assertFalse(self.sut.file_system.is_file(downloader_in_progress_file))
+        self.assertIn(downloader_in_progress_file, self.sut.file_system.historic_paths)
 
     def test_download_files_one___from_scratch_could_not_download___return_errors(self):
         self.sut.test_data.errors_at(file_one)
@@ -91,6 +104,10 @@ class TestFileDownloader(unittest.TestCase):
 
     def download_one(self):
         self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_one}, file_one)
+        self.sut.download_files(False)
+
+    def download_big_file(self, hash_value):
+        self.sut.queue_file({'url': 'https://fake.com/huge', 'hash': hash_value, 'size': 100_000_000}, file_big)
         self.sut.download_files(False)
 
     def download_reboot(self):

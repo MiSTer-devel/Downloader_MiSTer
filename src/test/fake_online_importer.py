@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import default_config
+from downloader.file_filter import FileFilterFactory
 from downloader.importer_command import ImporterCommand
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
 from test.fake_file_downloader import FileDownloaderFactory
@@ -30,14 +31,32 @@ class OnlineImporter(ProductionOnlineImporter):
         self.config = default_config() if config is None else config
         self._importer_command = ImporterCommand(self.config, [])
         super().__init__(
+            FileFilterFactory(),
             self.file_system,
-            FileDownloaderFactory(self.config, self.file_system) if file_downloader_factory is None else file_downloader_factory,
+            FileDownloaderFactory(self.file_system) if file_downloader_factory is None else file_downloader_factory,
             NoLogger())
 
     def download(self, full_resync):
         self.download_dbs_contents(self._importer_command, full_resync)
+        for _, store, _ in self._importer_command.read_dbs():
+            self._clean_store(store)
+
         return self
 
     def add_db(self, db, store, description=None):
         self._importer_command.add_db(db, store, {} if description is None else description)
         return self
+
+    def download_db(self, db, store, full_resync=False):
+        self.add_db(db, store)
+        self.download(full_resync)
+        self._clean_store(store)
+        return store
+
+    @staticmethod
+    def _clean_store(store):
+        for zip_description in store['zips'].values():
+            if 'zipped_files' in zip_description['contents_file']:
+                zip_description['contents_file'].pop('zipped_files')
+            if 'unzipped_json' in zip_description['summary_file']:
+                zip_description['summary_file'].pop('unzipped_json')

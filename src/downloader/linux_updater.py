@@ -18,11 +18,13 @@
 
 import subprocess
 import json
+import sys
 from downloader.constants import file_downloader_needs_reboot_after_linux_update, file_MiSTer_version, file_Linux_7z
 
 
 class LinuxUpdater:
-    def __init__(self, file_system, file_downloader_factory, logger):
+    def __init__(self, config, file_system, file_downloader_factory, logger):
+        self._config = config
         self._file_downloader_factory = file_downloader_factory
         self._logger = logger
         self._file_system = file_system
@@ -71,7 +73,7 @@ class LinuxUpdater:
         self._logger.print('Latest linux version -> %s' % linux['version'][-6:])
         self._logger.print()
 
-        file_downloader = self._file_downloader_factory.create(parallel_update=False)
+        file_downloader = self._file_downloader_factory.create(self._config, parallel_update=False)
 
         file_downloader.queue_file(linux, linux_path)
         if not self._file_system.is_file(file_Linux_7z):
@@ -97,6 +99,7 @@ class LinuxUpdater:
 
     def _run_subprocesses(self, linux, linux_path):
         if self._file_system.is_file('/media/fat/linux/7za.gz'):
+            sys.stdout.flush()
             result = subprocess.run('gunzip "/media/fat/linux/7za.gz"', shell=True, stderr=subprocess.STDOUT)
             self._file_system.unlink('/media/fat/linux/7za.gz')
             if result.returncode != 0:
@@ -111,6 +114,7 @@ class LinuxUpdater:
             self._logger.print()
             return
 
+        sys.stdout.flush()
         result = subprocess.run('''
                 sync
                 RET_CODE=
@@ -154,6 +158,7 @@ class LinuxUpdater:
         self._logger.print("======================================================================================")
         self._logger.print()
 
+        sys.stdout.flush()
         result = subprocess.run('''
                     sync
                     mv -f "/media/fat/linux.update/files/linux/linux.img" "/media/fat/linux/linux.img.new"

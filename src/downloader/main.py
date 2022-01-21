@@ -20,6 +20,7 @@
 import time
 import subprocess
 import traceback
+import sys
 
 from downloader.config import config_file_path
 from downloader.logger import FileLogger
@@ -47,8 +48,10 @@ def execute_full_run(env, logger):
     if runner.needs_reboot():
         logger.print()
         logger.print("Rebooting in 10 seconds...")
+        sys.stdout.flush()
         time.sleep(2)
         logger.close_logfile()
+        sys.stdout.flush()
         time.sleep(4)
         subprocess.run(['sync'], shell=False, stderr=subprocess.STDOUT)
         time.sleep(4)

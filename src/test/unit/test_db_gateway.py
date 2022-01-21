@@ -20,7 +20,7 @@ import unittest
 from test.fake_file_downloader import FileDownloader
 from test.objects import db_test_descr, db_test
 from test.fake_db_gateway import DbGateway
-from test.fake_file_system import fake_temp_file, FileSystem
+from test.fake_file_system import first_fake_temp_file, FileSystem
 from test.factory_stub import FactoryStub
 
 http_db_url = 'https://this_is_my_uri.json.zip'
@@ -32,7 +32,7 @@ class TestDbGateway(unittest.TestCase):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
 
         fs = FileSystem()
-        factory = FactoryStub(FileDownloader(file_system=fs)).has(lambda fd: fd.test_data.brings_file(fake_temp_file, db_description))
+        factory = FactoryStub(FileDownloader(file_system=fs)).has(lambda fd: fd.test_data.brings_file(first_fake_temp_file, db_description))
 
         self.assertEqual(db_test_descr().testable, fetch_all(http_db_url, fs, factory))
 
@@ -48,7 +48,7 @@ class TestDbGateway(unittest.TestCase):
         self.assertEqual(None, fetch_all(http_db_url))
 
     def test_fetch_all___db_with_failing_http_uri___returns_none(self):
-        factory = FactoryStub(FileDownloader()).has(lambda fd: fd.test_data.errors_at(fake_temp_file))
+        factory = FactoryStub(FileDownloader()).has(lambda fd: fd.test_data.errors_at(first_fake_temp_file))
         self.assertEqual(None, fetch_all(http_db_url, factory=factory))
 
 

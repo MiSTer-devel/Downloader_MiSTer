@@ -1,4 +1,4 @@
-# Copyright (c) 2021 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,20 +16,15 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.migrations.migration_v1 import MigrationV1
-from downloader.migrations.migration_v2 import MigrationV2
-from downloader.migrations.migration_v3 import MigrationV3
-from downloader.migrations.migration_v4 import MigrationV4
-from downloader.migrations.migration_v5 import MigrationV5
-from downloader.migrations.migration_v6 import MigrationV6
+from downloader.store_migrator import MigrationBase
 
+class MigrationV6(MigrationBase):
+    def __init__(self, file_system):
+        self._file_system = file_system
 
-def migrations(file_system):
-    return [
-        MigrationV1(),
-        MigrationV2(),
-        MigrationV3(),
-        MigrationV4(),
-        MigrationV5(file_system),
-        MigrationV6(file_system)
-    ]
+    version = 6
+
+    def migrate(self, local_store):
+        """remove shadow masks folder because it might contain empty folders because of issue #7"""
+        """DISABLED: disabled because was considered detrimental. Check git history to see previous code. It's safe to disable."""
+        pass

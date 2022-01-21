@@ -18,7 +18,7 @@
 
 import unittest
 from downloader.other import empty_store
-from test.objects import db_test_with_file_a_descr, file_test_json_zip_descr, file_test_json_zip, file_a
+from test.objects import db_test_with_file_a, file_test_json_zip_descr, file_test_json_zip, file_a
 from test.fake_offline_importer import OfflineImporter
 
 
@@ -77,7 +77,7 @@ class TestOfflineImporter(unittest.TestCase):
 
         store = empty_store()
         store['offline_databases_imported'].append(file_test_json_zip)
-        self.sut.add_db(db_test_with_file_a_descr(), store)
+        self.sut.add_db(db_test_with_file_a(), store)
         self.sut.apply()
         self.assertFalse(file_a in store['files'])
         self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
@@ -98,7 +98,7 @@ class TestOfflineImporter(unittest.TestCase):
         self.assertTrue(self.sut.file_system.is_file(file_test_json_zip))
 
     def test_apply_offline_databases___when_db_id_is_uppercase___still_adds_db_file(self):
-        unzipped_json = db_test_with_file_a_descr().testable
+        unzipped_json = db_test_with_file_a().testable
         unzipped_json['db_id'] = 'TEST'
 
         self.sut.file_system.test_data\
@@ -109,7 +109,7 @@ class TestOfflineImporter(unittest.TestCase):
         self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
 
     def test_apply_offline_databases___when_db_id_is_not_there___does_nothing(self):
-        unzipped_json = db_test_with_file_a_descr().testable
+        unzipped_json = db_test_with_file_a().testable
         unzipped_json.pop('db_id')
 
         self.sut.file_system.test_data\
@@ -122,6 +122,6 @@ class TestOfflineImporter(unittest.TestCase):
 
     def apply_db_test_with_file_a(self):
         store = empty_store()
-        self.sut.add_db(db_test_with_file_a_descr(), store)
+        self.sut.add_db(db_test_with_file_a(), store)
         self.sut.apply()
         return store

@@ -39,7 +39,7 @@ class DbEntity:
 
         if 'zips' not in db_raw or not isinstance(db_raw['zips'], dict):
             self._raise_not_field('zips')
-        self.zips = db_raw['zips']
+        self.zips = self._create_zips(db_raw['zips'])
 
         if 'db_files' not in db_raw or not isinstance(db_raw['db_files'], list):
             self._raise_not_field('db_files')
@@ -65,6 +65,8 @@ class DbEntity:
             self._raise_not_field('base_files_url')
         self.base_files_url = db_raw['base_files_url']
 
+        self.tag_dictionary = db_raw['tag_dictionary'] if 'tag_dictionary' in db_raw and isinstance(db_raw['tag_dictionary'], dict) else {}
+
         self.linux = db_raw['linux'] if 'linux' in db_raw and isinstance(db_raw['linux'], dict) else None
 
         self.header = db_raw['header'] if 'header' in db_raw and isinstance(db_raw['header'], list) else None
@@ -74,6 +76,9 @@ class DbEntity:
             return DbOptions(options, kind=DbOptionsKind.DEFAULT_OPTIONS)
         except DbOptionsValidationException as e:
             raise DbEntityValidationException('ERROR: db "%s" has invalid default options [%s], contact the db maintainer.' % (self.db_id, e.fields_to_string()))
+
+    def _create_zips(self, zips):
+        return zips
 
     @property
     @test_only

@@ -65,6 +65,15 @@ class DbOptions:
             if not isinstance(props['downloader_retries'], int) or props['downloader_retries'] < 1:
                 raise DbOptionsValidationException(['downloader_retries'])
             present.add('downloader_retries')
+        if 'filter' in props:
+            if not isinstance(props['filter'], str):
+                raise DbOptionsValidationException(['filter'])
+            present.add('filter')
+        if 'url_safe_characters' in props:
+            if not isinstance(props['url_safe_characters'], dict):
+                raise DbOptionsValidationException(['url_safe_characters'])
+            present.add('url_safe_characters')
+
         if len(present) != len(props):
             raise DbOptionsValidationException([o for o in props if o not in present])
 

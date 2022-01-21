@@ -28,9 +28,9 @@ from test.fake_logger import NoLogger
 class LinuxUpdater(ProductionLinuxUpdater):
     def __init__(self, file_downloader_factory=None, file_system=None):
         self.file_system = FileSystem() if file_system is None else file_system
-        self.file_downloader_factory = FileDownloaderFactory(default_config(), self.file_system) if file_downloader_factory is None else file_downloader_factory
+        self.file_downloader_factory = FileDownloaderFactory(self.file_system) if file_downloader_factory is None else file_downloader_factory
         self._importer_command = ImporterCommand({}, [])
-        super().__init__(self.file_system, self.file_downloader_factory, NoLogger())
+        super().__init__(default_config(), self.file_system, self.file_downloader_factory, NoLogger())
 
     def add_db(self, db):
         self._importer_command.add_db(db, {}, {})

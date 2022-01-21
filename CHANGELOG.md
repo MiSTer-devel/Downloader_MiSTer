@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Version 1.4 - 2022-01-21
+
+### Added
+- Support for **custom download filters**: Users can now avoid installing files that they are not interested in. More info [here](docs/download-filters.md).
+
+### Changed
+- Fixing makedirs errors.
+- Improved backup handling when a file is downloaded but the hash is wrong.
+- Option url_safe_characters introduced (which is used at`urllib.parse.quote(safe)`). 
+- Better logging for `update_only_linux` and `update_linux=false`.
+- Output is stored in the correct order in the logs when a Linux Update happens.
+- Custom databases can now trigger sleeps through its header property.
+- Better log when a file has override protection and could be updated.
+- Other general improvements: optimizations, more test coverage, code cleanup...
+
 ## Version 1.3 - 2021-12-04
 
 ### Added
