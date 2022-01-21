@@ -15,34 +15,48 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-
+import time
 from downloader.constants import distribution_mister_db_id
+from downloader.file_filter import BadFileFilterPartException
 
 
 class _Session:
     def __init__(self):
         self.files_that_failed = []
         self.correctly_installed_files = []
+        self.new_files_not_overwritten = {}
         self.processed_files = {}
         self.needs_reboot = False
         self.dbs_folders = None
         self.stores_folders = None
 
+    def add_new_file_not_overwritten(self, db_id, file):
+        if db_id not in self.new_files_not_overwritten:
+            self.new_files_not_overwritten[db_id] = []
+        self.new_files_not_overwritten[db_id].append(file)
 
 class OnlineImporter:
-    def __init__(self, file_system, file_downloader_factory, logger):
+    def __init__(self, file_filter_factory, file_system, file_downloader_factory, logger):
+        self._file_filter_factory = file_filter_factory
         self._file_system = file_system
         self._file_downloader_factory = file_downloader_factory
         self._logger = logger
         self._session = _Session()
+        self._unused_filter_tags = []
 
     def download_dbs_contents(self, importer_command, full_resync):
         self._session.dbs_folders = set()
         self._session.stores_folders = set()
 
+        # TODO: Move the filter validation to earlier (before downloading dbs).
         for db, store, config in importer_command.read_dbs():
-            sub = _SubOnlineImporter(config, self._file_system, self._file_downloader_factory, self._logger, self._session)
-            sub.process_db_contents(db, store, full_resync)
+            self._print_db_header(db)
+            file_filter = self._create_file_filter(db, config)
+            sub1 = _SubOnlineImporter1(db, store, full_resync, config, self._file_system, self._file_downloader_factory, self._logger, self._session)
+            sub1.import_zip_summaries()
+            filtered_db = file_filter.create_filtered_db(db, store)
+            sub2 = _SubOnlineImporter2(filtered_db, store, full_resync, config, self._file_system, self._file_downloader_factory, self._logger, self._session)
+            sub2.process_db_contents()
 
         deleted_folder = False
 
@@ -62,8 +76,33 @@ class OnlineImporter:
 
             self._file_system.remove_folder(folder)
 
+        self._unused_filter_tags = self._file_filter_factory.unused_filter_parts()
+
+    def _print_db_header(self, db):
+        self._logger.print()
+        if db.header is not None:
+            self._logger.print('################################################################################')
+            for line in db.header:
+                if isinstance(line, float):
+                    time.sleep(line)
+                else:
+                    self._logger.print(line, end='')
+        else:
+            self._logger.print('################################################################################')
+            self._logger.print('SECTION: %s' % db.db_id)
+            self._logger.print()
+
+    def _create_file_filter(self, db, config):
+        try:
+            return self._file_filter_factory.create(db, config)
+        except BadFileFilterPartException as e:
+            raise WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e)))
+
     def files_that_failed(self):
         return self._session.files_that_failed
+
+    def unused_filter_tags(self):
+        return self._unused_filter_tags
 
     def correctly_installed_files(self):
         return self._session.correctly_installed_files
@@ -71,51 +110,131 @@ class OnlineImporter:
     def needs_reboot(self):
         return self._session.needs_reboot
 
+    def new_files_not_overwritten(self):
+        return self._session.new_files_not_overwritten
 
-class _SubOnlineImporter:
-    def __init__(self, config, file_system, file_downloader_factory, logger, session):
+class _SubOnlineImporter1:
+    def __init__(self, db, store, full_resync, config, file_system, file_downloader_factory, logger, session):
+        self._db = db
+        self._store = store
+        self._full_resync = full_resync
         self._config = config
         self._file_system = file_system
         self._file_downloader_factory = file_downloader_factory
         self._logger = logger
         self._session = session
 
-    def process_db_contents(self, db, store, full_resync):
-        self._print_db_header(db)
 
-        self._import_zip_summaries(db, store)
+    @staticmethod
+    def _remove_non_zip_fields(descriptions, removed_zip_ids):
+        for description in descriptions:
+            if 'zip_id' in description and description['zip_id'] in removed_zip_ids:
+                description.pop('zip_id')
+                if 'tags' in description:
+                    description.pop('tags')
 
-        self._create_folders(db, store)
+    def import_zip_summaries(self):
+        removed_zip_ids = [zip_id for zip_id in self._store['zips'] if zip_id not in self._db.zips]
+        for zip_id in removed_zip_ids:
+            self._store['zips'].pop(zip_id)
 
-        self._remove_missing_files(store['files'], db.files)
+        if len(removed_zip_ids) > 0:
+            self._remove_non_zip_fields(self._store['files'].values(), removed_zip_ids)
+            self._remove_non_zip_fields(self._store['folders'].values(), removed_zip_ids)
 
-        file_downloader = self._file_downloader_factory.create(self._config['parallel_update'])
-        file_downloader.set_base_files_url(db.base_files_url)
+        zip_ids_from_store = []
+        zip_ids_to_download = []
+
+        for zip_id in self._db.zips:
+            if zip_id in self._store['zips'] and self._store['zips'][zip_id]['summary_file']['hash'] == self._db.zips[zip_id]['summary_file']['hash']:
+                zip_ids_from_store.append(zip_id)
+            else:
+                zip_ids_to_download.append(zip_id)
+
+        if len(zip_ids_from_store) > 0:
+            self._db.files.update({path: fd for path, fd in self._store['files'].items() if
+                             'zip_id' in fd and fd['zip_id'] in zip_ids_from_store})
+            self._db.folders.update({path: fd for path, fd in self._store['folders'].items() if
+                               'zip_id' in fd and fd['zip_id'] in zip_ids_from_store})
+
+        if len(zip_ids_to_download) > 0:
+            summary_downloader = self._file_downloader_factory.create(self._config, self._config['parallel_update'])
+            zip_ids_by_temp_zip = dict()
+
+            for zip_id in zip_ids_to_download:
+                temp_zip = '/tmp/%s_summary.json.zip' % zip_id
+                zip_ids_by_temp_zip[temp_zip] = zip_id
+
+                summary_downloader.queue_file(self._db.zips[zip_id]['summary_file'], temp_zip)
+
+            summary_downloader.download_files(self._is_first_run())
+            self._logger.print()
+
+            for temp_zip in summary_downloader.correctly_downloaded_files():
+                summary = self._file_system.load_dict_from_file(temp_zip)
+                for file_path, file_description in summary['files'].items():
+                    self._db.files[file_path] = file_description
+                    if file_path in self._store['files']:
+                        self._store['files'][file_path] = file_description
+                self._db.folders.update(summary['folders'])
+
+                zip_id = zip_ids_by_temp_zip[temp_zip]
+                self._store['zips'][zip_id] = self._db.zips[zip_id]
+
+                self._file_system.unlink(temp_zip)
+
+            for temp_zip in summary_downloader.errors():
+                zip_id = zip_ids_by_temp_zip[temp_zip]
+                if zip_id in self._store['zips']:
+                    self._db.folders.update(self._store['zips'][zip_id]['folders'])
+                    self._db.files.update({path: fd for path, fd in self._store['files'].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids_from_store})
+
+            self._session.files_that_failed.extend(summary_downloader.errors())
+
+    def _is_first_run(self):
+        return len(self._store['files']) == 0
+
+
+class _SubOnlineImporter2:
+    def __init__(self, db, store, full_resync, config, file_system, file_downloader_factory, logger, session):
+        self._db = db
+        self._store = store
+        self._full_resync = full_resync
+        self._config = config
+        self._file_system = file_system
+        self._file_downloader_factory = file_downloader_factory
+        self._logger = logger
+        self._session = session
+
+    def process_db_contents(self):
+        self._create_folders()
+
+        self._remove_missing_files()
+
+        file_downloader = self._file_downloader_factory.create(self._config, self._config['parallel_update'])
+        file_downloader.set_base_files_url(self._db.base_files_url)
         needed_zips = dict()
 
-        for file_path in db.files:
-            self._assert_valid_path(file_path, db.db_id)
+        for file_path in self._db.files:
+            self._assert_valid_path(file_path)
 
             if file_path in self._session.processed_files:
                 self._logger.print('DUPLICATED: %s' % file_path)
                 self._logger.print('Already been processed by database: %s' % self._session.processed_files[file_path])
                 continue
 
-            file_description = db.files[file_path]
-
-            if not full_resync and file_path in store['files'] and \
-                    store['files'][file_path]['hash'] == file_description['hash'] and \
+            file_description = self._db.files[file_path]
+            if not self._full_resync and file_path in self._store['files'] and \
+                    self._store['files'][file_path]['hash'] == file_description['hash'] and \
                     self._should_not_download_again(file_path):
                 continue
 
-            if 'overwrite' in file_description and not file_description['overwrite'] and self._file_system.is_file(
-                    file_path):
+            if 'overwrite' in file_description and not file_description['overwrite'] and self._file_system.is_file(file_path):
                 if self._file_system.hash(file_path) != file_description['hash']:
-                    self._logger.print('%s is already present, and is marked to not be overwritten.' % file_path)
-                    self._logger.print('Delete the file first if you wish to update it.')
+                    self._session.add_new_file_not_overwritten(self._db.db_id, file_path)
                 continue
 
-            self._session.processed_files[file_path] = db.db_id
+            self._session.processed_files[file_path] = self._db.db_id
 
             if 'zip_id' in file_description:
                 zip_id = file_description['zip_id']
@@ -127,24 +246,27 @@ class _SubOnlineImporter:
             file_downloader.queue_file(file_description, file_path)
 
         if len(needed_zips) > 0:
-            self._import_zip_contents(db, store, needed_zips, file_downloader)
+            self._import_zip_contents(needed_zips, file_downloader)
 
-        file_downloader.download_files(self._is_first_run(store))
+        file_downloader.download_files(self._is_first_run())
 
         for file_path in file_downloader.errors():
-            if file_path in store['files']:
-                store['files'].pop(file_path)
+            if file_path in self._store['files']:
+                self._store['files'].pop(file_path)
 
         self._session.files_that_failed.extend(file_downloader.errors())
 
         for path in file_downloader.correctly_downloaded_files():
-            store['files'][path] = db.files[path]
+            description = self._db.files[path]
+            if 'tags' in description and 'zip_id' not in description:
+                description.pop('tags')
+            self._store['files'][path] = description
 
         self._session.correctly_installed_files.extend(file_downloader.correctly_downloaded_files())
 
         self._session.needs_reboot = self._session.needs_reboot or file_downloader.needs_reboot()
 
-    def _assert_valid_path(self, path, db_id):
+    def _assert_valid_path(self, path):
         if not isinstance(path, str):
             raise InvalidDownloaderPath(
                 "Path is not a string '%s', contact with the author of the database." % str(path))
@@ -157,74 +279,18 @@ class _SubOnlineImporter:
         if lower_path in invalid_paths():
             raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
 
-        if db_id != distribution_mister_db_id and lower_path in no_distribution_mister_invalid_paths():
+        if self._db.db_id != distribution_mister_db_id and lower_path in no_distribution_mister_invalid_paths():
             raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
 
         parts = lower_path.split('/')
         if '..' in parts or len(parts) == 0 or parts[0] in invalid_folders():
             raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
 
-    def _is_first_run(self, store):
-        return len(store['files']) == 0
+    def _is_first_run(self):
+        return len(self._store['files']) == 0
 
-    def _import_zip_summaries(self, db, store):
-        for zip_id in list(store['zips']):
-            if zip_id not in db.zips:
-                store['zips'].pop(zip_id)
-
-        zip_ids_from_store = []
-        zip_ids_to_download = []
-
-        for zip_id in db.zips:
-            if zip_id in store['zips'] and store['zips'][zip_id]['summary_file']['hash'] == db.zips[zip_id]['summary_file']['hash']:
-                zip_ids_from_store.append(zip_id)
-            else:
-                zip_ids_to_download.append(zip_id)
-
-        if len(zip_ids_from_store) > 0:
-            db.files.update({path: fd for path, fd in store['files'].items() if
-                             'zip_id' in fd and fd['zip_id'] in zip_ids_from_store})
-            db.folders.update({path: fd for path, fd in store['folders'].items() if
-                               'zip_id' in fd and fd['zip_id'] in zip_ids_from_store})
-
-        if len(zip_ids_to_download) > 0:
-            summary_downloader = self._file_downloader_factory.create(self._config['parallel_update'])
-            zip_ids_by_temp_zip = dict()
-
-            for zip_id in zip_ids_to_download:
-                temp_zip = '/tmp/%s_summary.json.zip' % zip_id
-                zip_ids_by_temp_zip[temp_zip] = zip_id
-
-                summary_downloader.queue_file(db.zips[zip_id]['summary_file'], temp_zip)
-
-            summary_downloader.download_files(self._is_first_run(store))
-            self._logger.print()
-
-            for temp_zip in summary_downloader.correctly_downloaded_files():
-                summary = self._file_system.load_dict_from_file(temp_zip)
-                for file_path, file_description in summary['files'].items():
-                    db.files[file_path] = file_description
-                    if file_path in store['files']:
-                        store['files'][file_path] = file_description
-                db.folders.update(summary['folders'])
-
-                zip_id = zip_ids_by_temp_zip[temp_zip]
-                if zip_id in store['zips']:
-                    store['zips'][zip_id]['summary_file']['hash'] = db.zips[zip_id]['summary_file']['hash']
-
-                self._file_system.unlink(temp_zip)
-
-            for temp_zip in summary_downloader.errors():
-                zip_id = zip_ids_by_temp_zip[temp_zip]
-                if zip_id in store['zips']:
-                    db.folders.update(store['zips'][zip_id]['folders'])
-                    db.files.update({path: fd for path, fd in store['files'].items() if
-                                     'zip_id' in fd and fd['zip_id'] in zip_ids_from_store})
-
-            self._session.files_that_failed.extend(summary_downloader.errors())
-
-    def _import_zip_contents(self, db, store, needed_zips, file_downloader):
-        zip_downloader = self._file_downloader_factory.create(self._config['parallel_update'])
+    def _import_zip_contents(self, needed_zips, file_downloader):
+        zip_downloader = self._file_downloader_factory.create(self._config, self._config['parallel_update'])
         zip_ids_by_temp_zip = dict()
         for zip_id in needed_zips:
             zipped_files = needed_zips[zip_id]
@@ -235,37 +301,37 @@ class _SubOnlineImporter:
             if less_file_count and less_accumulated_mbs:
                 for file_path in zipped_files['files']:
                     file_downloader.queue_file(zipped_files['files'][file_path], file_path)
-                store['zips'][zip_id] = db.zips[zip_id]
+                self._store['zips'][zip_id] = self._db.zips[zip_id]
             else:
                 temp_zip = '/tmp/%s_contents.zip' % zip_id
                 zip_ids_by_temp_zip[temp_zip] = zip_id
-                zip_downloader.queue_file(db.zips[zip_id]['contents_file'], temp_zip)
+                zip_downloader.queue_file(self._db.zips[zip_id]['contents_file'], temp_zip)
 
         if len(zip_ids_by_temp_zip) > 0:
-            zip_downloader.download_files(self._is_first_run(store))
+            zip_downloader.download_files(self._is_first_run())
             self._logger.print()
+            filtered_zip_data = self._store['filtered_zip_data'] if 'filtered_zip_data' in self._store else {}
             for temp_zip in sorted(zip_downloader.correctly_downloaded_files()):
                 zip_id = zip_ids_by_temp_zip[temp_zip]
-                path = db.zips[zip_id]['path']
-                contents = ', '.join(db.zips[zip_id]['contents'])
+                path = self._db.zips[zip_id]['path']
+                contents = ', '.join(self._db.zips[zip_id]['contents'])
                 self._logger.print('Unpacking %s at %s' % (contents, 'the root' if path == './' else path))
-                self._file_system.unzip_contents(temp_zip, db.zips[zip_id]['path'])
+                self._file_system.unzip_contents(temp_zip, self._db.zips[zip_id]['path'])
                 self._file_system.unlink(temp_zip)
-                file_downloader.mark_unpacked_zip(zip_id, db.zips[zip_id]['base_files_url'])
-                store['zips'][zip_id] = db.zips[zip_id]
+                file_downloader.mark_unpacked_zip(zip_id, self._db.zips[zip_id]['base_files_url'])
+                if zip_id in filtered_zip_data:
+                    for file_path in filtered_zip_data[zip_id]['files']:
+                        self._file_system.unlink(file_path)
+                    for folder_path in sorted(filtered_zip_data[zip_id]['folders'].keys(), key=len, reverse=True):
+                        if not self._file_system.is_folder(folder_path):
+                            continue
+                        if self._file_system.folder_has_items(folder_path):
+                            continue
+                        self._file_system.remove_folder(folder_path)
+
+                self._store['zips'][zip_id] = self._db.zips[zip_id]
             self._logger.print()
             self._session.files_that_failed.extend(zip_downloader.errors())
-
-    def _print_db_header(self, db):
-        self._logger.print()
-        if db.header is not None:
-            self._logger.print('################################################################################')
-            for line in db.header:
-                self._logger.print(line, end='')
-        else:
-            self._logger.print('################################################################################')
-            self._logger.print('SECTION: %s' % db.db_id)
-            self._logger.print()
 
     def _should_not_download_again(self, file_path):
         if not self._config['check_manually_deleted_files']:
@@ -273,21 +339,28 @@ class _SubOnlineImporter:
 
         return self._file_system.is_file(file_path)
 
-    def _create_folders(self, db, store):
-        for folder in db.folders:
-            self._assert_valid_path(folder, db.db_id)
+    def _create_folders(self):
+        for folder in self._db.folders:
+            self._assert_valid_path(folder)
             self._file_system.make_dirs(folder)
 
-        self._session.dbs_folders |= set(db.folders)
-        self._session.stores_folders |= set(store['folders'])
+        self._session.dbs_folders |= set(self._db.folders)
+        self._session.stores_folders |= set(self._store['folders'])
 
-        store['folders'] = db.folders
+        self._store['folders'] = self._db.folders
 
-    def _remove_missing_files(self, store_files, db_files):
+        for description in self._store['folders'].values():
+            if 'tags' in description and 'zip_id' not in description:
+                description.pop('tags')
+
+    def _remove_missing_files(self):
+        store_files, db_files = self._store['files'], self._db.files
+
         files_to_delete = [f for f in store_files if f not in db_files]
 
         for file_path in files_to_delete:
             self._file_system.unlink(file_path)
+
             if file_path in store_files:
                 store_files.pop(file_path)
 
@@ -296,6 +369,10 @@ class _SubOnlineImporter:
 
 
 class InvalidDownloaderPath(Exception):
+    pass
+
+
+class WrongDatabaseOptions(Exception):
     pass
 
 

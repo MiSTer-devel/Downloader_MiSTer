@@ -16,20 +16,23 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.migrations.migration_v1 import MigrationV1
-from downloader.migrations.migration_v2 import MigrationV2
-from downloader.migrations.migration_v3 import MigrationV3
-from downloader.migrations.migration_v4 import MigrationV4
-from downloader.migrations.migration_v5 import MigrationV5
-from downloader.migrations.migration_v6 import MigrationV6
+class TempFilesPool:
+    def __init__(self, file_system):
+        self._file_system = file_system
+        self._temp_files = []
 
+    def make_temp_file(self):
+        temp_file = self._file_system.temp_file()
+        self._temp_files.append(temp_file)
+        return temp_file.name
 
-def migrations(file_system):
-    return [
-        MigrationV1(),
-        MigrationV2(),
-        MigrationV3(),
-        MigrationV4(),
-        MigrationV5(file_system),
-        MigrationV6(file_system)
-    ]
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        self.cleanup()
+
+    def cleanup(self):
+        for temp_file in self._temp_files:
+            temp_file.close()
+        self._temp_files = []

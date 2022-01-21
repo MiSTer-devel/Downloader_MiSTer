@@ -72,16 +72,20 @@ class FullRunService:
 
         if not update_only_linux:
             self._display_summary(self._online_importer.correctly_installed_files(),
-                                  self._online_importer.files_that_failed() + failed_dbs, start_time)
+                                  self._online_importer.files_that_failed() + failed_dbs,
+                                  self._online_importer.unused_filter_tags(),
+                                  self._online_importer.new_files_not_overwritten(),
+                                  start_time)
 
         self._logger.print()
 
         if update_linux:
             self._linux_updater.update_linux(importer_command)
 
-        if update_only_linux and not self._linux_updater.needs_reboot():
-            self._logger.print('Linux is already on the latest version.')
-            self._logger.print()
+            if update_only_linux and not self._linux_updater.needs_reboot():
+                self._logger.print('Linux is already on the latest version.\n')
+        elif update_only_linux:
+            self._logger.print('update_linux is set to false, skipping...\n')
 
         if self._env['FAIL_ON_FILE_ERROR'] == 'true' and len(self._online_importer.files_that_failed()) > 0:
             self._logger.debug('Length of files_that_failed: %d' % len(self._online_importer.files_that_failed()))
@@ -100,19 +104,36 @@ class FullRunService:
         config['config_path'] = str(config['config_path'])
         self._logger.debug('config: ' + json.dumps(config, default=lambda o: o.__dict__, indent=4))
 
-    def _display_summary(self, installed_files, failed_files, start_time):
+    def _display_summary(self, installed_files, failed_files, unused_filter_tags, new_files_not_installed, start_time):
         run_time = str(datetime.timedelta(seconds=time.time() - start_time))[0:-4]
 
         self._logger.print()
         self._logger.print('===========================')
-        self._logger.print('Downloader 1.3 (%s) by theypsilon. Run time: %ss' % (self._env['COMMIT'], run_time))
+        self._logger.print('Downloader 1.4 (%s) by theypsilon. Run time: %ss' % (self._env['COMMIT'], run_time))
         self._logger.print('Log: %s' % self._local_repository.logfile_path)
+        if len(unused_filter_tags) > 0:
+            self._logger.print()
+            self._logger.print("Unused filter terms:")
+            if len(unused_filter_tags) != 1:
+                self._logger.print(format_files_message(unused_filter_tags) + " (Did you misspell them?)")
+            else:
+                self._logger.print(format_files_message(unused_filter_tags) + " (Did you misspell it?)")
+
         self._logger.print()
         self._logger.print('Installed:')
         self._logger.print(format_files_message(installed_files))
         self._logger.print()
         self._logger.print('Errors:')
         self._logger.print(format_files_message(failed_files))
+        if len(new_files_not_installed) == 0:
+            return
+
+        self._logger.print()
+        self._logger.print('Not installed due to overwrite protection:')
+        for db_id in new_files_not_installed:
+            self._logger.print(' •%s: %s' % (db_id, ', '.join(new_files_not_installed[db_id])))
+        self._logger.print()
+        self._logger.print(' * Delete any protected file that you wish to install, and run this again.')
 
     def needs_reboot(self):
         return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.needs_reboot())

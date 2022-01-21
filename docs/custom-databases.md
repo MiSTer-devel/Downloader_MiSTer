@@ -1,6 +1,8 @@
 # Custom Databases
 
-To add a custom DB to the Downloader, you need to add a new section at the bottom of `/media/fat/downloader.ini` which should read like this:
+This feature allows users to download more files than the ones present at the official [MiSTer Distribution repository](https://github.com/MiSTer-devel/Distribution_MiSTer).
+
+To use a custom DB to the Downloader, you only need to add a new section at the bottom of `/media/fat/downloader.ini` which should read like this:
 ```ini
 [your_section_id]
 db_url = 'https://url_to_db.json.zip'
@@ -8,7 +10,7 @@ db_url = 'https://url_to_db.json.zip'
 
 Where `your_section_id` should be replaced with the unique ID of the database you are adding (see the `db_id` field from the json for more details).
 
-Here is the format of the json DB file:
+On the other hand, database maintainers need to hang on that URL specified by the property `db_url`, a collection of links following this json format:
 ```js
 {
     /**

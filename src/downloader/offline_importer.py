@@ -81,7 +81,7 @@ class _SubOfflineImporter:
             self._logger.print()
 
     def _update_from_zips(self, db, store):
-        summary_downloader = self._file_downloader_factory.create(self._config['parallel_update'])
+        summary_downloader = self._file_downloader_factory.create(self._config, self._config['parallel_update'])
         zip_ids_by_temp_zip = dict()
 
         for zip_id in db.zips:

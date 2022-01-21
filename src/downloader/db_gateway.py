@@ -20,29 +20,31 @@ from pathlib import Path
 from itertools import chain
 
 from downloader.db_entity import DbEntity, DbEntityValidationException
+from downloader.temp_files_pool import TempFilesPool
 
 
 class DbGateway:
-    def __init__(self, file_system, file_downloader_factory, logger):
+    def __init__(self, config, file_system, file_downloader_factory, logger):
+        self._config = config
         self._file_system = file_system
         self._logger = logger
         self._file_downloader_factory = file_downloader_factory
 
     def fetch_all(self, descriptions):
 
-        descriptions_by_file, local_files, remote_files = self._categorize_files_on_db_url(descriptions)
+        with TempFilesPool(self._file_system) as temp_files_pool:
 
-        downloaded_files, download_errors = self._download_files(remote_files)
+            descriptions_by_file, local_files, remote_files = self._categorize_files_on_db_url(descriptions, temp_files_pool)
 
-        files_by_section = {descriptions_by_file[file]['section']: file for file in chain(downloaded_files, local_files)}
+            downloaded_files, download_errors = self._download_files(remote_files)
 
-        dbs, db_errors = self._read_dbs(descriptions, files_by_section)
+            files_by_section = {descriptions_by_file[file]['section']: file for file in chain(downloaded_files, local_files)}
 
-        self._cleanup_temp_files(descriptions_by_file)
+            dbs, db_errors = self._read_dbs(descriptions, files_by_section)
 
         return dbs, db_errors + self._identify_download_errors(download_errors, descriptions_by_file)
 
-    def _categorize_files_on_db_url(self, descriptions):
+    def _categorize_files_on_db_url(self, descriptions, temp_files_pool):
         descriptions_by_file = {}
         local_files = []
         remote_files = []
@@ -57,7 +59,7 @@ class DbGateway:
                 descriptions_by_file[db_url] = description
                 local_files.append(db_url)
             else:
-                temp = self._file_system.temp_file()
+                temp = temp_files_pool.make_temp_file()
                 descriptions_by_file[temp] = description
                 description[temp_marker] = True
                 self._logger.debug('Loading db from url: %s' % db_url)
@@ -66,7 +68,7 @@ class DbGateway:
         return descriptions_by_file, local_files, remote_files
 
     def _download_files(self, remote_files):
-        file_downloader = self._file_downloader_factory.create(parallel_update=True, silent=True, hash_check=False)
+        file_downloader = self._file_downloader_factory.create(self._config, parallel_update=True, silent=True, hash_check=False)
 
         for db_url, temp in remote_files:
             file_downloader.queue_file({"url": db_url, "hash": "ignore", "size": 0}, temp)
@@ -92,11 +94,6 @@ class DbGateway:
                 errors.append(description['db_url'])
 
         return dbs, errors
-
-    def _cleanup_temp_files(self, descriptions_by_file):
-        for file, description in descriptions_by_file.items():
-            if temp_marker in description:
-                self._file_system.unlink(file)
 
     def _identify_download_errors(self, download_errors, descriptions_by_file):
         errors = [descriptions_by_file[file]['db_url'] for file in download_errors]

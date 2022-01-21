@@ -19,6 +19,7 @@
 from downloader.config import ConfigReader
 from downloader.db_gateway import DbGateway
 from downloader.file_downloader import make_file_downloader_factory
+from downloader.file_filter import FileFilterFactory
 from downloader.file_system import FileSystem
 from downloader.full_run_service import FullRunService
 from downloader.linux_updater import LinuxUpdater
@@ -43,11 +44,12 @@ def make_full_run_service(env, logger, ini_path):
 
     logger.set_local_repository(local_repository)
 
-    file_downloader_factory = make_file_downloader_factory(config, file_system, local_repository, logger)
-    db_gateway = DbGateway(file_system, file_downloader_factory, logger)
+    file_filter_factory = FileFilterFactory()
+    file_downloader_factory = make_file_downloader_factory(file_system, local_repository, logger)
+    db_gateway = DbGateway(config, file_system, file_downloader_factory, logger)
     offline_importer = OfflineImporter(file_system, file_downloader_factory, logger)
-    online_importer = OnlineImporter(file_system, file_downloader_factory, logger)
-    linux_updater = LinuxUpdater(file_system, file_downloader_factory, logger)
+    online_importer = OnlineImporter(file_filter_factory, file_system, file_downloader_factory, logger)
+    linux_updater = LinuxUpdater(config, file_system, file_downloader_factory, logger)
     store_migrator = StoreMigrator(migrations(file_system), logger)
 
     return FullRunService(

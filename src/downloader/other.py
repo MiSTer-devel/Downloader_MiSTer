@@ -18,6 +18,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import sys
+import urllib
+from urllib.parse import urlparse
+
 if 'unittest' in sys.modules.keys():
     import inspect
 from pathlib import Path
@@ -31,6 +34,15 @@ def empty_store():
         'files': {},
         'offline_databases_imported': []
     }
+
+
+def sanitize_url(input_url, safe_characters):
+    url_domain = urlparse(input_url).netloc
+    url_parts = input_url.split(url_domain)
+    url_end_part = urllib.parse.quote(url_parts[1], safe=safe_characters[url_domain]) if url_domain in safe_characters\
+        else urllib.parse.quote(url_parts[1])
+    url = url_parts[0] + url_domain + url_end_part
+    return url
 
 
 def format_files_message(file_list):
@@ -85,3 +97,12 @@ def test_only(func):
         return result
 
     return wrapper
+
+
+class ClosableValue:
+    def __init__(self, value, callback):
+        self.value = value
+        self._callback = callback
+
+    def close(self):
+        self._callback()

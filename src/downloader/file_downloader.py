@@ -19,38 +19,37 @@
 import shlex
 import subprocess
 import sys
-from urllib.parse import quote, urlparse
-import urllib.request
 import time
 from abc import ABC, abstractmethod
 
 from downloader.constants import file_MiSTer, file_MiSTer_new
 from downloader.logger import SilentLogger
+from downloader.other import sanitize_url
+from downloader.target_path_repository import TargetPathRepository
 
 
 class FileDownloaderFactory(ABC):
     @abstractmethod
-    def create(self, parallel_update, silent=False, hash_check=True):
+    def create(self, config, parallel_update, silent=False, hash_check=True):
         """Created a Parallel or Serial File Downloader"""
 
 
-def make_file_downloader_factory(config, file_system, local_repository, logger):
-    return _FileDownloaderFactoryImpl(config, file_system, local_repository, logger)
+def make_file_downloader_factory(file_system, local_repository, logger):
+    return _FileDownloaderFactoryImpl(file_system, local_repository, logger)
 
 
 class _FileDownloaderFactoryImpl(FileDownloaderFactory):
-    def __init__(self, config, file_system, local_repository, logger):
-        self._config = config
+    def __init__(self, file_system, local_repository, logger):
         self._file_system = file_system
         self._local_repository = local_repository
         self._logger = logger
 
-    def create(self, parallel_update, silent=False, hash_check=True):
+    def create(self, config, parallel_update, silent=False, hash_check=True):
         logger = SilentLogger(self._logger) if silent else self._logger
         if parallel_update:
-            return _CurlCustomParallelDownloader(self._config, self._file_system, self._local_repository, logger, hash_check)
+            return _CurlCustomParallelDownloader(config, self._file_system, self._local_repository, logger, hash_check, TargetPathRepository(config, self._file_system))
         else:
-            return _CurlSerialDownloader(self._config, self._file_system, self._local_repository, logger, hash_check)
+            return _CurlSerialDownloader(config, self._file_system, self._local_repository, logger, hash_check, TargetPathRepository(config, self._file_system))
 
 
 class FileDownloader(ABC):
@@ -84,12 +83,13 @@ class FileDownloader(ABC):
 
 
 class CurlDownloaderAbstract(FileDownloader):
-    def __init__(self, config, file_system, local_repository, logger, hash_check):
+    def __init__(self, config, file_system, local_repository, logger, hash_check, temp_files_registry):
         self._config = config
         self._file_system = file_system
         self._logger = logger
         self._local_repository = local_repository
         self._hash_check = hash_check
+        self._temp_files_registry = temp_files_registry
         self._curl_list = {}
         self._errors = _DownloadErrors(logger)
         self._http_oks = _HttpOks()
@@ -184,15 +184,17 @@ class CurlDownloaderAbstract(FileDownloader):
         self._logger.print('Checking hashes...')
 
         for path in self._http_oks.consume():
-            if not self._file_system.is_file(path if path != file_MiSTer else file_MiSTer_new):
+            if not self._file_system.is_file(self._temp_files_registry.access_target(path)):
                 self._errors.add_debug_report(path, 'Missing %s' % path)
                 continue
 
-            path_hash = self._file_system.hash(path if path != file_MiSTer else file_MiSTer_new)
+            path_hash = self._file_system.hash(self._temp_files_registry.access_target(path))
             if self._hash_check and path_hash != self._curl_list[path]['hash']:
                 self._errors.add_debug_report(path, 'Bad hash on %s (%s != %s)' % (path, self._curl_list[path]['hash'], path_hash))
+                self._temp_files_registry.clean_target(path)
                 continue
 
+            self._temp_files_registry.finish_target(path)
             self._logger.print('+', end='', flush=True)
             self._correct_downloads.append(path)
             if self._curl_list[path].get('reboot', False):
@@ -207,11 +209,9 @@ class CurlDownloaderAbstract(FileDownloader):
         if 'url' not in description:
             description['url'] = self._url_from_path(path)
 
-        url_domain = urlparse(description['url']).netloc
-        url_parts = description['url'].split(url_domain)
+        url = sanitize_url(description['url'], self._config['url_safe_characters'])
 
-        target_path = self._file_system.download_target_path(path if path != file_MiSTer else file_MiSTer_new)
-        url = url_parts[0] + url_domain + urllib.parse.quote(url_parts[1])
+        target_path = self._temp_files_registry.create_target(path, description)
 
         self._run(description, self._command(target_path, url), path)
 
@@ -242,8 +242,8 @@ class CurlDownloaderAbstract(FileDownloader):
 
 
 class _CurlCustomParallelDownloader(CurlDownloaderAbstract):
-    def __init__(self, config, file_system, local_repository, logger, hash_check):
-        super().__init__(config, file_system, local_repository, logger, hash_check)
+    def __init__(self, config, file_system, local_repository, logger, hash_check, temp_file_registry):
+        super().__init__(config, file_system, local_repository, logger, hash_check, temp_file_registry)
         self._processes = []
         self._files = []
         self._acc_size = 0
@@ -301,8 +301,8 @@ class _CurlCustomParallelDownloader(CurlDownloaderAbstract):
 
 
 class _CurlSerialDownloader(CurlDownloaderAbstract):
-    def __init__(self, config, file_system, local_repository, logger, hash_check):
-        super().__init__(config, file_system, local_repository, logger, hash_check)
+    def __init__(self, config, file_system, local_repository, logger, hash_check, temp_file_registry):
+        super().__init__(config, file_system, local_repository, logger, hash_check, temp_file_registry)
 
     def _run(self, description, command, file):
         result = subprocess.run(shlex.split(command), shell=False, stderr=subprocess.STDOUT)

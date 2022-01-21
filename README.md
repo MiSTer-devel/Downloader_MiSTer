@@ -64,21 +64,32 @@ downloader_retries = 3
 - [x] Initial Release
 - [x] [Cheats](https://gamehacking.org/mister/) fetching
 - [x] First-run optimisations
-- [ ] Configurable custom download filters
-- [ ] Handle duplicated `games` folders through symlinks (*GBA* <-> *GBA2P*, and *GAMEBOY* <-> *GAMEBOY2P*)
+- [x] Configurable custom download filters
+- [ ] Games folders resolution auto-detecting connected drives
 - [ ] Integration with *MiSTer* binary
 
 Check the [CHANGELOG](CHANGELOG.md) for more information about past releases.
 
+### Custom Download Filters
+
+With download filters, users will be able to opt-out from installing files that they don't want in their system, like for example, cheats or readme files.
+
+Example:
+
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/852246/149844707-fcbe0ce2-d4b2-4f15-96a5-74ec01d8d3de.png" /> 
+</p>
+<p align="center"><i>This filter will only install console cores, while avoiding all related cheats and documentation files.</i></p>
+
+More information about *Download Filters* [here](docs/download-filters.md).
+
 ### Custom Databases
 
-Custom databases give users the ability to download more file collections.
-
-Check the documentation [here](docs/custom-databases.md) for more information.
+*Custom Databases* give users the ability to download [more file collections](docs/custom-databases.md).
 
 ### Supporters+ shout-out!
 
-Antonio Villena
+Antonio Villena, Matt Hargett, MiSTerFPGA.co.uk and Visa-Valtteri Pimiä
 
 Thank you so much for supporting this project! If you would like to show up here, join us as **Supporter+** on Patreon:
 

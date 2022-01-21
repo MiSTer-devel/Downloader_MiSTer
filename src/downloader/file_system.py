@@ -25,6 +25,7 @@ import tempfile
 import re
 from pathlib import Path
 from downloader.config import AllowDelete
+from downloader.other import ClosableValue
 
 
 class FileSystem:
@@ -32,9 +33,18 @@ class FileSystem:
         self._config = config
         self._logger = logger
         self._system_paths = set()
+        self._unique_temp_filenames = set()
+        self._unique_temp_filenames.add(None)
 
     def temp_file(self):
-        return tempfile.NamedTemporaryFile(delete=False).name
+        return tempfile.NamedTemporaryFile(prefix='temp_file')
+
+    def unique_temp_filename(self):
+        name = None
+        while name in self._unique_temp_filenames:
+            name = os.path.join(tempfile._get_default_tempdir(), next(tempfile._get_candidate_names()))
+        self._unique_temp_filenames.add(name)
+        return ClosableValue(name, lambda: self._unique_temp_filenames.remove(name))
 
     def resolve(self, path):
         return str(Path(path).resolve())
@@ -60,7 +70,7 @@ class FileSystem:
         return Path(self._path(path)).touch()
 
     def move(self, source, target):
-        os.makedirs(str(Path(self._path(target)).parent), exist_ok=True)
+        self._makedirs(str(Path(self._path(target)).parent))
         os.replace(self._path(source), self._path(target))
 
     def copy(self, source, target):
@@ -70,10 +80,18 @@ class FileSystem:
         return hash_file(self._path(path))
 
     def make_dirs(self, path):
-        return os.makedirs(self._path(path), exist_ok=True)
+        return self._makedirs(self._path(path))
 
     def make_dirs_parent(self, path):
-        return os.makedirs(str(Path(self._path(path)).parent), exist_ok=True)
+        return self._makedirs(str(Path(self._path(path)).parent))
+
+    def _makedirs(self, target):
+        try:
+            os.makedirs(target, exist_ok=True)
+        except FileExistsError as e:
+            if e.errno == 17:
+                return
+            raise e
 
     def folder_has_items(self, path):
         result = False
@@ -109,6 +127,8 @@ class FileSystem:
             return True
 
         path = Path(self._path(file))
+        if not self.is_folder(str(path.parent)):
+            return
 
         regex = re.compile("^(.+_)[0-9]{8}([.][a-zA-Z0-9]+)$", )
         m = regex.match(path.name)
