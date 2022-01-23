@@ -22,27 +22,13 @@ On the other hand, database maintainers need to hang on that URL specified by th
 
     /**
      * [Mandatory] UNIX Epoch Time taken during the generation of this file (number)
-     *  Important: The system setting up this value should have the timezone configured correctly.
      *
      * Relevant utilities
      *  · date +%s
      *  · https://www.unixtimestamp.com/
      */
     "timestamp": 1636133398,
-  
-  
-    /**
-     * [Mandatory] Can be empty, the common initial part of all your URLs in this DB (string)
-     */
-    "base_files_url": "https://raw.githubusercontent.com/theypsilon/Downloader_MiSTer/",
-  
-  
-    /**
-     * [Mandatory] Can be empty
-     */
-    "db_files": [
-        // TO BE DOCUMENTED
-    ],
+        
   
     /**
      * [Mandatory] Files to be downloaded
@@ -67,11 +53,20 @@ On the other hand, database maintainers need to hang on that URL specified by th
           
           
             /**
-            * [Optional] Download source (string). If missing, it will be calculated with:
-            *            (base_files_url + the key of the file)
+            * [Mandatory if the top level field `base_files_url` is missing]
+            * [Optional otherwise]
+            *            Download source (string).
+            *            If this field is missing, it will be calculated with (`base_files_url` + the key of the file).
+            *            Or it will error if `base_files_url` is also missing.
             */
             "url": "https://url_to_db/path/of/file1.rbf",
-          
+
+            /**
+             * [Optional] List of tags or tag indexes associated with current file (list of strings OR list of numbers)
+             *            The download filters feature uses this to match this file.
+             *            Default value: empty list.
+             */
+            "tags": [],
           
             /**
             * [Optional] If there is a file already present in the path, should it be overwritten? (boolean)
@@ -106,7 +101,12 @@ On the other hand, database maintainers need to hang on that URL specified by th
           * The keys of the dictionary are the parent folders of the files you want to create.
           */
         "folder/path1/": {
-            // TO BE DOCUMENTED
+            /**
+             * [Optional] List of tags or tag indexes associated with current folder (list of strings OR list of numbers)
+             *            The download filters feature uses this to match this folder.
+             *            Default value: empty list.
+             */
+            "tags": [],
         },
       
       
@@ -116,8 +116,44 @@ On the other hand, database maintainers need to hang on that URL specified by th
         "folder/path_n/": {}
     },
     
+    //
+    // Following fields are optional and may be omitted. Database maintainers may achieve most use cases with the
+    // fields documented above. Feel free to stop reading the following documentation.
+    //
+    
     /**
-     * [Mandatory] Can be empty
+     * [Optional] The common initial part of all your URLs in this DB (string). It allows saving space in the database
+     *            file, if the initial part of the URL is redundant accross the entire database.
+     */
+    "base_files_url": "https://raw.githubusercontent.com/theypsilon/Downloader_MiSTer/",
+
+    /**
+     * [Optional] Defines a key-value map that links between tags and tag indexes. Tags are used by download filters.
+     *            They allow matching the files containing the tags specified by the filter terms.
+     *            Tag indexes are more efficient to use than whole tags, thus this dictionary allows better performance.
+     */
+    "tag_dictionary": {
+        /**
+          * The keys of the dictionary are the filter tags. They are matched against the terms introduced in the filters.
+          * The values of the dictionary are the term indexes. They must be integers.
+          * 
+          * Examples:
+          */
+        "sometag": 0,
+        "othertag": 1
+    }
+  
+  
+    /**
+     * [Optional] Local databases to import before fecthing the online databases.
+     *            During the local import, nothing is fetched. Only the local store is updated if the files
+     *            from the local databases matches with the files on the filesystem.
+     *            These loccal databases will be imported just once, then the file will be removed.
+     */
+    "db_files": [],
+        
+    /**
+     * [Optional] Databases can specify default options, like default filters, default url_safe_characters, etc... 
      */
     "default_options": {
         // Documented in the "Default Options" section of this page.
@@ -125,7 +161,7 @@ On the other hand, database maintainers need to hang on that URL specified by th
   
   
     /**
-     * [Mandatory] Can be empty
+     * [Optional] Databases can use ZIPs to download and install a big amount of files more efficiently.
      */
     "zips": {
         // TO BE DOCUMENTED

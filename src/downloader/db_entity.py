@@ -28,57 +28,24 @@ class DbEntity:
         if not isinstance(db_raw, dict):
             raise DbEntityValidationException('ERROR: db has incorrect format, contact the db maintainer if this error persists.')
 
-        if 'db_id' not in db_raw or not isinstance(db_raw['db_id'], str):
-            raise DbEntityValidationException(
-                'ERROR: db for section "%s" does not have "db_id", contact the db maintainer.' % section)
-        self.db_id = db_raw['db_id'].lower()
-
-        if self.db_id != section.lower():
-            raise DbEntityValidationException(
-                'ERROR: Section "%s" does not match database id "%s". Fix your INI file.' % (section,  self.db_id))
-
-        if 'zips' not in db_raw or not isinstance(db_raw['zips'], dict):
-            self._raise_not_field('zips')
-        self.zips = self._create_zips(db_raw['zips'])
-
-        if 'db_files' not in db_raw or not isinstance(db_raw['db_files'], list):
-            self._raise_not_field('db_files')
-        self.db_files = db_raw['db_files']
-
-        if 'default_options' not in db_raw or not isinstance(db_raw['default_options'], dict):
-            self._raise_not_field('default_options')
-        self.default_options = self._create_default_options(db_raw['default_options'])
-
-        if 'timestamp' not in db_raw or not isinstance(db_raw['timestamp'], int):
-            self._raise_not_field('timestamp')
-        self.timestamp = db_raw['timestamp']
-
-        if 'files' not in db_raw or not isinstance(db_raw['files'], dict):
-            self._raise_not_field('files')
-        self.files = db_raw['files']
-
-        if 'folders' not in db_raw or not isinstance(db_raw['folders'], dict):
-            self._raise_not_field('folders')
-        self.folders = db_raw['folders']
-
-        if 'base_files_url' not in db_raw or not isinstance(db_raw['base_files_url'], str):
-            self._raise_not_field('base_files_url')
-        self.base_files_url = db_raw['base_files_url']
-
-        self.tag_dictionary = db_raw['tag_dictionary'] if 'tag_dictionary' in db_raw and isinstance(db_raw['tag_dictionary'], dict) else {}
-
-        self.linux = db_raw['linux'] if 'linux' in db_raw and isinstance(db_raw['linux'], dict) else None
-
-        self.header = db_raw['header'] if 'header' in db_raw and isinstance(db_raw['header'], list) else None
-
-    def _create_default_options(self, options):
+        self.db_id = _mandatory(db_raw, 'db_id', lambda db_id, _: _create_db_id(db_id, section))
         try:
-            return DbOptions(options, kind=DbOptionsKind.DEFAULT_OPTIONS)
-        except DbOptionsValidationException as e:
-            raise DbEntityValidationException('ERROR: db "%s" has invalid default options [%s], contact the db maintainer.' % (self.db_id, e.fields_to_string()))
+            self._take_other_fields(db_raw)
+        except DbEntityValidationException as e:
+            raise DbEntityValidationException(str(e).replace('DB_ID', self.db_id))
 
-    def _create_zips(self, zips):
-        return zips
+    def _take_other_fields(self, db_raw):
+        self.timestamp = _mandatory(db_raw, 'timestamp', _guard(lambda v: isinstance(v, int)))
+        self.files = _mandatory(db_raw, 'files', _guard(lambda v: isinstance(v, dict)))
+        self.folders = _mandatory(db_raw, 'folders', _guard(lambda v: isinstance(v, dict)))
+
+        self.zips = _optional(db_raw, 'zips', _guard(lambda v: isinstance(v, dict)), {})
+        self.db_files = _optional(db_raw, 'db_files', _guard(lambda v: isinstance(v, list)), [])
+        self.default_options = _optional(db_raw, 'default_options', _create_default_options, DbOptions({}, DbOptionsKind.DEFAULT_OPTIONS))
+        self.base_files_url = _optional(db_raw, 'base_files_url', _guard(lambda v: isinstance(v, str)), '')
+        self.tag_dictionary = _optional(db_raw, 'tag_dictionary', _guard(lambda v: isinstance(v, dict)), {})
+        self.linux = _optional(db_raw, 'linux', _guard(lambda v: isinstance(v, dict)), None)
+        self.header = _optional(db_raw, 'header', _guard(lambda v: isinstance(v, list)), [])
 
     @property
     @test_only
@@ -91,9 +58,49 @@ class DbEntity:
             result.pop('header')
         return result
 
-    def _raise_not_field(self, field):
-        raise DbEntityValidationException('ERROR: db "%s" does not have "%s", contact the db maintainer.' % (self.db_id, field))
-
 
 class DbEntityValidationException(Exception):
     pass
+
+
+def _mandatory(raw, key, factory):
+    class _Error:
+        pass
+
+    result = _optional(raw, key, factory, _Error())
+    if isinstance(result, _Error):
+        raise DbEntityValidationException('ERROR: db "DB_ID" does not have "%s", contact the db maintainer.' % key)
+
+    return result
+
+
+def _optional(raw, key, factory, default):
+    if key not in raw:
+        return default
+
+    return factory(raw[key], key)
+
+
+def _create_db_id(db_id, section):
+    valid_id = _guard(lambda v: isinstance(v, str))(db_id, 'db_id').lower()
+
+    if valid_id != section.lower():
+        raise DbEntityValidationException('ERROR: Section "%s" does not match database id "%s". Fix your INI file.' % (section, valid_id))
+
+    return valid_id
+
+
+def _guard(predicate):
+    def func(v, k):
+        if predicate(v):
+            return v
+        else:
+            raise DbEntityValidationException('ERROR: db "DB_ID" does not have "%s", contact the db maintainer.' % k)
+    return func
+
+
+def _create_default_options(options, _):
+    try:
+        return DbOptions(options, kind=DbOptionsKind.DEFAULT_OPTIONS)
+    except DbOptionsValidationException as e:
+        raise DbEntityValidationException('ERROR: db "DB_ID" has invalid default options [%s], contact the db maintainer.' % e.fields_to_string())

@@ -80,7 +80,7 @@ class OnlineImporter:
 
     def _print_db_header(self, db):
         self._logger.print()
-        if db.header is not None:
+        if len(db.header) > 0:
             self._logger.print('################################################################################')
             for line in db.header:
                 if isinstance(line, float):
