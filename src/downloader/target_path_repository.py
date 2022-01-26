@@ -42,7 +42,7 @@ class TargetPathRepository:
         if not self._file_system.is_file(path):
             return path
 
-        if description['size'] <= 5_000_000:
+        if description['size'] <= 5000000:
             unique_temp_filename = self._file_system.unique_temp_filename()
             target_path = unique_temp_filename.value
             self._tempfiles[target_path] = unique_temp_filename
