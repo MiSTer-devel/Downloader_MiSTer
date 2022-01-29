@@ -25,7 +25,8 @@ from downloader.other import format_files_message, empty_store
 
 
 class FullRunService:
-    def __init__(self, env, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, store_migrator):
+    def __init__(self, env, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, store_migrator, base_path_relocator):
+        self._base_path_relocator = base_path_relocator
         self._store_migrator = store_migrator
         self._reboot_calculator = reboot_calculator
         self._linux_updater = linux_updater
@@ -52,7 +53,7 @@ class FullRunService:
         importer_command = ImporterCommand(self._config, self._config['user_defined_options'])
         for db in databases:
             if db.db_id not in local_store['dbs']:
-                local_store['dbs'][db.db_id] = empty_store()
+                local_store['dbs'][db.db_id] = empty_store(self._config['base_path'])
 
             store = local_store['dbs'][db.db_id]
             description = self._config['databases'][db.db_id]
@@ -63,6 +64,10 @@ class FullRunService:
         update_linux = self._env['UPDATE_LINUX'] != 'false' and self._config.get('update_linux', True)
 
         if not update_only_linux:
+            for relocation_package in self._base_path_relocator.relocating_base_paths(importer_command):
+                self._base_path_relocator.relocate_non_system_files(relocation_package)
+                self._local_repository.save_store(local_store)
+
             full_resync = not self._local_repository.has_last_successful_run()
 
             self._offline_importer.apply_offline_databases(importer_command)

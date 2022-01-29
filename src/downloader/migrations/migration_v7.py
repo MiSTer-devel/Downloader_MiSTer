@@ -1,4 +1,4 @@
-# Copyright (c) 2021 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,31 +15,16 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import distribution_mister_db_id
+
 from downloader.store_migrator import MigrationBase
 
 
-class MigrationV5(MigrationBase):
-    def __init__(self, file_system_factory):
-        self._file_system_factory = file_system_factory
+class MigrationV7(MigrationBase):
+    def __init__(self, config):
+        self._config = config
 
-    version = 5
+    version = 7
 
     def migrate(self, local_store):
-        """remove old mister from old location in case it exists"""
-
-        try:
-            file_system = self._file_system_factory.create_for_db_id(distribution_mister_db_id)
-        except KeyError as _:
-            return
-
-        migrate_file_mister_old(file_system)
-
-
-def migrate_file_mister_old(file_system):
-    file_MiSTer_old = 'Scripts/.config/downloader/MiSTer.old'
-
-    file_system.add_system_path(file_MiSTer_old)
-
-    if file_system.is_file(file_MiSTer_old):
-        file_system.unlink(file_MiSTer_old)
+        for store in local_store['dbs'].values():
+            store['base_path'] = self._config['base_path']

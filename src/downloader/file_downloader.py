@@ -34,22 +34,23 @@ class FileDownloaderFactory(ABC):
         """Created a Parallel or Serial File Downloader"""
 
 
-def make_file_downloader_factory(file_system, local_repository, logger):
-    return _FileDownloaderFactoryImpl(file_system, local_repository, logger)
+def make_file_downloader_factory(file_system_factory, local_repository, logger):
+    return _FileDownloaderFactoryImpl(file_system_factory, local_repository, logger)
 
 
 class _FileDownloaderFactoryImpl(FileDownloaderFactory):
-    def __init__(self, file_system, local_repository, logger):
-        self._file_system = file_system
+    def __init__(self, file_system_factory, local_repository, logger):
+        self._file_system_factory = file_system_factory
         self._local_repository = local_repository
         self._logger = logger
 
     def create(self, config, parallel_update, silent=False, hash_check=True):
         logger = SilentLogger(self._logger) if silent else self._logger
+        file_system = self._file_system_factory.create_for_config(config)
         if parallel_update:
-            return _CurlCustomParallelDownloader(config, self._file_system, self._local_repository, logger, hash_check, TargetPathRepository(config, self._file_system))
+            return _CurlCustomParallelDownloader(config, file_system, self._local_repository, logger, hash_check, TargetPathRepository(config, file_system))
         else:
-            return _CurlSerialDownloader(config, self._file_system, self._local_repository, logger, hash_check, TargetPathRepository(config, self._file_system))
+            return _CurlSerialDownloader(config, file_system, self._local_repository, logger, hash_check, TargetPathRepository(config, file_system))
 
 
 class FileDownloader(ABC):

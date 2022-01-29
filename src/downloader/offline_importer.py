@@ -21,16 +21,17 @@ from downloader.db_entity import DbEntity, DbEntityValidationException
 
 
 class OfflineImporter:
-    def __init__(self, file_system, file_downloader_factory, logger):
-        self._file_system = file_system
+    def __init__(self, file_system_factory, file_downloader_factory, logger):
+        self._file_system_factory = file_system_factory
         self._file_downloader_factory = file_downloader_factory
         self._logger = logger
 
     def apply_offline_databases(self, importer_command):
         for db, store, config in importer_command.read_dbs():
             for db_file in db.db_files:
-                sub = _SubOfflineImporter(config, self._file_system, self._file_downloader_factory, self._logger)
+                sub = _SubOfflineImporter(config, self._file_system_factory.create_for_db_id(db.db_id), self._file_downloader_factory, self._logger)
                 sub.update_store_from_offline_db(db.db_id, db_file, store)
+                store['base_path'] = config['base_path']
 
 
 class _SubOfflineImporter:

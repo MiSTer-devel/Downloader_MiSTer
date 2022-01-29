@@ -22,15 +22,15 @@ class ImporterCommand:
         self._user_defined_options = user_defined_options
         self._parameters = []
 
-    def add_db(self, db, store, description):
+    def add_db(self, db, store, ini_description):
         config = self._config.copy()
 
         for key, option in db.default_options.items():
             if key not in self._user_defined_options:
                 config[key] = option
 
-        if 'options' in description:
-            description['options'].apply_to_config(config)
+        if 'options' in ini_description:
+            ini_description['options'].apply_to_config(config)
 
         self._parameters.append((db, store, config))
         return self
