@@ -1,16 +1,15 @@
 # Custom Databases
 
-This feature allows users to download more files than the ones present at the official [MiSTer Distribution repository](https://github.com/MiSTer-devel/Distribution_MiSTer).
+This feature allows users to add additional update sources not present in the official [MiSTer Distribution repository](https://github.com/MiSTer-devel/Distribution_MiSTer).
 
-To use a custom DB to the Downloader, you only need to add a new section at the bottom of `/media/fat/downloader.ini` which should read like this:
+New repositories can be added to the bottom of `/media/fat/downloader.ini`:
 ```ini
-[your_section_id]
+[*custom_db_id*]
 db_url = 'https://url_to_db.json.zip'
 ```
+The `db_url` entry points to a JSON file that a maintainer has published. The `*custom_db_id*` entry must match the `db_id` of the JSON file.
 
-Where `your_section_id` should be replaced with the unique ID of the database you are adding (see the `db_id` field from the json for more details).
-
-On the other hand, database maintainers need to hang on that URL specified by the property `db_url`, a collection of links following this json format:
+The format of the aforementioned JSON file should be as follow:
 ```js
 {
     /**
@@ -169,27 +168,27 @@ On the other hand, database maintainers need to hang on that URL specified by th
 }
 ```
 
-The json file can be contained in a ZIP file. In that case, provide the URL of that file, which should end with the extension `*.json.zip`.
+A maintainer can compress their JSON file inside of a ZIP archive. If they choose to do so, the file must extension be: `*.json.zip`
 
-### Important note about the Database ID
+### Database IDs ["db_id"]
 
-It's very important to **NOT** change your database ID once you have published a collection for it. That ID is used by the downloader to track changes in files, and by changing it users could end up with duplicated files in the future, since name changes won't be detected. Also, you will bloat the local database of a user if you change this ID frequently, which would lead to a waste of space in the SD and to longer run times of the Downloader.
-
-Once you published a collection with a given database ID, please stick to it whenever you update that collection.
+Once a database has been published it's very important that it's ID is **NEVER** changed and persists through any modifications of the JSON file. The ID is used by the downloader to track changes and maintain it's database on the local system. Without the correct ID: duplicate files can appear and clean-up operations will not run.
 
 ### Restrictions
 
-1. The files and folders dictionary keys must be relative paths. They can not contain `..` nor be empty strings. They also can't point to common system folders, such as 'linux' or 'saves'. And finally, they can't be any system file such as: 'MiSTer', 'menu.rbf', 'MiSTer.ini' 
+1. The files and folders must use relative paths. They may not contain: `..` or empty strings, or point to any common system folders ['/linux' or '/saves'] or system files ['MiSTer', 'menu.rbf', 'MiSTer.ini']. 
 
 2. Only fields documented here should be used.
 
 ### Default Options
 
-_NOTE:_ First, I would like to remind you that the **global options** and their default values are documented [here](https://github.com/MiSTer-devel/Downloader_MiSTer#options).
-
-Databases can redefine the default option values that will apply to them. If they do so, these new default values will overshadow the global default values shown in that page linked above. You may refer to these definitions as "**database-scoped default options**" as opposed to "**global default options**".
-
-The options whose default values can be redefined as **database-scoped default options** are:
+Options for a repository can be defined in `/media/fat/downloader.ini` following the `db_url` entry. Here is an example that sets "_parallel_update_" option for the *custom_db_id* repository:
+```ini
+[*custom_db_id*]
+db_url = 'https://url_to_db.json.zip'
+parallel_update = true
+```
+The following options can be defined:
 - parallel_update
 - update_linux
 - downloader_size_mb_limit
@@ -197,9 +196,9 @@ The options whose default values can be redefined as **database-scoped default o
 - downloader_timeout
 - downloader_retries
 
-Since we are talking about default options, I'd like to remind that the default option values are only considered when users don't modify that value for that given option in the `downloader.ini` file.
+Using the same list: maintainers can also set new default options [for any users haven't set themselves] that will only apply to their repository; think of these as **database-scoped defaults**.
 
-This is an example of how you would define **database-scoped default options** in the database file. In this case, only the default value of the option "_parallel_update_" will be changed:
+Here is an example that sets the **database-scoped default** for the "_parallel_update_" option:
 ```js
     "default_options": {
         /**
@@ -210,14 +209,4 @@ This is an example of how you would define **database-scoped default options** i
     },
 ```
 
-Additionally, users can define option values affecting only a specific database. They will do it like this:
-
-```ini
-[your_section_id]
-db_url = 'https://url_to_db.json.zip'
-parallel_update = true
-```
-
-These option definitions are known as **database-scoped options**.
-
-Continuing the previous example, a user with that section in their `downloader.ini` file will make sure that he will always download files in parallel for that database, regardless of what the `default_options` field defines in the respective database file.
+Any option not set by a user or a maintainer will continue to use it's [global value](https://github.com/MiSTer-devel/Downloader_MiSTer#options).
