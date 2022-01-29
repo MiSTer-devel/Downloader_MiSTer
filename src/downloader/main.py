@@ -21,6 +21,7 @@ import time
 import subprocess
 import traceback
 import sys
+from pathlib import Path
 
 from downloader.config import config_file_path
 from downloader.logger import FileLogger
@@ -41,7 +42,7 @@ def main(env):
 
 
 def execute_full_run(env, logger):
-    runner = make_full_run_service(env, logger, config_file_path(env))
+    runner = make_full_run_service(env, logger, config_file_path(env, str(Path().resolve())))
 
     exit_code = runner.full_run()
 
