@@ -1,6 +1,7 @@
 {
   "dbs": {
     "distribution_mister": {
+      "base_path": "/media/fat/",
       "zips": {
         "cheats_folder_gameboy": {
           "base_files_url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/b97f3044bf75981be2382c54ecdc1258f7b0753d/",

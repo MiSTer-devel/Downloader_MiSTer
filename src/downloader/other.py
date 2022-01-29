@@ -27,8 +27,9 @@ from pathlib import Path
 from downloader.constants import file_MiSTer
 
 
-def empty_store():
+def empty_store(base_path):
     return {
+        'base_path': base_path,
         'zips': {},
         'folders': {},
         'files': {},

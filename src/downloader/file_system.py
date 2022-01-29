@@ -28,6 +28,30 @@ from downloader.config import AllowDelete
 from downloader.other import ClosableValue
 
 
+class FileSystemFactory:
+    def __init__(self, config, logger):
+        self._config = config
+        self._logger = logger
+
+    def create_for_db_id(self, db_id):
+        config = self._config.copy()
+
+        ini_description = self._config['databases'][db_id]
+
+        if 'options' in ini_description:
+            ini_description['options'].apply_to_config(config)
+
+        return FileSystem(config, self._logger)
+
+    def create_for_config(self, config):
+        return FileSystem(config, self._logger)
+
+    def create_for_base_path(self, config, base_path):
+        fs_config = config.copy()
+        fs_config['base_path'] = base_path
+        return FileSystem(fs_config, self._logger)
+
+
 class FileSystem:
     def __init__(self, config, logger):
         self._config = config
@@ -76,6 +100,11 @@ class FileSystem:
     def copy(self, source, target):
         return shutil.copyfile(self._path(source), self._path(target))
 
+    def copy_fast(self, source, target):
+        with open(self._path(source), 'rb') as fsource:
+            with open(self._path(target), 'wb') as ftarget:
+                shutil.copyfileobj(fsource, ftarget, length=1024 * 1024 * 4)
+
     def hash(self, path):
         return hash_file(self._path(path))
 
@@ -112,8 +141,8 @@ class FileSystem:
     def download_target_path(self, path):
         return self._path(path)
 
-    def unlink(self, path):
-        verbose = not path.startswith('/tmp/')
+    def unlink(self, path, verbose=True):
+        verbose = verbose and not path.startswith('/tmp/')
         if self._config['allow_delete'] != AllowDelete.ALL:
             if self._config['allow_delete'] == AllowDelete.OLD_RBF and path[-4:].lower() == ".rbf":
                 return self._unlink(path, verbose)

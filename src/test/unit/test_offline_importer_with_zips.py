@@ -17,8 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from downloader.other import empty_store
-from test.objects import file_test_json_zip, db_test_descr
+from test.objects import file_test_json_zip, db_test_descr, empty_test_store
 from test.zip_objects import cheats_folder_nes_file_hash, cheats_folder_nes_file_size, cheats_folder_nes_file_path, \
     cheats_folder_nes_folder_name, cheats_folder_zip_desc, store_with_unzipped_cheats, cheats_folder_id, \
     unzipped_summary_json_from_cheats_folder, cheats_folder_sms_file_path, cheats_folder_sms_file_hash, \
@@ -49,7 +48,7 @@ class TestOfflineImporterWithZips(unittest.TestCase):
         self.assertEqual(store_with_unzipped_cheats(url=False, online_database_imported=[file_test_json_zip]), store)
 
     def apply_db_test_with_cheats_folder_nes_zip(self):
-        store = empty_store()
+        store = empty_test_store()
         self.sut.add_db(db_test_descr(zips=cheats_folder_zip_desc(), db_files=[file_test_json_zip]), store)
         self.sut.apply()
         return store

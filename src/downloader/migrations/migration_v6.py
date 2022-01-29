@@ -18,9 +18,10 @@
 
 from downloader.store_migrator import MigrationBase
 
+
 class MigrationV6(MigrationBase):
-    def __init__(self, file_system):
-        self._file_system = file_system
+    def __init__(self, file_system_factory):
+        self._file_system_factory = file_system_factory
 
     version = 6
 

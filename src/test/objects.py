@@ -22,6 +22,7 @@ from pathlib import Path
 from downloader.config import default_config
 from downloader.constants import distribution_mister_db_id, distribution_mister_db_url, file_MiSTer_new
 from downloader.db_options import DbOptions, DbOptionsKind
+from downloader.other import empty_store
 from test.fake_db_entity import DbEntity
 import copy
 import tempfile
@@ -47,10 +48,20 @@ hash_big = 'big'
 hash_updated_big = 'updated_big'
 db_empty = 'empty'
 
+
+def empty_config():
+    return {}
+
+
+def config_test(base_path='/media/fat/'):
+    return {'databases': {db_test: {}}, 'base_path': base_path}
+
+
 def config_with_filter(filter_value):
     config = default_config()
     config['filter'] = filter_value
     return config
+
 
 def file_test_json_zip_descr():
     return {'hash': file_test_json_zip, 'unzipped_json': db_test_with_file_a().testable}
@@ -130,6 +141,7 @@ def store_test_descr(zips=None, folders=None, files=None, db_files=None):
 def db_to_store(db):
     raw_db = db.testable
     return {
+        "base_path": "/media/fat/",
         "zips": raw_db["zips"],
         "folders": raw_db["folders"],
         "files": raw_db["files"],
@@ -317,6 +329,10 @@ def db_with_folders(db_id, folders):
     if isinstance(folders, list):
         folders = {f: {} for f in folders}
     return db_entity(db_id=db_id, db_files=[db_id + '.json.zip'], folders=folders)
+
+
+def empty_test_store():
+    return empty_store(base_path='/media/fat/')
 
 
 def store_with_folders(db_id, folders):

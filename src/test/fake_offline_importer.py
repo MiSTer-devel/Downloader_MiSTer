@@ -20,7 +20,7 @@ from downloader.config import default_config
 from downloader.importer_command import ImporterCommand
 from downloader.offline_importer import OfflineImporter as ProductionOfflineImporter
 from test.fake_file_downloader import FileDownloaderFactory
-from test.fake_file_system import FileSystem
+from test.fake_file_system import FileSystem, StubFileSystemFactory
 from test.fake_logger import NoLogger
 
 
@@ -30,7 +30,7 @@ class OfflineImporter(ProductionOfflineImporter):
         self.config = default_config() if config is None else config
         self._importer_command = ImporterCommand(self.config, [])
         super().__init__(
-            self.file_system,
+            StubFileSystemFactory(self.file_system),
             FileDownloaderFactory(self.file_system) if file_downloader_factory is None else file_downloader_factory,
             NoLogger())
 

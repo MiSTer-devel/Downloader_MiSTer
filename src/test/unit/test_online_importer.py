@@ -25,7 +25,7 @@ from test.fake_file_system import FileSystem
 from test.objects import store_with_folders, db_distribution_mister_with_file, db_test_being_empty_descr, file_boot_rom, \
     boot_rom_descr, overwrite_file, file_mister_descr, file_a_descr, file_a_updated_descr, \
     db_test_with_file, db_with_file, db_with_folders, file_a, folder_a, \
-    store_test_with_file_a_descr, store_test_with_file, db_test_with_file_a, file_descr
+    store_test_with_file_a_descr, store_test_with_file, db_test_with_file_a, file_descr, empty_test_store
 from test.fake_online_importer import OnlineImporter
 from test.factory_stub import FactoryStub
 from test.fake_file_downloader import FileDownloader
@@ -35,17 +35,17 @@ class TestOnlineImporter(unittest.TestCase):
 
     def test_download_dbs_contents___with_trivial_db___does_nothing(self):
         sut = OnlineImporter()
-        store = empty_store()
+        store = empty_test_store()
 
         self.assertReportsNothing(sut.add_db(db_test_being_empty_descr(), store).download(False))
-        self.assertEqualDict(store, empty_store())
+        self.assertEqualDict(store, empty_test_store())
 
     def test_download_dbs_contents___being_empty___does_nothing(self):
         self.assertReportsNothing(OnlineImporter().download(False))
 
     def test_download_dbs_contents___with_one_file___fills_store_with_that_file(self):
         sut = OnlineImporter()
-        store = empty_store()
+        store = empty_test_store()
 
         sut.add_db(db_test_with_file_a(), store)
         sut.download(False)
@@ -81,7 +81,8 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertHasFolderA(store)
         self.assertReports(sut, [file_a])
         self.assertEqual(sut.file_system.hash(file_a), file_a)
-        self.assertNoRemovedFilesAndFolders(sut)
+        self.assertEqual([], sut.file_system.removed_folders)
+        self.assertEqual([], [f for f in sut.file_system.removed_files if not f.startswith('unique_temp_file')])
 
     def test_download_dbs_contents___with_non_existing_one_file_already_on_store___installs_file_regardless(self):
         sut = OnlineImporter()
@@ -97,7 +98,7 @@ class TestOnlineImporter(unittest.TestCase):
 
     def test_download_dbs_contents___with_one_failed_file___just_reports_error(self):
         sut = online_importer_with_custom_file_downloader(lambda fd: fd.test_data.errors_at(file_a))
-        store = empty_store()
+        store = empty_test_store()
 
         sut.add_db(db_test_with_file_a(), store)
         sut.download(False)
@@ -109,7 +110,7 @@ class TestOnlineImporter(unittest.TestCase):
 
     def test_download_dbs_contents___with_file_with_wrong_hash___just_reports_error(self):
         sut = online_importer_with_custom_file_downloader(lambda fd: fd.test_data.brings_file(file_a, file_descr(hash_code="wrong_hash")))
-        store = empty_store()
+        store = empty_test_store()
 
         sut.add_db(db_test_with_file_a(), store)
         sut.download(False)
@@ -121,7 +122,7 @@ class TestOnlineImporter(unittest.TestCase):
 
     def test_download_distribution_mister___with_mister___needs_reboot(self):
         sut = OnlineImporter()
-        store = empty_store()
+        store = empty_test_store()
         sut.file_system.test_data.with_old_mister_binary()
 
         sut.add_db(db_distribution_mister_with_file(file_MiSTer, file_mister_descr()), store)
@@ -135,13 +136,13 @@ class TestOnlineImporter(unittest.TestCase):
 
     def test_download_test_db___with_mister___raises_invalid_downloader_path_exception(self):
         sut = OnlineImporter()
-        store = empty_store()
+        store = empty_test_store()
         sut.file_system.test_data.with_old_mister_binary()
 
         sut.add_db(db_test_with_file(file_MiSTer, file_mister_descr()), store)
         self.assertRaises(InvalidDownloaderPath, lambda: sut.download(False))
 
-        self.assertEqualDict(store, empty_store())
+        self.assertEqualDict(store, empty_test_store())
         self.assertEmptyFolders(store)
         self.assertReportsNothing(sut)
         self.assertTrue(sut.file_system.is_file(file_MiSTer))
@@ -163,7 +164,7 @@ class TestOnlineImporter(unittest.TestCase):
 
     def test_download_dbs_contents___with_duplicated_file___just_accounts_for_the_first_added(self):
         sut = OnlineImporter()
-        store = empty_store()
+        store = empty_test_store()
 
         sut.add_db(db_with_file('test', file_a, file_a_descr()), store)
         sut.add_db(db_with_file('bar', file_a, file_a_updated_descr()), store)
@@ -228,7 +229,7 @@ class TestOnlineImporter(unittest.TestCase):
 
     def test_overwrite___when_boot_rom_present___should_not_overwrite_it(self):
         sut = OnlineImporter()
-        store = empty_store()
+        store = empty_test_store()
         sut.file_system.test_data.with_file(file_boot_rom, {"hash": "something_else"})
 
         sut.add_db(db_test_with_file(file_boot_rom, boot_rom_descr()), store)
@@ -241,7 +242,7 @@ class TestOnlineImporter(unittest.TestCase):
 
     def test_overwrite___when_boot_rom_present_but_with_different_case___should_not_overwrite_it(self):
         sut = OnlineImporter()
-        store = empty_store()
+        store = empty_test_store()
         sut.file_system.test_data.with_file(file_boot_rom.upper(), {"hash": "something_else"})
 
         sut.add_db(db_test_with_file(file_boot_rom.lower(), boot_rom_descr()), store)
@@ -258,7 +259,7 @@ class TestOnlineImporter(unittest.TestCase):
     def test_overwrite___when_overwrite_yes_file_a_is_present___should_not_overwrite_it(self):
         sut = OnlineImporter()
         sut.file_system.test_data.with_file_a()
-        store = empty_store()
+        store = empty_test_store()
 
         sut.add_db(db_test_with_file(file_a, overwrite_file(file_a_updated_descr(), True)), store)
         sut.download(False)
@@ -274,7 +275,7 @@ class TestOnlineImporter(unittest.TestCase):
     def test_overwrite___when_on_empty_store_overwrite_no_file_a_is_present___should_not_overwrite_it_but_fill_the_store(self):
         sut = OnlineImporter()
         sut.file_system.test_data.with_file_a()
-        store = empty_store()
+        store = empty_test_store()
 
         sut.add_db(db_test_with_file(file_a, overwrite_file(file_a_updated_descr(), False)), store)
         sut.download(False)
@@ -290,7 +291,7 @@ class TestOnlineImporter(unittest.TestCase):
     def test_overwrite___when_file_a_without_overwrite_is_present___should_overwrite_it(self):
         sut = OnlineImporter()
         sut.file_system.test_data.with_file_a()
-        store = empty_store()
+        store = empty_test_store()
 
         sut.add_db(db_test_with_file(file_a, file_a_updated_descr()), store)
         sut.download(False)
@@ -380,12 +381,13 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertEqual(sut.file_system.removed_folders, [])
 
     def assertNoRemovedFilesAndFolders(self, sut):
-        self.assertEqual(sut.file_system.removed_folders, [])
-        self.assertEqual(sut.file_system.removed_files, [])
+        self.assertEqual([], sut.file_system.removed_folders)
+        self.assertEqual([], sut.file_system.removed_files)
+
 
 def downloaded_single_db(db, store=None, full_resync=False):
     sut = OnlineImporter()
-    sut.add_db(db, store if store is not None else empty_store())
+    sut.add_db(db, store if store is not None else empty_test_store())
     sut.download(full_resync)
 
 

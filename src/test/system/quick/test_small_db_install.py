@@ -51,6 +51,15 @@ class TestSmallDbInstall(unittest.TestCase):
         self.assertRunOk("test/system/fixtures/small_db_install/small_db_3.ini")
         self.assertFalse(os.path.isfile(file_mister_downloader_needs_reboot))
 
+    def test_small_db_4(self):
+        print('test_small_db_4')
+        self.assertRunOk("test/system/fixtures/small_db_install/small_db_4_first_run.ini")
+        self.assertTrue(os.path.isfile('/tmp/default_base_path/_Cores/core.rbf'))
+
+        self.assertRunOk("test/system/fixtures/small_db_install/small_db_4_second_run.ini")
+        self.assertFalse(os.path.isfile('/tmp/default_base_path/_Cores/core.rbf'))
+        self.assertTrue(os.path.isfile('/tmp/special_base_path/_Cores/core.rbf'))
+
     def assertRunOk(self, ini_path):
         config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
         shutil.rmtree(config['base_path'], ignore_errors=True)
@@ -67,6 +76,7 @@ class TestSmallDbInstall(unittest.TestCase):
         test_env['FAIL_ON_FILE_ERROR'] = 'true'
         test_env['DEFAULT_BASE_PATH'] = default_base_path
         result = subprocess.run([tool], stderr=subprocess.STDOUT, env=test_env)
+        shutil.rmtree('src/%s' % tool, ignore_errors=True)
         self.assertEqual(result.returncode, 0)
         self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json.zip" % config['base_system_path']))
         os.unlink(tool)

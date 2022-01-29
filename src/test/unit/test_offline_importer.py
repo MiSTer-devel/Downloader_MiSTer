@@ -17,8 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from downloader.other import empty_store
-from test.objects import db_test_with_file_a, file_test_json_zip_descr, file_test_json_zip, file_a
+from test.objects import db_test_with_file_a, file_test_json_zip_descr, file_test_json_zip, file_a, empty_test_store
 from test.fake_offline_importer import OfflineImporter
 
 
@@ -75,7 +74,7 @@ class TestOfflineImporter(unittest.TestCase):
             .with_test_json_zip()\
             .with_file_a()
 
-        store = empty_store()
+        store = empty_test_store()
         store['offline_databases_imported'].append(file_test_json_zip)
         self.sut.add_db(db_test_with_file_a(), store)
         self.sut.apply()
@@ -85,7 +84,7 @@ class TestOfflineImporter(unittest.TestCase):
     def test_apply_offline_databases___when_file_does_not_exist___does_nothing(self):
         store = self.apply_db_test_with_file_a()
         self.assertTrue(file_test_json_zip not in store['offline_databases_imported'])
-        self.assertEqual(store, empty_store())
+        self.assertEqual(store, empty_test_store())
         self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
 
     def test_apply_offline_databases___when_db_id_does_not_match___does_nothing(self):
@@ -94,7 +93,7 @@ class TestOfflineImporter(unittest.TestCase):
 
         store = self.apply_db_test_with_file_a()
         self.assertTrue(file_test_json_zip not in store['offline_databases_imported'])
-        self.assertEqual(store, empty_store())
+        self.assertEqual(empty_test_store(), store)
         self.assertTrue(self.sut.file_system.is_file(file_test_json_zip))
 
     def test_apply_offline_databases___when_db_id_is_uppercase___still_adds_db_file(self):
@@ -117,11 +116,11 @@ class TestOfflineImporter(unittest.TestCase):
 
         store = self.apply_db_test_with_file_a()
         self.assertTrue(file_test_json_zip not in store['offline_databases_imported'])
-        self.assertEqual(store, empty_store())
+        self.assertEqual(store, empty_test_store())
         self.assertTrue(self.sut.file_system.is_file(file_test_json_zip))
 
     def apply_db_test_with_file_a(self):
-        store = empty_store()
+        store = empty_test_store()
         self.sut.add_db(db_test_with_file_a(), store)
         self.sut.apply()
         return store

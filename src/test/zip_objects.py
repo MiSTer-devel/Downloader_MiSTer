@@ -104,6 +104,7 @@ def cheats_folder_descr(zip_id=True, tags=True):
 
 def store_with_unzipped_cheats(url=True, folders=True, zip_id=True, zips=True, tags=True, online_database_imported=None, summary_hash=None):
     o = {
+        "base_path": "/media/fat/",
         "files": cheats_folder_files(url=url, zip_id=zip_id, tags=tags),
         'folders': cheats_folder_folders(zip_id=zip_id, tags=tags),
         'offline_databases_imported': online_database_imported if online_database_imported is not None else [],

@@ -21,7 +21,7 @@ import unittest
 from downloader.file_filter import BadFileFilterPartException
 from downloader.online_importer import WrongDatabaseOptions
 from downloader.other import empty_store
-from test.objects import db_test_descr, store_test_descr, config_with_filter
+from test.objects import db_test_descr, store_test_descr, config_with_filter, empty_test_store
 from test.fake_online_importer import OnlineImporter
 from test.zip_objects import cheats_folder_zip_desc, cheats_folder_tag_dictionary, cheats_folder_id, \
     cheats_folder_nes_file_path, cheats_folder_nes_folder_name, cheats_folder_sms_file_path, cheats_folder_sms_folder_name,\
@@ -33,19 +33,19 @@ from test.zip_objects import cheats_folder_zip_desc, cheats_folder_tag_dictionar
 class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
 
     def test_download_zipped_cheats_folder___with_empty_store_and_negative_nes_filter___installs_filtered_nes_zip_data_and_only_sms_file(self):
-        actual_store = self.download_zipped_cheats_folder(empty_store(), '!nes')
+        actual_store = self.download_zipped_cheats_folder(empty_test_store(), '!nes')
 
         self.assertEqual(store_with_filtered_nes_zip_data(), actual_store)
         self.assertOnlySmsFileIsInstalled()
 
     def test_download_zipped_cheats_folder___with_empty_store_and_negative_cheats_filter___installs_filtered_cheats_zip_data_but_no_files(self):
-        actual_store = self.download_zipped_cheats_folder(empty_store(), '!cheats')
+        actual_store = self.download_zipped_cheats_folder(empty_test_store(), '!cheats')
 
         self.assertEqual(store_with_filtered_cheats_zip_data(), actual_store)
         self.assertNoFiles()
 
     def test_download_zipped_cheats_folder___with_empty_store_and_filter_none___installs_zips_and_files(self):
-        actual_store = self.download_zipped_cheats_folder(empty_store(), None)
+        actual_store = self.download_zipped_cheats_folder(empty_test_store(), None)
 
         self.assertEqual(store_with_installed_files_and_zips_but_no_filtered_data(), actual_store)
         self.assertAllFilesAreInstalled()
@@ -77,7 +77,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
     def test_download_cheat_files_without_zip___with_filtered_nes_zip_data_in_store_and_negative_cheats_filter___removes_filtered_zip_data_and_installs_nothing(self):
         actual_store = self.download_cheat_files_without_zip(store_with_filtered_nes_zip_data(), '!cheats')
 
-        self.assertEqual(empty_store(), actual_store)
+        self.assertEqual(empty_test_store(), actual_store)
         self.assertNoFiles()
 
     def test_download_cheat_files_without_zip___with_filtered_nes_zip_data_in_store_but_filter_none___install_files_and_removes_filtered_zip_data(self):

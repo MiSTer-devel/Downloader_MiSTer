@@ -1,0 +1,14 @@
+{
+    "db_id": "db_4",
+    "files": {
+        "_Cores/core.rbf": {
+            "hash": "1ebbd3e34237af26da5dc08a4e440464",
+            "size": 20,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/LICENSE"
+        }
+    },
+    "folders": {
+        "_Cores/": {}
+    },
+    "timestamp": 0
+}

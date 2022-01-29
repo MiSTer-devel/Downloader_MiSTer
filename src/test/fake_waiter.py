@@ -15,23 +15,6 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-
-from downloader.migrations.migration_v1 import MigrationV1
-from downloader.migrations.migration_v2 import MigrationV2
-from downloader.migrations.migration_v3 import MigrationV3
-from downloader.migrations.migration_v4 import MigrationV4
-from downloader.migrations.migration_v5 import MigrationV5
-from downloader.migrations.migration_v6 import MigrationV6
-from downloader.migrations.migration_v7 import MigrationV7
-
-
-def migrations(config, file_system_factory):
-    return [
-        MigrationV1(),
-        MigrationV2(),
-        MigrationV3(),
-        MigrationV4(),
-        MigrationV5(file_system_factory),
-        MigrationV6(file_system_factory),
-        MigrationV7(config)
-    ]
+class NoWaiter:
+    def sleep(self, _):
+        pass

@@ -19,13 +19,12 @@
 import unittest
 
 from downloader.db_options import DbOptionsKind, DbOptions
-from downloader.importer_command import ImporterCommand as ProductionImporterCommand
-from test.objects import db_entity
+from test.fake_importer_command import ImporterCommand
+from test.objects import db_entity, empty_config
 
 nil = {}
 config = {'x': 'y'}
 config_with_options = {"downloader_retries": 42}
-empty_config = {}
 db = db_entity()
 db_with_options = db_entity(default_options={'downloader_retries': 1})
 ini_options = DbOptions({'downloader_retries': 8}, kind=DbOptionsKind.INI_SECTION)
@@ -69,7 +68,7 @@ class TestImporterCommand(unittest.TestCase):
         self.assert_config(ini_options.testable, actual[0])
 
     def test_read_dbs___with_db_options___returns_db_options(self):
-        actual = ImporterCommand(empty_config)\
+        actual = ImporterCommand(empty_config())\
             .add_db(db_with_options, nil, nil)\
             .read_dbs()[0]
 
@@ -94,8 +93,3 @@ class TestImporterCommand(unittest.TestCase):
 
     def assert_config(self, expected_config, actual):
         self.assertEqual(expected_config, actual[2], "config")
-
-
-class ImporterCommand(ProductionImporterCommand):
-    def __init__(self, input_config):
-        super().__init__(input_config, list(input_config))

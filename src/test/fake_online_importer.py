@@ -21,7 +21,7 @@ from downloader.file_filter import FileFilterFactory
 from downloader.importer_command import ImporterCommand
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
 from test.fake_file_downloader import FileDownloaderFactory
-from test.fake_file_system import FileSystem
+from test.fake_file_system import FileSystem, StubFileSystemFactory
 from test.fake_logger import NoLogger
 
 
@@ -30,9 +30,10 @@ class OnlineImporter(ProductionOnlineImporter):
         self.file_system = FileSystem() if file_system is None else file_system
         self.config = default_config() if config is None else config
         self._importer_command = ImporterCommand(self.config, [])
+        file_system_factory = StubFileSystemFactory(self.file_system)
         super().__init__(
             FileFilterFactory(),
-            self.file_system,
+            file_system_factory,
             FileDownloaderFactory(self.file_system) if file_downloader_factory is None else file_downloader_factory,
             NoLogger())
 

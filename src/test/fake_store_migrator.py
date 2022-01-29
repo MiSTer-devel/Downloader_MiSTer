@@ -15,14 +15,15 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-
+from downloader.config import default_config
 from downloader.migrations import migrations
 from downloader.store_migrator import StoreMigrator as ProductionStoreMigrator
-from test.fake_file_system import FileSystem
+from test.fake_file_system import FileSystem, StubFileSystemFactory
 from test.fake_logger import NoLogger
 
 
 class StoreMigrator(ProductionStoreMigrator):
-    def __init__(self, maybe_migrations=None, file_system=None):
+    def __init__(self, maybe_migrations=None, file_system=None, config=None):
         self.file_system = FileSystem() if file_system is None else file_system
-        super().__init__(migrations(self.file_system) if maybe_migrations is None else maybe_migrations, NoLogger())
+        self.config = default_config() if config is None else config
+        super().__init__(migrations(self.config, StubFileSystemFactory(self.file_system)) if maybe_migrations is None else maybe_migrations, NoLogger())

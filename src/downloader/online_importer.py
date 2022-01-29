@@ -27,56 +27,77 @@ class _Session:
         self.new_files_not_overwritten = {}
         self.processed_files = {}
         self.needs_reboot = False
-        self.dbs_folders = None
-        self.stores_folders = None
+        self.dbs_folders = set()
+        self.stores_folders = set()
+        self.file_system = None
 
     def add_new_file_not_overwritten(self, db_id, file):
         if db_id not in self.new_files_not_overwritten:
             self.new_files_not_overwritten[db_id] = []
         self.new_files_not_overwritten[db_id].append(file)
 
+
 class OnlineImporter:
-    def __init__(self, file_filter_factory, file_system, file_downloader_factory, logger):
+    def __init__(self, file_filter_factory, file_system_factory, file_downloader_factory, logger):
         self._file_filter_factory = file_filter_factory
-        self._file_system = file_system
+        self._file_system_factory = file_system_factory
         self._file_downloader_factory = file_downloader_factory
         self._logger = logger
-        self._session = _Session()
         self._unused_filter_tags = []
+        self._sessions = dict()
+        self._base_session = _Session()
 
     def download_dbs_contents(self, importer_command, full_resync):
-        self._session.dbs_folders = set()
-        self._session.stores_folders = set()
+
+        for session in self._sessions.values():
+            session.dbs_folders = set()
+            session.stores_folders = set()
 
         # TODO: Move the filter validation to earlier (before downloading dbs).
         for db, store, config in importer_command.read_dbs():
             self._print_db_header(db)
             file_filter = self._create_file_filter(db, config)
-            sub1 = _SubOnlineImporter1(db, store, full_resync, config, self._file_system, self._file_downloader_factory, self._logger, self._session)
+            file_system = self._file_system_factory.create_for_db_id(db.db_id)
+            session = self._session_for_config(config, file_system)
+            sub1 = _SubOnlineImporter1(db, store, full_resync, config, file_system, self._file_downloader_factory, self._logger, session)
             sub1.import_zip_summaries()
             filtered_db = file_filter.create_filtered_db(db, store)
-            sub2 = _SubOnlineImporter2(filtered_db, store, full_resync, config, self._file_system, self._file_downloader_factory, self._logger, self._session)
+            sub2 = _SubOnlineImporter2(filtered_db, store, full_resync, config, file_system, self._file_downloader_factory, self._logger, session)
             sub2.process_db_contents()
+            store['base_path'] = config['base_path']
 
         deleted_folder = False
 
-        for folder in sorted(self._session.stores_folders, key=len, reverse=True):
-            if folder in self._session.dbs_folders:
-                continue
+        for session in self._sessions.values():
+            for folder in sorted(session.stores_folders, key=len, reverse=True):
+                if folder in session.dbs_folders:
+                    continue
 
-            if not self._file_system.is_folder(folder):
-                continue
+                if not session.file_system.is_folder(folder):
+                    continue
 
-            if self._file_system.folder_has_items(folder):
-                continue
+                if session.file_system.folder_has_items(folder):
+                    continue
 
-            if not deleted_folder:
-                deleted_folder = True
-                self._logger.print()
+                if not deleted_folder:
+                    deleted_folder = True
+                    self._logger.print()
 
-            self._file_system.remove_folder(folder)
+                session.file_system.remove_folder(folder)
 
         self._unused_filter_tags = self._file_filter_factory.unused_filter_parts()
+
+    def _session_for_config(self, config, file_system):
+        base_path = config['base_path']
+        if base_path not in self._sessions:
+            new_session = _Session()
+            new_session.new_files_not_overwritten = self._base_session.new_files_not_overwritten
+            new_session.files_that_failed = self._base_session.files_that_failed
+            new_session.processed_files = self._base_session.processed_files
+            new_session.correctly_installed_files = self._base_session.correctly_installed_files
+            new_session.file_system = file_system
+            self._sessions[base_path] = new_session
+        return self._sessions[base_path]
 
     def _print_db_header(self, db):
         self._logger.print()
@@ -99,19 +120,20 @@ class OnlineImporter:
             raise WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e)))
 
     def files_that_failed(self):
-        return self._session.files_that_failed
+        return self._base_session.files_that_failed
 
     def unused_filter_tags(self):
         return self._unused_filter_tags
 
     def correctly_installed_files(self):
-        return self._session.correctly_installed_files
+        return self._base_session.correctly_installed_files
 
     def needs_reboot(self):
-        return self._session.needs_reboot
+        return any([session for session in self._sessions.values() if session.needs_reboot])
 
     def new_files_not_overwritten(self):
-        return self._session.new_files_not_overwritten
+        return self._base_session.new_files_not_overwritten
+
 
 class _SubOnlineImporter1:
     def __init__(self, db, store, full_resync, config, file_system, file_downloader_factory, logger, session):

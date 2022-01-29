@@ -1,6 +1,7 @@
 {
   "dbs": {
     "distribution_mister": {
+      "base_path": "/media/fat/",
       "zips": {},
       "folders": {
         "Filters": {},

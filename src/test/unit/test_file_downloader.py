@@ -29,7 +29,7 @@ from test.objects import file_menu_rbf, hash_menu_rbf, file_one, hash_one, hash_
 class TestFileDownloader(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.sut = FileDownloader(file_system=FileSystem(target_path_prefix='installed/'))
+        self.sut = FileDownloader(file_system=FileSystem(config={'base_path': '/installed/'}))
 
     def test_download_nothing___from_scratch_no_issues___nothing_downloaded_no_errors(self):
         self.sut.download_files(False)
@@ -45,12 +45,11 @@ class TestFileDownloader(unittest.TestCase):
         self.assertDownloaded([file_one], [file_one, file_one])
 
     def test_download_big_file___when_big_file_already_present_with_different_hash___gets_downloaded_through_a_downloader_in_progress_file_and_then_correctly_installed(self):
-        installed_file = 'installed/' + file_big
-        downloader_in_progress_file = installed_file + downloader_in_progress_postfix
-        self.sut.file_system.test_data.with_file(installed_file, {'hash': hash_big})
+        downloader_in_progress_file = file_big + downloader_in_progress_postfix
+        self.sut.file_system.test_data.with_file(file_big, {'hash': hash_big})
 
         self.download_big_file(hash_updated_big)
-        self.assertEqual(hash_updated_big, self.sut.file_system.hash(installed_file))
+        self.assertEqual(hash_updated_big, self.sut.file_system.hash(file_big))
         self.assertFalse(self.sut.file_system.is_file(downloader_in_progress_file))
         self.assertIn(downloader_in_progress_file, self.sut.file_system.historic_paths)
 
@@ -74,7 +73,7 @@ class TestFileDownloader(unittest.TestCase):
         self.assertDownloaded([file_menu_rbf], [file_menu_rbf], need_reboot=True)
 
     def test_download_reboot_file___update_no_issues___needs_reboot(self):
-        self.sut.file_system.test_data.with_file(file_menu_rbf, {'hash': 'old'})
+        self.sut.file_system.test_data.with_file(file_menu_rbf, {'hash': 'old', 'size': 23})
         self.download_reboot()
         self.assertDownloaded([file_menu_rbf], [file_menu_rbf], need_reboot=True)
 
@@ -111,5 +110,5 @@ class TestFileDownloader(unittest.TestCase):
         self.sut.download_files(False)
 
     def download_reboot(self):
-        self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_menu_rbf, 'reboot': True, 'path': 'system'}, file_menu_rbf)
+        self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_menu_rbf, 'reboot': True, 'path': 'system', 'size': 23}, file_menu_rbf)
         self.sut.download_files(False)

@@ -15,12 +15,12 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-
+from downloader.base_path_relocator import BasePathRelocator
 from downloader.config import ConfigReader
 from downloader.db_gateway import DbGateway
 from downloader.file_downloader import make_file_downloader_factory
 from downloader.file_filter import FileFilterFactory
-from downloader.file_system import FileSystem
+from downloader.file_system import FileSystem, FileSystemFactory
 from downloader.full_run_service import FullRunService
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository
@@ -29,6 +29,7 @@ from downloader.offline_importer import OfflineImporter
 from downloader.online_importer import OnlineImporter
 from downloader.reboot_calculator import RebootCalculator
 from downloader.store_migrator import StoreMigrator
+from downloader.waiter import Waiter
 
 
 def make_full_run_service(env, logger, ini_path):
@@ -39,18 +40,19 @@ def make_full_run_service(env, logger, ini_path):
     config = ConfigReader(logger, env).read_config(ini_path)
     config['curl_ssl'] = env['CURL_SSL']
 
-    file_system = FileSystem(config, logger)
-    local_repository = LocalRepository(config, logger, file_system)
+    system_file_system = FileSystem(config, logger)
+    local_repository = LocalRepository(config, logger, system_file_system)
 
     logger.set_local_repository(local_repository)
 
+    file_system_factory = FileSystemFactory(config, logger)
     file_filter_factory = FileFilterFactory()
-    file_downloader_factory = make_file_downloader_factory(file_system, local_repository, logger)
-    db_gateway = DbGateway(config, file_system, file_downloader_factory, logger)
-    offline_importer = OfflineImporter(file_system, file_downloader_factory, logger)
-    online_importer = OnlineImporter(file_filter_factory, file_system, file_downloader_factory, logger)
-    linux_updater = LinuxUpdater(config, file_system, file_downloader_factory, logger)
-    store_migrator = StoreMigrator(migrations(file_system), logger)
+    file_downloader_factory = make_file_downloader_factory(file_system_factory, local_repository, logger)
+    db_gateway = DbGateway(config, system_file_system, file_downloader_factory, logger)
+    offline_importer = OfflineImporter(file_system_factory, file_downloader_factory, logger)
+    online_importer = OnlineImporter(file_filter_factory, file_system_factory, file_downloader_factory, logger)
+    linux_updater = LinuxUpdater(config, system_file_system, file_downloader_factory, logger)
+    store_migrator = StoreMigrator(migrations(config, file_system_factory), logger)
 
     return FullRunService(
         env,
@@ -61,6 +63,7 @@ def make_full_run_service(env, logger, ini_path):
         offline_importer,
         online_importer,
         linux_updater,
-        RebootCalculator(config, logger, file_system),
-        store_migrator
+        RebootCalculator(config, logger, system_file_system),
+        store_migrator,
+        BasePathRelocator(file_system_factory, Waiter(), logger)
     )

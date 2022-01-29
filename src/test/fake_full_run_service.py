@@ -20,6 +20,7 @@ from pathlib import Path
 
 from downloader.config import default_config
 from downloader.full_run_service import FullRunService as ProductionFullRunService
+from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_db_gateway import DbGateway
 from test.fake_file_system import FileSystem
 from test.fake_linux_updater import LinuxUpdater
@@ -43,7 +44,8 @@ class FullRunService(ProductionFullRunService):
                          OnlineImporter(file_system=self.file_system),
                          LinuxUpdater(self.file_system),
                          RebootCalculator(file_system=self.file_system),
-                         StoreMigrator())
+                         StoreMigrator(),
+                         BasePathRelocator())
 
     @staticmethod
     def with_single_empty_db() -> ProductionFullRunService:

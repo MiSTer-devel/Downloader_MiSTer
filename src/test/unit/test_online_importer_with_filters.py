@@ -22,7 +22,7 @@ from downloader.config import default_config
 from downloader.online_importer import WrongDatabaseOptions
 from downloader.other import empty_store
 from test.objects import db_test_descr, store_test_descr, file_descr, file_b, file_a, file_c, folder_a, folder_b, \
-    folder_c, config_with_filter, file_one
+    folder_c, config_with_filter, file_one, empty_test_store
 from test.fake_online_importer import OnlineImporter
 
 
@@ -50,8 +50,8 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
             ('!nes cheats', store_with_file_gb_cheat),
             ('gb cheats', store_with_all_cheats_and_gb_game),
             ('!gb cheats', store_with_file_nes_cheat),
-            ('!gb !nes !cheats', empty_store),
-            ('!all', empty_store),
+            ('!gb !nes !cheats', empty_test_store),
+            ('!all', empty_test_store),
             ('!gb !nes', store_with_just_cheats_folder),
             ('all', store_with_cheats_and_console_files),
             ('nes gb', store_with_cheats_and_console_files),
@@ -88,8 +88,8 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
             ('a !b !c', store_with_file_a),
             ('!a b !c', store_with_file_b),
             ('!a !b c', store_with_file_c),
-            ('!a !b !c', empty_store),
-            ('!all', empty_store),
+            ('!a !b !c', empty_test_store),
+            ('!all', empty_test_store),
             ('something_not_in_db', store_with_files_a_b_c),
             ('a something_not_in_db', store_with_file_a),
             ('!a something_not_in_db', store_with_files_b_and_c),
@@ -99,7 +99,7 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
         self.assertEqual(store_with_one_non_tagged_file_and_file_a(), self.download_db_with_one_non_tagged_file_and_tagged_a_file(config_with_filter('a')))
 
     def test_download_db_with_one_non_tagged_file_and_tagged_a_file___using_negative_all_filter___installs_nothing(self):
-        self.assertEqual(empty_store(), self.download_db_with_one_non_tagged_file_and_tagged_a_file(config_with_filter('!all')))
+        self.assertEqual(empty_test_store(), self.download_db_with_one_non_tagged_file_and_tagged_a_file(config_with_filter('!all')))
 
     def test_download_db___using_incorrect_filter___raises_wrong_database_options(self):
         for given_filter in ['!!!b', '@what', '123', '  ', '', '_hidden', 'wha+tever', '"quotes1"', "'quotes2'", '!all a', 'none']:
@@ -107,10 +107,10 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
                 self.assertRaises(WrongDatabaseOptions, lambda: self.download_db_with_cheat_and_console_files_and_tag_dictionary(config_with_filter(given_filter)))
 
     def test_download_db_with_file_with_tag_foobar___using_negative_foo_underscore_bar_filter___installs_nothing(self):
-        self.assertEqual(empty_store(), self.download_db_with_file_with_tag_foobar(config=config_with_filter('!foo_bar')))
+        self.assertEqual(empty_test_store(), self.download_db_with_file_with_tag_foobar(config=config_with_filter('!foo_bar')))
 
     def test_download_db_with_file_with_tag_foobar___using_negative_foo_hyphen_bar_filter___installs_nothing(self):
-        self.assertEqual(empty_store(), self.download_db_with_file_with_tag_foobar(config=config_with_filter('!foo-bar')))
+        self.assertEqual(empty_test_store(), self.download_db_with_file_with_tag_foobar(config=config_with_filter('!foo-bar')))
 
     def test_download_db_with_file_with_tag_foobar___using_negative_filter_not_matching_tag___installs_file_with_tag_foobar(self):
         self.assertEqual(store_with_file_with_tag_foobar(), self.download_db_with_file_with_tag_foobar(config=config_with_filter('!foobar2')))
@@ -122,19 +122,19 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
                 self.assertEqual(expected_store(), download_interface(config_with_filter(given_filter)))
 
     def download_db_with_files_a_b_c(self, config):
-        return OnlineImporter(config=config).download_db(db_with_files_a_b_c(), empty_store())
+        return OnlineImporter(config=config).download_db(db_with_files_a_b_c(), empty_test_store())
 
     def download_db_with_essential_and_cheats_files(self, config):
-        return OnlineImporter(config=config).download_db(db_with_essential_and_cheats_files(), empty_store())
+        return OnlineImporter(config=config).download_db(db_with_essential_and_cheats_files(), empty_test_store())
 
     def download_db_with_cheat_and_console_files_and_tag_dictionary(self, config):
-        return OnlineImporter(config=config).download_db(db_with_cheats_and_console_files(), empty_store())
+        return OnlineImporter(config=config).download_db(db_with_cheats_and_console_files(), empty_test_store())
 
     def download_db_with_one_non_tagged_file_and_tagged_a_file(self, config):
-        return OnlineImporter(config=config).download_db(db_with_one_non_tagged_file_and_file_a(), empty_store())
+        return OnlineImporter(config=config).download_db(db_with_one_non_tagged_file_and_file_a(), empty_test_store())
 
     def download_db_with_file_with_tag_foobar(self, config):
-        return OnlineImporter(config=config).download_db(db_with_file_with_tag_foobar(), empty_store())
+        return OnlineImporter(config=config).download_db(db_with_file_with_tag_foobar(), empty_test_store())
 
 
 def db_with_files_a_b_c():
