@@ -25,7 +25,7 @@ from downloader.db_options import DbOptionsKind, DbOptions, DbOptionsValidationE
 from downloader.ini_parser import IniParser
 
 
-def config_file_path(env):
+def config_file_path(env, current_working_dir):
     ini_path = env.get('DOWNLOADER_INI_PATH', None)
     if ini_path is not None:
         return ini_path
@@ -35,6 +35,10 @@ def config_file_path(env):
         return file_downloader_ini
 
     executable_path = PurePosixPath(original_executable)
+
+    if str(executable_path.parent) == '.':
+        executable_path = PurePosixPath(current_working_dir) / executable_path
+        original_executable = str(executable_path)
 
     list_of_parents = [str(p.name) for p in reversed(executable_path.parents) if p.name.lower() != 'scripts' and p.name != '']
 
