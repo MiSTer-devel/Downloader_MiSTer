@@ -1,4 +1,4 @@
-# Copyright (c) 2021 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,6 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.base_path_relocator import BasePathRelocator
+from downloader.certificates_fix import CertificatesFix
 from downloader.config import ConfigReader
 from downloader.db_gateway import DbGateway
 from downloader.file_downloader import make_file_downloader_factory
@@ -65,5 +66,6 @@ def make_full_run_service(env, logger, ini_path):
         linux_updater,
         RebootCalculator(config, logger, system_file_system),
         store_migrator,
-        BasePathRelocator(file_system_factory, Waiter(), logger)
+        BasePathRelocator(file_system_factory, Waiter(), logger),
+        CertificatesFix(config, system_file_system, logger)
     )

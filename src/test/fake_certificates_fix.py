@@ -15,22 +15,29 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-
-from pathlib import Path
-
-from downloader.config import default_config
-from downloader.local_repository import LocalRepository as ProductionLocalRepository
+from downloader.certificates_fix import CertificatesFix as ProductionCertificatesFix
+from downloader.constants import default_curl_ssl_options
 from test.fake_file_system import FileSystem
 from test.fake_logger import NoLogger
 
 
-class LocalRepository(ProductionLocalRepository):
-    def __init__(self, config=None, file_system=None):
+class CertificatesFix(ProductionCertificatesFix):
+    def __init__(self, config=None, file_system=None, download_fails=False):
         self.file_system = FileSystem() if file_system is None else file_system
-        super().__init__(_config() if config is None else config, NoLogger(), self.file_system)
+        self.download_ran = False
+        super().__init__({'curl_ssl': default_curl_ssl_options} if config is None else config, self.file_system, NoLogger())
+        self._download_fails = download_fails
+
+    def _download(self, path):
+        self.file_system.unlink(path)
+        self.download_ran = True
+        if self._download_fails:
+            return FakeResult(1)
+
+        self.file_system.touch(str(path))
+        return FakeResult(0)
 
 
-def _config():
-    config = default_config()
-    config['config_path'] = Path('')
-    return config
+class FakeResult:
+    def __init__(self, returncode):
+        self.returncode = returncode

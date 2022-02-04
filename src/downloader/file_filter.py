@@ -1,4 +1,4 @@
-# Copyright (c) 2021 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -182,6 +182,7 @@ class FileFilter:
         if 'filtered_zip_data' not in store:
             store['filtered_zip_data'] = {}
         return store['filtered_zip_data']
+
 
 class FilterCalculator:
     def __init__(self, positive, negative):

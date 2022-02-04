@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2021 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,13 +19,13 @@
 
 import os
 from downloader.main import main
-from downloader.constants import distribution_mister_db_id, distribution_mister_db_url
+from downloader.constants import distribution_mister_db_id, distribution_mister_db_url, default_curl_ssl_options
 
 if __name__ == '__main__':
     exit_code = main({
         'DOWNLOADER_LAUNCHER_PATH': os.getenv('DOWNLOADER_LAUNCHER_PATH', None),
         'DOWNLOADER_INI_PATH': os.getenv('DOWNLOADER_INI_PATH', None),
-        'CURL_SSL': os.getenv('CURL_SSL', '--cacert /etc/ssl/certs/cacert.pem'),
+        'CURL_SSL': os.getenv('CURL_SSL', default_curl_ssl_options),
         'COMMIT': os.getenv('COMMIT', 'unknown'),
         'ALLOW_REBOOT': os.getenv('ALLOW_REBOOT', None),
         'UPDATE_LINUX': os.getenv('UPDATE_LINUX', 'true').lower(),

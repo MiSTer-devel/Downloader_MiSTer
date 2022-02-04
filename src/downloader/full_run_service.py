@@ -1,4 +1,4 @@
-# Copyright (c) 2021 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,7 +25,8 @@ from downloader.other import format_files_message, empty_store
 
 
 class FullRunService:
-    def __init__(self, env, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, store_migrator, base_path_relocator):
+    def __init__(self, env, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, store_migrator, base_path_relocator, certificates_fix):
+        self._certificates_fix = certificates_fix
         self._base_path_relocator = base_path_relocator
         self._store_migrator = store_migrator
         self._reboot_calculator = reboot_calculator
@@ -45,6 +46,7 @@ class FullRunService:
             self._logger.enable_verbose_mode()
 
         self._debug_log_initial_state()
+        self._certificates_fix.fix_certificates_if_needed()
 
         local_store = self._local_repository.load_store(self._store_migrator)
 

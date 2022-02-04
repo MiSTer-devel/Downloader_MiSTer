@@ -89,7 +89,7 @@ More information about *Download Filters* [here](docs/download-filters.md).
 
 ### Supporters+ shout-out!
 
-Antonio Villena, Matt Hargett, MiSTerFPGA.co.uk and Visa-Valtteri Pimiä
+Antonio Villena, Hard Rich, Matt Hargett, and MiSTerFPGA.co.uk
 
 Thank you so much for supporting this project! If you would like to show up here, join us as **Supporter+** on Patreon:
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@ from test.fake_offline_importer import OfflineImporter
 from test.fake_reboot_calculator import RebootCalculator
 from test.fake_store_migrator import StoreMigrator
 from test.objects import db_empty
+from test.fake_certificates_fix import CertificatesFix
 
 
 class FullRunService(ProductionFullRunService):
@@ -45,7 +46,8 @@ class FullRunService(ProductionFullRunService):
                          LinuxUpdater(self.file_system),
                          RebootCalculator(file_system=self.file_system),
                          StoreMigrator(),
-                         BasePathRelocator())
+                         BasePathRelocator(),
+                         CertificatesFix())
 
     @staticmethod
     def with_single_empty_db() -> ProductionFullRunService:
