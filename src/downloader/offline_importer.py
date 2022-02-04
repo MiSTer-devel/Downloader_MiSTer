@@ -1,4 +1,4 @@
-# Copyright (c) 2021 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,12 +29,12 @@ class OfflineImporter:
     def apply_offline_databases(self, importer_command):
         for db, store, config in importer_command.read_dbs():
             for db_file in db.db_files:
-                sub = _SubOfflineImporter(config, self._file_system_factory.create_for_db_id(db.db_id), self._file_downloader_factory, self._logger)
-                sub.update_store_from_offline_db(db.db_id, db_file, store)
+                db_importer = _OfflineDatabaseImporter(config, self._file_system_factory.create_for_db_id(db.db_id), self._file_downloader_factory, self._logger)
+                db_importer.update_store_from_offline_db(db.db_id, db_file, store)
                 store['base_path'] = config['base_path']
 
 
-class _SubOfflineImporter:
+class _OfflineDatabaseImporter:
     def __init__(self, config, file_system, file_downloader_factory, logger):
         self._config = config
         self._file_system = file_system

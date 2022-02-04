@@ -1,4 +1,4 @@
-# Copyright (c) 2021 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,6 +15,10 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+
+# Default SSL option
+default_cacert_file = '/etc/ssl/certs/cacert.pem'
+default_curl_ssl_options = '--cacert %s' % default_cacert_file
 
 # Pre-selected database
 distribution_mister_db_url = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'

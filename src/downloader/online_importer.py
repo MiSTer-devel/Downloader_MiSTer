@@ -1,4 +1,4 @@
-# Copyright (c) 2021 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -56,14 +56,18 @@ class OnlineImporter:
         # TODO: Move the filter validation to earlier (before downloading dbs).
         for db, store, config in importer_command.read_dbs():
             self._print_db_header(db)
-            file_filter = self._create_file_filter(db, config)
             file_system = self._file_system_factory.create_for_db_id(db.db_id)
             session = self._session_for_config(config, file_system)
-            sub1 = _SubOnlineImporter1(db, store, full_resync, config, file_system, self._file_downloader_factory, self._logger, session)
-            sub1.import_zip_summaries()
-            filtered_db = file_filter.create_filtered_db(db, store)
-            sub2 = _SubOnlineImporter2(filtered_db, store, full_resync, config, file_system, self._file_downloader_factory, self._logger, session)
-            sub2.process_db_contents()
+
+            zip_summaries = _OnlineZipSummaries(db, store, full_resync, config, file_system, self._file_downloader_factory, self._logger, session)
+            populated_db = zip_summaries.populate_db_with_summaries()
+
+            file_filter = self._create_file_filter(populated_db, config)
+            filtered_db = file_filter.create_filtered_db(populated_db, store)
+
+            db_importer = _OnlineDatabaseImporter(filtered_db, store, full_resync, config, file_system, self._file_downloader_factory, self._logger, session)
+            db_importer.process_db_contents()
+
             store['base_path'] = config['base_path']
 
         deleted_folder = False
@@ -135,7 +139,7 @@ class OnlineImporter:
         return self._base_session.new_files_not_overwritten
 
 
-class _SubOnlineImporter1:
+class _OnlineZipSummaries:
     def __init__(self, db, store, full_resync, config, file_system, file_downloader_factory, logger, session):
         self._db = db
         self._store = store
@@ -146,23 +150,10 @@ class _SubOnlineImporter1:
         self._logger = logger
         self._session = session
 
-
-    @staticmethod
-    def _remove_non_zip_fields(descriptions, removed_zip_ids):
-        for description in descriptions:
-            if 'zip_id' in description and description['zip_id'] in removed_zip_ids:
-                description.pop('zip_id')
-                if 'tags' in description:
-                    description.pop('tags')
-
-    def import_zip_summaries(self):
+    def populate_db_with_summaries(self):
         removed_zip_ids = [zip_id for zip_id in self._store['zips'] if zip_id not in self._db.zips]
-        for zip_id in removed_zip_ids:
-            self._store['zips'].pop(zip_id)
-
         if len(removed_zip_ids) > 0:
-            self._remove_non_zip_fields(self._store['files'].values(), removed_zip_ids)
-            self._remove_non_zip_fields(self._store['folders'].values(), removed_zip_ids)
+            self._remove_old_zip_ids(removed_zip_ids)
 
         zip_ids_from_store = []
         zip_ids_to_download = []
@@ -174,50 +165,72 @@ class _SubOnlineImporter1:
                 zip_ids_to_download.append(zip_id)
 
         if len(zip_ids_from_store) > 0:
-            self._db.files.update({path: fd for path, fd in self._store['files'].items() if
-                             'zip_id' in fd and fd['zip_id'] in zip_ids_from_store})
-            self._db.folders.update({path: fd for path, fd in self._store['folders'].items() if
-                               'zip_id' in fd and fd['zip_id'] in zip_ids_from_store})
+            self._import_zip_ids_from_store(zip_ids_from_store)
 
         if len(zip_ids_to_download) > 0:
-            summary_downloader = self._file_downloader_factory.create(self._config, self._config['parallel_update'])
-            zip_ids_by_temp_zip = dict()
+            self._import_zip_ids_from_network(zip_ids_to_download)
 
-            for zip_id in zip_ids_to_download:
-                temp_zip = '/tmp/%s_summary.json.zip' % zip_id
-                zip_ids_by_temp_zip[temp_zip] = zip_id
+        return self._db
 
-                summary_downloader.queue_file(self._db.zips[zip_id]['summary_file'], temp_zip)
+    def _remove_old_zip_ids(self, removed_zip_ids):
+        for zip_id in removed_zip_ids:
+            self._store['zips'].pop(zip_id)
 
-            summary_downloader.download_files(self._is_first_run())
-            self._logger.print()
+        self._remove_non_zip_fields(self._store['files'].values(), removed_zip_ids)
+        self._remove_non_zip_fields(self._store['folders'].values(), removed_zip_ids)
 
-            for temp_zip in summary_downloader.correctly_downloaded_files():
-                summary = self._file_system.load_dict_from_file(temp_zip)
-                for file_path, file_description in summary['files'].items():
-                    self._db.files[file_path] = file_description
-                    if file_path in self._store['files']:
-                        self._store['files'][file_path] = file_description
-                self._db.folders.update(summary['folders'])
+    @staticmethod
+    def _remove_non_zip_fields(descriptions, removed_zip_ids):
+        for description in descriptions:
+            if 'zip_id' in description and description['zip_id'] in removed_zip_ids:
+                description.pop('zip_id')
+                if 'tags' in description:
+                    description.pop('tags')
 
-                zip_id = zip_ids_by_temp_zip[temp_zip]
-                self._store['zips'][zip_id] = self._db.zips[zip_id]
+    def _import_zip_ids_from_network(self, zip_ids_to_download):
+        summary_downloader = self._file_downloader_factory.create(self._config, self._config['parallel_update'])
+        zip_ids_by_temp_zip = dict()
 
-                self._file_system.unlink(temp_zip)
+        for zip_id in zip_ids_to_download:
+            temp_zip = '/tmp/%s_summary.json.zip' % zip_id
+            zip_ids_by_temp_zip[temp_zip] = zip_id
 
-            for temp_zip in summary_downloader.errors():
-                zip_id = zip_ids_by_temp_zip[temp_zip]
-                if zip_id in self._store['zips']:
-                    self._db.folders.update(self._store['zips'][zip_id]['folders'])
-                    self._db.files.update({path: fd for path, fd in self._store['files'].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids_from_store})
+            summary_downloader.queue_file(self._db.zips[zip_id]['summary_file'], temp_zip)
 
-            self._session.files_that_failed.extend(summary_downloader.errors())
+        summary_downloader.download_files(self._is_first_run())
+        downloaded_summaries = [(zip_ids_by_temp_zip[temp_zip], temp_zip) for temp_zip in
+                                summary_downloader.correctly_downloaded_files()]
+        failed_zip_ids = [zip_ids_by_temp_zip[temp_zip] for temp_zip in summary_downloader.errors()]
+
+        self._logger.print()
+
+        for zip_id, temp_zip in downloaded_summaries:
+            summary = self._file_system.load_dict_from_file(temp_zip)
+            self._db.files.update(summary['files'])
+            self._db.folders.update(summary['folders'])
+
+            self._store['zips'][zip_id] = self._db.zips[zip_id]
+
+            self._file_system.unlink(temp_zip)
+
+        zip_ids_falling_back_to_store = [zip_id for zip_id in failed_zip_ids if zip_id in self._store['zips']]
+        if len(zip_ids_falling_back_to_store) > 0:
+            self._import_zip_ids_from_store(zip_ids_falling_back_to_store)
+
+        self._session.files_that_failed.extend(summary_downloader.errors())
+
+    def _import_zip_ids_from_store(self, zip_ids):
+        self._db.files.update(self._entries_from_store('files', zip_ids))
+        self._db.folders.update(self._entries_from_store('folders', zip_ids))
+
+    def _entries_from_store(self, entry_kind, zip_ids):
+        return {path: fd for path, fd in self._store[entry_kind].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids}
 
     def _is_first_run(self):
         return len(self._store['files']) == 0
 
 
-class _SubOnlineImporter2:
+class _OnlineDatabaseImporter:
     def __init__(self, db, store, full_resync, config, file_system, file_downloader_factory, logger, session):
         self._db = db
         self._store = store
@@ -249,6 +262,7 @@ class _SubOnlineImporter2:
             if not self._full_resync and file_path in self._store['files'] and \
                     self._store['files'][file_path]['hash'] == file_description['hash'] and \
                     self._should_not_download_again(file_path):
+                self._store['files'][file_path] = file_description
                 continue
 
             if 'overwrite' in file_description and not file_description['overwrite'] and self._file_system.is_file(file_path):
