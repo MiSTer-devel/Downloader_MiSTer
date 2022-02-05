@@ -37,13 +37,16 @@ def empty_store(base_path):
     }
 
 
-def sanitize_url(input_url, safe_characters):
-    url_domain = urlparse(input_url).netloc
-    url_parts = input_url.split(url_domain)
-    url_end_part = urllib.parse.quote(url_parts[1], safe=safe_characters[url_domain]) if url_domain in safe_characters\
-        else urllib.parse.quote(url_parts[1])
-    url = url_parts[0] + url_domain + url_end_part
+def calculate_url(base_files_url, path):
+    if base_files_url is None:
+        raise NoArgumentsToComputeUrlError('Could not calculate URL for "%s" because "base_files_url" is not defined.' % path)
+
+    url = base_files_url + urllib.parse.quote(path)
     return url
+
+
+class NoArgumentsToComputeUrlError(Exception):
+    pass
 
 
 def format_files_message(file_list):

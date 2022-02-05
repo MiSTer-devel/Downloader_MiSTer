@@ -69,10 +69,6 @@ class DbOptions:
             if not isinstance(props['filter'], str):
                 raise DbOptionsValidationException(['filter'])
             present.add('filter')
-        if 'url_safe_characters' in props:
-            if not isinstance(props['url_safe_characters'], dict):
-                raise DbOptionsValidationException(['url_safe_characters'])
-            present.add('url_safe_characters')
 
         if len(present) != len(props):
             raise DbOptionsValidationException([o for o in props if o not in present])

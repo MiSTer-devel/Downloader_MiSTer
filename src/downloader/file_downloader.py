@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 
 from downloader.constants import file_MiSTer, file_MiSTer_new
 from downloader.logger import SilentLogger
-from downloader.other import sanitize_url
+from downloader.other import calculate_url, NoArgumentsToComputeUrlError
 from downloader.target_path_repository import TargetPathRepository
 
 
@@ -208,21 +208,14 @@ class CurlDownloaderAbstract(FileDownloader):
         self._file_system.make_dirs_parent(path)
 
         if 'url' not in description:
-            description['url'] = self._url_from_path(path)
-
-        url = sanitize_url(description['url'], self._config['url_safe_characters'])
+            description['url'] = calculate_url(self._base_files_url, path)
 
         target_path = self._temp_files_registry.create_target(path, description)
 
-        self._run(description, self._command(target_path, url), path)
+        self._run(description, self._command(target_path, description['url']), path)
 
     def _command(self, target_path, url):
         return 'curl %s --show-error --fail --location -o "%s" "%s"' % (self._config['curl_ssl'], target_path, url)
-
-    def _url_from_path(self, path):
-        if self._base_files_url is None:
-            raise Exception('Trying to process %s, but no base_files_url filed has been provided to calculate the url.' % path)
-        return self._base_files_url + path
 
     def errors(self):
         return self._errors.list()
