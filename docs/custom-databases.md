@@ -134,6 +134,8 @@ The format of the aforementioned JSON file should be as follow:
     "tag_dictionary": {
         /**
           * The keys of the dictionary are the filter tags. They are matched against the terms introduced in the filters.
+          *     They must be strings. But transformed into lowercase letters and stripped of `_` and `-` characters.
+          *     Matching will happen regardless of the transformation. For example, term 'Some-Tag' matches key 'sometag'.
           * The values of the dictionary are the term indexes. They must be integers.
           * 
           * Examples:
