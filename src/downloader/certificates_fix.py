@@ -20,6 +20,8 @@ from downloader.constants import default_curl_ssl_options
 
 
 class CertificatesFix:
+    cacert_pem_url = 'https://curl.se/ca/cacert.pem'
+
     def __init__(self, config, file_system, logger):
         self._config = config
         self._file_system = file_system
@@ -36,17 +38,31 @@ class CertificatesFix:
 
         cacert_path = parts[1]
         if self._file_system.is_file(cacert_path):
-            self._logger.debug('cacert file seems to be fine at %s.' % cacert_path)
+            self._check_cacert(cacert_path)
             return
 
-        self._logger.print('cacert file seems to be missing.')
+        self._logger.print('WARNING: cacert file at "%s" seems to be missing!' % cacert_path)
+        self._get_new_cacert(cacert_path)
 
+    def _check_cacert(self, cacert_path):
+        result = self._test_query(cacert_path)
+        if result.returncode == 0:
+            self._logger.debug('cacert file at "%s" seems to be fine.' % cacert_path)
+            return
+
+        self._logger.print('WARNING: cacert file at "%s" seems to be wrong!' % cacert_path)
+        self._logger.print('         Return Code: %d' % result.returncode)
+        self._file_system.unlink(cacert_path)
+        self._get_new_cacert(cacert_path)
+
+    def _get_new_cacert(self, cacert_path):
         try:
             self._file_system.touch(cacert_path)
         except OSError as _:
             self._logger.print('ERROR: cacert path is invalid!')
             return
 
+        self._logger.print()
         self._logger.print('Downloading new cacert file...')
 
         result = self._download(cacert_path)
@@ -54,8 +70,12 @@ class CertificatesFix:
             self._logger.print('ERROR: Download failed! %d' % result.returncode)
             return
 
-        self._logger.print('New cacert file has been installed at %s!' % cacert_path)
+        self._logger.print()
+        self._logger.print('New cacert file has been installed at "%s" successfully.' % cacert_path)
         self._logger.print()
 
+    def _test_query(self, path):
+        return subprocess.run(['curl', '--cacert', path, self.cacert_pem_url], stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+
     def _download(self, path):
-        return subprocess.run(['curl', '--insecure', '-o', str(path), 'https://curl.se/ca/cacert.pem'], stderr=subprocess.STDOUT)
+        return subprocess.run(['curl', '--insecure', '-o', path, self.cacert_pem_url], stderr=subprocess.STDOUT)

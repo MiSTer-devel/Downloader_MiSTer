@@ -22,11 +22,13 @@ from test.fake_logger import NoLogger
 
 
 class CertificatesFix(ProductionCertificatesFix):
-    def __init__(self, config=None, file_system=None, download_fails=False):
+    def __init__(self, config=None, file_system=None, download_fails=False, test_query_fails=False):
         self.file_system = FileSystem() if file_system is None else file_system
         self.download_ran = False
+        self.test_query_ran = False
         super().__init__({'curl_ssl': default_curl_ssl_options} if config is None else config, self.file_system, NoLogger())
         self._download_fails = download_fails
+        self._test_query_fails = test_query_fails
 
     def _download(self, path):
         self.file_system.unlink(path)
@@ -35,6 +37,13 @@ class CertificatesFix(ProductionCertificatesFix):
             return FakeResult(1)
 
         self.file_system.touch(str(path))
+        return FakeResult(0)
+
+    def _test_query(self, path):
+        self.test_query_ran = True
+        if self._test_query_fails:
+            return FakeResult(1)
+
         return FakeResult(0)
 
 

@@ -46,3 +46,23 @@ class TestCertificatesFix(unittest.TestCase):
         self.assertTrue(sut.download_ran)
         self.assertFalse(sut.file_system.is_file(default_cacert_file))
 
+    def test_fix_certificates_if_needed___when_is_needed_and_cacert_test_fails___installs_new_cacert_file(self):
+        old_hash = 'old'
+        new_hash = default_cacert_file
+
+        sut = CertificatesFix(test_query_fails=True)
+        sut.file_system.test_data.with_file(default_cacert_file, {'hash': old_hash})
+        self.assertEqual(old_hash, sut.file_system.hash(default_cacert_file))
+
+        sut.fix_certificates_if_needed()
+        self.assertTrue(sut.download_ran)
+        self.assertTrue(sut.test_query_ran)
+        self.assertEqual(new_hash, sut.file_system.hash(default_cacert_file))
+
+    def test_fix_certificates_if_needed___when_is_needed_but_cacert_and_download_fails___it_tries_to_test_and_download_but_doesnt_install_anything(self):
+        sut = CertificatesFix(test_query_fails=True, download_fails=True)
+        sut.file_system.test_data.with_file(default_cacert_file, {'hash': 'old'})
+        sut.fix_certificates_if_needed()
+        self.assertTrue(sut.download_ran)
+        self.assertTrue(sut.test_query_ran)
+        self.assertFalse(sut.file_system.is_file(default_cacert_file))
