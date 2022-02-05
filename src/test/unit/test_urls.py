@@ -18,21 +18,22 @@
 
 import unittest
 
-from downloader.other import sanitize_url
+from downloader.other import calculate_url, NoArgumentsToComputeUrlError
 
 
 class TestUrls(unittest.TestCase):
 
-    def test_sanitize_urls(self):
-        for input_url, input_safe, expected in [
-            ['https://weird-server.com/download/MAME217RomsOnlyMerged/MAME%200.217%20ROMs%20%28merged%29.zip/aliensyn.zip', {'weird-server.com': '/()%'},
-             'https://weird-server.com/download/MAME217RomsOnlyMerged/MAME%200.217%20ROMs%20%28merged%29.zip/aliensyn.zip'],
-            ['https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/Cheats/AtariLynx/A.P.B. (USA, Europe) [F6FB48FB].zip', {},
+    def test_calculate_urls(self):
+        for input_url, input_file_ctx, expected in [
+            ['https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/', 'Cheats/AtariLynx/A.P.B. (USA, Europe) [F6FB48FB].zip',
              'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/Cheats/AtariLynx/A.P.B.%20%28USA%2C%20Europe%29%20%5BF6FB48FB%5D.zip'],
-            ['https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/Cheats/NES/Lipstick #1 - Lolita Hen (Japan) (Unl) [30D9946C].zip', {},
+            ['https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/', 'Cheats/NES/Lipstick #1 - Lolita Hen (Japan) (Unl) [30D9946C].zip',
              'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/Cheats/NES/Lipstick%20%231%20-%20Lolita%20Hen%20%28Japan%29%20%28Unl%29%20%5B30D9946C%5D.zip'],
-            ['https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/Cheats/SNES/Maerchen Adventure Cotton 100% (Japan) [5FB7A31D].zip', {},
+            ['https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/', 'Cheats/SNES/Maerchen Adventure Cotton 100% (Japan) [5FB7A31D].zip',
              'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/Cheats/SNES/Maerchen%20Adventure%20Cotton%20100%25%20%28Japan%29%20%5B5FB7A31D%5D.zip'],
         ]:
             with self.subTest(input_url) as _:
-                self.assertEqual(expected, sanitize_url(input_url, input_safe))
+                self.assertEqual(expected, calculate_url(input_url, input_file_ctx))
+
+    def test_calculate_url___without_base_files_url___raises_no_arguments_to_compute_url_error(self):
+        self.assertRaises(NoArgumentsToComputeUrlError, lambda: calculate_url(None, 'Cheats/SNES/Maerchen Adventure Cotton 100% (Japan) [5FB7A31D].zip'))

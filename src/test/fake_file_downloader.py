@@ -44,7 +44,7 @@ class TestDataCurlDownloader:
 
 class FileDownloader(CurlDownloaderAbstract):
     def __init__(self, config=None, file_system=None):
-        config = config if config is not None else {'curl_ssl': '', 'downloader_retries': 3, 'url_safe_characters': {}}
+        config = config if config is not None else {'curl_ssl': '', 'downloader_retries': 3}
         self.file_system = FileSystem() if file_system is None else file_system
         self.local_repository = ProductionLocalRepository(config, NoLogger(), self.file_system)
         super().__init__(config, self.file_system, self.local_repository, NoLogger(), True, TargetPathRepository(config, self.file_system))

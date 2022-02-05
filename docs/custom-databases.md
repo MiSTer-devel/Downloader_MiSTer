@@ -154,7 +154,7 @@ The format of the aforementioned JSON file should be as follow:
     "db_files": [],
         
     /**
-     * [Optional] Databases can specify default options, like default filters, default url_safe_characters, etc... 
+     * [Optional] Databases can specify default options, like default filters, default downloader_timeout, etc... 
      */
     "default_options": {
         // Documented in the "Default Options" section of this page.

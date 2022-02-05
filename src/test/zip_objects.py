@@ -30,7 +30,7 @@ def cheats_folder_tags():
 
 cheats_folder_nes_folder_name = 'Cheats/NES'
 cheats_folder_nes_file_path = cheats_folder_nes_folder_name + '/10-Yard Fight (USA, Europe) [3D564757].zip'
-cheats_folder_nes_file_url = "https://%s/10-Yard Fight (USA, Europe) [3D564757].zip" % cheats_folder_nes_folder_name
+cheats_folder_nes_file_url = f'https://{cheats_folder_nes_folder_name}/10-Yard%20Fight%20%28USA%2C%20Europe%29%20%5B3D564757%5D.zip'
 cheats_folder_nes_file_hash = "8c02595fef1096a9dd160e59067f4f4"
 cheats_folder_nes_file_size = 1020
 
@@ -39,7 +39,7 @@ def cheats_folder_nes_tags():
 
 cheats_folder_sms_folder_name = 'Cheats/SMS'
 cheats_folder_sms_file_path = cheats_folder_sms_folder_name + '/Sonic The Hedgehog (World).zip'
-cheats_folder_sms_file_url = "https://%s/Sonic The Hedgehog (World).zip" % cheats_folder_sms_folder_name
+cheats_folder_sms_file_url = f'https://{cheats_folder_sms_folder_name}/Sonic%20The%20Hedgehog%20%28World%29.zip'
 cheats_folder_sms_file_hash = "1c111111111096a9dd160e59067f4f4"
 cheats_folder_sms_file_size = 2048
 
