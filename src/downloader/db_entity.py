@@ -39,7 +39,7 @@ class DbEntity:
         self.files = _mandatory(db_raw, 'files', _guard(lambda v: isinstance(v, dict)))
         self.folders = _mandatory(db_raw, 'folders', _guard(lambda v: isinstance(v, dict)))
 
-        self.zips = _optional(db_raw, 'zips', _guard(lambda v: isinstance(v, dict)), {})
+        self.zips = _optional(db_raw, 'zips', _guard(lambda v: _is_valid_zips(v)), {})
         self.db_files = _optional(db_raw, 'db_files', _guard(lambda v: isinstance(v, list)), [])
         self.default_options = _optional(db_raw, 'default_options', _create_default_options, DbOptions({}, DbOptionsKind.DEFAULT_OPTIONS))
         self.base_files_url = _optional(db_raw, 'base_files_url', _guard(lambda v: isinstance(v, str)), '')
@@ -95,7 +95,7 @@ def _guard(predicate):
         if predicate(v):
             return v
         else:
-            raise DbEntityValidationException('ERROR: db "DB_ID" does not have "%s", contact the db maintainer.' % k)
+            raise DbEntityValidationException('ERROR: db "DB_ID" has invalid "%s", contact the db maintainer.' % k)
     return func
 
 
@@ -104,3 +104,16 @@ def _create_default_options(options, _):
         return DbOptions(options, kind=DbOptionsKind.DEFAULT_OPTIONS)
     except DbOptionsValidationException as e:
         raise DbEntityValidationException('ERROR: db "DB_ID" has invalid default options [%s], contact the db maintainer.' % e.fields_to_string())
+
+
+def _is_valid_zips(zips):
+    if not isinstance(zips, dict):
+        return False
+
+    for zip_id, zip_desc in zips.items():
+        if 'internal_summary' in zip_desc or 'summary_file' in zip_desc:
+            continue
+
+        return False
+
+    return True

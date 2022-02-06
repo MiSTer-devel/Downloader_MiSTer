@@ -18,6 +18,7 @@
 import time
 from downloader.constants import distribution_mister_db_id
 from downloader.file_filter import BadFileFilterPartException
+from downloader.other import UnreachableException
 
 
 class _Session:
@@ -157,12 +158,23 @@ class _OnlineZipSummaries:
 
         zip_ids_from_store = []
         zip_ids_to_download = []
+        zip_ids_from_internal_summary = []
 
-        for zip_id in self._db.zips:
-            if zip_id in self._store['zips'] and self._store['zips'][zip_id]['summary_file']['hash'] == self._db.zips[zip_id]['summary_file']['hash']:
-                zip_ids_from_store.append(zip_id)
+        for zip_id, db_zip_desc in self._db.zips.items():
+            if 'summary_file' in db_zip_desc:
+                db_summary_file_hash = db_zip_desc['summary_file']['hash']
+                store_summary_file_hash = self._store_summary_file_hash_by_zip_id(zip_id)
+                if store_summary_file_hash is not None and store_summary_file_hash == db_summary_file_hash:
+                    zip_ids_from_store.append(zip_id)
+                else:
+                    zip_ids_to_download.append(zip_id)
+            elif 'internal_summary' in db_zip_desc:
+                zip_ids_from_internal_summary.append(zip_id)
             else:
-                zip_ids_to_download.append(zip_id)
+                raise UnreachableException('Unreachable code path for: %s.%s' % (self._db.db_id, zip_id))
+
+        if len(zip_ids_from_internal_summary) > 0:
+            self._import_zip_ids_from_internal_summaries(zip_ids_from_internal_summary)
 
         if len(zip_ids_from_store) > 0:
             self._import_zip_ids_from_store(zip_ids_from_store)
@@ -171,6 +183,11 @@ class _OnlineZipSummaries:
             self._import_zip_ids_from_network(zip_ids_to_download)
 
         return self._db
+
+    def _store_summary_file_hash_by_zip_id(self, zip_id):
+        store_zip_desc = self._store['zips'][zip_id] if zip_id in self._store['zips'] else {}
+        store_summary_file = store_zip_desc['summary_file'] if 'summary_file' in store_zip_desc else {}
+        return store_summary_file['hash'] if 'hash' in store_summary_file else None
 
     def _remove_old_zip_ids(self, removed_zip_ids):
         for zip_id in removed_zip_ids:
@@ -186,6 +203,12 @@ class _OnlineZipSummaries:
                 description.pop('zip_id')
                 if 'tags' in description:
                     description.pop('tags')
+
+    def _import_zip_ids_from_internal_summaries(self, zip_ids_from_internal_summaries):
+        for zip_id in zip_ids_from_internal_summaries:
+            summary = self._db.zips[zip_id]['internal_summary']
+            self._populate_with_summary(zip_id, summary)
+            self._db.zips[zip_id].pop('internal_summary')
 
     def _import_zip_ids_from_network(self, zip_ids_to_download):
         summary_downloader = self._file_downloader_factory.create(self._config, self._config['parallel_update'])
@@ -206,11 +229,7 @@ class _OnlineZipSummaries:
 
         for zip_id, temp_zip in downloaded_summaries:
             summary = self._file_system.load_dict_from_file(temp_zip)
-            self._db.files.update(summary['files'])
-            self._db.folders.update(summary['folders'])
-
-            self._store['zips'][zip_id] = self._db.zips[zip_id]
-
+            self._populate_with_summary(zip_id, summary)
             self._file_system.unlink(temp_zip)
 
         zip_ids_falling_back_to_store = [zip_id for zip_id in failed_zip_ids if zip_id in self._store['zips']]
@@ -218,6 +237,11 @@ class _OnlineZipSummaries:
             self._import_zip_ids_from_store(zip_ids_falling_back_to_store)
 
         self._session.files_that_failed.extend(summary_downloader.errors())
+
+    def _populate_with_summary(self, zip_id, summary):
+        self._db.files.update(summary['files'])
+        self._db.folders.update(summary['folders'])
+        self._store['zips'][zip_id] = self._db.zips[zip_id]
 
     def _import_zip_ids_from_store(self, zip_ids):
         self._db.files.update(self._entries_from_store('files', zip_ids))

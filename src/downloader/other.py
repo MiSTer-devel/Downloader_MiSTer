@@ -49,6 +49,10 @@ class NoArgumentsToComputeUrlError(Exception):
     pass
 
 
+class UnreachableException(Exception):
+    pass
+
+
 def format_files_message(file_list):
     any_mra_files = [file for file in file_list if file[-4:].lower() == '.mra']
 

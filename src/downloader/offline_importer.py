@@ -85,7 +85,23 @@ class _OfflineDatabaseImporter:
         summary_downloader = self._file_downloader_factory.create(self._config, self._config['parallel_update'])
         zip_ids_by_temp_zip = dict()
 
-        for zip_id in db.zips:
+        zip_ids_to_download = []
+        zip_ids_from_internal_summary = []
+
+        for zip_id, zip_desc in db.zips.items():
+            if 'summary_file' in zip_desc:
+                zip_ids_to_download.append(zip_id)
+            elif 'internal_summary' in zip_desc:
+                zip_ids_from_internal_summary.append(zip_id)
+
+        for zip_id in zip_ids_from_internal_summary:
+            summary = db.zips[zip_id]['internal_summary']
+            self._import_folders(summary['folders'], store['folders'])
+            self._import_files(summary['files'], store['files'])
+            store['zips'][zip_id] = db.zips[zip_id]
+            store['zips'][zip_id].pop('internal_summary')
+
+        for zip_id in zip_ids_to_download:
             temp_zip = '/tmp/%s.json.zip' % zip_id
             zip_ids_by_temp_zip[temp_zip] = zip_id
 
