@@ -102,32 +102,30 @@ def cheats_folder_descr(zip_id=True, tags=True):
     }, zip_id=zip_id, tags=tags)
 
 
-def store_with_unzipped_cheats(url=True, folders=True, zip_id=True, zips=True, tags=True, online_database_imported=None, summary_hash=None):
+def store_with_unzipped_cheats(url=True, folders=True, zip_id=True, zips=True, tags=True, online_database_imported=None, summary_hash=None, is_summary_internal=False):
     o = {
         "base_path": "/media/fat/",
         "files": cheats_folder_files(url=url, zip_id=zip_id, tags=tags),
         'folders': cheats_folder_folders(zip_id=zip_id, tags=tags),
         'offline_databases_imported': online_database_imported if online_database_imported is not None else [],
         "zips": {
-            cheats_folder_id: cheats_folder_zip_desc(summary_hash=summary_hash)
+            cheats_folder_id: cheats_folder_zip_desc(summary_hash=summary_hash, is_summary_internal=is_summary_internal)
         }
     }
-
     if not folders:
         o.pop('folders')
     if not zips:
         o['zips'] = {}
+    if is_summary_internal:
+        for zip_description in o['zips'].values():
+            zip_description.pop('internal_summary')
     return o
 
-def cheats_folder_zip_desc(zipped_files=None, unzipped_json=None, summary_hash=None):
-    json = zip_desc(["NES"], "Cheats/", "Cheats/NES", summary_hash=summary_hash, zipped_files=zipped_files, unzipped_json=unzipped_json)
-    if zipped_files is not None:
-        json['contents_file']['zipped_files'] = zipped_files
-    if unzipped_json is not None:
-        json['summary_file']['unzipped_json'] = unzipped_json
+def cheats_folder_zip_desc(zipped_files=None, summary=None, summary_hash=None, is_summary_internal=False):
+    json = zip_desc(["NES"], "Cheats/", "Cheats/NES", summary_hash=summary_hash, zipped_files=zipped_files, summary=summary, is_summary_internal=is_summary_internal)
     return json
 
-def unzipped_summary_json_from_cheats_folder():
+def summary_json_from_cheats_folder():
     return {
         'files': cheats_folder_files(url=False),
         'folders': cheats_folder_folders(),

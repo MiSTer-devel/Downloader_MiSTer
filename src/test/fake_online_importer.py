@@ -59,5 +59,5 @@ class OnlineImporter(ProductionOnlineImporter):
         for zip_description in store['zips'].values():
             if 'zipped_files' in zip_description['contents_file']:
                 zip_description['contents_file'].pop('zipped_files')
-            if 'unzipped_json' in zip_description['summary_file']:
+            if 'summary_file' in zip_description and 'unzipped_json' in zip_description['summary_file']:
                 zip_description['summary_file'].pop('unzipped_json')

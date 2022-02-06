@@ -23,7 +23,7 @@ from test.objects import file_a, zipped_file_a_descr, zip_desc
 from test.fake_online_importer import OnlineImporter
 from test.zip_objects import store_with_unzipped_cheats, cheats_folder_zip_desc, \
     cheats_folder_nes_file_path, \
-    unzipped_summary_json_from_cheats_folder, \
+    summary_json_from_cheats_folder, \
     zipped_files_from_cheats_folder, cheats_folder_id, cheats_folder_sms_file_path, cheats_folder_folders, \
     cheats_folder_files, with_installed_cheats_folder_on_fs
 
@@ -38,24 +38,41 @@ class TestOnlineImporterWithZips(unittest.TestCase):
         self.sut.download(False)
         return store
 
-    def test_download_zipped_cheats_folder___on_empty_store_from_summary_and_contents_when_file_count_threshold_is_surpassed___installs_from_zip_content(self):
+    def test_download_zipped_cheats_folder___on_empty_store_from_summary_and_contents_files_when_file_count_threshold_is_surpassed___installs_from_zip_content(self):
         self.sut.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
         store = self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=True)
         self.assertEqual(store_with_unzipped_cheats(url=False), store)
 
-    def test_download_zipped_cheats_folder___on_empty_store_from_summary_and_contents_when_accumulated_mb_threshold_is_surpassed___installs_from_zip_content(self):
+    def test_download_zipped_cheats_folder___on_empty_store_from_internal_summary_and_contents_file_when_file_count_threshold_is_surpassed___installs_from_zip_content(self):
+        self.sut.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
+        store = self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=True, is_summary_internal=True)
+        self.assertEqual(store_with_unzipped_cheats(url=False, is_summary_internal=True), store)
+
+    def test_download_zipped_cheats_folder___on_empty_store_from_summary_and_contents_files_when_accumulated_mb_threshold_is_surpassed___installs_from_zip_content(self):
         self.sut.config['zip_accumulated_mb_threshold'] = 0  # This will cause to unzip the contents
         store = self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=True)
         self.assertEqual(store_with_unzipped_cheats(url=False), store)
 
-    def test_download_zipped_cheats_folder___on_empty_store_from_summary_but_no_contents_because_thresholds_are_not_surpassed___installs_from_url(self):
+    def test_download_zipped_cheats_folder___on_empty_store_from_summary_file_but_no_contents_because_thresholds_are_not_surpassed___installs_from_url(self):
         self.assertEqual(store_with_unzipped_cheats(), self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=False))
 
-    def test_download_zipped_cheats_folder___with_already_downloaded_summary___restores_file_contained_in_summary(self):
+    def test_download_zipped_cheats_folder___on_empty_store_from_internal_summary_but_no_contents_because_thresholds_are_not_surpassed___installs_from_zip_content(self):
+        expected_store = store_with_unzipped_cheats(is_summary_internal=True)
+        self.assertEqual(expected_store, self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=False, is_summary_internal=True))
+
+    def test_download_zipped_cheats_folder___with_already_downloaded_summary_file___restores_file_contained_in_summary(self):
         self.assertEqual(store_with_unzipped_cheats(), self.download_zipped_cheats_folder(store_with_unzipped_cheats(), from_zip_content=False))
 
-    def test_download_zipped_cheats_folder___with_summary_containing_already_existing_files___updates_files_in_the_store_now_pointing_to_summary(self):
+    def test_download_zipped_cheats_folder___with_already_stored_internal_summary___restores_file_contained_in_summary(self):
+        expected_store = store_with_unzipped_cheats(is_summary_internal=True)
+        self.assertEqual(expected_store, self.download_zipped_cheats_folder(store_with_unzipped_cheats(), from_zip_content=False, is_summary_internal=True))
+
+    def test_download_zipped_cheats_folder___with_summary_file_containing_already_existing_files___updates_files_in_the_store_now_pointing_to_summary(self):
         self.assertEqual(store_with_unzipped_cheats(), self.download_zipped_cheats_folder(store_with_unzipped_cheats(zip_id=False, zips=False), from_zip_content=False))
+
+    def test_download_zipped_cheats_folder___with_internal_summary_containing_already_existing_files___updates_files_in_the_store_now_pointing_to_summary(self):
+        expected_store = store_with_unzipped_cheats(is_summary_internal=True)
+        self.assertEqual(expected_store, self.download_zipped_cheats_folder(store_with_unzipped_cheats(zip_id=False, zips=False), from_zip_content=False, is_summary_internal=True))
 
     def test_download_zipped_contents___on_existing_store_with_zips___removes_old_zip_id_and_inserts_new_one(self):
         with_installed_cheats_folder_on_fs(self.sut.file_system)
@@ -64,7 +81,7 @@ class TestOnlineImporterWithZips(unittest.TestCase):
         different_folder = "Different"
 
         store = self.download(db_test_descr(zips={
-            different_zip_id: zip_desc([different_folder], "./", different_folder, unzipped_json={
+            different_zip_id: zip_desc([different_folder], "./", different_folder, summary={
                 "files": {file_a: zipped_file_a_descr(different_zip_id)},
                 "files_count": 1,
                 "folders": {different_folder: {"zip_id": different_zip_id}},
@@ -99,23 +116,23 @@ class TestOnlineImporterWithZips(unittest.TestCase):
         expected_store = store_with_unzipped_cheats(url=False, summary_hash="something_new")
 
         actual_store = self.download(db_test_descr(zips={
-            cheats_folder_id: cheats_folder_zip_desc(summary_hash="something_new", unzipped_json=unzipped_summary_json_from_cheats_folder())
+            cheats_folder_id: cheats_folder_zip_desc(summary_hash="something_new", summary=summary_json_from_cheats_folder())
         }), previous_store)
 
         self.assertReports([])
         self.assertEqual(expected_store, actual_store)
 
     def test_download_zip_summary_without_files___for_the_first_time___adds_zip_id_to_store(self):
-        zip_descriptions = {cheats_folder_id: cheats_folder_zip_desc(unzipped_json=empty_zip_summary())}
+        zip_descriptions = {cheats_folder_id: cheats_folder_zip_desc(summary=empty_zip_summary())}
         expected_store = store_test_descr(zips=zip_descriptions)
         actual_store = self.download(db_test_descr(zips=zip_descriptions), empty_test_store())
         self.assertEqual(expected_store, actual_store)
 
-    def download_zipped_cheats_folder(self, input_store, from_zip_content):
+    def download_zipped_cheats_folder(self, input_store, from_zip_content, is_summary_internal=False):
         zipped_files = zipped_files_from_cheats_folder() if from_zip_content else None
 
         output_store = self.download(db_test_descr(zips={
-            cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files, unzipped_json=unzipped_summary_json_from_cheats_folder())
+            cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files, summary=summary_json_from_cheats_folder(), is_summary_internal=is_summary_internal)
         }), input_store)
 
         self.assertReports(list(cheats_folder_files()))

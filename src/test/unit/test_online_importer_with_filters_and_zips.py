@@ -27,7 +27,7 @@ from test.fake_online_importer import OnlineImporter
 from test.zip_objects import cheats_folder_zip_desc, cheats_folder_tag_dictionary, cheats_folder_id, \
     cheats_folder_nes_file_path, cheats_folder_nes_folder_name, cheats_folder_sms_file_path, \
     cheats_folder_sms_folder_name, \
-    zipped_files_from_cheats_folder, unzipped_summary_json_from_cheats_folder, cheats_folder_name, \
+    zipped_files_from_cheats_folder, summary_json_from_cheats_folder, cheats_folder_name, \
     cheats_folder_files, cheats_folder_folders, cheats_folder_sms_file_descr, cheats_folder_sms_folder_descr, \
     cheats_folder_descr, cheats_folder_nes_file_descr, cheats_folder_nes_folder_descr, cheats_folder_nes_file_hash, \
     cheats_folder_nes_file_size, cheats_folder_sms_file_hash, cheats_folder_sms_file_size
@@ -80,7 +80,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
             store_with_cheats_non_filtered(),
             'all',
             file_system=fs,
-            summary=_append_tag_to_store('x', unzipped_summary_json_from_cheats_folder()),
+            summary=_append_tag_to_store('x', summary_json_from_cheats_folder()),
             summary_hash='different')
 
         self.assertEqual(store_with_cheats_non_filtered_and_filter_x(), actual_store)
@@ -113,10 +113,10 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
 
         self.sut = OnlineImporter(config=config, file_system=file_system)
 
-        summary = unzipped_summary_json_from_cheats_folder() if summary is None else summary
+        summary = summary_json_from_cheats_folder() if summary is None else summary
 
         self.sut.add_db(db_test_descr(zips={
-            cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files_from_cheats_folder(), unzipped_json=summary, summary_hash=summary_hash)
+            cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files_from_cheats_folder(), summary=summary, summary_hash=summary_hash)
         }, tag_dictionary=cheats_folder_tag_dictionary()), store).download(False)
 
         return store
@@ -218,7 +218,7 @@ def store_with_filtered_cheats_zip_data():
     })
 
     store['filtered_zip_data'] = {
-        cheats_folder_id: unzipped_summary_json_from_cheats_folder()
+        cheats_folder_id: summary_json_from_cheats_folder()
     }
 
     return store

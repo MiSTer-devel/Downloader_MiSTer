@@ -76,7 +76,7 @@ def temp_name():
         return temp.name
 
 
-def zip_desc(contents, path, source, zipped_files=None, unzipped_json=None, summary_hash=None, summary_size=None, contents_hash=None, contents_size=None):
+def zip_desc(contents, path, source, zipped_files=None, summary=None, summary_hash=None, summary_size=None, contents_hash=None, contents_size=None, is_summary_internal=False):
     json = {
         "base_files_url": "https://base_files_url",
         "contents": contents,
@@ -89,17 +89,22 @@ def zip_desc(contents, path, source, zipped_files=None, unzipped_json=None, summ
         "folders_count": 0,
         "path": path,
         "raw_files_size": 6995290,
-        "source": source,
-        "summary_file": {
+        "source": source
+    }
+    if is_summary_internal:
+        json['internal_summary'] = {} if summary is None else summary
+    else:
+        json['summary_file'] = {
             "hash": summary_hash if summary_hash is not None else "b5d85d1cd6f92d714ab74a997b97130d",
             "size": summary_size if summary_size is not None else 84460,
             "url": "https://summary_file"
         }
-    }
+        if summary is not None:
+            json['summary_file']['unzipped_json'] = summary
+
     if zipped_files is not None:
         json['contents_file']['zipped_files'] = zipped_files
-    if unzipped_json is not None:
-        json['summary_file']['unzipped_json'] = unzipped_json
+
     return json
 
 
