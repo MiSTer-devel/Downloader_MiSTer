@@ -20,7 +20,7 @@ import re
 from pathlib import Path
 
 
-filter_part_regex = re.compile("[!]?[a-z]+[-_a-z0-9.]*$", )
+filter_part_regex = re.compile("[!]?[a-z0-9]+[-_a-z0-9.]*$", )
 
 
 class FileFilterFactory:

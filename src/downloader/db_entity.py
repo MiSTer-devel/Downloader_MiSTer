@@ -39,7 +39,7 @@ class DbEntity:
         self.files = _mandatory(db_raw, 'files', _guard(lambda v: isinstance(v, dict)))
         self.folders = _mandatory(db_raw, 'folders', _guard(lambda v: isinstance(v, dict)))
 
-        self.zips = _optional(db_raw, 'zips', _guard(lambda v: _is_valid_zips(v)), {})
+        self.zips = _optional(db_raw, 'zips', _guard(_is_valid_zips), {})
         self.db_files = _optional(db_raw, 'db_files', _guard(lambda v: isinstance(v, list)), [])
         self.default_options = _optional(db_raw, 'default_options', _create_default_options, DbOptions({}, DbOptionsKind.DEFAULT_OPTIONS))
         self.base_files_url = _optional(db_raw, 'base_files_url', _guard(lambda v: isinstance(v, str)), '')
