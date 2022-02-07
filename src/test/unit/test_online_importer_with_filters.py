@@ -102,7 +102,7 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
         self.assertEqual(empty_test_store(), self.download_db_with_one_non_tagged_file_and_tagged_a_file(config_with_filter('!all')))
 
     def test_download_db___using_incorrect_filter___raises_wrong_database_options(self):
-        for given_filter in ['!!!b', '@what', '123', '  ', '', '_hidden', 'wha+tever', '"quotes1"', "'quotes2'", '!all a', 'none']:
+        for given_filter in ['!!!b', '@what', '  ', '', '_hidden', 'wha+tever', '"quotes1"', "'quotes2'", '!all a', 'none']:
             with self.subTest(given_filter) as _:
                 self.assertRaises(WrongDatabaseOptions, lambda: self.download_db_with_cheat_and_console_files_and_tag_dictionary(config_with_filter(given_filter)))
 
