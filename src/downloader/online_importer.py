@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import time
-from downloader.constants import distribution_mister_db_id
+from downloader.constants import distribution_mister_db_id, file_PDFViewer, file_lesskey, file_glow
 from downloader.file_filter import BadFileFilterPartException
 from downloader.other import UnreachableException
 
@@ -451,4 +451,4 @@ def invalid_folders():
     return ('linux', 'saves', 'savestates', 'screenshots')
 
 def distribution_mister_exceptional_paths():
-    return ('linux/pdfviewer')
+    return (file_PDFViewer, file_lesskey, file_glow)
