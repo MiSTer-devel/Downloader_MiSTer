@@ -26,6 +26,7 @@ distribution_mister_db_id = 'distribution_mister'
 
 # Firmware files
 file_MiSTer = 'MiSTer'
+file_PDFViewer = 'linux/pdfviewer'
 file_MiSTer_new = 'MiSTer.new'
 file_MiSTer_old = '.MiSTer.old'
 

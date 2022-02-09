@@ -35,6 +35,7 @@ file_boot_rom = 'boot.rom'
 file_menu_rbf = 'menu.rbf'
 hash_menu_rbf = 'menu.rbf'
 hash_MiSTer = file_MiSTer_new
+hash_PDFViewer = 'pdfviewer'
 hash_MiSTer_old = 'something_old'
 hash_real_test_file = '3de8f8b0dc94b8c2230fab9ec0ba0506'
 folder_a = 'a'
@@ -235,6 +236,15 @@ def db_options(kind=None, base_path=None, parallel_update=None, update_linux=Non
     elif kind == DbOptionsKind.INI_SECTION:
         raw_db_options['base_path'] = '/media/usb0/'
     return DbOptions(raw_db_options, kind)
+
+
+def file_pdfviewer_descr():
+    return {
+        "hash": hash_PDFViewer,
+        "size": 2915040,
+        "url": "https://pdfviewer",
+        "path": "system"
+    }
 
 
 def file_mister_descr():

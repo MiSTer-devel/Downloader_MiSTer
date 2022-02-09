@@ -18,14 +18,15 @@
 
 import unittest
 from downloader.config import default_config
-from downloader.constants import file_MiSTer_old, file_MiSTer
+from downloader.constants import file_MiSTer_old, file_MiSTer, file_PDFViewer
 from downloader.other import empty_store
 from downloader.online_importer import InvalidDownloaderPath, invalid_folders, invalid_paths, no_distribution_mister_invalid_paths
 from test.fake_file_system import FileSystem
 from test.objects import store_with_folders, db_distribution_mister_with_file, db_test_being_empty_descr, file_boot_rom, \
     boot_rom_descr, overwrite_file, file_mister_descr, file_a_descr, file_a_updated_descr, \
     db_test_with_file, db_with_file, db_with_folders, file_a, folder_a, \
-    store_test_with_file_a_descr, store_test_with_file, db_test_with_file_a, file_descr, empty_test_store
+    store_test_with_file_a_descr, store_test_with_file, db_test_with_file_a, file_descr, empty_test_store, \
+    file_pdfviewer_descr
 from test.fake_online_importer import OnlineImporter
 from test.factory_stub import FactoryStub
 from test.fake_file_downloader import FileDownloader
@@ -133,6 +134,19 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertReports(sut, [file_MiSTer], needs_reboot=True)
         self.assertTrue(sut.file_system.is_file(file_MiSTer))
         self.assertTrue(sut.file_system.is_file(file_MiSTer_old))
+
+    def test_download_distribution_mister___with_pdfviewer___needs_reboot(self):
+        sut = OnlineImporter()
+        store = empty_test_store()
+        sut.file_system.test_data.with_old_mister_binary()
+
+        sut.add_db(db_distribution_mister_with_file(file_PDFViewer, file_pdfviewer_descr()), store)
+        sut.download(False)
+
+        self.assertEqualDict(store['files'], {file_PDFViewer: file_pdfviewer_descr()})
+        self.assertEmptyFolders(store)
+        self.assertReports(sut, [file_PDFViewer], needs_reboot=False)
+        self.assertTrue(sut.file_system.is_file(file_PDFViewer))
 
     def test_download_test_db___with_mister___raises_invalid_downloader_path_exception(self):
         sut = OnlineImporter()
