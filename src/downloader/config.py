@@ -69,6 +69,7 @@ def default_config():
         'databases': {},
         'base_path': '/media/fat/',
         'base_system_path': '/media/fat/',
+        'gamesdir_path': 'auto',
         'allow_delete': AllowDelete.ALL,
         'allow_reboot': AllowReboot.ALWAYS,
         'check_manually_deleted_files': True,

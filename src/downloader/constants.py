@@ -45,3 +45,14 @@ file_Linux_7z = '/media/fat/linux/7za'
 # Reboot files
 file_downloader_needs_reboot_after_linux_update = '/tmp/downloader_needs_reboot_after_linux_update'
 file_mister_downloader_needs_reboot = '/tmp/MiSTer_downloader_needs_reboot'
+
+# Games Directory Priority
+gamesdir_priority = [
+    '/media/usb0',
+    '/media/usb1',
+    '/media/usb2',
+    '/media/usb3',
+    '/media/usb4',
+    '/media/usb5',
+    '/media/fat/cifs',
+]
