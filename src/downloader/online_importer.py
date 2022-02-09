@@ -336,6 +336,9 @@ class _OnlineDatabaseImporter:
 
         lower_path = path.lower()
 
+        if self._db.db_id == distribution_mister_db_id and lower_path in distribution_mister_exceptional_paths():
+            return
+
         if lower_path in invalid_paths():
             raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
 
@@ -446,3 +449,6 @@ def invalid_paths():
 
 def invalid_folders():
     return ('linux', 'saves', 'savestates', 'screenshots')
+
+def distribution_mister_exceptional_paths():
+    return ('linux/pdfviewer')

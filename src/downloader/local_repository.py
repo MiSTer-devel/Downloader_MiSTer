@@ -39,8 +39,7 @@ class LocalRepository:
     @property
     def _last_successful_run(self):
         if self._last_successful_run_value is None:
-            self._last_successful_run_value = file_downloader_last_successful_run % self._config[
-                'config_path'].stem
+            self._last_successful_run_value = file_downloader_last_successful_run % self._config['config_path'].stem
             self._file_system.add_system_path(self._last_successful_run_value)
         return self._last_successful_run_value
 
