@@ -451,4 +451,4 @@ def invalid_folders():
     return ('linux', 'saves', 'savestates', 'screenshots')
 
 def distribution_mister_exceptional_paths():
-    return (file_PDFViewer, file_lesskey, file_glow)
+    return (file_PDFViewer, file_lesskey, file_glow, 'linux')
