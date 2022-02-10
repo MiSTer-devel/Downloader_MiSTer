@@ -18,26 +18,22 @@
 from downloader.constants import gamesdir_priority
 
 
-class GamesdirResolver:
-    def __init__(self, config, file_system, logger):
-        self._config = config
+class GamesdirResolverFactory:
+    def __init__(self, auto_path_resolver):
+        self._auto_path_resolver = auto_path_resolver
+
+    def create(self, config):
+        return _GamesdirConfigResolver(config, self._auto_path_resolver)
+
+
+class GamesdirAutoResolver:
+    def __init__(self, file_system, logger):
         self._file_system = file_system
         self._logger = logger
         self._cached_gamesdir_priority = None
         self._drive_folders_cache = {}
 
-    def translate_path(self, path):
-        if path[0] != '|':
-            return path
-
-        path = path[1:]
-
-        if not path.startswith('games/'):
-            raise GamesdirError("Path '|%s' should not start with character '|', please contact the database maintainer." % path)
-
-        if self._config['gamesdir_path'] != 'auto':
-            return '%s/%s' % (self._config['gamesdir_path'], path)
-
+    def translate_auto_path(self, path):
         parts = path.split('/')
         if len(parts) <= 2:
             raise GamesdirError("Path '|%s' is incorrect, please contact the database maintainer." % path)
@@ -86,6 +82,26 @@ class GamesdirResolver:
 
     def _check_if_folder_exists(self, folder):
         return self._file_system.is_folder(folder)
+
+
+class _GamesdirConfigResolver:
+    def __init__(self, config, auto_path_resolver):
+        self._config = config
+        self._auto_path_resolver = auto_path_resolver
+
+    def translate_path(self, path):
+        if path[0] != '|':
+            return path
+
+        path = path[1:]
+
+        if not path.startswith('games/'):
+            raise GamesdirError("Path '|%s' should not start with character '|', please contact the database maintainer." % path)
+
+        if self._config['gamesdir_path'] != 'auto':
+            return '%s/%s' % (self._config['gamesdir_path'], path)
+
+        return self._auto_path_resolver.translate_auto_path(path)
 
 
 class GamesdirError(Exception):
