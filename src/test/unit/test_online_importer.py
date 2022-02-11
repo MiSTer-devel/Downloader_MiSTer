@@ -18,7 +18,7 @@
 
 import unittest
 from downloader.config import default_config
-from downloader.constants import file_MiSTer_old, file_MiSTer, file_PDFViewer
+from downloader.constants import file_MiSTer_old, file_MiSTer, file_PDFViewer, file_MiSTer_new
 from downloader.other import empty_store
 from downloader.online_importer import InvalidDownloaderPath, invalid_folders, invalid_paths, no_distribution_mister_invalid_paths
 from test.fake_file_system import FileSystem
@@ -55,6 +55,7 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertHasFolderA(store)
         self.assertReports(sut, [file_a])
         self.assertTrue(sut.file_system.is_file(file_a))
+        self.assertEqual([], sut.file_system.system_paths)
 
     def test_download_dbs_contents___with_existing_incorrect_file_but_correct_already_on_store___changes_nothing(self):
         sut = OnlineImporter()
@@ -134,6 +135,7 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertReports(sut, [file_MiSTer], needs_reboot=True)
         self.assertTrue(sut.file_system.is_file(file_MiSTer))
         self.assertTrue(sut.file_system.is_file(file_MiSTer_old))
+        self.assertEqual([file_MiSTer, file_MiSTer_new, file_MiSTer_old], sut.file_system.system_paths)
 
     def test_download_distribution_mister___with_pdfviewer___needs_reboot(self):
         sut = OnlineImporter()
@@ -147,6 +149,7 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertEmptyFolders(store)
         self.assertReports(sut, [file_PDFViewer], needs_reboot=False)
         self.assertTrue(sut.file_system.is_file(file_PDFViewer))
+        self.assertEqual([file_PDFViewer], sut.file_system.system_paths)
 
     def test_download_test_db___with_mister___raises_invalid_downloader_path_exception(self):
         sut = OnlineImporter()
@@ -161,6 +164,7 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertReportsNothing(sut)
         self.assertTrue(sut.file_system.is_file(file_MiSTer))
         self.assertFalse(sut.file_system.is_file(file_MiSTer_old))
+        self.assertEqual([], sut.file_system.system_paths)
 
     def test_download_dbs_contents___with_stored_file_a_and_download_error___store_deletes_file_a_but_not_folder_a_and_fs_is_unchanged(self):
         sut = online_importer_with_custom_file_downloader(lambda fd: fd.test_data.errors_at(file_a))

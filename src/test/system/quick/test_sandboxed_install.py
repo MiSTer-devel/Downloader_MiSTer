@@ -22,10 +22,11 @@ import os
 import json
 from pathlib import Path
 from downloader.config import ConfigReader
+from test.fake_file_system import make_production_filesystem
 from test.objects import debug_env, default_base_path
 from test.fake_logger import NoLogger
 from test.fake_store_migrator import StoreMigrator
-from downloader.file_system import hash_file, FileSystem
+from downloader.file_system import hash_file
 from downloader.main import main
 from downloader.local_repository import LocalRepository
 from downloader.store_migrator import make_new_local_store
@@ -248,7 +249,7 @@ class TestSandboxedInstall(unittest.TestCase):
             return
 
         config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
-        self.file_system = FileSystem(config, NoLogger())
+        self.file_system = make_production_filesystem(config)
         counter = 0
         if 'local_store' in expected:
             counter += 1

@@ -16,6 +16,10 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+# Config dict keys
+base_path = 'base_path'
+base_system_path = 'base_system_path'
+
 # Default SSL option
 default_cacert_file = '/etc/ssl/certs/cacert.pem'
 default_curl_ssl_options = '--cacert %s' % default_cacert_file

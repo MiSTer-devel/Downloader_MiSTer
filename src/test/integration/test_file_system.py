@@ -22,8 +22,10 @@ import unittest
 import os
 from pathlib import Path
 
-from downloader.constants import file_MiSTer
-from test.objects import temp_name
+from downloader.constants import file_MiSTer, base_path, base_system_path
+from downloader.file_system import FileSystemFactory
+from test.fake_logger import NoLogger
+from test.objects import temp_name, file_a, file_b
 from test.fake_file_system import make_production_filesystem
 from downloader.config import AllowDelete, default_config
 
@@ -61,7 +63,7 @@ class TestFileSystem(unittest.TestCase):
         self.assertEqual(self.sut().hash(empty_file), empty_file_hash)
 
     def test_hash___on_bigger_file__returns_different_string(self):
-        self.assertNotEqual(self.sut({'base_path': '..'}).hash('downloader.sh'), empty_file_hash)
+        self.assertNotEqual(self.sut({base_path: '..'}).hash('downloader.sh'), empty_file_hash)
 
     def test_move___on_existing_file__works_fine(self):
         self.sut().move(empty_file, not_created_file)
@@ -121,12 +123,12 @@ class TestFileSystem(unittest.TestCase):
         self.assertFalse(self.sut().is_file(empty_file))
 
     def test_curl_path_x___after_add_system_path_x_with_system_path_b___returns_b_plus_x(self):
-        sut = self.sut({'base_path': 'a', 'base_system_path': 'b'})
+        sut = self.sut({base_path: 'a', base_system_path: 'b'})
         sut.add_system_path('x')
         self.assertEqual(sut.download_target_path('x'), 'b/x')
 
     def test_curl_path_x___with_system_path_a___returns_a_plus_x(self):
-        sut = self.sut({'base_path': 'a', 'base_system_path': 'b'})
+        sut = self.sut({base_path: 'a', base_system_path: 'b'})
         self.assertEqual(sut.download_target_path('x'), 'a/x')
 
     def test_curl_path_temp_x___always___returns_temp_plus_x(self):
@@ -141,6 +143,28 @@ class TestFileSystem(unittest.TestCase):
         self.sut().write_file_contents(json_file, json.dumps(foo_bar_json))
         self.assertEqual(foo_bar_json.copy(), self.sut().load_dict_from_file(json_file))
 
+    def test_system_paths_on_fs_1_and_2_created_by_same_factory___when_fs_1_adds_system_path_file_a___fs_2_download_target_path_returns_system_path_for_file_a(self):
+        fs_1, fs_2 = self.fs_1_and_2_by_same_factory()
+        fs_1.add_system_path(file_a)
+
+        self.assertEqual(f'{base_system_path}/{file_a}', fs_2.download_target_path(file_a))
+
+    def test_system_paths_on_fs_1_and_2_created_by_same_factory___when_fs_1_adds_system_path_file_a___fs_2_and_fs_1_download_target_path_are_the_same_for_file_a(self):
+        fs_1, fs_2 = self.fs_1_and_2_by_same_factory()
+        fs_1.add_system_path(file_a)
+
+        self.assertEqual(fs_1.download_target_path(file_a), fs_2.download_target_path(file_a))
+
+    def test_system_paths_on_fs_1_and_2_created_by_same_factory___when_no_system_path_is_added___fs_2_download_target_path_returns_base_path_for_file_a(self):
+        fs_1, fs_2 = self.fs_1_and_2_by_same_factory()
+        self.assertEqual(f'{base_path}/{file_a}', fs_2.download_target_path(file_a))
+
+    def test_system_paths_on_fs_1_and_2_created_by_same_factory___when_fs_1_adds_system_path_file_a___fs_2_download_target_path_returns_base_path_for_file_b(self):
+        fs_1, fs_2 = self.fs_1_and_2_by_same_factory()
+        fs_1.add_system_path(file_a)
+
+        self.assertEqual(f'{base_path}/{file_b}', fs_2.download_target_path(file_b))
+
     @unittest.skipIf(sys.platform.startswith("win"), "requires Linux")
     def test_load_dict_from_file___on_zipped_json___returns_json_dict(self):
         zip_file = 'foo.json.zip'
@@ -150,10 +174,19 @@ class TestFileSystem(unittest.TestCase):
     def sut(self, config=None):
         return make_production_filesystem(self.default_test_config() if config is None else config)
 
+    def factory(self, config=None):
+        return FileSystemFactory(self.default_test_config() if config is None else config, NoLogger())
+
+    def fs_1_and_2_by_same_factory(self):
+        shared_config = {base_path: base_path, base_system_path: base_system_path}
+        factory = self.factory({})
+
+        return factory.create_for_config(shared_config), factory.create_for_config(shared_config)
+
     def default_test_config(self, allow_delete=None):
         actual_config = default_config()
-        actual_config['base_path'] = self.tempdir.name
-        actual_config['base_system_path'] = self.tempdir.name
+        actual_config[base_path] = self.tempdir.name
+        actual_config[base_system_path] = self.tempdir.name
         if allow_delete is not None:
             actual_config['allow_delete'] = allow_delete
         return actual_config

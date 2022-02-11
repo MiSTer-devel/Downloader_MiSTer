@@ -32,6 +32,9 @@ class FileSystemFactory:
     def __init__(self, config, logger):
         self._config = config
         self._logger = logger
+        self._system_paths = set()
+        self._unique_temp_filenames = set()
+        self._unique_temp_filenames.add(None)
 
     def create_for_db_id(self, db_id):
         config = self._config.copy()
@@ -41,24 +44,23 @@ class FileSystemFactory:
         if 'options' in ini_description:
             ini_description['options'].apply_to_config(config)
 
-        return FileSystem(config, self._logger)
+        return FileSystem(config, self._logger, self._system_paths, self._unique_temp_filenames)
 
     def create_for_config(self, config):
-        return FileSystem(config, self._logger)
+        return FileSystem(config, self._logger, self._system_paths, self._unique_temp_filenames)
 
     def create_for_base_path(self, config, base_path):
         fs_config = config.copy()
         fs_config['base_path'] = base_path
-        return FileSystem(fs_config, self._logger)
+        return FileSystem(fs_config, self._logger, self._system_paths, self._unique_temp_filenames)
 
 
 class FileSystem:
-    def __init__(self, config, logger):
+    def __init__(self, config, logger, system_paths, unique_temp_filenames):
         self._config = config
         self._logger = logger
-        self._system_paths = set()
-        self._unique_temp_filenames = set()
-        self._unique_temp_filenames.add(None)
+        self._system_paths = system_paths
+        self._unique_temp_filenames = unique_temp_filenames
 
     def temp_file(self):
         return tempfile.NamedTemporaryFile(prefix='temp_file')

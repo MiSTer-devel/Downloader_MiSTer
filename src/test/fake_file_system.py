@@ -67,7 +67,7 @@ class TestDataFileSystem:
 
 
 def make_production_filesystem(config) -> ProductionFileSystem:
-    return ProductionFileSystem(config, NoLogger())
+    return ProductionFileSystem(config, NoLogger(), set(), {None})
 
 
 class FakeTempFile:
