@@ -41,12 +41,12 @@ def make_full_run_service(env, logger, ini_path):
     config = ConfigReader(logger, env).read_config(ini_path)
     config['curl_ssl'] = env['CURL_SSL']
 
-    system_file_system = FileSystem(config, logger)
+    file_system_factory = FileSystemFactory(config, logger)
+    system_file_system = file_system_factory.create_for_config(config)
     local_repository = LocalRepository(config, logger, system_file_system)
 
     logger.set_local_repository(local_repository)
 
-    file_system_factory = FileSystemFactory(config, logger)
     file_filter_factory = FileFilterFactory()
     file_downloader_factory = make_file_downloader_factory(file_system_factory, local_repository, logger)
     db_gateway = DbGateway(config, system_file_system, file_downloader_factory, logger)
