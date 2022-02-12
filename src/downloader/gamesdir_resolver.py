@@ -16,6 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import GAMESDIR_PRIORITY, K_GAMESDIR_PATH
+from downloader.other import cache
 
 
 class GamesdirResolverFactory:
@@ -30,7 +31,6 @@ class GamesdirAutoResolver:
     def __init__(self, file_system, logger):
         self._file_system = file_system
         self._logger = logger
-        self._cached_gamesdir_priority = None
         self._drive_folders_cache = {}
 
     def translate_auto_path(self, path):
@@ -59,24 +59,21 @@ class GamesdirAutoResolver:
             self._drive_folders_cache[drive][directory] = self._check_if_folder_exists('%s/games/%s' % (drive, directory))
         return self._drive_folders_cache[drive][directory]
 
-    # TODO: Testing @cache decorator here
+    @cache
     def _gamesdir_priority(self):
-        if self._cached_gamesdir_priority is not None:
-            return self._cached_gamesdir_priority
-
-        self._cached_gamesdir_priority = []
+        result = []
         for drive in GAMESDIR_PRIORITY:
             if self._is_gamesdir_not_empty_on_drive('%s/games' % drive):
-                self._cached_gamesdir_priority.append(drive)
+                result.append(drive)
 
-        if len(self._cached_gamesdir_priority) > 0:
+        if len(result) > 0:
             self._logger.debug()
             self._logger.debug('Detected following connected drives:')
-            for directory in self._cached_gamesdir_priority:
+            for directory in result:
                 self._logger.debug(directory)
             self._logger.debug()
 
-        return self._cached_gamesdir_priority
+        return result
 
     def _is_gamesdir_not_empty_on_drive(self, drive):
         return self._file_system.is_folder(drive) and self._file_system.folder_has_items(drive)

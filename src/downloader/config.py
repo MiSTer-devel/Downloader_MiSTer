@@ -21,10 +21,13 @@ from enum import IntEnum, unique
 from pathlib import Path, PurePosixPath
 
 from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_BASE_SYSTEM_PATH, K_GAMESDIR_PATH, K_DATABASES, \
-    K_ALLOW_DELETE, K_ALLOW_REBOOT, K_UPDATE_LINUX, K_PARALLEL_UPDATE, K_DOWNLOADER_SIZE_MB_LIMIT, K_DOWNLOADER_PROCESS_LIMIT, \
-    K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, K_FILTER, K_VERBOSE, \
+    K_ALLOW_DELETE, K_ALLOW_REBOOT, K_UPDATE_LINUX, K_PARALLEL_UPDATE, K_DOWNLOADER_SIZE_MB_LIMIT, \
+    K_DOWNLOADER_PROCESS_LIMIT, \
+    K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, K_FILTER, \
+    K_VERBOSE, \
     K_DB_URL, K_SECTION, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, KENV_DOWNLOADER_INI_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, \
-    KENV_DEFAULT_BASE_PATH, KENV_ALLOW_REBOOT, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEBUG, K_OPTIONS, MEDIA_FAT
+    KENV_DEFAULT_BASE_PATH, KENV_ALLOW_REBOOT, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEBUG, K_OPTIONS, \
+    MEDIA_FAT, K_DEBUG
 from downloader.db_options import DbOptionsKind, DbOptions, DbOptionsValidationException
 from downloader.ini_parser import IniParser
 
@@ -91,7 +94,8 @@ def default_config():
         K_ZIP_FILE_COUNT_THRESHOLD: 60,
         K_ZIP_ACCUMULATED_MB_THRESHOLD: 100,
         K_FILTER: None,
-        K_VERBOSE: False
+        K_VERBOSE: False,
+        K_DEBUG: False
     }
 
 
@@ -103,6 +107,8 @@ class ConfigReader:
     def read_config(self, config_path):
         result = default_config()
         result[K_CONFIG_PATH] = Path(config_path)
+        result[K_DEBUG] = self._env[KENV_DEBUG] == 'true'
+
         if self._env[KENV_DEFAULT_BASE_PATH] is not None:
             result[K_BASE_PATH] = self._env[KENV_DEFAULT_BASE_PATH]
             result[K_BASE_SYSTEM_PATH] = self._env[KENV_DEFAULT_BASE_PATH]

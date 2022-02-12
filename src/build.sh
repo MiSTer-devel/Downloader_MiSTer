@@ -6,8 +6,12 @@ set -euo pipefail
 TEMP_ZIP1="$(mktemp -u).zip"
 TEMP_ZIP2="$(mktemp -u).zip"
 BIN="/tmp/dont_download.zip"
-COMMIT="$(git rev-parse --short HEAD)"
 UUDECODE_CMD=$({ [[ "${MISTER:-false}" == "false" ]] && [[ "$(uname -s)" == "Darwin" ]] ; } && echo "uudecode -p" || echo "uudecode -o -")
+EXPORTS="export COMMIT=$(git rev-parse --short HEAD)"
+
+if [[ "${DEBUG:-false}" == "true" ]] ; then
+  EXPORTS="${EXPORTS}"$'\n'"export DEBUG=true"
+fi
 
 pin_metadata() {
   touch -a -m -t 202108231405 "${1}"
@@ -28,7 +32,7 @@ cat <<-EOF
 #!/usr/bin/env bash
 set -euo pipefail
 export DOWNLOADER_LAUNCHER_PATH="\${DOWNLOADER_LAUNCHER_PATH:-\${0}}"
-export COMMIT="${COMMIT}"
+${EXPORTS}
 ${UUDECODE_CMD} "\${0}" | xzcat -d -c > "${BIN}"
 chmod a+x "${BIN}"
 "${BIN}"

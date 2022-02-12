@@ -108,13 +108,21 @@ def test_only(func):
 
 
 def cache(func):
-    value = None
+    cache_dict = {}
 
-    def wrapper():
-        nonlocal value
-        if value is None:
-            value = func()
-        return value
+    def wrapper(*args):
+        if len(args) > 1 or (len(args) == 1 and not isinstance(args[0], object)):
+            raise Exception('cache decorator should only be used with functions and methods with empty arguments')
+
+        idx = 0 if len(args) == 0 else id(args[0])
+
+        nonlocal cache_dict
+
+        if idx not in cache_dict:
+            cache_dict[idx] = func(*args)
+
+        return cache_dict[idx]
+
     return wrapper
 
 

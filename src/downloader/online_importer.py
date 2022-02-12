@@ -20,7 +20,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, FILE_PDFViewer, FILE
     K_PARALLEL_UPDATE, K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, FOLDER_screenshots, \
     FOLDER_savestates, FOLDER_saves, FOLDER_linux, FILE_MiSTer_new, FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, \
     FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, \
-    FILE_downloader_launcher_script
+    FILE_downloader_launcher_script, K_VERBOSE
 from downloader.file_filter import BadFileFilterPartException
 from downloader.other import UnreachableException, cache
 
@@ -225,8 +225,7 @@ class _OnlineZipSummaries:
             summary_downloader.queue_file(self._db.zips[zip_id]['summary_file'], temp_zip)
 
         summary_downloader.download_files(self._is_first_run())
-        downloaded_summaries = [(zip_ids_by_temp_zip[temp_zip], temp_zip) for temp_zip in
-                                summary_downloader.correctly_downloaded_files()]
+        downloaded_summaries = [(zip_ids_by_temp_zip[temp_zip], temp_zip) for temp_zip in summary_downloader.correctly_downloaded_files()]
         failed_zip_ids = [zip_ids_by_temp_zip[temp_zip] for temp_zip in summary_downloader.errors()]
 
         self._logger.print()
@@ -332,8 +331,7 @@ class _OnlineDatabaseImporter:
 
     def _assert_valid_path(self, path):
         if not isinstance(path, str):
-            raise InvalidDownloaderPath(
-                "Path is not a string '%s', contact with the author of the database." % str(path))
+            raise InvalidDownloaderPath("Path is not a string '%s', contact with the author of the database." % str(path))
 
         if path == '' or path[0] == '/' or path[0] == '.' or path[0] == '\\':
             raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
@@ -359,6 +357,7 @@ class _OnlineDatabaseImporter:
     def _import_zip_contents(self, needed_zips, file_downloader):
         zip_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE])
         zip_ids_by_temp_zip = dict()
+
         for zip_id in needed_zips:
             zipped_files = needed_zips[zip_id]
 
@@ -372,6 +371,7 @@ class _OnlineDatabaseImporter:
             else:
                 temp_zip = '/tmp/%s_contents.zip' % zip_id
                 zip_ids_by_temp_zip[temp_zip] = zip_id
+
                 zip_downloader.queue_file(self._db.zips[zip_id]['contents_file'], temp_zip)
 
         if len(zip_ids_by_temp_zip) > 0:
