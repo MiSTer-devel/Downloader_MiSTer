@@ -57,7 +57,7 @@ class OnlineImporter:
         # TODO: Move the filter validation to earlier (before downloading dbs).
         for db, store, config in importer_command.read_dbs():
             self._print_db_header(db)
-            file_system = self._file_system_factory.create_for_db_id(db.db_id)
+            file_system = self._file_system_factory.create_for_config(config)
             session = self._session_for_config(config, file_system)
 
             zip_summaries = _OnlineZipSummaries(db, store, full_resync, config, file_system, self._file_downloader_factory, self._logger, session)

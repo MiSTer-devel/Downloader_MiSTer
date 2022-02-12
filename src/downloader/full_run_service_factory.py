@@ -21,7 +21,7 @@ from downloader.config import ConfigReader
 from downloader.db_gateway import DbGateway
 from downloader.file_downloader import make_file_downloader_factory
 from downloader.file_filter import FileFilterFactory
-from downloader.file_system import FileSystem, FileSystemFactory
+from downloader.file_system import FileSystemFactory
 from downloader.full_run_service import FullRunService
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository
@@ -42,7 +42,7 @@ def make_full_run_service(env, logger, ini_path):
     config['curl_ssl'] = env['CURL_SSL']
 
     file_system_factory = FileSystemFactory(config, logger)
-    system_file_system = file_system_factory.create_for_config(config)
+    system_file_system = file_system_factory.create_for_system_scope()
     local_repository = LocalRepository(config, logger, system_file_system)
 
     logger.set_local_repository(local_repository)

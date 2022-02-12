@@ -20,18 +20,25 @@ from downloader.store_migrator import MigrationBase
 
 
 class MigrationV5(MigrationBase):
-    def __init__(self, file_system_factory):
+    def __init__(self, file_system_factory, config):
         self._file_system_factory = file_system_factory
+        self._config = config
 
     version = 5
 
     def migrate(self, local_store):
         """remove old mister from old location in case it exists"""
 
+        config = self._config.copy()
         try:
-            file_system = self._file_system_factory.create_for_db_id(distribution_mister_db_id)
+            ini_description = self._config['databases'][distribution_mister_db_id]
         except KeyError as _:
             return
+
+        if 'options' in ini_description:
+            ini_description['options'].apply_to_config(config)
+
+        file_system = self._file_system_factory.create_for_config(config)
 
         migrate_file_mister_old(file_system)
 

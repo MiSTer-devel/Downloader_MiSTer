@@ -29,7 +29,7 @@ class OfflineImporter:
     def apply_offline_databases(self, importer_command):
         for db, store, config in importer_command.read_dbs():
             for db_file in db.db_files:
-                db_importer = _OfflineDatabaseImporter(config, self._file_system_factory.create_for_db_id(db.db_id), self._file_downloader_factory, self._logger)
+                db_importer = _OfflineDatabaseImporter(config, self._file_system_factory.create_for_config(config), self._file_downloader_factory, self._logger)
                 db_importer.update_store_from_offline_db(db.db_id, db_file, store)
                 store['base_path'] = config['base_path']
 
