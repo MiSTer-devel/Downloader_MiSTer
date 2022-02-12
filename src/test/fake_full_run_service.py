@@ -22,7 +22,7 @@ from downloader.config import default_config
 from downloader.full_run_service import FullRunService as ProductionFullRunService
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_db_gateway import DbGateway
-from test.fake_file_system import FileSystem
+from test.fake_file_system import FileSystemFactory
 from test.fake_linux_updater import LinuxUpdater
 from test.fake_local_repository import LocalRepository
 from test.fake_logger import NoLogger
@@ -35,16 +35,17 @@ from test.fake_certificates_fix import CertificatesFix
 
 
 class FullRunService(ProductionFullRunService):
-    def __init__(self, env, config, db_gateway, file_system=None):
-        self.file_system = FileSystem() if file_system is None else file_system
+    def __init__(self, env, config, db_gateway, file_system_factory=None):
+        self.file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
+        self.system_file_system = self.file_system_factory.create_for_system_scope()
         super().__init__(env, config,
                          NoLogger(),
-                         LocalRepository(config=config, file_system=self.file_system),
+                         LocalRepository(config=config, file_system=self.system_file_system),
                          db_gateway,
-                         OfflineImporter(file_system=self.file_system),
-                         OnlineImporter(file_system=self.file_system),
-                         LinuxUpdater(self.file_system),
-                         RebootCalculator(file_system=self.file_system),
+                         OfflineImporter(file_system_factory=self.file_system_factory),
+                         OnlineImporter(file_system=self.system_file_system),
+                         LinuxUpdater(self.system_file_system),
+                         RebootCalculator(file_system=self.system_file_system),
                          StoreMigrator(),
                          BasePathRelocator(),
                          CertificatesFix())

@@ -98,8 +98,10 @@ class TestConfigReader(unittest.TestCase):
         })
 
     def test_config_reader___with_invalid_base_path_ini___raises_invalid_config_parameter_exception(self):
-        self.assertRaises(InvalidConfigParameter,
-                          lambda: ConfigReader().read_config("test/integration/fixtures/invalid_base_path.ini"))
+        invalid_base_path_files = ["test/integration/fixtures/invalid_base_path_1.ini", "test/integration/fixtures/invalid_base_path_2.ini"]
+        for file in invalid_base_path_files:
+            with self.subTest(file):
+                self.assertRaises(InvalidConfigParameter, lambda: ConfigReader().read_config(file))
 
     def test_config_reader___with_invalid_base_system_path_ini___raises_invalid_config_parameter_exception(self):
         self.assertRaises(InvalidConfigParameter,

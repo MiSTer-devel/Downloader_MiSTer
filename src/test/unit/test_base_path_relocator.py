@@ -22,7 +22,7 @@ from downloader.base_path_relocator import RelocatorError
 from downloader.other import empty_store
 from test.fake_importer_command import ImporterCommand
 from test.fake_base_path_relocator import BasePathRelocator
-from test.fake_file_system import FakeFileSystemFactory
+from test.fake_file_system import FileSystemFactory
 from test.objects import db_test_with_file_a, store_test_with_file_a_descr, store_test_with_file, file_a, \
     empty_config, config_test
 
@@ -38,9 +38,9 @@ def media_fat_store_with_system_file():
 class TestBasePathRelocator(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.file_system_factory = FakeFileSystemFactory()
-        self.media_fat_file_system = self.file_system_factory.create_for_base_path(config_test(base_path='/media/fat/'), '/media/fat/')
-        self.media_usb0_file_system = self.file_system_factory.create_for_base_path(config_test(base_path='/media/usb0/'), '/media/usb0/')
+        self.file_system_factory = FileSystemFactory()
+        self.media_fat_file_system = self.file_system_factory.create_for_config(config_test(base_path='/media/fat/'))
+        self.media_usb0_file_system = self.file_system_factory.create_for_config(config_test(base_path='/media/usb0/'))
         self.sut = BasePathRelocator(self.file_system_factory)
 
     def test_relocating_base_paths___with_empty_command___returns_empty_array(self):

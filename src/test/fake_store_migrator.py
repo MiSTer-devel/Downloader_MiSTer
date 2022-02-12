@@ -16,14 +16,26 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.config import default_config
+from downloader.constants import distribution_mister_db_id
+from downloader.db_options import DbOptionsKind
 from downloader.migrations import migrations
 from downloader.store_migrator import StoreMigrator as ProductionStoreMigrator
-from test.fake_file_system import FileSystem, StubFileSystemFactory
+from test.objects import db_options
+from test.fake_file_system import FileSystemFactory
 from test.fake_logger import NoLogger
 
 
+def default_config_with_distribution_mister():
+    config = default_config()
+    config['databases'] = {
+        distribution_mister_db_id: {'options': db_options(kind=DbOptionsKind.INI_SECTION, base_path='/media/fat')}
+    }
+    return config
+
+
 class StoreMigrator(ProductionStoreMigrator):
-    def __init__(self, maybe_migrations=None, file_system=None, config=None):
-        self.file_system = FileSystem() if file_system is None else file_system
-        self.config = default_config() if config is None else config
-        super().__init__(migrations(self.config, StubFileSystemFactory(self.file_system)) if maybe_migrations is None else maybe_migrations, NoLogger())
+    def __init__(self, maybe_migrations=None, file_system_factory=None, config=None):
+        self.config = default_config_with_distribution_mister() if config is None else config
+        file_system_factory = FileSystemFactory(config=self.config) if file_system_factory is None else file_system_factory
+        self.system_file_system = file_system_factory.create_for_system_scope()
+        super().__init__(migrations(self.config, file_system_factory) if maybe_migrations is None else maybe_migrations, NoLogger())

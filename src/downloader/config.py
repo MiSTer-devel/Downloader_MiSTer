@@ -50,6 +50,12 @@ def config_file_path(env, current_working_dir):
     return ('/' if original_executable[0] == '/' else './') + parents + executable_path.stem + '.ini'
 
 
+def config_with_base_path(config, base_path):
+    result = config.copy()
+    result['base_path'] = base_path
+    return result
+
+
 @unique
 class AllowDelete(IntEnum):
     NONE = 0

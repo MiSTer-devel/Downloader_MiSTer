@@ -15,10 +15,12 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from typing import List, Set
+from typing import List
 import pathlib
+
+from downloader.config import default_config
 from downloader.constants import file_MiSTer
-from downloader.file_system import FileSystem as ProductionFileSystem
+from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem
 from downloader.other import ClosableValue
 from test.objects import file_a, file_a_descr, file_mister_descr, hash_MiSTer_old, file_test_json_zip, \
     file_test_json_zip_descr, folder_a
@@ -67,7 +69,7 @@ class TestDataFileSystem:
 
 
 def make_production_filesystem(config) -> ProductionFileSystem:
-    return ProductionFileSystem(config, NoLogger(), set(), {None})
+    return ProductionFileSystemFactory(config, NoLogger()).create_for_system_scope()
 
 
 class FakeTempFile:
@@ -78,19 +80,26 @@ class FakeTempFile:
         pass
 
 
-class FakeFileSystemFactory:
-    def __init__(self):
+class FileSystemFactory(ProductionFileSystemFactory):
+    def __init__(self, config=None):
+        self.config = default_config() if config is None else config
+        super().__init__(self.config, NoLogger())
         self.file_systems = dict()
         self._common_files = CaseInsensitiveDict()
         self._common_folders = CaseInsensitiveDict()
 
-    def create_for_base_path(self, config, base_path):
+    def create_for_config(self, config):
+        base_path = config['base_path']
         if base_path not in self.file_systems:
-            fs_config = config.copy()
-            fs_config['base_path'] = base_path
-            self.file_systems[base_path] = FileSystem(fs_config, self._common_files, self._common_folders)
+            self.add_file_system(config, FileSystem(config, self._common_files, self._common_folders))
         return self.file_systems[base_path]
 
+    def create_for_system_scope(self):
+        return self.create_for_config(self.config)
+
+    def add_file_system(self, config, file_system):
+        base_path = config['base_path']
+        self.file_systems[base_path] = file_system
 
 class StubFileSystemFactory:
     def __init__(self, file_system):
@@ -99,7 +108,7 @@ class StubFileSystemFactory:
     def create_for_config(self, _):
         return self._file_system
 
-    def create_for_db_id(self, _):
+    def create_for_system_scope(self):
         return self._file_system
 
 

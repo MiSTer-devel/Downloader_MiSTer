@@ -178,10 +178,8 @@ class TestFileSystem(unittest.TestCase):
         return FileSystemFactory(self.default_test_config() if config is None else config, NoLogger())
 
     def fs_1_and_2_by_same_factory(self):
-        shared_config = {base_path: base_path, base_system_path: base_system_path}
-        factory = self.factory({})
-
-        return factory.create_for_config(shared_config), factory.create_for_config(shared_config)
+        factory = self.factory({base_path: base_path, base_system_path: base_system_path})
+        return factory.create_for_system_scope(), factory.create_for_system_scope()
 
     def default_test_config(self, allow_delete=None):
         actual_config = default_config()

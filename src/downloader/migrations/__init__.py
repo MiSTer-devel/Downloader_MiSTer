@@ -31,7 +31,7 @@ def migrations(config, file_system_factory):
         MigrationV2(),
         MigrationV3(),
         MigrationV4(),
-        MigrationV5(file_system_factory),
+        MigrationV5(file_system_factory, config),
         MigrationV6(file_system_factory),
         MigrationV7(config)
     ]

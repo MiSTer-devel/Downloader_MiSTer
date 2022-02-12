@@ -51,10 +51,10 @@ class TestRealisticMigrations(unittest.TestCase):
     def test_migrate___on_empty_store_with_file_mister_old___file_mister_old_gets_removed(self):
         file = 'Scripts/.config/downloader/MiSTer.old'
         sut = StoreMigrator()
-        sut.file_system.test_data.with_file(file, file_descr())
-        self.assertTrue(sut.file_system.is_file(file))
+        sut.system_file_system.test_data.with_file(file, file_descr())
+        self.assertTrue(sut.system_file_system.is_file(file))
         sut.migrate({})
-        self.assertFalse(sut.file_system.is_file(file))
+        self.assertFalse(sut.system_file_system.is_file(file))
 
     def assert_versions_change_as_expected(self, initial_file, expected_file):
         store = load_file(initial_file)

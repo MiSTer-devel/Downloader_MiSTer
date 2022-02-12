@@ -221,7 +221,7 @@ def raw_db_wrong_descr():
     }
 
 
-def db_options(kind=None, base_path=None, parallel_update=None, update_linux=None, downloader_size_mb_limit=None, downloader_process_limit=None, downloader_timeout=None, downloader_retries=None):
+def db_options(kind=None, base_path=None, parallel_update=None, update_linux=None, downloader_size_mb_limit=None, downloader_process_limit=None, downloader_timeout=None, downloader_retries=None, download_filter=None):
     raw_db_options = {
         'parallel_update': False if parallel_update is None else parallel_update,
         'update_linux': False if update_linux is None else update_linux,
@@ -229,6 +229,7 @@ def db_options(kind=None, base_path=None, parallel_update=None, update_linux=Non
         'downloader_process_limit': 3 if downloader_process_limit is None else downloader_process_limit,
         'downloader_timeout': 1 if downloader_timeout is None else downloader_timeout,
         'downloader_retries': 100 if downloader_retries is None else downloader_retries,
+        'filter': 'all' if download_filter is None else download_filter
     }
     kind = DbOptionsKind.INI_SECTION if kind is None else kind
     if base_path is not None:

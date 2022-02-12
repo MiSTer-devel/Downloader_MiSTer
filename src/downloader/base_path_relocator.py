@@ -15,6 +15,9 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+from downloader.config import config_with_base_path
+
+
 class BasePathRelocator:
     def __init__(self, file_system_factory, waiter, logger):
         self._file_system_factory = file_system_factory
@@ -31,8 +34,8 @@ class BasePathRelocator:
                 self._logger.debug('%s still uses base_path: %s' % (db.db_id, config['base_path']))
                 continue
 
-            from_file_system = self._file_system_factory.create_for_base_path(config, from_base_path)
-            to_file_system = self._file_system_factory.create_for_base_path(config, to_base_path)
+            from_file_system = self._file_system_factory.create_for_config(config_with_base_path(config, from_base_path))
+            to_file_system = self._file_system_factory.create_for_config(config_with_base_path(config, to_base_path))
 
             result.append(BasePathRelocatorPackage(
                 store,

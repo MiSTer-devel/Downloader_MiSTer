@@ -23,6 +23,7 @@ import json
 import subprocess
 import tempfile
 import re
+from abc import ABC, abstractmethod
 from pathlib import Path
 from downloader.config import AllowDelete
 from downloader.other import ClosableValue
@@ -36,26 +37,112 @@ class FileSystemFactory:
         self._unique_temp_filenames = set()
         self._unique_temp_filenames.add(None)
 
-    def create_for_db_id(self, db_id):
-        config = self._config.copy()
-
-        ini_description = self._config['databases'][db_id]
-
-        if 'options' in ini_description:
-            ini_description['options'].apply_to_config(config)
-
-        return FileSystem(config, self._logger, self._system_paths, self._unique_temp_filenames)
+    def create_for_system_scope(self):
+        return self.create_for_config(self._config)
 
     def create_for_config(self, config):
-        return FileSystem(config, self._logger, self._system_paths, self._unique_temp_filenames)
-
-    def create_for_base_path(self, config, base_path):
-        fs_config = config.copy()
-        fs_config['base_path'] = base_path
-        return FileSystem(fs_config, self._logger, self._system_paths, self._unique_temp_filenames)
+        return _FileSystem(config, self._logger, self._system_paths, self._unique_temp_filenames)
 
 
-class FileSystem:
+class FileSystem(ABC):
+
+    @abstractmethod
+    def temp_file(self):
+        '''interface'''
+
+    @abstractmethod
+    def unique_temp_filename(self):
+        '''interface'''
+
+    @abstractmethod
+    def resolve(self, path):
+        '''interface'''
+
+    @abstractmethod
+    def add_system_path(self, path):
+        '''interface'''
+
+    @abstractmethod
+    def is_file(self, path):
+        '''interface'''
+
+    @abstractmethod
+    def is_folder(self, path):
+        '''interface'''
+
+    @abstractmethod
+    def read_file_contents(self, path):
+        '''interface'''
+
+    @abstractmethod
+    def write_file_contents(self, path, content):
+        '''interface'''
+
+    @abstractmethod
+    def touch(self, path):
+        '''interface'''
+
+    @abstractmethod
+    def move(self, source, target):
+        '''interface'''
+
+    @abstractmethod
+    def copy(self, source, target):
+        '''interface'''
+
+    @abstractmethod
+    def copy_fast(self, source, target):
+        '''interface'''
+
+    def hash(self, path):
+        '''interface'''
+
+    @abstractmethod
+    def make_dirs(self, path):
+        '''interface'''
+
+    @abstractmethod
+    def make_dirs_parent(self, path):
+        '''interface'''
+
+    @abstractmethod
+    def folder_has_items(self, path):
+        '''interface'''
+
+    @abstractmethod
+    def folders(self):
+        '''interface'''
+
+    @abstractmethod
+    def remove_folder(self, path):
+        '''interface'''
+
+    @abstractmethod
+    def download_target_path(self, path):
+        '''interface'''
+
+    @abstractmethod
+    def unlink(self, path, verbose=True):
+        '''interface'''
+
+    @abstractmethod
+    def delete_previous(self, file):
+        '''interface'''
+
+    @abstractmethod
+    def load_dict_from_file(self, path, suffix=None):
+        '''interface'''
+
+    @abstractmethod
+    def save_json_on_zip(self, db, path):
+        '''interface'''
+
+    @abstractmethod
+    def unzip_contents(self, file, path):
+        '''interface'''
+
+
+class _FileSystem(FileSystem):
     def __init__(self, config, logger, system_paths, unique_temp_filenames):
         self._config = config
         self._logger = logger
