@@ -23,7 +23,7 @@ import time
 from abc import ABC, abstractmethod
 
 from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, K_DOWNLOADER_RETRIES, K_DOWNLOADER_SIZE_MB_LIMIT, \
-    K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_CURL_SSL
+    K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_CURL_SSL, K_DEBUG
 from downloader.logger import SilentLogger
 from downloader.other import calculate_url, NoArgumentsToComputeUrlError
 from downloader.target_path_repository import TargetPathRepository
@@ -212,6 +212,11 @@ class CurlDownloaderAbstract(FileDownloader):
             description['url'] = calculate_url(self._base_files_url, path)
 
         target_path = self._temp_files_registry.create_target(path, description)
+
+        if self._config[K_DEBUG] and target_path.startswith('/tmp/') and not description['url'].startswith('http'):
+            self._file_system.copy(description['url'], target_path)
+            self._run(description, 'echo > /dev/null', path)
+            return
 
         self._run(description, self._command(target_path, description['url']), path)
 

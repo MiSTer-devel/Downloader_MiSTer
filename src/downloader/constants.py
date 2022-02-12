@@ -109,6 +109,7 @@ K_CURL_SSL = 'curl_ssl'
 K_DB_URL = 'db_url'
 K_SECTION = 'section'
 K_OPTIONS = 'options'
+K_DEBUG = 'debug'
 
 # Env
 KENV_DOWNLOADER_LAUNCHER_PATH = 'DOWNLOADER_LAUNCHER_PATH'

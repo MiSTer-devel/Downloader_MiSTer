@@ -18,7 +18,7 @@
 
 from typing import List
 
-from downloader.constants import K_DOWNLOADER_RETRIES, K_CURL_SSL
+from downloader.constants import K_DOWNLOADER_RETRIES, K_CURL_SSL, K_DEBUG
 from downloader.file_downloader import CurlDownloaderAbstract, FileDownloaderFactory as ProductionFileDownloaderFactory
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from downloader.target_path_repository import TargetPathRepository
@@ -45,7 +45,7 @@ class TestDataCurlDownloader:
 
 class FileDownloader(CurlDownloaderAbstract):
     def __init__(self, config=None, file_system=None):
-        config = config if config is not None else {K_CURL_SSL: '', K_DOWNLOADER_RETRIES: 3}
+        config = config if config is not None else {K_CURL_SSL: '', K_DOWNLOADER_RETRIES: 3, K_DEBUG: False}
         self.file_system = FileSystem() if file_system is None else file_system
         self.local_repository = ProductionLocalRepository(config, NoLogger(), self.file_system)
         super().__init__(config, self.file_system, self.local_repository, NoLogger(), True, TargetPathRepository(config, self.file_system))

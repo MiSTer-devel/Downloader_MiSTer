@@ -18,8 +18,9 @@
 
 import unittest
 
-from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, \
-    KENV_ALLOW_REBOOT, KENV_CURL_SSL, KENV_DEFAULT_BASE_PATH
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, KENV_DEFAULT_DB_URL, \
+    KENV_DEFAULT_DB_ID, \
+    KENV_ALLOW_REBOOT, KENV_CURL_SSL, KENV_DEFAULT_BASE_PATH, KENV_DEBUG
 from downloader.full_run_service_factory import make_full_run_service
 from test.fake_logger import NoLogger
 
@@ -33,7 +34,8 @@ class TestFullRunServiceFactory(unittest.TestCase):
                 KENV_DEFAULT_DB_ID: DISTRIBUTION_MISTER_DB_ID,
                 KENV_ALLOW_REBOOT: 0,
                 KENV_CURL_SSL: '',
-                KENV_DEFAULT_BASE_PATH: None
+                KENV_DEFAULT_BASE_PATH: None,
+                KENV_DEBUG: 'false'
             }, NoLogger(), '')
         except TypeError:
             self.fail('TypeError during make_full_run_service, composition root failed!')
