@@ -19,6 +19,9 @@
 import unittest
 import configparser
 from downloader.config import AllowDelete, AllowReboot, InvalidConfigParameter
+from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, K_UPDATE_LINUX, K_PARALLEL_UPDATE, K_ALLOW_REBOOT, K_ALLOW_DELETE, \
+    K_DOWNLOADER_SIZE_MB_LIMIT, K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_VERBOSE, K_DATABASES, \
+    K_DB_URL, K_SECTION, K_OPTIONS, MEDIA_USB2, MEDIA_USB1
 from test.objects import not_found_ini, db_options, default_base_path
 from test.fake_config_reader import ConfigReader
 
@@ -29,21 +32,20 @@ class TestConfigReader(unittest.TestCase):
 
     def test_config_reader___when_no_ini___returns_default_values(self):
         self.assertConfig(not_found_ini(), {
-            'update_linux': True,
-            'parallel_update': True,
-            'allow_reboot': AllowReboot.ALWAYS,
-            'allow_delete': AllowDelete.ALL,
-            'check_manually_deleted_files': True,
-            'base_path': default_base_path,
-            'base_system_path': default_base_path,
-            'downloader_size_mb_limit': 100,
-            'downloader_process_limit': 300,
-            'downloader_timeout': 300,
-            'downloader_retries': 3,
-            'verbose': False,
-            'databases': {'distribution_mister': {
-                'db_url': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
-                'section': 'distribution_mister',
+            K_UPDATE_LINUX: True,
+            K_PARALLEL_UPDATE: True,
+            K_ALLOW_REBOOT: AllowReboot.ALWAYS,
+            K_ALLOW_DELETE: AllowDelete.ALL,
+            K_BASE_PATH: default_base_path,
+            K_BASE_SYSTEM_PATH: default_base_path,
+            K_DOWNLOADER_SIZE_MB_LIMIT: 100,
+            K_DOWNLOADER_PROCESS_LIMIT: 300,
+            K_DOWNLOADER_TIMEOUT: 300,
+            K_DOWNLOADER_RETRIES: 3,
+            K_VERBOSE: False,
+            K_DATABASES: {'distribution_mister': {
+                K_DB_URL: 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
+                K_SECTION: 'distribution_mister',
             }}
         })
 
@@ -52,15 +54,15 @@ class TestConfigReader(unittest.TestCase):
 
     def test_databases___with_single_db_ini___returns_single_db_only(self):
         self.assertEqual(databases("test/integration/fixtures/single_db.ini"), {'single': {
-            'db_url': 'https://single.com',
-            'section': 'single',
+            K_DB_URL: 'https://single.com',
+            K_SECTION: 'single',
         }})
 
     def test_databases___with_single_db_ini_with_correct_options___returns_single_db_only_with_all_options(self):
         self.assertEqual(databases("test/integration/fixtures/single_db_with_correct_options.ini"), {'single': {
-            'db_url': 'https://single.com',
-            'options': db_options().testable,
-            'section': 'single',
+            K_DB_URL: 'https://single.com',
+            K_OPTIONS: db_options().testable,
+            K_SECTION: 'single',
         }})
 
     def test_databases___with_single_db_ini_with_incorrect_base_path___raises_invalid_config_parameter(self):
@@ -74,26 +76,25 @@ class TestConfigReader(unittest.TestCase):
 
     def test_databases___with_dobule_db_ini___returns_dobule_db_only(self):
         self.assertEqual(databases("test/integration/fixtures/double_db.ini"), {'single': {
-            'db_url': 'https://single.com',
-            'section': 'single',
+            K_DB_URL: 'https://single.com',
+            K_SECTION: 'single',
         }, 'double': {
-            'db_url': 'https://double.com',
-            'section': 'double',
+            K_DB_URL: 'https://double.com',
+            K_SECTION: 'double',
         }})
 
     def test_config_reader___with_custom_mister_ini___returns_custom_fields(self):
         self.assertConfig("test/integration/fixtures/custom_mister.ini", {
-            'update_linux': False,
-            'parallel_update': False,
-            'check_manually_deleted_files': True,
-            'allow_reboot': AllowReboot.NEVER,
-            'allow_delete': AllowDelete.OLD_RBF,
-            'base_path': '/media/usb0/',
-            'base_system_path': '/media/cifs/',
-            'verbose': True,
-            'databases': {'distribution_mister': {
-                'db_url': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
-                'section': 'distribution_mister',
+            K_UPDATE_LINUX: False,
+            K_PARALLEL_UPDATE: False,
+            K_ALLOW_REBOOT: AllowReboot.NEVER,
+            K_ALLOW_DELETE: AllowDelete.OLD_RBF,
+            K_BASE_PATH: '/media/usb0',
+            K_BASE_SYSTEM_PATH: '/media/cifs',
+            K_VERBOSE: True,
+            K_DATABASES: {'distribution_mister': {
+                K_DB_URL: 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
+                K_SECTION: 'distribution_mister',
             }},
         })
 
@@ -109,39 +110,38 @@ class TestConfigReader(unittest.TestCase):
 
     def test_config_reader___with_custom_mister_dbs_ini___returns_custom_fields_and_dbs(self):
         self.assertConfig("test/integration/fixtures/custom_mister_dbs.ini", {
-            'update_linux': False,
-            'parallel_update': True,
-            'check_manually_deleted_files': False,
-            'allow_reboot': AllowReboot.ONLY_AFTER_LINUX_UPDATE,
-            'allow_delete': AllowDelete.NONE,
-            'base_path': '/media/usb1/',
-            'base_system_path': '/media/usb2/',
-            'databases': {'single': {
-                'db_url': 'https://single.com',
-                'section': 'single',
+            K_UPDATE_LINUX: False,
+            K_PARALLEL_UPDATE: True,
+            K_ALLOW_REBOOT: AllowReboot.ONLY_AFTER_LINUX_UPDATE,
+            K_ALLOW_DELETE: AllowDelete.NONE,
+            K_BASE_PATH: MEDIA_USB1,
+            K_BASE_SYSTEM_PATH: MEDIA_USB2,
+            K_DATABASES: {'single': {
+                K_DB_URL: 'https://single.com',
+                K_SECTION: 'single',
             }, 'double': {
-                'db_url': 'https://double.com',
-                'section': 'double',
+                K_DB_URL: 'https://double.com',
+                K_SECTION: 'double',
             }},
         })
 
     def test_config_reader___with_db_and_distrib_empty_section_1___returns_one_db_and_defult_distrib(self):
         self.assertEqual(databases("test/integration/fixtures/db_plus_distrib_empty_section_1.ini"),
                          {'distribution_mister': {
-                             'db_url': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
-                             'section': 'distribution_mister',
+                             K_DB_URL: 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
+                             K_SECTION: 'distribution_mister',
                          }, 'one': {
-                             'db_url': 'https://one.com',
-                             'section': 'one',
+                             K_DB_URL: 'https://one.com',
+                             K_SECTION: 'one',
                          }, })
 
     def test_config_reader___with_db_and_distrib_empty_section_2___returns_one_db_and_defult_distrib(self):
         self.assertEqual(databases("test/integration/fixtures/db_plus_distrib_empty_section_2.ini"), {'one': {
-            'db_url': 'https://one.com',
-            'section': 'one',
+            K_DB_URL: 'https://one.com',
+            K_SECTION: 'one',
         }, 'distribution_mister': {
-            'db_url': 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
-            'section': 'distribution_mister',
+            K_DB_URL: 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip',
+            K_SECTION: 'distribution_mister',
         }})
 
     def test_config_reader___with_db_and_random_empty_section_2___raises_exception(self):
@@ -168,11 +168,11 @@ class TestConfigReader(unittest.TestCase):
 
 
 def databases(path):
-    return {k: testable(v) for k, v in (ConfigReader().read_config(path)['databases'].items())}
+    return {k: testable(v) for k, v in (ConfigReader().read_config(path)[K_DATABASES].items())}
 
 
 def testable(db):
-    if 'options' in db:
-        db['options'] = db['options'].testable
+    if K_OPTIONS in db:
+        db[K_OPTIONS] = db[K_OPTIONS].testable
 
     return db

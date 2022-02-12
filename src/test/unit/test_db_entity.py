@@ -19,6 +19,7 @@
 import unittest
 
 from downloader.config import default_config
+from downloader.constants import K_BASE_PATH
 from downloader.db_entity import DbEntityValidationException
 from test.fake_db_entity import DbEntity
 from test.objects import raw_db_empty_descr, db_empty
@@ -53,5 +54,5 @@ class TestDbEntity(unittest.TestCase):
 
     def test_construct_db_entity___with_wrong_options___raises_db_entity_validation_exception(self):
         raw_db = raw_db_empty_descr()
-        raw_db['default_options'] = {'base_path': default_config()['base_path']}
+        raw_db['default_options'] = {K_BASE_PATH: default_config()[K_BASE_PATH]}
         self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))

@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.certificates_fix import CertificatesFix as ProductionCertificatesFix
-from downloader.constants import default_curl_ssl_options
+from downloader.constants import DEFAULT_CURL_SSL_OPTIONS, K_CURL_SSL
 from test.fake_file_system import FileSystem
 from test.fake_logger import NoLogger
 
@@ -26,7 +26,7 @@ class CertificatesFix(ProductionCertificatesFix):
         self.file_system = FileSystem() if file_system is None else file_system
         self.download_ran = False
         self.test_query_ran = False
-        super().__init__({'curl_ssl': default_curl_ssl_options} if config is None else config, self.file_system, NoLogger())
+        super().__init__({K_CURL_SSL: DEFAULT_CURL_SSL_OPTIONS} if config is None else config, self.file_system, NoLogger())
         self._download_fails = download_fails
         self._test_query_fails = test_query_fails
 

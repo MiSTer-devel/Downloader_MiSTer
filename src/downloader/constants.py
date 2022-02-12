@@ -16,47 +16,109 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-# Config dict keys
-base_path = 'base_path'
-base_system_path = 'base_system_path'
-
 # Default SSL option
-default_cacert_file = '/etc/ssl/certs/cacert.pem'
-default_curl_ssl_options = '--cacert %s' % default_cacert_file
+DEFAULT_CACERT_FILE = '/etc/ssl/certs/cacert.pem'
+DEFAULT_CURL_SSL_OPTIONS = '--cacert %s' % DEFAULT_CACERT_FILE
 
 # Pre-selected database
-distribution_mister_db_url = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'
-distribution_mister_db_id = 'distribution_mister'
+DISTRIBUTION_MISTER_DB_URL = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'
+DISTRIBUTION_MISTER_DB_ID = 'distribution_mister'
 
 # Firmware files
-file_MiSTer = 'MiSTer'
-file_PDFViewer = 'linux/pdfviewer'
-file_lesskey = 'linux/lesskey'
-file_glow = 'linux/glow'
-file_MiSTer_new = 'MiSTer.new'
-file_MiSTer_old = '.MiSTer.old'
+FILE_MiSTer = 'MiSTer'
+FILE_PDFViewer = 'linux/pdfviewer'
+FILE_lesskey = 'linux/lesskey'
+FILE_glow = 'linux/glow'
+FILE_MiSTer_new = 'MiSTer.new'
+FILE_MiSTer_old = '.MiSTer.old'
+FILE_menu_rbf = 'menu.rbf'
+
+# INI files
+FILE_MiSTer_ini = 'MiSTer.ini'
+FILE_MiSTer_alt_ini = 'MiSTer_alt.ini'
+FILE_MiSTer_alt_1_ini = 'MiSTer_alt_1.ini'
+FILE_MiSTer_alt_2_ini = 'MiSTer_alt_2.ini'
+FILE_MiSTer_alt_3_ini = 'MiSTer_alt_3.ini'
+
+# System folders
+FOLDER_linux = 'linux'
+FOLDER_saves = 'saves'
+FOLDER_savestates = 'savestates'
+FOLDER_screenshots = 'screenshots'
 
 # Downloader files
-file_downloader_storage = 'Scripts/.config/downloader/downloader.json.zip'
-file_downloader_last_successful_run = 'Scripts/.config/downloader/%s.last_successful_run'
-file_downloader_log = 'Scripts/.config/downloader/%s.log'
-file_downloader_ini = '/media/fat/downloader.ini'
+FILE_downloader_storage = 'Scripts/.config/downloader/downloader.json.zip'
+FILE_downloader_last_successful_run = 'Scripts/.config/downloader/%s.last_successful_run'
+FILE_downloader_log = 'Scripts/.config/downloader/%s.log'
+FILE_downloader_ini = '/media/fat/downloader.ini'
+FILE_downloader_launcher_script = 'Scripts/downloader.sh'
 
 # Linux Update files
-file_MiSTer_version = '/MiSTer.version'
-file_Linux_7z = '/media/fat/linux/7za'
+FILE_MiSTer_version = '/MiSTer.version'
+FILE_Linux_7z = '/media/fat/linux/7za'
 
 # Reboot files
-file_downloader_needs_reboot_after_linux_update = '/tmp/downloader_needs_reboot_after_linux_update'
-file_mister_downloader_needs_reboot = '/tmp/MiSTer_downloader_needs_reboot'
+FILE_downloader_needs_reboot_after_linux_update = '/tmp/downloader_needs_reboot_after_linux_update'
+FILE_mister_downloader_needs_reboot = '/tmp/MiSTer_downloader_needs_reboot'
+
+
+# Standard Drives
+MEDIA_USB0 = '/media/usb0'
+MEDIA_USB1 = '/media/usb1'
+MEDIA_USB2 = '/media/usb2'
+MEDIA_USB3 = '/media/usb3'
+MEDIA_USB4 = '/media/usb4'
+MEDIA_USB5 = '/media/usb5'
+MEDIA_FAT_CIFS = '/media/fat/cifs'
+MEDIA_FAT = '/media/fat'
 
 # Games Directory Priority
-gamesdir_priority = [
-    '/media/usb0',
-    '/media/usb1',
-    '/media/usb2',
-    '/media/usb3',
-    '/media/usb4',
-    '/media/usb5',
-    '/media/fat/cifs',
+GAMESDIR_PRIORITY = [
+    MEDIA_USB0,
+    MEDIA_USB1,
+    MEDIA_USB2,
+    MEDIA_USB3,
+    MEDIA_USB4,
+    MEDIA_USB5,
+    MEDIA_FAT_CIFS,
 ]
+
+
+# Dictionary Keys:
+
+# Config
+K_BASE_PATH = 'base_path'
+K_BASE_SYSTEM_PATH = 'base_system_path'
+K_GAMESDIR_PATH = 'gamesdir_path'
+K_DATABASES = 'databases'
+K_ALLOW_DELETE = 'allow_delete'
+K_ALLOW_REBOOT = 'allow_reboot'
+K_UPDATE_LINUX = 'update_linux'
+K_PARALLEL_UPDATE = 'parallel_update'
+K_DOWNLOADER_SIZE_MB_LIMIT = 'downloader_size_mb_limit'
+K_DOWNLOADER_PROCESS_LIMIT = 'downloader_process_limit'
+K_DOWNLOADER_TIMEOUT = 'downloader_timeout'
+K_DOWNLOADER_RETRIES = 'downloader_retries'
+K_ZIP_FILE_COUNT_THRESHOLD = 'zip_file_count_threshold'
+K_ZIP_ACCUMULATED_MB_THRESHOLD = 'zip_accumulated_mb_threshold'
+K_FILTER = 'filter'
+K_VERBOSE = 'verbose'
+K_CONFIG_PATH = 'config_path'
+K_USER_DEFINED_OPTIONS = 'user_defined_options'
+K_CURL_SSL = 'curl_ssl'
+K_DB_URL = 'db_url'
+K_SECTION = 'section'
+K_OPTIONS = 'options'
+
+# Env
+KENV_DOWNLOADER_LAUNCHER_PATH = 'DOWNLOADER_LAUNCHER_PATH'
+KENV_DOWNLOADER_INI_PATH = 'DOWNLOADER_INI_PATH'
+KENV_CURL_SSL = 'CURL_SSL'
+KENV_COMMIT = 'COMMIT'
+KENV_ALLOW_REBOOT = 'ALLOW_REBOOT'
+KENV_UPDATE_LINUX = 'UPDATE_LINUX'
+KENV_DEFAULT_DB_URL = 'DEFAULT_DB_URL'
+KENV_DEFAULT_DB_ID = 'DEFAULT_DB_ID'
+KENV_DEFAULT_BASE_PATH = 'DEFAULT_BASE_PATH'
+KENV_DEBUG = 'DEBUG'
+KENV_FAIL_ON_FILE_ERROR = 'FAIL_ON_FILE_ERROR'

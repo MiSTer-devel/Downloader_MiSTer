@@ -23,6 +23,7 @@ from downloader.migrations.migration_v4 import MigrationV4
 from downloader.migrations.migration_v5 import MigrationV5
 from downloader.migrations.migration_v6 import MigrationV6
 from downloader.migrations.migration_v7 import MigrationV7
+from downloader.migrations.migration_v8 import MigrationV8
 
 
 def migrations(config, file_system_factory):
@@ -33,5 +34,6 @@ def migrations(config, file_system_factory):
         MigrationV4(),
         MigrationV5(file_system_factory, config),
         MigrationV6(file_system_factory),
-        MigrationV7(config)
+        MigrationV7(config),
+        MigrationV8()
     ]

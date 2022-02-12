@@ -20,19 +20,23 @@ import configparser
 from enum import IntEnum, unique
 from pathlib import Path, PurePosixPath
 
-from downloader.constants import file_downloader_ini
+from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_BASE_SYSTEM_PATH, K_GAMESDIR_PATH, K_DATABASES, \
+    K_ALLOW_DELETE, K_ALLOW_REBOOT, K_UPDATE_LINUX, K_PARALLEL_UPDATE, K_DOWNLOADER_SIZE_MB_LIMIT, K_DOWNLOADER_PROCESS_LIMIT, \
+    K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, K_FILTER, K_VERBOSE, \
+    K_DB_URL, K_SECTION, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, KENV_DOWNLOADER_INI_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, \
+    KENV_DEFAULT_BASE_PATH, KENV_ALLOW_REBOOT, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEBUG, K_OPTIONS, MEDIA_FAT
 from downloader.db_options import DbOptionsKind, DbOptions, DbOptionsValidationException
 from downloader.ini_parser import IniParser
 
 
 def config_file_path(env, current_working_dir):
-    ini_path = env.get('DOWNLOADER_INI_PATH', None)
+    ini_path = env.get(KENV_DOWNLOADER_INI_PATH, None)
     if ini_path is not None:
         return ini_path
 
-    original_executable = env.get('DOWNLOADER_LAUNCHER_PATH', None)
+    original_executable = env.get(KENV_DOWNLOADER_LAUNCHER_PATH, None)
     if original_executable is None:
-        return file_downloader_ini
+        return FILE_downloader_ini
 
     executable_path = PurePosixPath(original_executable)
 
@@ -52,7 +56,7 @@ def config_file_path(env, current_working_dir):
 
 def config_with_base_path(config, base_path):
     result = config.copy()
-    result['base_path'] = base_path
+    result[K_BASE_PATH] = base_path
     return result
 
 
@@ -72,23 +76,22 @@ class AllowReboot(IntEnum):
 
 def default_config():
     return {
-        'databases': {},
-        'base_path': '/media/fat/',
-        'base_system_path': '/media/fat/',
-        'gamesdir_path': 'auto',
-        'allow_delete': AllowDelete.ALL,
-        'allow_reboot': AllowReboot.ALWAYS,
-        'check_manually_deleted_files': True,
-        'update_linux': True,
-        'parallel_update': True,
-        'downloader_size_mb_limit': 100,
-        'downloader_process_limit': 300,
-        'downloader_timeout': 300,
-        'downloader_retries': 3,
-        'zip_file_count_threshold': 60,
-        'zip_accumulated_mb_threshold': 100,
-        'filter': None,
-        'verbose': False
+        K_DATABASES: {},
+        K_BASE_PATH: MEDIA_FAT,
+        K_BASE_SYSTEM_PATH: MEDIA_FAT,
+        K_GAMESDIR_PATH: 'auto',
+        K_ALLOW_DELETE: AllowDelete.ALL,
+        K_ALLOW_REBOOT: AllowReboot.ALWAYS,
+        K_UPDATE_LINUX: True,
+        K_PARALLEL_UPDATE: True,
+        K_DOWNLOADER_SIZE_MB_LIMIT: 100,
+        K_DOWNLOADER_PROCESS_LIMIT: 300,
+        K_DOWNLOADER_TIMEOUT: 300,
+        K_DOWNLOADER_RETRIES: 3,
+        K_ZIP_FILE_COUNT_THRESHOLD: 60,
+        K_ZIP_ACCUMULATED_MB_THRESHOLD: 100,
+        K_FILTER: None,
+        K_VERBOSE: False
     }
 
 
@@ -99,10 +102,10 @@ class ConfigReader:
 
     def read_config(self, config_path):
         result = default_config()
-        result['config_path'] = Path(config_path)
-        if self._env['DEFAULT_BASE_PATH'] is not None:
-            result['base_path'] = self._env['DEFAULT_BASE_PATH']
-            result['base_system_path'] = self._env['DEFAULT_BASE_PATH']
+        result[K_CONFIG_PATH] = Path(config_path)
+        if self._env[KENV_DEFAULT_BASE_PATH] is not None:
+            result[K_BASE_PATH] = self._env[KENV_DEFAULT_BASE_PATH]
+            result[K_BASE_SYSTEM_PATH] = self._env[KENV_DEFAULT_BASE_PATH]
 
         ini_config = self._load_ini_config(config_path)
         default_db = self._default_db_config()
@@ -118,15 +121,15 @@ class ConfigReader:
             self._logger.print("Reading '%s' db section" % section)
             self._parse_database_section(default_db, parser, result, section_id)
 
-        if len(result['databases']) == 0:
+        if len(result[K_DATABASES]) == 0:
             self._logger.print('Reading default db')
             self._add_default_database(ini_config, result)
 
-        if self._env['ALLOW_REBOOT'] is not None:
-            result['allow_reboot'] = AllowReboot(int(self._env['ALLOW_REBOOT']))
+        if self._env[KENV_ALLOW_REBOOT] is not None:
+            result[K_ALLOW_REBOOT] = AllowReboot(int(self._env[KENV_ALLOW_REBOOT]))
 
-        if 'user_defined_options' not in result:
-            result['user_defined_options'] = []
+        if K_USER_DEFINED_OPTIONS not in result:
+            result[K_USER_DEFINED_OPTIONS] = []
 
         return result
 
@@ -142,49 +145,49 @@ class ConfigReader:
 
     def _add_default_database(self, ini_config, result):
         default_db = self._default_db_config()
-        result['databases'][default_db['section']] = {
-            'db_url': ini_config['DEFAULT'].get('db_url', default_db['db_url']),
-            'section': default_db['section']
+        result[K_DATABASES][default_db[K_SECTION]] = {
+            K_DB_URL: ini_config['DEFAULT'].get(K_DB_URL, default_db[K_DB_URL]),
+            K_SECTION: default_db[K_SECTION]
         }
 
     def _parse_database_section(self, default_db, parser, result, section_id):
-        default_db_url = default_db['db_url'] if section_id == default_db['section'].lower() else None
-        db_url = parser.get_string('db_url', default_db_url)
+        default_db_url = default_db[K_DB_URL] if section_id == default_db[K_SECTION].lower() else None
+        db_url = parser.get_string(K_DB_URL, default_db_url)
 
         if db_url is None:
             raise InvalidConfigParameter("Can't import db for section '%s' without an url field" % section_id)
-        if section_id in result['databases']:
+        if section_id in result[K_DATABASES]:
             raise InvalidConfigParameter("Can't import db for section '%s' twice" % section_id)
 
         description = {
-            'db_url': db_url,
-            'section': section_id
+            K_DB_URL: db_url,
+            K_SECTION: section_id
         }
 
         options = self._parse_database_options(parser, section_id)
         if len(options.items()) > 0:
-            description['options'] = options
+            description[K_OPTIONS] = options
 
-        result['databases'][section_id] = description
+        result[K_DATABASES][section_id] = description
 
     def _parse_database_options(self, parser, section_id):
         options = dict()
-        if parser.has('base_path'):
-            options['base_path'] = self._valid_base_path(parser.get_string('base_path', None))
-        if parser.has('parallel_update'):
-            options['parallel_update'] = parser.get_bool('parallel_update', None)
-        if parser.has('update_linux'):
-            options['update_linux'] = parser.get_bool('update_linux', None)
-        if parser.has('downloader_size_mb_limit'):
-            options['downloader_size_mb_limit'] = parser.get_int('downloader_size_mb_limit', None)
-        if parser.has('downloader_process_limit'):
-            options['downloader_process_limit'] = parser.get_int('downloader_process_limit', None)
-        if parser.has('downloader_timeout'):
-            options['downloader_timeout'] = parser.get_int('downloader_timeout', None)
-        if parser.has('downloader_retries'):
-            options['downloader_retries'] = parser.get_int('downloader_retries', None)
-        if parser.has('filter'):
-            options['filter'] = parser.get_string('filter', None)
+        if parser.has(K_BASE_PATH):
+            options[K_BASE_PATH] = self._valid_base_path(parser.get_string(K_BASE_PATH, None))
+        if parser.has(K_PARALLEL_UPDATE):
+            options[K_PARALLEL_UPDATE] = parser.get_bool(K_PARALLEL_UPDATE, None)
+        if parser.has(K_UPDATE_LINUX):
+            options[K_UPDATE_LINUX] = parser.get_bool(K_UPDATE_LINUX, None)
+        if parser.has(K_DOWNLOADER_SIZE_MB_LIMIT):
+            options[K_DOWNLOADER_SIZE_MB_LIMIT] = parser.get_int(K_DOWNLOADER_SIZE_MB_LIMIT, None)
+        if parser.has(K_DOWNLOADER_PROCESS_LIMIT):
+            options[K_DOWNLOADER_PROCESS_LIMIT] = parser.get_int(K_DOWNLOADER_PROCESS_LIMIT, None)
+        if parser.has(K_DOWNLOADER_TIMEOUT):
+            options[K_DOWNLOADER_TIMEOUT] = parser.get_int(K_DOWNLOADER_TIMEOUT, None)
+        if parser.has(K_DOWNLOADER_RETRIES):
+            options[K_DOWNLOADER_RETRIES] = parser.get_int(K_DOWNLOADER_RETRIES, None)
+        if parser.has(K_FILTER):
+            options[K_FILTER] = parser.get_string(K_FILTER, None)
 
         try:
             return DbOptions(options, kind=DbOptionsKind.INI_SECTION)
@@ -193,43 +196,45 @@ class ConfigReader:
 
     def _parse_mister_section(self, result, parser):
         mister = dict()
-        mister['base_path'] = self._valid_base_path(parser.get_string('base_path', result['base_path']))
-        mister['base_system_path'] = self._valid_base_path(parser.get_string('base_system_path', result['base_system_path']))
-        mister['allow_delete'] = AllowDelete(parser.get_int('allow_delete', result['allow_delete'].value))
-        mister['allow_reboot'] = AllowReboot(parser.get_int('allow_reboot', result['allow_reboot'].value))
-        mister['check_manually_deleted_files'] = parser.get_bool('check_manually_deleted_files',  result['check_manually_deleted_files'])
-        mister['verbose'] = parser.get_bool('verbose', result['verbose'])
-        mister['parallel_update'] = parser.get_bool('parallel_update', result['parallel_update'])
-        mister['update_linux'] = parser.get_bool('update_linux', result['update_linux'])
-        mister['downloader_size_mb_limit'] = parser.get_int('downloader_size_mb_limit', result['downloader_size_mb_limit'])
-        mister['downloader_process_limit'] = parser.get_int('downloader_process_limit', result['downloader_process_limit'])
-        mister['downloader_timeout'] = parser.get_int('downloader_timeout', result['downloader_timeout'])
-        mister['downloader_retries'] = parser.get_int('downloader_retries', result['downloader_retries'])
-        mister['filter'] = parser.get_string('filter', result['filter'])
+        mister[K_BASE_PATH] = self._valid_base_path(parser.get_string(K_BASE_PATH, result[K_BASE_PATH]))
+        mister[K_BASE_SYSTEM_PATH] = self._valid_base_path(parser.get_string(K_BASE_SYSTEM_PATH, result[K_BASE_SYSTEM_PATH]))
+        mister[K_ALLOW_DELETE] = AllowDelete(parser.get_int(K_ALLOW_DELETE, result[K_ALLOW_DELETE].value))
+        mister[K_ALLOW_REBOOT] = AllowReboot(parser.get_int(K_ALLOW_REBOOT, result[K_ALLOW_REBOOT].value))
+        mister[K_VERBOSE] = parser.get_bool(K_VERBOSE, result[K_VERBOSE])
+        mister[K_PARALLEL_UPDATE] = parser.get_bool(K_PARALLEL_UPDATE, result[K_PARALLEL_UPDATE])
+        mister[K_UPDATE_LINUX] = parser.get_bool(K_UPDATE_LINUX, result[K_UPDATE_LINUX])
+        mister[K_DOWNLOADER_SIZE_MB_LIMIT] = parser.get_int(K_DOWNLOADER_SIZE_MB_LIMIT, result[K_DOWNLOADER_SIZE_MB_LIMIT])
+        mister[K_DOWNLOADER_PROCESS_LIMIT] = parser.get_int(K_DOWNLOADER_PROCESS_LIMIT, result[K_DOWNLOADER_PROCESS_LIMIT])
+        mister[K_DOWNLOADER_TIMEOUT] = parser.get_int(K_DOWNLOADER_TIMEOUT, result[K_DOWNLOADER_TIMEOUT])
+        mister[K_DOWNLOADER_RETRIES] = parser.get_int(K_DOWNLOADER_RETRIES, result[K_DOWNLOADER_RETRIES])
+        mister[K_FILTER] = parser.get_string(K_FILTER, result[K_FILTER])
 
         user_defined = []
         for key in mister:
             if parser.has(key):
                 user_defined.append(key)
 
-        mister['user_defined_options'] = user_defined
+        mister[K_USER_DEFINED_OPTIONS] = user_defined
 
         result.update(mister)
 
     def _default_db_config(self):
         return {
-            'db_url': self._env['DEFAULT_DB_URL'],
-            'section': self._env['DEFAULT_DB_ID']
+            K_DB_URL: self._env[KENV_DEFAULT_DB_URL],
+            K_SECTION: self._env[KENV_DEFAULT_DB_ID]
         }
 
     def _valid_base_path(self, path):
-        if self._env['DEBUG'] != 'true':
+        if self._env[KENV_DEBUG] != 'true':
             if path == '' or path[0] == '.' or path[0] == '\\':
                 raise InvalidConfigParameter("Invalid base path '%s', base paths should start with '/media/*/'" % path)
 
             parts = path.lower().split('/')
             if '..' in parts or len(parts) < 3 or parts[0] != '' or parts[1] != 'media':
                 raise InvalidConfigParameter("Invalid base path '%s', base paths should start with '/media/*/'" % path)
+
+        if len(path) > 1 and path[-1] == '/':
+            path = path[0:-1]
         
         return path
 

@@ -15,7 +15,7 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-
+from downloader.constants import K_BASE_PATH
 from downloader.store_migrator import MigrationBase
 
 
@@ -27,4 +27,4 @@ class MigrationV7(MigrationBase):
 
     def migrate(self, local_store):
         for store in local_store['dbs'].values():
-            store['base_path'] = self._config['base_path']
+            store[K_BASE_PATH] = self._config[K_BASE_PATH]

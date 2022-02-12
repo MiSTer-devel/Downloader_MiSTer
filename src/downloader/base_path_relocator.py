@@ -16,6 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.config import config_with_base_path
+from downloader.constants import K_BASE_PATH
 
 
 class BasePathRelocator:
@@ -27,11 +28,11 @@ class BasePathRelocator:
     def relocating_base_paths(self, importer_command):
         result = []
         for db, store, config in importer_command.read_dbs():
-            from_base_path = store['base_path']
-            to_base_path = config['base_path']
+            from_base_path = store[K_BASE_PATH]
+            to_base_path = config[K_BASE_PATH]
 
             if to_base_path == from_base_path:
-                self._logger.debug('%s still uses base_path: %s' % (db.db_id, config['base_path']))
+                self._logger.debug('%s still uses base_path: %s' % (db.db_id, config[K_BASE_PATH]))
                 continue
 
             from_file_system = self._file_system_factory.create_for_config(config_with_base_path(config, from_base_path))
@@ -141,15 +142,15 @@ class BasePathRelocatorPackage:
             self._logger.print('Restored: %s' % file)
 
     def update_store(self):
-        self._store['base_path'] = self._to_base_path
+        self._store[K_BASE_PATH] = self._to_base_path
 
     @property
     def _from_base_path(self):
-        return self._store['base_path']
+        return self._store[K_BASE_PATH]
 
     @property
     def _to_base_path(self):
-        return self._config['base_path']
+        return self._config[K_BASE_PATH]
 
 
 class RelocatorError(Exception):

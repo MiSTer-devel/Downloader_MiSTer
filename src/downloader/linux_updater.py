@@ -19,7 +19,7 @@
 import subprocess
 import json
 import sys
-from downloader.constants import file_downloader_needs_reboot_after_linux_update, file_MiSTer_version, file_Linux_7z
+from downloader.constants import FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version, FILE_Linux_7z
 
 
 class LinuxUpdater:
@@ -61,8 +61,8 @@ class LinuxUpdater:
         self._logger.debug('linux: ' + json.dumps(linux, indent=4))
 
         current_linux_version = 'unknown'
-        if self._file_system.is_file(file_MiSTer_version):
-            current_linux_version = self._file_system.read_file_contents(file_MiSTer_version)
+        if self._file_system.is_file(FILE_MiSTer_version):
+            current_linux_version = self._file_system.read_file_contents(FILE_MiSTer_version)
 
         if current_linux_version == linux['version'][-6:]:
             self._logger.debug('current_linux_version "%s" matches db linux: %s' % (current_linux_version, linux['version']))
@@ -76,7 +76,7 @@ class LinuxUpdater:
         file_downloader = self._file_downloader_factory.create(self._config, parallel_update=False)
 
         file_downloader.queue_file(linux, linux_path)
-        if not self._file_system.is_file(file_Linux_7z):
+        if not self._file_system.is_file(FILE_Linux_7z):
             file_downloader.queue_file({
                 'delete': [],
                 'url': 'https://github.com/MiSTer-devel/SD-Installer-Win64_MiSTer/raw/master/7za.gz',
@@ -108,7 +108,7 @@ class LinuxUpdater:
                 self._logger.print()
                 return
 
-        if not self._file_system.is_file(file_Linux_7z):
+        if not self._file_system.is_file(FILE_Linux_7z):
             self._logger.print('ERROR! 7z is not present in the system.')
             self._logger.print('Aborting Linux update.')
             self._logger.print()
@@ -138,7 +138,7 @@ class LinuxUpdater:
                 fi
                 rm "{1}" > /dev/null 2>&1
                 exit $RET_CODE
-        '''.format(file_Linux_7z, self._file_system.download_target_path(linux_path)), shell=True, stderr=subprocess.STDOUT)
+        '''.format(FILE_Linux_7z, self._file_system.download_target_path(linux_path)), shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
             self._logger.print('ERROR! Could not uncompress the linux installer.')
@@ -178,4 +178,4 @@ class LinuxUpdater:
             self._logger.print()
 
     def needs_reboot(self):
-        return self._file_system.is_file(file_downloader_needs_reboot_after_linux_update)
+        return self._file_system.is_file(FILE_downloader_needs_reboot_after_linux_update)

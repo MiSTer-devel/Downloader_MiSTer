@@ -22,7 +22,8 @@ import os
 import os.path
 from pathlib import Path
 from downloader.config import ConfigReader
-from downloader.constants import file_mister_downloader_needs_reboot
+from downloader.constants import FILE_mister_downloader_needs_reboot, K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_CURL_SSL, KENV_DEBUG, \
+    KENV_FAIL_ON_FILE_ERROR, KENV_DEFAULT_BASE_PATH
 from test.objects import debug_env, default_base_path
 from test.fake_logger import NoLogger
 import subprocess
@@ -32,24 +33,24 @@ class TestSmallDbInstall(unittest.TestCase):
 
     def setUp(self) -> None:
         try:
-            Path(file_mister_downloader_needs_reboot).unlink()
+            Path(FILE_mister_downloader_needs_reboot).unlink()
         except FileNotFoundError as _:
             pass
 
     def test_small_db_1(self):
         print('test_small_db_1')
         self.assertRunOk("test/system/fixtures/small_db_install/small_db_1.ini")
-        self.assertTrue(os.path.isfile(file_mister_downloader_needs_reboot))
+        self.assertTrue(os.path.isfile(FILE_mister_downloader_needs_reboot))
 
     def test_small_db_2(self):
         print('test_small_db_2')
         self.assertRunOk("test/system/fixtures/small_db_install/small_db_2.ini")
-        self.assertFalse(os.path.isfile(file_mister_downloader_needs_reboot))
+        self.assertFalse(os.path.isfile(FILE_mister_downloader_needs_reboot))
 
     def test_small_db_3(self):
         print('test_small_db_3')
         self.assertRunOk("test/system/fixtures/small_db_install/small_db_3.ini")
-        self.assertFalse(os.path.isfile(file_mister_downloader_needs_reboot))
+        self.assertFalse(os.path.isfile(FILE_mister_downloader_needs_reboot))
 
     def test_small_db_4(self):
         print('test_small_db_4')
@@ -62,21 +63,21 @@ class TestSmallDbInstall(unittest.TestCase):
 
     def assertRunOk(self, ini_path):
         config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
-        shutil.rmtree(config['base_path'], ignore_errors=True)
-        shutil.rmtree(config['base_system_path'], ignore_errors=True)
-        mister_path = Path('%s/MiSTer' % config['base_system_path'])
+        shutil.rmtree(config[K_BASE_PATH], ignore_errors=True)
+        shutil.rmtree(config[K_BASE_SYSTEM_PATH], ignore_errors=True)
+        mister_path = Path('%s/MiSTer' % config[K_BASE_SYSTEM_PATH])
         os.makedirs(str(mister_path.parent), exist_ok=True)
         mister_path.touch()
         tool = str(Path(ini_path).with_suffix('.sh'))
         subprocess.run('cd ..; ./src/build.sh > src/%s' % tool, shell=True, stderr=subprocess.STDOUT)
         subprocess.run(['chmod', '+x', tool], shell=False, stderr=subprocess.STDOUT)
         test_env = os.environ.copy()
-        test_env['CURL_SSL'] = ''
-        test_env['DEBUG'] = 'true'
-        test_env['FAIL_ON_FILE_ERROR'] = 'true'
-        test_env['DEFAULT_BASE_PATH'] = default_base_path
+        test_env[KENV_CURL_SSL] = ''
+        test_env[KENV_DEBUG] = 'true'
+        test_env[KENV_FAIL_ON_FILE_ERROR] = 'true'
+        test_env[KENV_DEFAULT_BASE_PATH] = default_base_path
         result = subprocess.run([tool], stderr=subprocess.STDOUT, env=test_env)
         shutil.rmtree('src/%s' % tool, ignore_errors=True)
         self.assertEqual(result.returncode, 0)
-        self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json.zip" % config['base_system_path']))
+        self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json.zip" % config[K_BASE_SYSTEM_PATH]))
         os.unlink(tool)

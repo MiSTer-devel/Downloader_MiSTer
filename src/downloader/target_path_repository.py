@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import file_MiSTer, file_MiSTer_new
+from downloader.constants import FILE_MiSTer, FILE_MiSTer_new
 
 
 downloader_in_progress_postfix = '._downloader_in_progress'
@@ -82,6 +82,6 @@ class TargetPathRepository:
         self._registry.pop(path)
 
     def _fix_path(self, path):
-        fixed_path = path if path != file_MiSTer else file_MiSTer_new
+        fixed_path = path if path != FILE_MiSTer else FILE_MiSTer_new
         target_path = self._file_system.download_target_path(fixed_path)
         return target_path, fixed_path == target_path

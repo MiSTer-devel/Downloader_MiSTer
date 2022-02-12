@@ -18,6 +18,7 @@
 
 import unittest
 
+from downloader.constants import K_BASE_PATH, K_DOWNLOADER_RETRIES, K_PARALLEL_UPDATE, K_OPTIONS
 from downloader.db_options import DbOptionsKind, DbOptions
 from test.fake_importer_command import ImporterCommand
 from test.objects import db_entity, empty_config
@@ -26,8 +27,8 @@ nil = {}
 config = {'x': 'y'}
 config_with_options = {"downloader_retries": 42}
 db = db_entity()
-db_with_options = db_entity(default_options={'downloader_retries': 1})
-ini_options = DbOptions({'downloader_retries': 8}, kind=DbOptionsKind.INI_SECTION)
+db_with_options = db_entity(default_options={K_DOWNLOADER_RETRIES: 1})
+ini_options = DbOptions({K_DOWNLOADER_RETRIES: 8}, kind=DbOptionsKind.INI_SECTION)
 
 
 class TestImporterCommand(unittest.TestCase):
@@ -46,12 +47,12 @@ class TestImporterCommand(unittest.TestCase):
 
     def test_read_dbs___after_adding_different_options___returns_corresponding_original_config_variants(self):
         actual = ImporterCommand(config)\
-            .add_db(db, nil, {'options': DbOptions({'base_path': 'b'}, kind=DbOptionsKind.INI_SECTION)})\
-            .add_db(db, nil, {'options': DbOptions({'parallel_update': False}, kind=DbOptionsKind.INI_SECTION)})\
+            .add_db(db, nil, {K_OPTIONS: DbOptions({K_BASE_PATH: 'abc'}, kind=DbOptionsKind.INI_SECTION)})\
+            .add_db(db, nil, {K_OPTIONS: DbOptions({K_PARALLEL_UPDATE: False}, kind=DbOptionsKind.INI_SECTION)})\
             .read_dbs()
 
-        self.assert_config({'base_path': 'b', 'x': 'y'}, actual[0])
-        self.assert_config({'parallel_update': False, 'x': 'y'}, actual[1])
+        self.assert_config({K_BASE_PATH: 'abc', 'x': 'y'}, actual[0])
+        self.assert_config({K_PARALLEL_UPDATE: False, 'x': 'y'}, actual[1])
 
     def test_read_dbs___with_config_options___returns_config_with_options(self):
         actual = ImporterCommand(config_with_options)\
@@ -62,7 +63,7 @@ class TestImporterCommand(unittest.TestCase):
 
     def test_read_dbs___with_ini_options___returns_ini_options(self):
         actual = ImporterCommand(config_with_options)\
-            .add_db(db, nil, {'options': ini_options})\
+            .add_db(db, nil, {K_OPTIONS: ini_options})\
             .read_dbs()
 
         self.assert_config(ini_options.testable, actual[0])
@@ -83,7 +84,7 @@ class TestImporterCommand(unittest.TestCase):
 
     def test_read_dbs___with_config_db_and_ini_options___returns_ini_options(self):
         actual = ImporterCommand(config_with_options)\
-            .add_db(db_with_options, nil, {'options': ini_options})\
+            .add_db(db_with_options, nil, {K_OPTIONS: ini_options})\
             .read_dbs()[0]
 
         self.assert_config(ini_options.testable, actual)

@@ -19,6 +19,7 @@
 import unittest
 import json
 
+from downloader.constants import K_BASE_PATH, DISTRIBUTION_MISTER_DB_ID
 from downloader.other import empty_store
 from test.objects import file_descr
 from test.fake_store_migrator import StoreMigrator
@@ -28,6 +29,8 @@ class TestRealisticMigrations(unittest.TestCase):
 
     filled_store_v0 = 'test/integration/fixtures/filled_store_v0.json'
     filled_store_v0_with_uppercase_db_id = 'test/integration/fixtures/filled_store_v0_with_uppercase_db_id.json'
+    filled_store_v7_with_root_base_path = 'test/integration/fixtures/filled_store_v7_with_root_base_path.json'
+    filled_store_v7_with_oldschool_base_path = 'test/integration/fixtures/filled_store_v7_with_oldschool_base_path.json'
     filled_store_vlast = 'test/integration/fixtures/filled_store_vlast.json'
 
     filled_store_v1_with_zip = 'test/integration/fixtures/filled_store_v1_with_zip.json'
@@ -41,6 +44,16 @@ class TestRealisticMigrations(unittest.TestCase):
 
     def test_migrate___on_vlast_filled_store___returns_same_store(self):
         self.assert_versions_stay_the_same(self.filled_store_vlast)
+
+    def test_migrate___on_v7_filled_store_with_oldschool_base_path___returns_expected_store(self):
+        self.assert_versions_change_as_expected(self.filled_store_v7_with_oldschool_base_path, self.filled_store_vlast)
+
+    def test_migrate___on_v7_filled_store_with_root_base_path___returns_same_base_path_as_in_v7(self):
+        store = load_file(self.filled_store_v7_with_root_base_path)
+        v7_base_path = store['dbs'][DISTRIBUTION_MISTER_DB_ID][K_BASE_PATH]
+
+        StoreMigrator().migrate(store)
+        self.assertEqual(v7_base_path, store['dbs'][DISTRIBUTION_MISTER_DB_ID][K_BASE_PATH])
 
     def test_migrate___on_v1_with_zip_filled_store___returns_expected_store(self):
         self.assert_versions_change_as_expected(self.filled_store_v1_with_zip, self.filled_store_vlast_with_zip)

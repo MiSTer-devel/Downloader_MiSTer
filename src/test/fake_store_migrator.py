@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.config import default_config
-from downloader.constants import distribution_mister_db_id
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, K_DATABASES, K_OPTIONS
 from downloader.db_options import DbOptionsKind
 from downloader.migrations import migrations
 from downloader.store_migrator import StoreMigrator as ProductionStoreMigrator
@@ -27,8 +27,8 @@ from test.fake_logger import NoLogger
 
 def default_config_with_distribution_mister():
     config = default_config()
-    config['databases'] = {
-        distribution_mister_db_id: {'options': db_options(kind=DbOptionsKind.INI_SECTION, base_path='/media/fat')}
+    config[K_DATABASES] = {
+        DISTRIBUTION_MISTER_DB_ID: {K_OPTIONS: db_options(kind=DbOptionsKind.INI_SECTION, base_path='/media/fat')}
     }
     return config
 

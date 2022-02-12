@@ -20,7 +20,10 @@ import unittest
 from pathlib import Path
 
 from downloader.config import default_config
-from downloader.constants import distribution_mister_db_id, distribution_mister_db_url, file_MiSTer_new
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, FILE_MiSTer_new, K_BASE_PATH, \
+    K_PARALLEL_UPDATE, K_UPDATE_LINUX, K_DOWNLOADER_SIZE_MB_LIMIT, K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, \
+    K_DOWNLOADER_RETRIES, K_FILTER, K_DATABASES, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_ALLOW_REBOOT, KENV_DEBUG, \
+    MEDIA_FAT
 from downloader.db_options import DbOptions, DbOptionsKind
 from downloader.other import empty_store
 from test.fake_db_entity import DbEntity
@@ -34,7 +37,7 @@ file_c = 'c/C'
 file_boot_rom = 'boot.rom'
 file_menu_rbf = 'menu.rbf'
 hash_menu_rbf = 'menu.rbf'
-hash_MiSTer = file_MiSTer_new
+hash_MiSTer = FILE_MiSTer_new
 hash_PDFViewer = 'pdfviewer'
 hash_MiSTer_old = 'something_old'
 hash_real_test_file = '3de8f8b0dc94b8c2230fab9ec0ba0506'
@@ -54,13 +57,13 @@ def empty_config():
     return {}
 
 
-def config_test(base_path='/media/fat/'):
-    return {'databases': {db_test: {}}, 'base_path': base_path}
+def config_test(base_path=MEDIA_FAT):
+    return {K_DATABASES: {db_test: {}}, K_BASE_PATH: base_path}
 
 
 def config_with_filter(filter_value):
     config = default_config()
-    config['filter'] = filter_value
+    config[K_FILTER] = filter_value
     return config
 
 
@@ -147,7 +150,7 @@ def store_test_descr(zips=None, folders=None, files=None, db_files=None):
 def db_to_store(db):
     raw_db = db.testable
     return {
-        "base_path": "/media/fat/",
+        K_BASE_PATH: "/media/fat",
         "zips": raw_db["zips"],
         "folders": raw_db["folders"],
         "files": raw_db["files"],
@@ -223,19 +226,19 @@ def raw_db_wrong_descr():
 
 def db_options(kind=None, base_path=None, parallel_update=None, update_linux=None, downloader_size_mb_limit=None, downloader_process_limit=None, downloader_timeout=None, downloader_retries=None, download_filter=None):
     raw_db_options = {
-        'parallel_update': False if parallel_update is None else parallel_update,
-        'update_linux': False if update_linux is None else update_linux,
-        'downloader_size_mb_limit': 5 if downloader_size_mb_limit is None else downloader_size_mb_limit,
-        'downloader_process_limit': 3 if downloader_process_limit is None else downloader_process_limit,
-        'downloader_timeout': 1 if downloader_timeout is None else downloader_timeout,
-        'downloader_retries': 100 if downloader_retries is None else downloader_retries,
-        'filter': 'all' if download_filter is None else download_filter
+        K_PARALLEL_UPDATE: False if parallel_update is None else parallel_update,
+        K_UPDATE_LINUX: False if update_linux is None else update_linux,
+        K_DOWNLOADER_SIZE_MB_LIMIT: 5 if downloader_size_mb_limit is None else downloader_size_mb_limit,
+        K_DOWNLOADER_PROCESS_LIMIT: 3 if downloader_process_limit is None else downloader_process_limit,
+        K_DOWNLOADER_TIMEOUT: 1 if downloader_timeout is None else downloader_timeout,
+        K_DOWNLOADER_RETRIES: 100 if downloader_retries is None else downloader_retries,
+        K_FILTER: 'all' if download_filter is None else download_filter
     }
     kind = DbOptionsKind.INI_SECTION if kind is None else kind
     if base_path is not None:
-        raw_db_options['base_path'] = base_path
+        raw_db_options[K_BASE_PATH] = base_path
     elif kind == DbOptionsKind.INI_SECTION:
-        raw_db_options['base_path'] = '/media/usb0/'
+        raw_db_options[K_BASE_PATH] = '/media/usb0'
     return DbOptions(raw_db_options, kind)
 
 
@@ -334,7 +337,7 @@ def db_test_with_file(name_file, file):
 
 
 def db_distribution_mister_with_file(name_file, file):
-    return db_entity(db_id=distribution_mister_db_id, db_files=[file_test_json_zip], files={name_file: file})
+    return db_entity(db_id=DISTRIBUTION_MISTER_DB_ID, db_files=[file_test_json_zip], files={name_file: file})
 
 
 def db_with_file(db_id, name_file, file):
@@ -348,7 +351,7 @@ def db_with_folders(db_id, folders):
 
 
 def empty_test_store():
-    return empty_store(base_path='/media/fat/')
+    return empty_store(base_path=MEDIA_FAT)
 
 
 def store_with_folders(db_id, folders):
@@ -382,15 +385,15 @@ default_base_path = '/tmp/default_base_path/'
 
 def default_env():
     return {
-        'DEFAULT_DB_URL': distribution_mister_db_url,
-        'DEFAULT_DB_ID': distribution_mister_db_id,
-        'DEFAULT_BASE_PATH': default_base_path,
-        'ALLOW_REBOOT': None,
-        'DEBUG': 'false'
+        KENV_DEFAULT_DB_URL: DISTRIBUTION_MISTER_DB_URL,
+        KENV_DEFAULT_DB_ID: DISTRIBUTION_MISTER_DB_ID,
+        KENV_DEFAULT_BASE_PATH: default_base_path,
+        KENV_ALLOW_REBOOT: None,
+        KENV_DEBUG: 'false'
     }
 
 
 def debug_env():
     env = default_env()
-    env['DEBUG'] = 'true'
+    env[KENV_DEBUG] = 'true'
     return env

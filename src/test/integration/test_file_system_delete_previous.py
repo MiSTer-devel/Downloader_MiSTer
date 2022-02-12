@@ -20,6 +20,7 @@ import unittest
 import tempfile
 import os
 from downloader.config import default_config
+from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, K_ALLOW_DELETE
 from test.objects import db_test_with_file, file_descr, hash_real_test_file, empty_test_store
 from test.fake_online_importer import OnlineImporter
 from test.fake_file_system import make_production_filesystem
@@ -98,7 +99,7 @@ class TestFileSystemDeletePrevious(unittest.TestCase):
     def test_delete_previous_mycore_3___with_existing_mycore_file_but_disallow_deletes___deletes_nothing(self):
         with tempfile.TemporaryDirectory() as tempdir:
             config = self.config(tempdir)
-            config['allow_delete'] = False
+            config[K_ALLOW_DELETE] = False
 
             file_system = make_production_filesystem(config)
             file_system.touch(self.mycore_1)
@@ -118,6 +119,6 @@ class TestFileSystemDeletePrevious(unittest.TestCase):
 
     def config(self, tempdir):
         config = default_config()
-        config['base_path'] = tempdir
-        config['base_system_path'] = tempdir
+        config[K_BASE_PATH] = tempdir
+        config[K_BASE_SYSTEM_PATH] = tempdir
         return config

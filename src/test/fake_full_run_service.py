@@ -19,6 +19,8 @@
 from pathlib import Path
 
 from downloader.config import default_config
+from downloader.constants import K_DATABASES, K_DB_URL, K_SECTION, K_VERBOSE, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, KENV_COMMIT, \
+    KENV_UPDATE_LINUX, KENV_FAIL_ON_FILE_ERROR
 from downloader.full_run_service import FullRunService as ProductionFullRunService
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_db_gateway import DbGateway
@@ -54,24 +56,24 @@ class FullRunService(ProductionFullRunService):
     def with_single_empty_db() -> ProductionFullRunService:
         config = default_config()
         config.update({
-            'databases': {
+            K_DATABASES: {
                 db_empty: {
-                    'db_url': db_empty,
-                    'section': db_empty,
+                    K_DB_URL: db_empty,
+                    K_SECTION: db_empty,
                     'base_files_url': '',
                     'zips': {}
                 }
             },
-            'verbose': False,
-            'config_path': Path(''),
-            'user_defined_options': []
+            K_VERBOSE: False,
+            K_CONFIG_PATH: Path(''),
+            K_USER_DEFINED_OPTIONS: []
         })
 
         db_gateway = DbGateway(config)
         db_gateway.file_system.test_data.with_file(db_empty, {'unzipped_json': {}})
 
         return FullRunService(
-            {'COMMIT': 'test', 'UPDATE_LINUX': 'false', 'FAIL_ON_FILE_ERROR': 'true'},
+            {KENV_COMMIT: 'test', KENV_UPDATE_LINUX: 'false', KENV_FAIL_ON_FILE_ERROR: 'true'},
             config,
             db_gateway,
         )
@@ -80,20 +82,20 @@ class FullRunService(ProductionFullRunService):
     def with_single_db(db_id, db_descr) -> ProductionFullRunService:
         config = default_config()
         config.update({
-                'databases': {
+                K_DATABASES: {
                     db_id: {
-                        'db_url': db_id,
-                        'section': db_id,
+                        K_DB_URL: db_id,
+                        K_SECTION: db_id,
                         'base_files_url': '',
                         'zips': {}
                     }
                 },
-                'verbose': False,
-                'user_defined_options': [],
-                'config_path': Path('')
+                K_VERBOSE: False,
+                K_USER_DEFINED_OPTIONS: [],
+                K_CONFIG_PATH: Path('')
             })
         return FullRunService(
-            {'COMMIT': 'test', 'UPDATE_LINUX': 'false', 'FAIL_ON_FILE_ERROR': 'true'},
+            {KENV_COMMIT: 'test', KENV_UPDATE_LINUX: 'false', KENV_FAIL_ON_FILE_ERROR: 'true'},
             config,
             DbGateway.with_single_db(db_id, db_descr, config=config),
         )
@@ -101,9 +103,9 @@ class FullRunService(ProductionFullRunService):
     @staticmethod
     def with_no_dbs() -> ProductionFullRunService:
         config = default_config()
-        config.update({'databases': {}, 'verbose': False, 'config_path': Path(''), 'user_defined_options': []})
+        config.update({K_DATABASES: {}, K_VERBOSE: False, K_CONFIG_PATH: Path(''), K_USER_DEFINED_OPTIONS: []})
         return FullRunService(
-            {'COMMIT': 'test', 'UPDATE_LINUX': 'false', 'FAIL_ON_FILE_ERROR': 'true'},
+            {KENV_COMMIT: 'test', KENV_UPDATE_LINUX: 'false', KENV_FAIL_ON_FILE_ERROR: 'true'},
             config,
             DbGateway(config),
         )

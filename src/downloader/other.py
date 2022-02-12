@@ -24,12 +24,12 @@ from urllib.parse import urlparse
 if 'unittest' in sys.modules.keys():
     import inspect
 from pathlib import Path
-from downloader.constants import file_MiSTer
+from downloader.constants import FILE_MiSTer, K_BASE_PATH
 
 
 def empty_store(base_path):
     return {
-        'base_path': base_path,
+        K_BASE_PATH: base_path,
         'zips': {},
         'folders': {},
         'files': {},
@@ -56,7 +56,7 @@ class UnreachableException(Exception):
 def format_files_message(file_list):
     any_mra_files = [file for file in file_list if file[-4:].lower() == '.mra']
 
-    rbfs = [file for file in file_list if file[-4:].lower() == '.rbf' or file == file_MiSTer]
+    rbfs = [file for file in file_list if file[-4:].lower() == '.rbf' or file == FILE_MiSTer]
     mras = [file for file in any_mra_files if '/_alternatives/' not in file.lower()]
     alts = [file for file in any_mra_files if '/_alternatives/' in file.lower()]
     urls = [file for file in file_list if file[0:4].lower() == 'http']
@@ -104,6 +104,17 @@ def test_only(func):
         _calling_test_only = False
         return result
 
+    return wrapper
+
+
+def cache(func):
+    value = None
+
+    def wrapper():
+        nonlocal value
+        if value is None:
+            value = func()
+        return value
     return wrapper
 
 

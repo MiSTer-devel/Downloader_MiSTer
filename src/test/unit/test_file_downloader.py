@@ -18,7 +18,7 @@
 
 import unittest
 
-from downloader.constants import file_MiSTer, file_MiSTer_new
+from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, K_BASE_PATH
 from downloader.target_path_repository import downloader_in_progress_postfix
 from test.fake_file_system import FileSystem
 from test.fake_file_downloader import FileDownloader
@@ -29,7 +29,7 @@ from test.objects import file_menu_rbf, hash_menu_rbf, file_one, hash_one, hash_
 class TestFileDownloader(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.sut = FileDownloader(file_system=FileSystem(config={'base_path': '/installed/'}))
+        self.sut = FileDownloader(file_system=FileSystem(config={K_BASE_PATH: '/installed'}))
 
     def test_download_nothing___from_scratch_no_issues___nothing_downloaded_no_errors(self):
         self.sut.download_files(False)
@@ -84,16 +84,16 @@ class TestFileDownloader(unittest.TestCase):
 
     def test_download_mister_file___from_scratch_no_issues___stores_it_as_mister(self):
         self.sut.file_system.test_data.with_old_mister_binary()
-        self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_MiSTer, 'reboot': True, 'path': 'system'}, file_MiSTer)
+        self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_MiSTer, 'reboot': True, 'path': 'system'}, FILE_MiSTer)
         self.sut.download_files(False)
-        self.assertDownloaded([file_MiSTer], [file_MiSTer], need_reboot=True)
-        self.assertTrue(self.sut.file_system.is_file(file_MiSTer))
+        self.assertDownloaded([FILE_MiSTer], [FILE_MiSTer], need_reboot=True)
+        self.assertTrue(self.sut.file_system.is_file(FILE_MiSTer))
 
     def test_download_mister_file___from_scratch_no_issues___adds_the_three_mister_files_on_system_paths(self):
         self.sut.file_system.test_data.with_old_mister_binary()
-        self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_MiSTer, 'reboot': True, 'path': 'system'}, file_MiSTer)
+        self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_MiSTer, 'reboot': True, 'path': 'system'}, FILE_MiSTer)
         self.sut.download_files(False)
-        self.assertEqual([file_MiSTer, file_MiSTer_new, self.sut.local_repository.old_mister_path], self.sut.file_system.system_paths)
+        self.assertEqual([FILE_MiSTer, FILE_MiSTer_new, self.sut.local_repository.old_mister_path], self.sut.file_system.system_paths)
 
     def assertDownloaded(self, oks, run=None, errors=None, need_reboot=False):
         self.assertEqual(oks, self.sut.correctly_downloaded_files())

@@ -18,7 +18,7 @@
 
 import unittest
 from downloader.config import default_config
-from downloader.constants import file_MiSTer_old, file_MiSTer, file_PDFViewer, file_MiSTer_new
+from downloader.constants import FILE_MiSTer_old, FILE_MiSTer, FILE_PDFViewer, FILE_MiSTer_new
 from downloader.other import empty_store
 from downloader.online_importer import InvalidDownloaderPath, invalid_folders, invalid_paths, no_distribution_mister_invalid_paths
 from test.fake_file_system import FileSystem
@@ -127,43 +127,43 @@ class TestOnlineImporter(unittest.TestCase):
         store = empty_test_store()
         sut.file_system.test_data.with_old_mister_binary()
 
-        sut.add_db(db_distribution_mister_with_file(file_MiSTer, file_mister_descr()), store)
+        sut.add_db(db_distribution_mister_with_file(FILE_MiSTer, file_mister_descr()), store)
         sut.download(False)
 
-        self.assertEqualDict(store['files'], {file_MiSTer: file_mister_descr()})
+        self.assertEqualDict(store['files'], {FILE_MiSTer: file_mister_descr()})
         self.assertEmptyFolders(store)
-        self.assertReports(sut, [file_MiSTer], needs_reboot=True)
-        self.assertTrue(sut.file_system.is_file(file_MiSTer))
-        self.assertTrue(sut.file_system.is_file(file_MiSTer_old))
-        self.assertEqual([file_MiSTer, file_MiSTer_new, file_MiSTer_old], sut.file_system.system_paths)
+        self.assertReports(sut, [FILE_MiSTer], needs_reboot=True)
+        self.assertTrue(sut.file_system.is_file(FILE_MiSTer))
+        self.assertTrue(sut.file_system.is_file(FILE_MiSTer_old))
+        self.assertEqual([FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old], sut.file_system.system_paths)
 
     def test_download_distribution_mister___with_pdfviewer___needs_reboot(self):
         sut = OnlineImporter()
         store = empty_test_store()
         sut.file_system.test_data.with_old_mister_binary()
 
-        sut.add_db(db_distribution_mister_with_file(file_PDFViewer, file_pdfviewer_descr()), store)
+        sut.add_db(db_distribution_mister_with_file(FILE_PDFViewer, file_pdfviewer_descr()), store)
         sut.download(False)
 
-        self.assertEqualDict(store['files'], {file_PDFViewer: file_pdfviewer_descr()})
+        self.assertEqualDict(store['files'], {FILE_PDFViewer: file_pdfviewer_descr()})
         self.assertEmptyFolders(store)
-        self.assertReports(sut, [file_PDFViewer], needs_reboot=False)
-        self.assertTrue(sut.file_system.is_file(file_PDFViewer))
-        self.assertEqual([file_PDFViewer], sut.file_system.system_paths)
+        self.assertReports(sut, [FILE_PDFViewer], needs_reboot=False)
+        self.assertTrue(sut.file_system.is_file(FILE_PDFViewer))
+        self.assertEqual([FILE_PDFViewer], sut.file_system.system_paths)
 
     def test_download_test_db___with_mister___raises_invalid_downloader_path_exception(self):
         sut = OnlineImporter()
         store = empty_test_store()
         sut.file_system.test_data.with_old_mister_binary()
 
-        sut.add_db(db_test_with_file(file_MiSTer, file_mister_descr()), store)
+        sut.add_db(db_test_with_file(FILE_MiSTer, file_mister_descr()), store)
         self.assertRaises(InvalidDownloaderPath, lambda: sut.download(False))
 
         self.assertEqualDict(store, empty_test_store())
         self.assertEmptyFolders(store)
         self.assertReportsNothing(sut)
-        self.assertTrue(sut.file_system.is_file(file_MiSTer))
-        self.assertFalse(sut.file_system.is_file(file_MiSTer_old))
+        self.assertTrue(sut.file_system.is_file(FILE_MiSTer))
+        self.assertFalse(sut.file_system.is_file(FILE_MiSTer_old))
         self.assertEqual([], sut.file_system.system_paths)
 
     def test_download_dbs_contents___with_stored_file_a_and_download_error___store_deletes_file_a_but_not_folder_a_and_fs_is_unchanged(self):
@@ -231,19 +231,6 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertHasFolderA(store)
         self.assertReports(sut, [file_a])
         self.assertTrue(sut.file_system.is_file(file_a))
-
-    def test_download_dbs_contents___when_no_check_downloaded_files_and_downloaded_file_is_missing___does_nothing(self):
-        config = default_config()
-        config['check_manually_deleted_files'] = False
-        sut = OnlineImporter(config=config)
-        store = store_test_with_file_a_descr()
-
-        sut.add_db(db_test_with_file_a(), store)
-        sut.download(False)
-
-        self.assertHasFolderA(store)
-        self.assertReportsNothing(sut)
-        self.assertFalse(sut.file_system.is_file(file_a))
 
     def test_overwrite___when_boot_rom_present___should_not_overwrite_it(self):
         sut = OnlineImporter()
@@ -350,7 +337,7 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertEqualDict(store2['folders'], ['b'])
         self.assertEqualDict(store3['folders'], [])
         self.assertReportsNothing(sut)
-        self.assertEqual(sut.file_system.folders(), ['a', 'b', 'x'])
+        self.assertEqual(['a', 'b', 'x'], sut.file_system.folders())
 
     def test_downloaded_single_db___with_invalid_files___raises_error(self):
         invalids = [0, 'linux/file.txt', 'linux/something/something/file.txt', '../omg.txt', 'this/is/ok/../or/nope.txt', '/tmp/no', '.hidden'] + \

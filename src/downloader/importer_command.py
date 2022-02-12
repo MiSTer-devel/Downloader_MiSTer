@@ -15,6 +15,8 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+from downloader.constants import K_OPTIONS
+
 
 class ImporterCommand:
     def __init__(self, config, user_defined_options):
@@ -29,8 +31,8 @@ class ImporterCommand:
             if key not in self._user_defined_options:
                 config[key] = option
 
-        if 'options' in ini_description:
-            ini_description['options'].apply_to_config(config)
+        if K_OPTIONS in ini_description:
+            ini_description[K_OPTIONS].apply_to_config(config)
 
         self._parameters.append((db, store, config))
         return self

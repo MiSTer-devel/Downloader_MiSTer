@@ -1,7 +1,7 @@
 {
   "dbs": {
     "distribution_mister": {
-      "base_path": "/media/fat",
+      "base_path": "/media/fat/",
       "zips": {},
       "folders": {
         "Filters": {},
@@ -17,5 +17,5 @@
       }
     }
   },
-  "migration_version": -1
+  "migration_version": 7
 }

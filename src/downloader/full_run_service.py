@@ -20,6 +20,8 @@ import datetime
 import time
 import json
 
+from downloader.constants import K_BASE_PATH, K_VERBOSE, K_DATABASES, K_UPDATE_LINUX, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, \
+    KENV_UPDATE_LINUX, KENV_FAIL_ON_FILE_ERROR, KENV_COMMIT
 from downloader.importer_command import ImporterCommand
 from downloader.other import format_files_message, empty_store
 
@@ -42,7 +44,7 @@ class FullRunService:
     def full_run(self):
         start_time = time.time()
 
-        if self._config['verbose']:
+        if self._config[K_VERBOSE]:
             self._logger.enable_verbose_mode()
 
         self._debug_log_initial_state()
@@ -50,20 +52,20 @@ class FullRunService:
 
         local_store = self._local_repository.load_store(self._store_migrator)
 
-        databases, failed_dbs = self._db_gateway.fetch_all(self._config['databases'])
+        databases, failed_dbs = self._db_gateway.fetch_all(self._config[K_DATABASES])
 
-        importer_command = ImporterCommand(self._config, self._config['user_defined_options'])
+        importer_command = ImporterCommand(self._config, self._config[K_USER_DEFINED_OPTIONS])
         for db in databases:
             if db.db_id not in local_store['dbs']:
-                local_store['dbs'][db.db_id] = empty_store(self._config['base_path'])
+                local_store['dbs'][db.db_id] = empty_store(self._config[K_BASE_PATH])
 
             store = local_store['dbs'][db.db_id]
-            description = self._config['databases'][db.db_id]
+            description = self._config[K_DATABASES][db.db_id]
 
             importer_command.add_db(db, store, description)
 
-        update_only_linux = self._env['UPDATE_LINUX'] == 'only'
-        update_linux = self._env['UPDATE_LINUX'] != 'false' and self._config.get('update_linux', True)
+        update_only_linux = self._env[KENV_UPDATE_LINUX] == 'only'
+        update_linux = self._env[KENV_UPDATE_LINUX] != 'false' and self._config.get(K_UPDATE_LINUX, True)
 
         if not update_only_linux:
             for relocation_package in self._base_path_relocator.relocating_base_paths(importer_command):
@@ -94,7 +96,7 @@ class FullRunService:
         elif update_only_linux:
             self._logger.print('update_linux is set to false, skipping...\n')
 
-        if self._env['FAIL_ON_FILE_ERROR'] == 'true' and len(self._online_importer.files_that_failed()) > 0:
+        if self._env[KENV_FAIL_ON_FILE_ERROR] == 'true' and len(self._online_importer.files_that_failed()) > 0:
             self._logger.debug('Length of files_that_failed: %d' % len(self._online_importer.files_that_failed()))
             self._logger.debug('Length of failed_dbs: %d' % len(failed_dbs))
             return 1
@@ -108,7 +110,7 @@ class FullRunService:
     def _debug_log_initial_state(self):
         self._logger.debug('env: ' + json.dumps(self._env, indent=4))
         config = self._config.copy()
-        config['config_path'] = str(config['config_path'])
+        config[K_CONFIG_PATH] = str(config[K_CONFIG_PATH])
         self._logger.debug('config: ' + json.dumps(config, default=lambda o: o.__dict__, indent=4))
 
     def _display_summary(self, installed_files, failed_files, unused_filter_tags, new_files_not_installed, start_time):
@@ -116,7 +118,7 @@ class FullRunService:
 
         self._logger.print()
         self._logger.print('===========================')
-        self._logger.print('Downloader 1.4 (%s) by theypsilon. Run time: %ss' % (self._env['COMMIT'], run_time))
+        self._logger.print('Downloader 1.4 (%s) by theypsilon. Run time: %ss' % (self._env[KENV_COMMIT], run_time))
         self._logger.print('Log: %s' % self._local_repository.logfile_path)
         if len(unused_filter_tags) > 0:
             self._logger.print()

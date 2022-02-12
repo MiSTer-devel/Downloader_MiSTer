@@ -17,6 +17,8 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
+
+from downloader.constants import K_SECTION, K_DB_URL
 from test.fake_file_downloader import FileDownloader
 from test.objects import db_test_descr, db_test
 from test.fake_db_gateway import DbGateway
@@ -60,4 +62,4 @@ def fetch_all(db_url, fs=None, factory=None):
 
 
 def test_db(db_uri):
-    return {db_test: {'section': db_test, 'db_url': db_uri}}
+    return {db_test: {K_SECTION: db_test, K_DB_URL: db_uri}}

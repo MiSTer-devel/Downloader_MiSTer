@@ -22,6 +22,8 @@ import os
 import json
 from pathlib import Path
 from downloader.config import ConfigReader
+from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, K_CURL_SSL, KENV_UPDATE_LINUX, \
+    KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR
 from test.fake_file_system import make_production_filesystem
 from test.objects import debug_env, default_base_path
 from test.fake_logger import NoLogger
@@ -225,7 +227,7 @@ class TestSandboxedInstall(unittest.TestCase):
             'local_store': {
                 'dbs': {
                     'sandbox': {
-                        'base_path': '/tmp/delme_relocated',
+                        K_BASE_PATH: '/tmp/delme_relocated',
                         'files': {
                             'bar.txt': {'delete': [], 'hash': '942b89ab661f86228ea9ad3e980763a7', 'size': 4, 'url': 'https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/bar.txt'},
                             'foo.txt': {'delete': [], 'hash': '133af32b4894d9c5527cc5c91269ee28', 'size': 20, 'url': 'https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/foo.txt'}},
@@ -234,7 +236,7 @@ class TestSandboxedInstall(unittest.TestCase):
                         'zips': {}
                     }
                 },
-            'migration_version': 7}
+            'migration_version': StoreMigrator().latest_migration_version()}
         })
 
         self.assertFalse(Path('/tmp/delme_sandbox/foo.txt').is_file())
@@ -258,43 +260,43 @@ class TestSandboxedInstall(unittest.TestCase):
 
         if 'files' in expected:
             counter += 1
-            self.assertEqual(expected['files'], self.find_all_files(config['base_path']))
+            self.assertEqual(expected['files'], self.find_all_files(config[K_BASE_PATH]))
 
         if 'files_count' in expected:
             counter += 1
-            self.assertEqual(expected['files_count'], len(self.find_all_files(config['base_path'])))
+            self.assertEqual(expected['files_count'], len(self.find_all_files(config[K_BASE_PATH])))
 
         if 'system_files' in expected:
             counter += 1
-            self.assertEqual(expected['system_files'], self.find_all_files(config['base_system_path']))
+            self.assertEqual(expected['system_files'], self.find_all_files(config[K_BASE_SYSTEM_PATH]))
 
         if 'system_files_count' in expected:
             counter += 1
-            self.assertEqual(expected['system_files_count'], len(self.find_all_files(config['base_path'])))
+            self.assertEqual(expected['system_files_count'], len(self.find_all_files(config[K_BASE_PATH])))
 
         if 'folders' in expected:
             counter += 1
-            self.assertEqual(sorted(list(expected['folders'])), self.find_all_folders(config['base_path']))
+            self.assertEqual(sorted(list(expected['folders'])), self.find_all_folders(config[K_BASE_PATH]))
 
         if 'system_folders' in expected:
             counter += 1
-            self.assertEqual(sorted(list(expected['system_folders'])), self.find_all_folders(config['base_system_path']))
+            self.assertEqual(sorted(list(expected['system_folders'])), self.find_all_folders(config[K_BASE_SYSTEM_PATH]))
 
         self.assertEqual(len(expected), counter)
 
     @staticmethod
     def run_main(ini_path):
         return main({
-            'DOWNLOADER_LAUNCHER_PATH': str(Path(ini_path).with_suffix('.sh')),
-            'CURL_SSL': '',
-            'UPDATE_LINUX': 'false',
-            'ALLOW_REBOOT': None,
-            'COMMIT': 'quick system test',
-            'DEFAULT_DB_URL': '',
-            'DEFAULT_DB_ID': '',
-            'DEFAULT_BASE_PATH': default_base_path,
-            'DEBUG': 'true',
-            'FAIL_ON_FILE_ERROR': 'true'
+            KENV_DOWNLOADER_LAUNCHER_PATH: str(Path(ini_path).with_suffix('.sh')),
+            KENV_CURL_SSL: '',
+            KENV_UPDATE_LINUX: 'false',
+            KENV_ALLOW_REBOOT: None,
+            KENV_COMMIT: 'quick system test',
+            KENV_DEFAULT_DB_URL: '',
+            KENV_DEFAULT_DB_ID: '',
+            KENV_DEFAULT_BASE_PATH: default_base_path,
+            KENV_DEBUG: 'true',
+            KENV_FAIL_ON_FILE_ERROR: 'true'
         })
 
     def find_all_files(self, directory):
@@ -323,7 +325,7 @@ class TestSandboxedInstall(unittest.TestCase):
         store = make_new_local_store(StoreMigrator())
         for store_id, files in tuples:
             store['dbs'][store_id] = {
-                'base_path': TestSandboxedInstall.tmp_delme[0:-1],
+                K_BASE_PATH: TestSandboxedInstall.tmp_delme[0:-1],
                 'folders': {},
                 'files': files,
                 'offline_databases_imported': [],
@@ -333,10 +335,10 @@ class TestSandboxedInstall(unittest.TestCase):
 
 def cleanup(ini_path):
     config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
-    shutil.rmtree(config['base_path'], ignore_errors=True)
-    shutil.rmtree(config['base_system_path'], ignore_errors=True)
-    Path(config['base_path']).mkdir(parents=True, exist_ok=True)
-    Path(config['base_system_path']).mkdir(parents=True, exist_ok=True)
+    shutil.rmtree(config[K_BASE_PATH], ignore_errors=True)
+    shutil.rmtree(config[K_BASE_SYSTEM_PATH], ignore_errors=True)
+    Path(config[K_BASE_PATH]).mkdir(parents=True, exist_ok=True)
+    Path(config[K_BASE_SYSTEM_PATH]).mkdir(parents=True, exist_ok=True)
 
 
 def hashes(base_path, files):

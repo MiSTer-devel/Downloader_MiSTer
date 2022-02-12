@@ -18,6 +18,7 @@
 
 import unittest
 
+from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD
 from downloader.file_filter import BadFileFilterPartException
 from downloader.online_importer import WrongDatabaseOptions
 from downloader.other import empty_store
@@ -109,7 +110,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
 
     def download_zipped_cheats_folder(self, store, filter_value, file_system=None, summary=None, summary_hash=None):
         config = config_with_filter(filter_value)
-        config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
+        config[K_ZIP_FILE_COUNT_THRESHOLD] = 0  # This will cause to unzip the contents
 
         self.sut = OnlineImporter(config=config, file_system=file_system)
 

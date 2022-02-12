@@ -18,7 +18,7 @@
 
 import unittest
 
-from downloader.constants import file_MiSTer_version
+from downloader.constants import FILE_MiSTer_version
 from test.factory_stub import FactoryStub
 from test.fake_linux_updater import LinuxUpdater
 from test.objects import db_entity
@@ -33,27 +33,27 @@ class TestLinuxUpdater(unittest.TestCase):
     def test_update_linux___no_databases___no_need_to_reboot(self):
         self.sut.update()
         self.assertFalse(self.sut.needs_reboot())
-        self.assertEqual(self.sut.file_system.read_file_contents(file_MiSTer_version), "unknown")
+        self.assertEqual(self.sut.file_system.read_file_contents(FILE_MiSTer_version), "unknown")
 
     def test_update_linux___no_linux_databases___no_need_to_reboot(self):
         self.sut.add_db(db_entity(db_id='first'))
         self.sut.add_db(db_entity(db_id='second'))
         self.sut.update()
         self.assertFalse(self.sut.needs_reboot())
-        self.assertEqual(self.sut.file_system.read_file_contents(file_MiSTer_version), "unknown")
+        self.assertEqual(self.sut.file_system.read_file_contents(FILE_MiSTer_version), "unknown")
 
     def test_update_linux___db_with_new_linux___has_new_version_and_needs_reboot(self):
         self.sut.add_db(db_entity(db_id='new', linux=linux_description()))
         self.sut.update()
         self.assertTrue(self.sut.needs_reboot())
-        self.assertEqual(self.sut.file_system.read_file_contents(file_MiSTer_version), "210711")
+        self.assertEqual(self.sut.file_system.read_file_contents(FILE_MiSTer_version), "210711")
 
     def test_update_linux___db_with_old_linux___has_old_version_and_no_need_to_reboot(self):
-        self.sut.file_system.test_data.with_file(file_MiSTer_version, {'content': "210711"})
+        self.sut.file_system.test_data.with_file(FILE_MiSTer_version, {'content': "210711"})
         self.sut.add_db(db_entity(db_id='new', linux=linux_description()))
         self.sut.update()
         self.assertFalse(self.sut.needs_reboot())
-        self.assertEqual(self.sut.file_system.read_file_contents(file_MiSTer_version), "210711")
+        self.assertEqual(self.sut.file_system.read_file_contents(FILE_MiSTer_version), "210711")
 
     def test_update_linux___dbs_with_different_new_linux___updates_first_linux_and_needs_reboot(self):
         self.sut.add_db(db_entity(db_id='new_2', linux=linux_description_with_version("222222")))
@@ -61,14 +61,14 @@ class TestLinuxUpdater(unittest.TestCase):
         self.sut.add_db(db_entity(db_id='new_3', linux=linux_description_with_version("333333")))
         self.sut.update()
         self.assertTrue(self.sut.needs_reboot())
-        self.assertEqual(self.sut.file_system.read_file_contents(file_MiSTer_version), "222222")
+        self.assertEqual(self.sut.file_system.read_file_contents(FILE_MiSTer_version), "222222")
 
     def test_update_linux___new_linux_but_failed_download___no_need_to_reboot(self):
         self.sut = LinuxUpdater(FactoryStub(FileDownloader()).has(lambda fd: fd.test_data.errors_at('linux.7z')))
         self.sut.add_db(db_entity(db_id='new', linux=linux_description()))
         self.sut.update()
         self.assertFalse(self.sut.needs_reboot())
-        self.assertEqual(self.sut.file_system.read_file_contents(file_MiSTer_version), "unknown")
+        self.assertEqual(self.sut.file_system.read_file_contents(FILE_MiSTer_version), "unknown")
 
 
 def linux_description():

@@ -18,6 +18,7 @@
 
 import unittest
 from downloader.config import config_file_path
+from downloader.constants import KENV_DOWNLOADER_LAUNCHER_PATH, KENV_DOWNLOADER_INI_PATH
 
 
 class TestConfigFilePath(unittest.TestCase):
@@ -52,6 +53,6 @@ class TestConfigFilePath(unittest.TestCase):
 
 def env(launcher_path, ini_path=None):
     return {
-        'DOWNLOADER_LAUNCHER_PATH': launcher_path,
-        'DOWNLOADER_INI_PATH': ini_path,
+        KENV_DOWNLOADER_LAUNCHER_PATH: launcher_path,
+        KENV_DOWNLOADER_INI_PATH: ini_path,
     }

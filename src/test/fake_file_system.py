@@ -19,7 +19,7 @@ from typing import List
 import pathlib
 
 from downloader.config import default_config
-from downloader.constants import file_MiSTer
+from downloader.constants import FILE_MiSTer, K_BASE_PATH, MEDIA_FAT
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem
 from downloader.other import ClosableValue
 from test.objects import file_a, file_a_descr, file_mister_descr, hash_MiSTer_old, file_test_json_zip, \
@@ -53,7 +53,7 @@ class TestDataFileSystem:
         return self.with_folder_a()
 
     def with_mister_binary(self, description=None):
-        self._files.add(self._path(file_MiSTer), description if description is not None else file_mister_descr())
+        self._files.add(self._path(FILE_MiSTer), description if description is not None else file_mister_descr())
 
     def with_old_mister_binary(self):
         self.with_mister_binary({'hash': hash_MiSTer_old})
@@ -89,7 +89,7 @@ class FileSystemFactory(ProductionFileSystemFactory):
         self._common_folders = CaseInsensitiveDict()
 
     def create_for_config(self, config):
-        base_path = config['base_path']
+        base_path = config[K_BASE_PATH]
         if base_path not in self.file_systems:
             self.add_file_system(config, FileSystem(config, self._common_files, self._common_folders))
         return self.file_systems[base_path]
@@ -98,7 +98,7 @@ class FileSystemFactory(ProductionFileSystemFactory):
         return self.create_for_config(self.config)
 
     def add_file_system(self, config, file_system):
-        base_path = config['base_path']
+        base_path = config[K_BASE_PATH]
         self.file_systems[base_path] = file_system
 
 class StubFileSystemFactory:
@@ -122,7 +122,7 @@ class FileSystem(ProductionFileSystem):
         self._removed_files = list()
         self._removed_folders = list()
         self._current_temp_file_index = 0
-        self._base_path = '/media/fat/' if config is None else config['base_path']
+        self._base_path = MEDIA_FAT if config is None else config[K_BASE_PATH]
         self._historic_paths = set()
         self._copy_buggy = False
 
@@ -230,7 +230,7 @@ class FileSystem(ProductionFileSystem):
         return self._fix_paths(sorted(self._folders.keys()))
 
     def _fix_paths(self, paths):
-        return [p.replace(self._base_path, '') for p in paths]
+        return [p.replace(self._base_path + '/', '') for p in paths]
 
     def remove_folder(self, path):
         self._folders.pop(self._path(path))

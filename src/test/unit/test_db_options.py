@@ -18,23 +18,27 @@
 
 import unittest
 
+from downloader.constants import K_BASE_PATH, K_UPDATE_LINUX, K_PARALLEL_UPDATE, K_DOWNLOADER_SIZE_MB_LIMIT, \
+    K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES
 from downloader.db_options import DbOptionsValidationException, DbOptions, DbOptionsKind
 from test.objects import db_options
 
 
-props_base_path = {'base_path': 'something'}
+props_base_path = {K_BASE_PATH: 'something'}
 
 
 class TestDbOptions(unittest.TestCase):
 
     props_with_bad_calls = [
-        ('base_path', lambda: db_options(base_path=False)),
-        ('update_linux', lambda: db_options(update_linux='false')),
-        ('parallel_update', lambda: db_options(parallel_update=0)),
-        ('downloader_size_mb_limit', lambda: db_options(downloader_size_mb_limit=-10)),
-        ('downloader_process_limit', lambda: db_options(downloader_process_limit=False)),
-        ('downloader_timeout', lambda: db_options(downloader_timeout='1')),
-        ('downloader_retries', lambda: db_options(downloader_retries=0)),
+        (K_BASE_PATH, lambda: db_options(base_path=False)),
+        (K_BASE_PATH, lambda: db_options(base_path='a')),
+        (K_BASE_PATH, lambda: db_options(base_path='/media/fat/')),
+        (K_UPDATE_LINUX, lambda: db_options(update_linux='false')),
+        (K_PARALLEL_UPDATE, lambda: db_options(parallel_update=0)),
+        (K_DOWNLOADER_SIZE_MB_LIMIT, lambda: db_options(downloader_size_mb_limit=-10)),
+        (K_DOWNLOADER_PROCESS_LIMIT, lambda: db_options(downloader_process_limit=False)),
+        (K_DOWNLOADER_TIMEOUT, lambda: db_options(downloader_timeout='1')),
+        (K_DOWNLOADER_RETRIES, lambda: db_options(downloader_retries=0)),
     ]
 
     def test_construct_db_options___with_correct_props___returns_options(self):
@@ -46,13 +50,13 @@ class TestDbOptions(unittest.TestCase):
                 self.assertEqual({}, DbOptions({}, kind=kind).testable)
 
     def test_construct_db_options___with_wrong_incorrect_option___raises_db_options_validation_exception(self):
-        for prop, bad_call in self.props_with_bad_calls:
-            with self.subTest(prop):
+        for n, (prop, bad_call) in enumerate(self.props_with_bad_calls):
+            with self.subTest(f'{n} {prop}'):
                 self.assertRaises(DbOptionsValidationException, bad_call)
 
     def test_construct_db_options___with_props_in_isolation___returns_options(self):
-        for prop, _ in self.props_with_bad_calls:
-            with self.subTest(prop):
+        for n, (prop, _) in enumerate(self.props_with_bad_calls):
+            with self.subTest(f'{n} {prop}'):
                 expected_prop = {prop: db_options().testable[prop]}
                 self.assertIsNotNone(DbOptions(expected_prop, kind=DbOptionsKind.INI_SECTION).testable)
 

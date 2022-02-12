@@ -19,6 +19,7 @@
 import unittest
 
 from downloader.base_path_relocator import RelocatorError
+from downloader.constants import MEDIA_FAT, MEDIA_USB0
 from downloader.other import empty_store
 from test.fake_importer_command import ImporterCommand
 from test.fake_base_path_relocator import BasePathRelocator
@@ -39,21 +40,21 @@ class TestBasePathRelocator(unittest.TestCase):
 
     def setUp(self) -> None:
         self.file_system_factory = FileSystemFactory()
-        self.media_fat_file_system = self.file_system_factory.create_for_config(config_test(base_path='/media/fat/'))
-        self.media_usb0_file_system = self.file_system_factory.create_for_config(config_test(base_path='/media/usb0/'))
+        self.media_fat_file_system = self.file_system_factory.create_for_config(config_test(base_path=MEDIA_FAT))
+        self.media_usb0_file_system = self.file_system_factory.create_for_config(config_test(base_path=MEDIA_USB0))
         self.sut = BasePathRelocator(self.file_system_factory)
 
     def test_relocating_base_paths___with_empty_command___returns_empty_array(self):
         self.assertEqual([], self.sut.relocating_base_paths(ImporterCommand(empty_config())))
 
     def test_relocating_base_paths___with_command_containing_new_store___returns_empty_array(self):
-        self.assertEqual([], self.sut.relocating_base_paths(command(empty_store(base_path='/media/fat/'), base_path='/media/fat/')))
+        self.assertEqual([], self.sut.relocating_base_paths(command(empty_store(base_path=MEDIA_FAT), base_path=MEDIA_FAT)))
 
     def test_relocating_base_paths___with_command_containing_old_store_with_matching_base_path___returns_empty_array(self):
-        self.assertEqual([], self.sut.relocating_base_paths(command(media_fat_store(), base_path='/media/fat/')))
+        self.assertEqual([], self.sut.relocating_base_paths(command(media_fat_store(), base_path=MEDIA_FAT)))
 
     def test_relocating_base_paths___with_command_containing_old_store_with_non_matching_base_path___returns_a_length_one_array(self):
-        importer_command = command(media_fat_store_with_system_file(), base_path='/media/usb0/')
+        importer_command = command(media_fat_store_with_system_file(), base_path=MEDIA_USB0)
         self.assertEqual(1, len(self.sut.relocating_base_paths(importer_command)))
 
     def test_relocate_non_system_files___with_package_with_system_file_moved_from_fat_to_usb0___causes_system_file_to_stay_at_fat(self):
@@ -87,7 +88,7 @@ class TestBasePathRelocator(unittest.TestCase):
         self.assertFalse(self.media_usb0_file_system.is_file(file_a))
 
     def relocate_non_system_files_to_media_usb0(self, store):
-        importer_command = command(store, base_path='/media/usb0/')
+        importer_command = command(store, base_path=MEDIA_USB0)
 
         packages = self.sut.relocating_base_paths(importer_command)
         self.sut.relocate_non_system_files(packages[0])

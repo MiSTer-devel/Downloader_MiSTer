@@ -20,7 +20,7 @@ from downloader.config import default_config
 from downloader.importer_command import ImporterCommand
 from downloader.offline_importer import OfflineImporter as ProductionOfflineImporter
 from test.fake_file_downloader import FileDownloaderFactory
-from test.fake_file_system import StubFileSystemFactory, FileSystemFactory
+from test.fake_file_system import FileSystemFactory
 from test.fake_logger import NoLogger
 
 

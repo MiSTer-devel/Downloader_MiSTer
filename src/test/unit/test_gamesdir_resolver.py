@@ -18,6 +18,7 @@
 import unittest
 from pathlib import Path
 
+from downloader.constants import K_BASE_PATH, K_GAMESDIR_PATH
 from downloader.gamesdir_resolver import GamesdirError
 from test.fake_file_system import FileSystem
 from test.fake_gamesdir_resolver import GamesdirResolver
@@ -34,7 +35,7 @@ def fs(input_folders):
 
 
 def gamesdir_config_media_fat():
-    return {'gamesdir_path': 'auto', 'base_path': '/media/usb0'}
+    return {K_GAMESDIR_PATH: 'auto', K_BASE_PATH: '/media/usb0'}
 
 
 class TestGamesdirResolver(unittest.TestCase):
@@ -42,8 +43,8 @@ class TestGamesdirResolver(unittest.TestCase):
     def test_translate_correct_paths(self):
         for n, (path, expected, config, file_system) in enumerate([
             ('games/cons/file_a', 'games/cons/file_a', None, None),
-            ('|games/cons/file_a', '/media/fat/games/cons/file_a', {'gamesdir_path': '/media/fat'}, None),
-            ('|games/cons/file_a', 'games/cons/file_a', {'gamesdir_path': 'auto'}, fs([])),
+            ('|games/cons/file_a', '/media/fat/games/cons/file_a', {K_GAMESDIR_PATH: '/media/fat'}, None),
+            ('|games/cons/file_a', 'games/cons/file_a', {K_GAMESDIR_PATH: 'auto'}, fs([])),
             ('|games/cons/file_a', '/media/usb0/games/cons/file_a', gamesdir_config_media_fat(), fs(['/media/usb0/games/cons'])),
             ('|games/cons/file_a', '/media/usb2/games/cons/file_a', gamesdir_config_media_fat(), fs(['/media/usb5/games/cons', '/media/usb2/games/cons'])),
             ('|games/cons/file_a', '/media/usb5/games/cons/file_a', gamesdir_config_media_fat(), fs(['/media/usb5/games/cons', '/media/fat/cifs/games/cons'])),

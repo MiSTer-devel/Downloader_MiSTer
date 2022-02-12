@@ -16,9 +16,13 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import time
-from downloader.constants import distribution_mister_db_id, file_PDFViewer, file_lesskey, file_glow
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, FILE_PDFViewer, FILE_lesskey, FILE_glow, K_BASE_PATH, \
+    K_PARALLEL_UPDATE, K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, FOLDER_screenshots, \
+    FOLDER_savestates, FOLDER_saves, FOLDER_linux, FILE_MiSTer_new, FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, \
+    FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, \
+    FILE_downloader_launcher_script
 from downloader.file_filter import BadFileFilterPartException
-from downloader.other import UnreachableException
+from downloader.other import UnreachableException, cache
 
 
 class _Session:
@@ -69,7 +73,7 @@ class OnlineImporter:
             db_importer = _OnlineDatabaseImporter(filtered_db, store, full_resync, config, file_system, self._file_downloader_factory, self._logger, session)
             db_importer.process_db_contents()
 
-            store['base_path'] = config['base_path']
+            store[K_BASE_PATH] = config[K_BASE_PATH]
 
         deleted_folder = False
 
@@ -93,7 +97,7 @@ class OnlineImporter:
         self._unused_filter_tags = self._file_filter_factory.unused_filter_parts()
 
     def _session_for_config(self, config, file_system):
-        base_path = config['base_path']
+        base_path = config[K_BASE_PATH]
         if base_path not in self._sessions:
             new_session = _Session()
             new_session.new_files_not_overwritten = self._base_session.new_files_not_overwritten
@@ -211,7 +215,7 @@ class _OnlineZipSummaries:
             self._db.zips[zip_id].pop('internal_summary')
 
     def _import_zip_ids_from_network(self, zip_ids_to_download):
-        summary_downloader = self._file_downloader_factory.create(self._config, self._config['parallel_update'])
+        summary_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE])
         zip_ids_by_temp_zip = dict()
 
         for zip_id in zip_ids_to_download:
@@ -270,7 +274,7 @@ class _OnlineDatabaseImporter:
 
         self._remove_missing_files()
 
-        file_downloader = self._file_downloader_factory.create(self._config, self._config['parallel_update'])
+        file_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE])
         file_downloader.set_base_files_url(self._db.base_files_url)
         needed_zips = dict()
 
@@ -285,7 +289,7 @@ class _OnlineDatabaseImporter:
             file_description = self._db.files[file_path]
             if not self._full_resync and file_path in self._store['files'] and \
                     self._store['files'][file_path]['hash'] == file_description['hash'] and \
-                    self._should_not_download_again(file_path):
+                    self._file_system.is_file(file_path):
                 self._store['files'][file_path] = file_description
                 continue
 
@@ -336,13 +340,13 @@ class _OnlineDatabaseImporter:
 
         lower_path = path.lower()
 
-        if self._db.db_id == distribution_mister_db_id and lower_path in distribution_mister_exceptional_paths():
+        if self._db.db_id == DISTRIBUTION_MISTER_DB_ID and lower_path in distribution_mister_exceptional_paths():
             return
 
         if lower_path in invalid_paths():
             raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
 
-        if self._db.db_id != distribution_mister_db_id and lower_path in no_distribution_mister_invalid_paths():
+        if self._db.db_id != DISTRIBUTION_MISTER_DB_ID and lower_path in no_distribution_mister_invalid_paths():
             raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
 
         parts = lower_path.split('/')
@@ -353,13 +357,13 @@ class _OnlineDatabaseImporter:
         return len(self._store['files']) == 0
 
     def _import_zip_contents(self, needed_zips, file_downloader):
-        zip_downloader = self._file_downloader_factory.create(self._config, self._config['parallel_update'])
+        zip_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE])
         zip_ids_by_temp_zip = dict()
         for zip_id in needed_zips:
             zipped_files = needed_zips[zip_id]
 
-            less_file_count = len(zipped_files['files']) < self._config['zip_file_count_threshold']
-            less_accumulated_mbs = zipped_files['total_size'] < (1000 * 1000 * self._config['zip_accumulated_mb_threshold'])
+            less_file_count = len(zipped_files['files']) < self._config[K_ZIP_FILE_COUNT_THRESHOLD]
+            less_accumulated_mbs = zipped_files['total_size'] < (1000 * 1000 * self._config[K_ZIP_ACCUMULATED_MB_THRESHOLD])
 
             if less_file_count and less_accumulated_mbs:
                 for file_path in zipped_files['files']:
@@ -395,12 +399,6 @@ class _OnlineDatabaseImporter:
                 self._store['zips'][zip_id] = self._db.zips[zip_id]
             self._logger.print()
             self._session.files_that_failed.extend(zip_downloader.errors())
-
-    def _should_not_download_again(self, file_path):
-        if not self._config['check_manually_deleted_files']:
-            return True
-
-        return self._file_system.is_file(file_path)
 
     def _create_folders(self):
         for folder in self._db.folders:
@@ -439,16 +437,21 @@ class WrongDatabaseOptions(Exception):
     pass
 
 
+@cache
 def no_distribution_mister_invalid_paths():
-    return ('mister', 'menu.rbf')
+    return tuple(item.lower() for item in [FILE_MiSTer, FILE_menu_rbf])
 
 
+@cache
 def invalid_paths():
-    return ('mister.ini', 'mister_alt.ini', 'mister_alt_1.ini', 'mister_alt_2.ini', 'mister_alt_3.ini', 'scripts/downloader.sh', 'mister.new')
+    return tuple(item.lower() for item in [FILE_MiSTer_ini, FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, FILE_downloader_launcher_script, FILE_MiSTer_new])
 
 
+@cache
 def invalid_folders():
-    return ('linux', 'saves', 'savestates', 'screenshots')
+    return tuple(item.lower() for item in [FOLDER_linux, FOLDER_saves, FOLDER_savestates, FOLDER_screenshots])
 
+
+@cache
 def distribution_mister_exceptional_paths():
-    return (file_PDFViewer, file_lesskey, file_glow, 'linux')
+    return tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow, FOLDER_linux])
