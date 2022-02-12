@@ -22,7 +22,8 @@ import sys
 import time
 from abc import ABC, abstractmethod
 
-from downloader.constants import file_MiSTer, file_MiSTer_new
+from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, K_DOWNLOADER_RETRIES, K_DOWNLOADER_SIZE_MB_LIMIT, \
+    K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_CURL_SSL
 from downloader.logger import SilentLogger
 from downloader.other import calculate_url, NoArgumentsToComputeUrlError
 from downloader.target_path_repository import TargetPathRepository
@@ -111,14 +112,14 @@ class CurlDownloaderAbstract(FileDownloader):
     def download_files(self, first_run):
         self._download_files_internal(first_run)
 
-        if self._file_system.is_file(file_MiSTer_new):
+        if self._file_system.is_file(FILE_MiSTer_new):
             self._logger.print()
             self._logger.print('Copying new MiSTer binary:')
-            if self._file_system.is_file(file_MiSTer):
-                self._file_system.move(file_MiSTer, self._local_repository.old_mister_path)
-            self._file_system.move(file_MiSTer_new, file_MiSTer)
+            if self._file_system.is_file(FILE_MiSTer):
+                self._file_system.move(FILE_MiSTer, self._local_repository.old_mister_path)
+            self._file_system.move(FILE_MiSTer_new, FILE_MiSTer)
 
-            if self._file_system.is_file(file_MiSTer):
+            if self._file_system.is_file(FILE_MiSTer):
                 self._logger.print('New MiSTer binary copied.')
             else:
                 # This error message should never happen.
@@ -138,8 +139,8 @@ class CurlDownloaderAbstract(FileDownloader):
         for path in sorted(self._curl_list):
             if 'path' in self._curl_list[path] and self._curl_list[path]['path'] == 'system':
                 self._file_system.add_system_path(path)
-                if path == file_MiSTer:
-                    self._file_system.add_system_path(file_MiSTer_new)
+                if path == FILE_MiSTer:
+                    self._file_system.add_system_path(FILE_MiSTer_new)
 
             if self._hash_check and self._file_system.is_file(path):
                 path_hash = self._file_system.hash(path)
@@ -166,7 +167,7 @@ class CurlDownloaderAbstract(FileDownloader):
         self._wait()
         self._check_hashes()
 
-        for retry in range(self._config['downloader_retries']):
+        for retry in range(self._config[K_DOWNLOADER_RETRIES]):
 
             if self._errors.none():
                 return
@@ -215,7 +216,7 @@ class CurlDownloaderAbstract(FileDownloader):
         self._run(description, self._command(target_path, description['url']), path)
 
     def _command(self, target_path, url):
-        return 'curl %s --show-error --fail --location -o "%s" "%s"' % (self._config['curl_ssl'], target_path, url)
+        return 'curl %s --show-error --fail --location -o "%s" "%s"' % (self._config[K_CURL_SSL], target_path, url)
 
     def errors(self):
         return self._errors.list()
@@ -251,8 +252,8 @@ class _CurlCustomParallelDownloader(CurlDownloaderAbstract):
         self._processes.append(result)
         self._files.append(file)
 
-        more_accumulated_size_than_limit = self._acc_size > (1000 * 1000 * self._config['downloader_size_mb_limit'])
-        more_processes_than_limit = len(self._processes) > self._config['downloader_process_limit']
+        more_accumulated_size_than_limit = self._acc_size > (1000 * 1000 * self._config[K_DOWNLOADER_SIZE_MB_LIMIT])
+        more_processes_than_limit = len(self._processes) > self._config[K_DOWNLOADER_PROCESS_LIMIT]
 
         if more_accumulated_size_than_limit or more_processes_than_limit:
             self._wait()
@@ -277,7 +278,7 @@ class _CurlCustomParallelDownloader(CurlDownloaderAbstract):
                     else:
                         self._errors.add_debug_report(self._files[i], 'Bad http code! %s: %s' % (result, self._files[i]))
             end = time.time()
-            if (end - start) > self._config['downloader_timeout']:
+            if (end - start) > self._config[K_DOWNLOADER_TIMEOUT]:
                 for i, p in enumerate(self._processes):
                     if p is None:
                         continue

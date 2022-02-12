@@ -15,7 +15,8 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import file_MiSTer_old, file_downloader_storage, file_downloader_log, file_downloader_last_successful_run
+from downloader.constants import FILE_MiSTer_old, FILE_downloader_storage, FILE_downloader_log, \
+    FILE_downloader_last_successful_run, K_CONFIG_PATH
 from downloader.store_migrator import make_new_local_store
 
 
@@ -32,28 +33,28 @@ class LocalRepository:
     @property
     def _storage_path(self):
         if self._storage_path_value is None:
-            self._storage_path_value = file_downloader_storage
+            self._storage_path_value = FILE_downloader_storage
             self._file_system.add_system_path(self._storage_path_value)
         return self._storage_path_value
 
     @property
     def _last_successful_run(self):
         if self._last_successful_run_value is None:
-            self._last_successful_run_value = file_downloader_last_successful_run % self._config['config_path'].stem
+            self._last_successful_run_value = FILE_downloader_last_successful_run % self._config[K_CONFIG_PATH].stem
             self._file_system.add_system_path(self._last_successful_run_value)
         return self._last_successful_run_value
 
     @property
     def logfile_path(self):
         if self._logfile_path_value is None:
-            self._logfile_path_value = file_downloader_log % self._config['config_path'].stem
+            self._logfile_path_value = FILE_downloader_log % self._config[K_CONFIG_PATH].stem
             self._file_system.add_system_path(self._logfile_path_value)
         return self._logfile_path_value
 
     @property
     def old_mister_path(self):
         if self._old_mister_path is None:
-            self._old_mister_path = file_MiSTer_old
+            self._old_mister_path = FILE_MiSTer_old
             self._file_system.add_system_path(self._old_mister_path)
         return self._old_mister_path
 

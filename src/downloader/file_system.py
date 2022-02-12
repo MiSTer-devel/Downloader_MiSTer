@@ -26,6 +26,7 @@ import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 from downloader.config import AllowDelete
+from downloader.constants import K_BASE_SYSTEM_PATH, K_BASE_PATH, K_ALLOW_DELETE
 from downloader.other import ClosableValue
 
 
@@ -221,7 +222,7 @@ class _FileSystem(FileSystem):
         raise Exception('folders Not implemented')
 
     def remove_folder(self, path):
-        if self._config['allow_delete'] != AllowDelete.ALL:
+        if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
             return
 
         self._logger.print('Deleting empty folder %s' % path)
@@ -232,8 +233,8 @@ class _FileSystem(FileSystem):
 
     def unlink(self, path, verbose=True):
         verbose = verbose and not path.startswith('/tmp/')
-        if self._config['allow_delete'] != AllowDelete.ALL:
-            if self._config['allow_delete'] == AllowDelete.OLD_RBF and path[-4:].lower() == ".rbf":
+        if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
+            if self._config[K_ALLOW_DELETE] == AllowDelete.OLD_RBF and path[-4:].lower() == ".rbf":
                 return self._unlink(path, verbose)
 
             return True
@@ -241,7 +242,7 @@ class _FileSystem(FileSystem):
         return self._unlink(path, verbose)
 
     def delete_previous(self, file):
-        if self._config['allow_delete'] != AllowDelete.ALL:
+        if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
             return True
 
         path = Path(self._path(file))
@@ -315,7 +316,7 @@ class _FileSystem(FileSystem):
         if path[0] == '/':
             return path
 
-        base_path = self._config['base_system_path'] if path in self._system_paths else self._config['base_path']
+        base_path = self._config[K_BASE_SYSTEM_PATH] if path in self._system_paths else self._config[K_BASE_PATH]
 
         return '%s/%s' % (base_path, path)
 

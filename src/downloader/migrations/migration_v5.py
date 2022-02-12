@@ -15,7 +15,7 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import distribution_mister_db_id
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, K_DATABASES, K_OPTIONS
 from downloader.store_migrator import MigrationBase
 
 
@@ -31,12 +31,12 @@ class MigrationV5(MigrationBase):
 
         config = self._config.copy()
         try:
-            ini_description = self._config['databases'][distribution_mister_db_id]
+            ini_description = self._config[K_DATABASES][DISTRIBUTION_MISTER_DB_ID]
         except KeyError as _:
             return
 
-        if 'options' in ini_description:
-            ini_description['options'].apply_to_config(config)
+        if K_OPTIONS in ini_description:
+            ini_description[K_OPTIONS].apply_to_config(config)
 
         file_system = self._file_system_factory.create_for_config(config)
 

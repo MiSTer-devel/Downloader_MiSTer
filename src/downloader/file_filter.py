@@ -19,6 +19,7 @@
 import re
 from pathlib import Path
 
+from downloader.constants import K_FILTER
 
 filter_part_regex = re.compile("[!]?[a-z0-9]+[-_a-z0-9.]*$", )
 
@@ -35,9 +36,9 @@ class FileFilterFactory:
         return list(self._unused - self._used)
 
     def _create_filter_calculator(self, db, config):
-        if config['filter'] is None:
+        if config[K_FILTER] is None:
             return None
-        this_filter = config['filter'].strip().lower() # @TODO Remove strip after field is validated in other place
+        this_filter = config[K_FILTER].strip().lower() # @TODO Remove strip after field is validated in other place
         if this_filter == '':
             raise BadFileFilterPartException(this_filter)
         if this_filter == 'all':

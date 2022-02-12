@@ -19,6 +19,7 @@
 from pathlib import Path
 from itertools import chain
 
+from downloader.constants import K_DB_URL, K_SECTION
 from downloader.db_entity import DbEntity, DbEntityValidationException
 from downloader.temp_files_pool import TempFilesPool
 
@@ -38,7 +39,7 @@ class DbGateway:
 
             downloaded_files, download_errors = self._download_files(remote_files)
 
-            files_by_section = {descriptions_by_file[file]['section']: file for file in chain(downloaded_files, local_files)}
+            files_by_section = {descriptions_by_file[file][K_SECTION]: file for file in chain(downloaded_files, local_files)}
 
             dbs, db_errors = self._read_dbs(descriptions, files_by_section)
 
@@ -50,7 +51,7 @@ class DbGateway:
         remote_files = []
 
         for section, description in descriptions.items():
-            db_url = description['db_url']
+            db_url = description[K_DB_URL]
             if not db_url.startswith("http"):
                 if not db_url.startswith("/"):
                     db_url = self._file_system.resolve(db_url)
@@ -84,19 +85,19 @@ class DbGateway:
             if section not in files_by_section:
                 continue
             try:
-                db_raw = self._file_system.load_dict_from_file(files_by_section[section], Path(description['db_url']).suffix.lower())
+                db_raw = self._file_system.load_dict_from_file(files_by_section[section], Path(description[K_DB_URL]).suffix.lower())
                 dbs.append(DbEntity(db_raw, section))
             except Exception as e:
                 self._logger.debug(e)
                 if isinstance(e, DbEntityValidationException):
                     self._logger.print(str(e))
-                self._logger.print('Could not load json from "%s"' % description['db_url'])
-                errors.append(description['db_url'])
+                self._logger.print('Could not load json from "%s"' % description[K_DB_URL])
+                errors.append(description[K_DB_URL])
 
         return dbs, errors
 
     def _identify_download_errors(self, download_errors, descriptions_by_file):
-        errors = [descriptions_by_file[file]['db_url'] for file in download_errors]
+        errors = [descriptions_by_file[file][K_DB_URL] for file in download_errors]
 
         for db_url in errors:
             self._logger.print('Could not download file from db_url: "%s"' % db_url)

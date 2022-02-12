@@ -19,21 +19,23 @@
 
 import os
 from downloader.main import main
-from downloader.constants import distribution_mister_db_id, distribution_mister_db_url, default_curl_ssl_options
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, DEFAULT_CURL_SSL_OPTIONS, \
+    KENV_DOWNLOADER_INI_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, KENV_CURL_SSL, KENV_COMMIT, KENV_ALLOW_REBOOT, KENV_UPDATE_LINUX, KENV_DEFAULT_DB_URL, \
+    KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR
 
 if __name__ == '__main__':
     exit_code = main({
-        'DOWNLOADER_LAUNCHER_PATH': os.getenv('DOWNLOADER_LAUNCHER_PATH', None),
-        'DOWNLOADER_INI_PATH': os.getenv('DOWNLOADER_INI_PATH', None),
-        'CURL_SSL': os.getenv('CURL_SSL', default_curl_ssl_options),
-        'COMMIT': os.getenv('COMMIT', 'unknown'),
-        'ALLOW_REBOOT': os.getenv('ALLOW_REBOOT', None),
-        'UPDATE_LINUX': os.getenv('UPDATE_LINUX', 'true').lower(),
-        'DEFAULT_DB_URL': os.getenv('DEFAULT_DB_URL', distribution_mister_db_url),
-        'DEFAULT_DB_ID': os.getenv('DEFAULT_DB_ID', distribution_mister_db_id),
-        'DEFAULT_BASE_PATH': os.getenv('DEFAULT_BASE_PATH', None),
-        'DEBUG': os.getenv('DEBUG', 'false').lower(),
-        'FAIL_ON_FILE_ERROR': os.getenv('FAIL_ON_FILE_ERROR', 'false')
+        KENV_DOWNLOADER_LAUNCHER_PATH: os.getenv(KENV_DOWNLOADER_LAUNCHER_PATH, None),
+        KENV_DOWNLOADER_INI_PATH: os.getenv(KENV_DOWNLOADER_INI_PATH, None),
+        KENV_CURL_SSL: os.getenv(KENV_CURL_SSL, DEFAULT_CURL_SSL_OPTIONS),
+        KENV_COMMIT: os.getenv(KENV_COMMIT, 'unknown'),
+        KENV_ALLOW_REBOOT: os.getenv(KENV_ALLOW_REBOOT, None),
+        KENV_UPDATE_LINUX: os.getenv(KENV_UPDATE_LINUX, 'true').lower(),
+        KENV_DEFAULT_DB_URL: os.getenv(KENV_DEFAULT_DB_URL, DISTRIBUTION_MISTER_DB_URL),
+        KENV_DEFAULT_DB_ID: os.getenv(KENV_DEFAULT_DB_ID, DISTRIBUTION_MISTER_DB_ID),
+        KENV_DEFAULT_BASE_PATH: os.getenv(KENV_DEFAULT_BASE_PATH, None),
+        KENV_DEBUG: os.getenv(KENV_DEBUG, 'false').lower(),
+        KENV_FAIL_ON_FILE_ERROR: os.getenv(KENV_FAIL_ON_FILE_ERROR, 'false')
     })
 
     exit(exit_code)

@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import AllowDelete
+from downloader.constants import K_BASE_PATH, K_ALLOW_DELETE, K_PARALLEL_UPDATE
 from downloader.db_entity import DbEntity, DbEntityValidationException
 
 
@@ -31,7 +32,7 @@ class OfflineImporter:
             for db_file in db.db_files:
                 db_importer = _OfflineDatabaseImporter(config, self._file_system_factory.create_for_config(config), self._file_downloader_factory, self._logger)
                 db_importer.update_store_from_offline_db(db.db_id, db_file, store)
-                store['base_path'] = config['base_path']
+                store[K_BASE_PATH] = config[K_BASE_PATH]
 
 
 class _OfflineDatabaseImporter:
@@ -82,7 +83,7 @@ class _OfflineDatabaseImporter:
             self._logger.print()
 
     def _update_from_zips(self, db, store):
-        summary_downloader = self._file_downloader_factory.create(self._config, self._config['parallel_update'])
+        summary_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE])
         zip_ids_by_temp_zip = dict()
 
         zip_ids_to_download = []
@@ -139,5 +140,5 @@ class _OfflineDatabaseImporter:
                 store_folders[folder_path] = folder_description
 
     def _remove_db_file(self, db_file):
-        if self._config['allow_delete'] == AllowDelete.ALL:
+        if self._config[K_ALLOW_DELETE] == AllowDelete.ALL:
             self._file_system.unlink(db_file)

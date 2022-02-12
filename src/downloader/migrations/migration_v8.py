@@ -19,12 +19,12 @@ from downloader.constants import K_BASE_PATH
 from downloader.store_migrator import MigrationBase
 
 
-class MigrationV7(MigrationBase):
-    def __init__(self, config):
-        self._config = config
-
-    version = 7
+class MigrationV8(MigrationBase):
+    version = 8
 
     def migrate(self, local_store):
         for store in local_store['dbs'].values():
-            store[K_BASE_PATH] = self._config[K_BASE_PATH]
+            if len(store[K_BASE_PATH]) <= 1 or store[K_BASE_PATH][-1] != '/':
+                continue
+
+            store[K_BASE_PATH] = store[K_BASE_PATH][0:-1]

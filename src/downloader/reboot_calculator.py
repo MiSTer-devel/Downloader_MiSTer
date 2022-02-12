@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import AllowReboot
-from downloader.constants import file_mister_downloader_needs_reboot
+from downloader.constants import FILE_mister_downloader_needs_reboot, K_ALLOW_REBOOT
 
 
 class RebootCalculator:
@@ -31,12 +31,12 @@ class RebootCalculator:
         will_reboot = False
         should_reboot = False
 
-        if self._config['allow_reboot'] == AllowReboot.NEVER:
+        if self._config[K_ALLOW_REBOOT] == AllowReboot.NEVER:
             should_reboot = linux_needs_reboot or importer_needs_reboot
-        elif self._config['allow_reboot'] == AllowReboot.ONLY_AFTER_LINUX_UPDATE:
+        elif self._config[K_ALLOW_REBOOT] == AllowReboot.ONLY_AFTER_LINUX_UPDATE:
             will_reboot = linux_needs_reboot
             should_reboot = importer_needs_reboot
-        elif self._config['allow_reboot'] == AllowReboot.ALWAYS:
+        elif self._config[K_ALLOW_REBOOT] == AllowReboot.ALWAYS:
             will_reboot = linux_needs_reboot or importer_needs_reboot
         else:
             raise Exception('AllowReboot.%s not recognized' % AllowReboot.name)
@@ -45,7 +45,7 @@ class RebootCalculator:
             return True
 
         if should_reboot:
-            self._file_system.touch(file_mister_downloader_needs_reboot)
+            self._file_system.touch(FILE_mister_downloader_needs_reboot)
             if linux_needs_reboot:
                 self._logger.print('Linux has been updated! It is recommended to reboot your system now.')
             else:

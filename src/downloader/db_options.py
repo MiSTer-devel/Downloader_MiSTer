@@ -18,6 +18,8 @@
 
 from enum import unique, Enum
 
+from downloader.constants import K_BASE_PATH, K_PARALLEL_UPDATE, K_UPDATE_LINUX, K_DOWNLOADER_SIZE_MB_LIMIT, \
+    K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER
 from downloader.other import test_only
 
 
@@ -32,43 +34,48 @@ class DbOptions:
         present = set()
 
         if kind == DbOptionsKind.INI_SECTION:
-            if 'base_path' in props:
-                if not isinstance(props['base_path'], str):
-                    raise DbOptionsValidationException(['base_path'])
-                present.add('base_path')
+            if K_BASE_PATH in props:
+                if not isinstance(props[K_BASE_PATH], str):
+                    raise DbOptionsValidationException([K_BASE_PATH])
+                if len(props[K_BASE_PATH]) <= 1:
+                    raise DbOptionsValidationException([K_BASE_PATH])
+                if props[K_BASE_PATH][-1] == '/':
+                    raise DbOptionsValidationException([K_BASE_PATH])
+
+                present.add(K_BASE_PATH)
         elif kind == DbOptionsKind.DEFAULT_OPTIONS:
             pass
         else:
             raise ValueError("Invalid props kind: " + str(kind))
 
-        if 'parallel_update' in props:
-            if not isinstance(props['parallel_update'], bool):
-                raise DbOptionsValidationException(['parallel_update'])
-            present.add('parallel_update')
-        if 'update_linux' in props:
-            if not isinstance(props['update_linux'], bool):
-                raise DbOptionsValidationException(['update_linux'])
-            present.add('update_linux')
-        if 'downloader_size_mb_limit' in props:
-            if not isinstance(props['downloader_size_mb_limit'], int) or props['downloader_size_mb_limit'] < 1:
-                raise DbOptionsValidationException(['downloader_size_mb_limit'])
-            present.add('downloader_size_mb_limit')
-        if 'downloader_process_limit' in props:
-            if not isinstance(props['downloader_process_limit'], int) or props['downloader_process_limit'] < 1:
-                raise DbOptionsValidationException(['downloader_process_limit'])
-            present.add('downloader_process_limit')
-        if 'downloader_timeout' in props:
-            if not isinstance(props['downloader_timeout'], int) or props['downloader_timeout'] < 1:
-                raise DbOptionsValidationException(['downloader_timeout'])
-            present.add('downloader_timeout')
-        if 'downloader_retries' in props:
-            if not isinstance(props['downloader_retries'], int) or props['downloader_retries'] < 1:
-                raise DbOptionsValidationException(['downloader_retries'])
-            present.add('downloader_retries')
-        if 'filter' in props:
-            if not isinstance(props['filter'], str):
-                raise DbOptionsValidationException(['filter'])
-            present.add('filter')
+        if K_PARALLEL_UPDATE in props:
+            if not isinstance(props[K_PARALLEL_UPDATE], bool):
+                raise DbOptionsValidationException([K_PARALLEL_UPDATE])
+            present.add(K_PARALLEL_UPDATE)
+        if K_UPDATE_LINUX in props:
+            if not isinstance(props[K_UPDATE_LINUX], bool):
+                raise DbOptionsValidationException([K_UPDATE_LINUX])
+            present.add(K_UPDATE_LINUX)
+        if K_DOWNLOADER_SIZE_MB_LIMIT in props:
+            if not isinstance(props[K_DOWNLOADER_SIZE_MB_LIMIT], int) or props[K_DOWNLOADER_SIZE_MB_LIMIT] < 1:
+                raise DbOptionsValidationException([K_DOWNLOADER_SIZE_MB_LIMIT])
+            present.add(K_DOWNLOADER_SIZE_MB_LIMIT)
+        if K_DOWNLOADER_PROCESS_LIMIT in props:
+            if not isinstance(props[K_DOWNLOADER_PROCESS_LIMIT], int) or props[K_DOWNLOADER_PROCESS_LIMIT] < 1:
+                raise DbOptionsValidationException([K_DOWNLOADER_PROCESS_LIMIT])
+            present.add(K_DOWNLOADER_PROCESS_LIMIT)
+        if K_DOWNLOADER_TIMEOUT in props:
+            if not isinstance(props[K_DOWNLOADER_TIMEOUT], int) or props[K_DOWNLOADER_TIMEOUT] < 1:
+                raise DbOptionsValidationException([K_DOWNLOADER_TIMEOUT])
+            present.add(K_DOWNLOADER_TIMEOUT)
+        if K_DOWNLOADER_RETRIES in props:
+            if not isinstance(props[K_DOWNLOADER_RETRIES], int) or props[K_DOWNLOADER_RETRIES] < 1:
+                raise DbOptionsValidationException([K_DOWNLOADER_RETRIES])
+            present.add(K_DOWNLOADER_RETRIES)
+        if K_FILTER in props:
+            if not isinstance(props[K_FILTER], str):
+                raise DbOptionsValidationException([K_FILTER])
+            present.add(K_FILTER)
 
         if len(present) != len(props):
             raise DbOptionsValidationException([o for o in props if o not in present])

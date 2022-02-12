@@ -15,7 +15,7 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import gamesdir_priority
+from downloader.constants import GAMESDIR_PRIORITY, K_GAMESDIR_PATH
 
 
 class GamesdirResolverFactory:
@@ -59,12 +59,13 @@ class GamesdirAutoResolver:
             self._drive_folders_cache[drive][directory] = self._check_if_folder_exists('%s/games/%s' % (drive, directory))
         return self._drive_folders_cache[drive][directory]
 
+    # TODO: Testing @cache decorator here
     def _gamesdir_priority(self):
         if self._cached_gamesdir_priority is not None:
             return self._cached_gamesdir_priority
 
         self._cached_gamesdir_priority = []
-        for drive in gamesdir_priority:
+        for drive in GAMESDIR_PRIORITY:
             if self._is_gamesdir_not_empty_on_drive('%s/games' % drive):
                 self._cached_gamesdir_priority.append(drive)
 
@@ -98,8 +99,8 @@ class _GamesdirConfigResolver:
         if not path.startswith('games/'):
             raise GamesdirError("Path '|%s' should not start with character '|', please contact the database maintainer." % path)
 
-        if self._config['gamesdir_path'] != 'auto':
-            return '%s/%s' % (self._config['gamesdir_path'], path)
+        if self._config[K_GAMESDIR_PATH] != 'auto':
+            return '%s/%s' % (self._config[K_GAMESDIR_PATH], path)
 
         return self._auto_path_resolver.translate_auto_path(path)
 
