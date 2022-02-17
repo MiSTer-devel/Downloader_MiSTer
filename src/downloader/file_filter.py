@@ -122,7 +122,7 @@ class FileFilter:
     def __init__(self, filter_calculator):
         self._filter_calculator = filter_calculator
 
-    def create_filtered_db(self, db, store):
+    def select_filtered_files(self, db, store):
         if 'filtered_zip_data' in store:
             for zip_id, zip_data in list(store['filtered_zip_data'].items()):
                 if zip_id not in db.zips:
