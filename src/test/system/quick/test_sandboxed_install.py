@@ -24,7 +24,7 @@ from pathlib import Path
 from downloader.config import ConfigReader
 from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, K_CURL_SSL, KENV_UPDATE_LINUX, \
     KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR
-from test.fake_file_system import make_production_filesystem
+from test.fake_file_system_factory import make_production_filesystem_factory
 from test.objects import debug_env, default_base_path
 from test.fake_logger import NoLogger
 from test.fake_store_migrator import StoreMigrator
@@ -251,7 +251,7 @@ class TestSandboxedInstall(unittest.TestCase):
             return
 
         config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
-        self.file_system = make_production_filesystem(config)
+        self.file_system = make_production_filesystem_factory(config).create_for_system_scope()
         counter = 0
         if 'local_store' in expected:
             counter += 1

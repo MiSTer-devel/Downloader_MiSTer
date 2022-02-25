@@ -18,51 +18,48 @@
 
 import unittest
 
-from downloader.constants import DEFAULT_CACERT_FILE, K_CURL_SSL
+from downloader.constants import DEFAULT_CACERT_FILE, K_CURL_SSL, K_BASE_PATH, MEDIA_FAT
+from test.fake_file_system_factory import fs_data, FileSystemFactory
 from test.fake_certificates_fix import CertificatesFix
 
 
 class TestCertificatesFix(unittest.TestCase):
 
     def test_fix_certificates_if_needed___when_is_not_needed_because_no_curl_ssl_options___it_doesnt_download_anything(self):
-        sut = CertificatesFix(config={K_CURL_SSL: ''})
+        sut = CertificatesFix(config={K_CURL_SSL: '', K_BASE_PATH: MEDIA_FAT})
         sut.fix_certificates_if_needed()
         self.assertFalse(sut.download_ran)
 
     def test_fix_certificates_if_needed___when_is_not_needed_because_cacert_file_is_already_there___it_doesnt_download_anything(self):
-        sut = CertificatesFix()
-        sut.file_system.test_data.with_file(DEFAULT_CACERT_FILE, {})
+        sut = CertificatesFix(file_system_factory=FileSystemFactory(files={DEFAULT_CACERT_FILE: {}}))
         sut.fix_certificates_if_needed()
         self.assertFalse(sut.download_ran)
 
     def test_fix_certificates_if_needed___when_is_needed_and_download_works___installs_cacert_file(self):
         sut = CertificatesFix()
         sut.fix_certificates_if_needed()
-        self.assertTrue(sut.file_system.is_file(DEFAULT_CACERT_FILE))
+        self.assertEqual(fs_data(files={DEFAULT_CACERT_FILE: {'hash': DEFAULT_CACERT_FILE, 'size': 1}}), sut.file_system.data)
 
     def test_fix_certificates_if_needed___when_is_needed_and_download_fails___it_tries_to_download_but_doesnt_install_anything(self):
         sut = CertificatesFix(download_fails=True)
         sut.fix_certificates_if_needed()
         self.assertTrue(sut.download_ran)
-        self.assertFalse(sut.file_system.is_file(DEFAULT_CACERT_FILE))
+        self.assertEqual(fs_data(), sut.file_system.data)
 
     def test_fix_certificates_if_needed___when_is_needed_and_cacert_test_fails___installs_new_cacert_file(self):
         old_hash = 'old'
         new_hash = DEFAULT_CACERT_FILE
 
-        sut = CertificatesFix(test_query_fails=True)
-        sut.file_system.test_data.with_file(DEFAULT_CACERT_FILE, {'hash': old_hash})
-        self.assertEqual(old_hash, sut.file_system.hash(DEFAULT_CACERT_FILE))
+        sut = CertificatesFix(test_query_fails=True, file_system_factory=FileSystemFactory(files={DEFAULT_CACERT_FILE: {'hash': old_hash}}))
 
         sut.fix_certificates_if_needed()
         self.assertTrue(sut.download_ran)
         self.assertTrue(sut.test_query_ran)
-        self.assertEqual(new_hash, sut.file_system.hash(DEFAULT_CACERT_FILE))
+        self.assertEqual(fs_data(files={DEFAULT_CACERT_FILE: {'hash': new_hash, 'size': 1}}), sut.file_system.data)
 
     def test_fix_certificates_if_needed___when_is_needed_but_cacert_and_download_fails___it_tries_to_test_and_download_but_doesnt_install_anything(self):
-        sut = CertificatesFix(test_query_fails=True, download_fails=True)
-        sut.file_system.test_data.with_file(DEFAULT_CACERT_FILE, {'hash': 'old'})
+        sut = CertificatesFix(test_query_fails=True, download_fails=True, file_system_factory=FileSystemFactory(files={DEFAULT_CACERT_FILE: {'hash': 'old'}}))
         sut.fix_certificates_if_needed()
         self.assertTrue(sut.download_ran)
         self.assertTrue(sut.test_query_ran)
-        self.assertFalse(sut.file_system.is_file(DEFAULT_CACERT_FILE))
+        self.assertEqual(fs_data(), sut.file_system.data)

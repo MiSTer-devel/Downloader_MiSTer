@@ -22,7 +22,7 @@ from downloader.constants import K_SECTION, K_DB_URL
 from test.fake_file_downloader import FileDownloader
 from test.objects import db_test_descr, db_test
 from test.fake_db_gateway import DbGateway
-from test.fake_file_system import first_fake_temp_file, FileSystem
+from test.fake_file_system_factory import first_fake_temp_file, FileSystemFactory
 from test.factory_stub import FactoryStub
 
 http_db_url = 'https://this_is_my_uri.json.zip'
@@ -33,18 +33,17 @@ class TestDbGateway(unittest.TestCase):
     def test_fetch_all___db_with_working_http_uri___returns_expected_db(self):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
 
-        fs = FileSystem()
-        factory = FactoryStub(FileDownloader(file_system=fs)).has(lambda fd: fd.test_data.brings_file(first_fake_temp_file, db_description))
+        file_system_factory = FileSystemFactory()
+        factory = FactoryStub(FileDownloader(file_system=file_system_factory.create_for_system_scope())).has(lambda fd: fd.test_data.brings_file(first_fake_temp_file, db_description))
 
-        self.assertEqual(db_test_descr().testable, fetch_all(http_db_url, fs, factory))
+        self.assertEqual(db_test_descr().testable, fetch_all(http_db_url, file_system_factory, factory))
 
     def test_fetch_all___db_with_fs_path___returns_expected_db(self):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
 
-        fs = FileSystem()
-        fs.test_data.with_file(fs_db_path, db_description)
+        file_system_factory = FileSystemFactory(files={fs_db_path: db_description})
 
-        self.assertEqual(db_test_descr().testable, fetch_all(fs_db_path, fs))
+        self.assertEqual(db_test_descr().testable, fetch_all(fs_db_path, file_system_factory))
 
     def test_fetch_all___db_with_wrong_downloaded_file___returns_none(self):
         self.assertEqual(None, fetch_all(http_db_url))
@@ -54,8 +53,8 @@ class TestDbGateway(unittest.TestCase):
         self.assertEqual(None, fetch_all(http_db_url, factory=factory))
 
 
-def fetch_all(db_url, fs=None, factory=None):
-    dbs, errors = DbGateway(file_system=fs, file_downloader_factory=factory).fetch_all(test_db(db_url))
+def fetch_all(db_url, file_system_factory=None, factory=None):
+    dbs, errors = DbGateway(file_system_factory=file_system_factory, file_downloader_factory=factory).fetch_all(test_db(db_url))
     if len(dbs) == 0:
         return None
     return dbs[0].testable

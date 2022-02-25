@@ -20,12 +20,12 @@ from pathlib import Path
 
 from downloader.constants import K_BASE_PATH, K_GAMESDIR_PATH
 from downloader.gamesdir_resolver import GamesdirError
-from test.fake_file_system import FileSystem
+from test.fake_file_system_factory import FileSystemFactory
 from test.fake_gamesdir_resolver import GamesdirResolver
 
 
 def fs(input_folders):
-    result = FileSystem()
+    result = FileSystemFactory().create_for_system_scope()
     actual_folders = []
     for folder in input_folders:
         actual_folders.append(str(Path(folder).parent))
@@ -59,6 +59,6 @@ class TestGamesdirResolver(unittest.TestCase):
             with self.subTest(path):
                 self.assertRaises(GamesdirError, lambda: GamesdirResolver().translate_path(path))
 
-    def assert_translated_path(self, expected, path, config=None, fs=None):
-        self.assertEqual(expected, GamesdirResolver(config=config, file_system=fs).translate_path(path))
+    def assert_translated_path(self, expected, path, config=None, file_system=None):
+        self.assertEqual(expected, GamesdirResolver(config=config, file_system=file_system).translate_path(path))
 

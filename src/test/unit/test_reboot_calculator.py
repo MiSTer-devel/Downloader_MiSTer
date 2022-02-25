@@ -18,7 +18,7 @@
 
 import unittest
 from test.fake_reboot_calculator import RebootCalculator
-from test.fake_file_system import FileSystem
+from test.fake_file_system_factory import FileSystemFactory
 from downloader.config import AllowReboot
 from downloader.constants import FILE_mister_downloader_needs_reboot, K_ALLOW_REBOOT
 
@@ -26,7 +26,7 @@ from downloader.constants import FILE_mister_downloader_needs_reboot, K_ALLOW_RE
 class TestRebootCalculator(unittest.TestCase):
 
     def test_calc_needs_reboot___when_nothing_needs_reboot___returns_false_and_doesnt_create_reboot_file(self):
-        fs = FileSystem()
+        fs = FileSystemFactory().create_for_system_scope()
         actual = RebootCalculator(file_system=fs).calc_needs_reboot(False, False)
         self.assertFalse(actual)
         self.assertFalse(fs.is_file(FILE_mister_downloader_needs_reboot))
@@ -44,13 +44,13 @@ class TestRebootCalculator(unittest.TestCase):
         self.assertTrue(actual)
 
     def test_calc_needs_reboot___when_no_reboot_config_but_everything_needs_reboot___returns_false_and_creates_reboot_file(self):
-        fs = FileSystem()
+        fs = FileSystemFactory().create_for_system_scope()
         actual = RebootCalculator({K_ALLOW_REBOOT: AllowReboot.NEVER}, fs).calc_needs_reboot(True, True)
         self.assertFalse(actual)
         self.assertTrue(fs.is_file(FILE_mister_downloader_needs_reboot))
 
     def test_calc_needs_reboot___when_only_linux_reboots_and_importer_needs_reboot___returns_false_and_creates_reboot_file(self):
-        fs = FileSystem()
+        fs = FileSystemFactory().create_for_system_scope()
         actual = RebootCalculator({K_ALLOW_REBOOT: AllowReboot.ONLY_AFTER_LINUX_UPDATE}, fs).calc_needs_reboot(False, True)
         self.assertFalse(actual)
         self.assertTrue(fs.is_file(FILE_mister_downloader_needs_reboot))

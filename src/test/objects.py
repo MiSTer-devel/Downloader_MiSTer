@@ -22,8 +22,9 @@ from pathlib import Path
 from downloader.config import default_config
 from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, FILE_MiSTer_new, K_BASE_PATH, \
     K_PARALLEL_UPDATE, K_UPDATE_LINUX, K_DOWNLOADER_SIZE_MB_LIMIT, K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, \
-    K_DOWNLOADER_RETRIES, K_FILTER, K_DATABASES, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_ALLOW_REBOOT, KENV_DEBUG, \
-    MEDIA_FAT
+    K_DOWNLOADER_RETRIES, K_FILTER, K_DATABASES, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, \
+    KENV_ALLOW_REBOOT, KENV_DEBUG, \
+    MEDIA_FAT, K_BASE_SYSTEM_PATH
 from downloader.db_options import DbOptions, DbOptionsKind
 from downloader.other import empty_store
 from test.fake_db_entity import DbEntity
@@ -51,6 +52,7 @@ file_big = 'big'
 hash_big = 'big'
 hash_updated_big = 'updated_big'
 db_empty = 'empty'
+big_size = 100_000_000
 
 
 def empty_config():
@@ -61,10 +63,19 @@ def config_test(base_path=MEDIA_FAT):
     return {K_DATABASES: {db_test: {}}, K_BASE_PATH: base_path}
 
 
-def config_with_filter(filter_value):
+def config_with(filter_value=None, base_path=None, base_system_path=None):
     config = default_config()
-    config[K_FILTER] = filter_value
+    if filter_value is not None:
+        config[K_FILTER] = filter_value
+    if base_path is not None:
+        config[K_BASE_PATH] = base_path.lower()
+    if base_system_path is not None:
+        config[K_BASE_SYSTEM_PATH] = base_system_path.lower()
     return config
+
+
+def config_with_filter(filter_value):
+    return config_with(filter_value=filter_value)
 
 
 def file_test_json_zip_descr():
@@ -336,8 +347,8 @@ def db_test_with_file(name_file, file):
     return db_entity(db_id=db_test, db_files=[file_test_json_zip], files={name_file: file})
 
 
-def db_distribution_mister_with_file(name_file, file):
-    return db_entity(db_id=DISTRIBUTION_MISTER_DB_ID, db_files=[file_test_json_zip], files={name_file: file})
+def db_distribution_mister(files=None, folders=None):
+    return db_entity(db_id=DISTRIBUTION_MISTER_DB_ID, db_files=[file_test_json_zip], files=files, folders=folders)
 
 
 def db_with_file(db_id, name_file, file):

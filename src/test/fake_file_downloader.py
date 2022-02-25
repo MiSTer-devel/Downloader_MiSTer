@@ -18,11 +18,11 @@
 
 from typing import List
 
-from downloader.constants import K_DOWNLOADER_RETRIES, K_CURL_SSL, K_DEBUG
+from downloader.constants import K_DOWNLOADER_RETRIES, K_CURL_SSL, K_DEBUG, K_BASE_PATH, MEDIA_FAT
 from downloader.file_downloader import CurlDownloaderAbstract, FileDownloaderFactory as ProductionFileDownloaderFactory
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from downloader.target_path_repository import TargetPathRepository
-from test.fake_file_system import FileSystem
+from test.fake_file_system_factory import FileSystemFactory
 from test.fake_logger import NoLogger
 
 
@@ -45,8 +45,8 @@ class TestDataCurlDownloader:
 
 class FileDownloader(CurlDownloaderAbstract):
     def __init__(self, config=None, file_system=None):
-        config = config if config is not None else {K_CURL_SSL: '', K_DOWNLOADER_RETRIES: 3, K_DEBUG: False}
-        self.file_system = FileSystem() if file_system is None else file_system
+        config = config if config is not None else {K_CURL_SSL: '', K_DOWNLOADER_RETRIES: 3, K_DEBUG: False, K_BASE_PATH: MEDIA_FAT}
+        self.file_system = FileSystemFactory(config=config).create_for_system_scope() if file_system is None else file_system
         self.local_repository = ProductionLocalRepository(config, NoLogger(), self.file_system)
         super().__init__(config, self.file_system, self.local_repository, NoLogger(), True, TargetPathRepository(config, self.file_system))
         self._run_files = []

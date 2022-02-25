@@ -24,7 +24,7 @@ from downloader.constants import K_DATABASES, K_DB_URL, K_SECTION, K_VERBOSE, K_
 from downloader.full_run_service import FullRunService as ProductionFullRunService
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_db_gateway import DbGateway
-from test.fake_file_system import FileSystemFactory
+from test.fake_file_system_factory import FileSystemFactory
 from test.fake_linux_updater import LinuxUpdater
 from test.fake_local_repository import LocalRepository
 from test.fake_logger import NoLogger
@@ -44,8 +44,8 @@ class FullRunService(ProductionFullRunService):
                          NoLogger(),
                          LocalRepository(config=config, file_system=self.system_file_system),
                          db_gateway,
-                         OfflineImporter(file_system_factory=self.file_system_factory),
-                         OnlineImporter(file_system=self.system_file_system),
+                         OfflineImporter(file_system_factory=file_system_factory),
+                         OnlineImporter(file_system_factory=file_system_factory),
                          LinuxUpdater(self.system_file_system),
                          RebootCalculator(file_system=self.system_file_system),
                          StoreMigrator(),

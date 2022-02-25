@@ -26,7 +26,7 @@ from downloader.constants import FILE_MiSTer, K_BASE_PATH, K_BASE_SYSTEM_PATH, K
 from downloader.file_system import FileSystemFactory
 from test.fake_logger import NoLogger
 from test.objects import temp_name, file_a, file_b
-from test.fake_file_system import make_production_filesystem
+from test.fake_file_system_factory import make_production_filesystem_factory
 from downloader.config import AllowDelete, default_config
 
 not_created_file = temp_name() + '_opened_file'
@@ -172,7 +172,7 @@ class TestFileSystem(unittest.TestCase):
         self.assertEqual(foo_bar_json.copy(), self.sut().load_dict_from_file(zip_file))
 
     def sut(self, config=None):
-        return make_production_filesystem(self.default_test_config() if config is None else config)
+        return make_production_filesystem_factory(self.default_test_config() if config is None else config).create_for_system_scope()
 
     def factory(self, config=None):
         return FileSystemFactory(self.default_test_config() if config is None else config, NoLogger())

@@ -20,7 +20,7 @@ import unittest
 import json
 
 from downloader.constants import K_BASE_PATH, DISTRIBUTION_MISTER_DB_ID
-from downloader.other import empty_store
+from test.fake_file_system_factory import fs_data, FileSystemFactory
 from test.objects import file_descr
 from test.fake_store_migrator import StoreMigrator
 
@@ -63,11 +63,9 @@ class TestRealisticMigrations(unittest.TestCase):
 
     def test_migrate___on_empty_store_with_file_mister_old___file_mister_old_gets_removed(self):
         file = 'Scripts/.config/downloader/MiSTer.old'
-        sut = StoreMigrator()
-        sut.system_file_system.test_data.with_file(file, file_descr())
-        self.assertTrue(sut.system_file_system.is_file(file))
+        sut = StoreMigrator(file_system_factory=FileSystemFactory(files={file: file_descr()}))
         sut.migrate({})
-        self.assertFalse(sut.system_file_system.is_file(file))
+        self.assertEqual(fs_data(system_paths=[file]), sut.system_file_system.data)
 
     def assert_versions_change_as_expected(self, initial_file, expected_file):
         store = load_file(initial_file)

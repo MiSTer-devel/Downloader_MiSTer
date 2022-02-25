@@ -17,13 +17,13 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.config import default_config
 from downloader.gamesdir_resolver import GamesdirResolverFactory, GamesdirAutoResolver
-from test.fake_file_system import FileSystem
+from test.fake_file_system_factory import FileSystemFactory
 from test.fake_logger import NoLogger
 
 
 class GamesdirResolver:
     def __init__(self, config=None, file_system=None):
-        auto_resolver = GamesdirAutoResolver(FileSystem() if file_system is None else file_system, NoLogger())
+        auto_resolver = GamesdirAutoResolver(FileSystemFactory().create_for_system_scope() if file_system is None else file_system, NoLogger())
         factory = GamesdirResolverFactory(auto_resolver)
         self._resolver = factory.create(default_config() if config is None else config)
 

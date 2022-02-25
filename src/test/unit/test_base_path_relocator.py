@@ -23,7 +23,7 @@ from downloader.constants import MEDIA_FAT, MEDIA_USB0
 from downloader.other import empty_store
 from test.fake_importer_command import ImporterCommand
 from test.fake_base_path_relocator import BasePathRelocator
-from test.fake_file_system import FileSystemFactory
+from test.fake_file_system_factory import FileSystemFactory
 from test.objects import db_test_with_file_a, store_test_with_file_a_descr, store_test_with_file, file_a, \
     empty_config, config_test
 

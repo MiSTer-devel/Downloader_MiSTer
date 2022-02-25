@@ -118,6 +118,9 @@ class _OfflineDatabaseImporter:
 
             zip_id = zip_ids_by_temp_zip[temp_zip]
 
+            if 'summary_file' in db.zips[zip_id] and 'unzipped_json' in db.zips[zip_id]['summary_file']:
+                db.zips[zip_id]['summary_file'].pop('unzipped_json')
+
             store['zips'][zip_id] = db.zips[zip_id]
             self._import_folders(summary['folders'], store['folders'])
             self._import_files(summary['files'], store['files'])

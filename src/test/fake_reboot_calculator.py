@@ -18,11 +18,11 @@
 
 from downloader.config import default_config
 from downloader.reboot_calculator import RebootCalculator as ProductionRebootCalculator
-from test.fake_file_system import FileSystem
+from test.fake_file_system_factory import FileSystemFactory
 from test.fake_logger import NoLogger
 
 
 class RebootCalculator(ProductionRebootCalculator):
     def __init__(self, config=None, file_system=None):
-        self.file_system = FileSystem() if file_system is None else file_system
+        self.file_system = FileSystemFactory().create_for_system_scope() if file_system is None else file_system
         super().__init__(default_config() if config is None else config, NoLogger(), self.file_system)

@@ -20,18 +20,18 @@ from downloader.config import default_config
 from downloader.importer_command import ImporterCommand
 from downloader.offline_importer import OfflineImporter as ProductionOfflineImporter
 from test.fake_file_downloader import FileDownloaderFactory
-from test.fake_file_system import FileSystemFactory
+from test.fake_file_system_factory import FileSystemFactory
 from test.fake_logger import NoLogger
 
 
 class OfflineImporter(ProductionOfflineImporter):
     def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None):
-        self.file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
-        self.file_system = self.file_system_factory.create_for_system_scope()
         self.config = default_config() if config is None else config
+        self.fsf = FileSystemFactory(config=config) if file_system_factory is None else file_system_factory
+        self.file_system = self.fsf.create_for_system_scope()
         self._importer_command = ImporterCommand(self.config, [])
         super().__init__(
-            self.file_system_factory,
+            self.fsf,
             FileDownloaderFactory(self.file_system) if file_downloader_factory is None else file_downloader_factory,
             NoLogger())
 

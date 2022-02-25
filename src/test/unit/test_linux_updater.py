@@ -33,14 +33,14 @@ class TestLinuxUpdater(unittest.TestCase):
     def test_update_linux___no_databases___no_need_to_reboot(self):
         self.sut.update()
         self.assertFalse(self.sut.needs_reboot())
-        self.assertEqual(self.sut.file_system.read_file_contents(FILE_MiSTer_version), "unknown")
+        self.assertFalse(self.sut.file_system.is_file(FILE_MiSTer_version))
 
     def test_update_linux___no_linux_databases___no_need_to_reboot(self):
         self.sut.add_db(db_entity(db_id='first'))
         self.sut.add_db(db_entity(db_id='second'))
         self.sut.update()
         self.assertFalse(self.sut.needs_reboot())
-        self.assertEqual(self.sut.file_system.read_file_contents(FILE_MiSTer_version), "unknown")
+        self.assertFalse(self.sut.file_system.is_file(FILE_MiSTer_version))
 
     def test_update_linux___db_with_new_linux___has_new_version_and_needs_reboot(self):
         self.sut.add_db(db_entity(db_id='new', linux=linux_description()))
@@ -68,7 +68,7 @@ class TestLinuxUpdater(unittest.TestCase):
         self.sut.add_db(db_entity(db_id='new', linux=linux_description()))
         self.sut.update()
         self.assertFalse(self.sut.needs_reboot())
-        self.assertEqual(self.sut.file_system.read_file_contents(FILE_MiSTer_version), "unknown")
+        self.assertFalse(self.sut.file_system.is_file(FILE_MiSTer_version))
 
 
 def linux_description():

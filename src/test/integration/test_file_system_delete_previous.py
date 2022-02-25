@@ -23,7 +23,7 @@ from downloader.config import default_config
 from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, K_ALLOW_DELETE
 from test.objects import db_test_with_file, file_descr, hash_real_test_file, empty_test_store
 from test.fake_online_importer import OnlineImporter
-from test.fake_file_system import make_production_filesystem
+from test.fake_file_system_factory import make_production_filesystem_factory
 
 
 class TestFileSystemDeletePrevious(unittest.TestCase):
@@ -34,11 +34,12 @@ class TestFileSystemDeletePrevious(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             os.mkdir('%s/_Computer' % tempdir)
 
-            file_system = self.file_system(tempdir)
+            file_system_factory = self.file_system_factory(tempdir)
+            file_system = file_system_factory.create_for_system_scope()
             file_system.touch(self.ao486_old)
             store = empty_test_store()
 
-            sut = OnlineImporter(file_system=file_system)
+            sut = OnlineImporter(file_system_factory=file_system_factory)
             sut.add_db(db_test_with_file(self.ao486_new, file_descr(delete=[True], hash_code=hash_real_test_file)), store)
             sut.download(False)
 
@@ -52,12 +53,13 @@ class TestFileSystemDeletePrevious(unittest.TestCase):
 
     def test_delete_previous_mycore_3___with_existing_mycore_files___deletes_only_previous_mycores(self):
         with tempfile.TemporaryDirectory() as tempdir:
-            file_system = self.file_system(tempdir)
+            file_system_factory = self.file_system_factory(tempdir)
+            file_system = file_system_factory.create_for_system_scope()
             file_system.touch(self.mycore_1)
             file_system.touch(self.mycore_2)
             file_system.touch(self.yourcore)
 
-            self.run_delete_previous_on_mycore_3(file_system)
+            self.run_delete_previous_on_mycore_3(file_system_factory)
 
             self.assertFalse(file_system.is_file(self.mycore_1))
             self.assertFalse(file_system.is_file(self.mycore_2))
@@ -67,29 +69,32 @@ class TestFileSystemDeletePrevious(unittest.TestCase):
         for mycore_wrong in ['mycore_2021020.rbf', 'mycore20210202.rbf', 'mycore_20210101.rbfs', 'mycore_2021a101.rbf']:
             with self.subTest(mycore_wrong) as _:
                 with tempfile.TemporaryDirectory() as tempdir:
-                    file_system = self.file_system(tempdir)
+                    file_system_factory = self.file_system_factory(tempdir)
+                    file_system = file_system_factory.create_for_system_scope()
                     file_system.touch(mycore_wrong)
-                    self.run_delete_previous_on_mycore_3(file_system)
+                    self.run_delete_previous_on_mycore_3(file_system_factory)
                     self.assertTrue(file_system.is_file(mycore_wrong))
 
     def test_delete_previous_mycore_3___with_existing_mycore_files___deletes_all_matching_files(self):
         for mycore_correct in [self.mycore_1, 'mycore_99999999.rbf', 'mycore_00000000.rbf', 'mycore_20210101.RBF', 'MYCORE_20210101.rbf']:
             with self.subTest(mycore_correct) as _:
                 with tempfile.TemporaryDirectory() as tempdir:
-                    file_system = self.file_system(tempdir)
+                    file_system_factory = self.file_system_factory(tempdir)
+                    file_system = file_system_factory.create_for_system_scope()
                     file_system.touch(mycore_correct)
-                    self.run_delete_previous_on_mycore_3(file_system)
+                    self.run_delete_previous_on_mycore_3(file_system_factory)
                     self.assertFalse(file_system.is_file(mycore_correct))
 
     def test_delete_previous_menucore___with_existing_menucore_files___deletes_nothing(self):
         menu_rbf = 'menu2.rbf'
         other_menu_rbf = 'menu2_20202121.rbf'
         with tempfile.TemporaryDirectory() as tempdir:
-            file_system = self.file_system(tempdir)
+            file_system_factory = self.file_system_factory(tempdir)
+            file_system = file_system_factory.create_for_system_scope()
             file_system.touch(menu_rbf)
             file_system.touch(other_menu_rbf)
 
-            sut = OnlineImporter(file_system=file_system)
+            sut = OnlineImporter(file_system_factory=file_system_factory)
             sut.add_db(db_test_with_file(menu_rbf, file_descr(delete=[True])), empty_test_store())
             sut.download(False)
 
@@ -101,21 +106,22 @@ class TestFileSystemDeletePrevious(unittest.TestCase):
             config = self.config(tempdir)
             config[K_ALLOW_DELETE] = False
 
-            file_system = make_production_filesystem(config)
+            file_system_factory = make_production_filesystem_factory(config)
+            file_system = file_system_factory.create_for_system_scope()
             file_system.touch(self.mycore_1)
 
-            self.run_delete_previous_on_mycore_3(file_system)
+            self.run_delete_previous_on_mycore_3(file_system_factory)
 
             self.assertTrue(file_system.is_file(self.mycore_1))
 
-    def run_delete_previous_on_mycore_3(self, file_system):
-        sut = OnlineImporter(file_system=file_system)
+    def run_delete_previous_on_mycore_3(self, file_system_factory):
+        sut = OnlineImporter(file_system_factory=file_system_factory)
         sut.add_db(db_test_with_file(self.mycore_3, file_descr(delete=[True], hash_code=hash_real_test_file)), empty_test_store())
         sut.download(False)
-        self.assertTrue(file_system.is_file(self.mycore_3))
+        self.assertTrue(file_system_factory.create_for_system_scope().is_file(self.mycore_3))
 
-    def file_system(self, tempdir):
-        return make_production_filesystem(self.config(tempdir))
+    def file_system_factory(self, tempdir):
+        return make_production_filesystem_factory(self.config(tempdir))
 
     def config(self, tempdir):
         config = default_config()

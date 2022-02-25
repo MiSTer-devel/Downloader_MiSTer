@@ -49,98 +49,98 @@ class FileSystem(ABC):
 
     @abstractmethod
     def temp_file(self):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def unique_temp_filename(self):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def resolve(self, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def add_system_path(self, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def is_file(self, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def is_folder(self, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def read_file_contents(self, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def write_file_contents(self, path, content):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def touch(self, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def move(self, source, target):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def copy(self, source, target):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def copy_fast(self, source, target):
-        '''interface'''
+        """interface"""
 
     def hash(self, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def make_dirs(self, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def make_dirs_parent(self, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def folder_has_items(self, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def folders(self):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def remove_folder(self, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def download_target_path(self, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def unlink(self, path, verbose=True):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def delete_previous(self, file):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def load_dict_from_file(self, path, suffix=None):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
     def save_json_on_zip(self, db, path):
-        '''interface'''
+        """interface"""
 
     @abstractmethod
-    def unzip_contents(self, file, path):
-        '''interface'''
+    def unzip_contents(self, file, path, contained_files):
+        """interface"""
 
 
 class _FileSystem(FileSystem):
@@ -294,7 +294,7 @@ class _FileSystem(FileSystem):
 
         self._unlink(json_path, False)
 
-    def unzip_contents(self, file, path):
+    def unzip_contents(self, file, path, contained_files):
         result = subprocess.run(['unzip', '-q', '-o', self._path(file), '-d', self._path(path)], shell=False, stderr=subprocess.STDOUT)
         if result.returncode != 0:
             raise Exception("Could not unzip %s: %s" % (file, result.returncode))

@@ -16,17 +16,19 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.certificates_fix import CertificatesFix as ProductionCertificatesFix
+from downloader.config import default_config
 from downloader.constants import DEFAULT_CURL_SSL_OPTIONS, K_CURL_SSL
-from test.fake_file_system import FileSystem
+from test.fake_file_system_factory import FileSystemFactory
 from test.fake_logger import NoLogger
 
 
 class CertificatesFix(ProductionCertificatesFix):
-    def __init__(self, config=None, file_system=None, download_fails=False, test_query_fails=False):
-        self.file_system = FileSystem() if file_system is None else file_system
+    def __init__(self, config=None, download_fails=False, test_query_fails=False, file_system_factory=None):
+        self.config = _config() if config is None else config
+        self.file_system = FileSystemFactory(config=self.config).create_for_system_scope() if file_system_factory is None else file_system_factory.create_for_system_scope()
         self.download_ran = False
         self.test_query_ran = False
-        super().__init__({K_CURL_SSL: DEFAULT_CURL_SSL_OPTIONS} if config is None else config, self.file_system, NoLogger())
+        super().__init__(self.config, self.file_system, NoLogger())
         self._download_fails = download_fails
         self._test_query_fails = test_query_fails
 
@@ -45,6 +47,12 @@ class CertificatesFix(ProductionCertificatesFix):
             return FakeResult(1)
 
         return FakeResult(0)
+
+
+def _config():
+    config = default_config()
+    config[K_CURL_SSL] = DEFAULT_CURL_SSL_OPTIONS
+    return config
 
 
 class FakeResult:

@@ -20,7 +20,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, FILE_PDFViewer, FILE
     K_PARALLEL_UPDATE, K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, FOLDER_screenshots, \
     FOLDER_savestates, FOLDER_saves, FOLDER_linux, FILE_MiSTer_new, FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, \
     FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, \
-    FILE_downloader_launcher_script, K_VERBOSE
+    FILE_downloader_launcher_script
 from downloader.file_filter import BadFileFilterPartException
 from downloader.other import UnreachableException, cache
 
@@ -390,10 +390,12 @@ class _OnlineDatabaseImporter:
         filtered_zip_data = self._store['filtered_zip_data'] if 'filtered_zip_data' in self._store else {}
         for temp_zip in sorted(zip_downloader.correctly_downloaded_files()):
             zip_id = zip_ids_by_temp_zip[temp_zip]
+            zipped_files = needed_zips[zip_id]
+
             path = self._db.zips[zip_id]['path']
             contents = ', '.join(self._db.zips[zip_id]['contents'])
             self._logger.print('Unpacking %s at %s' % (contents, 'the root' if path == './' else path))
-            self._file_system.unzip_contents(temp_zip, self._db.zips[zip_id]['path'])
+            self._file_system.unzip_contents(temp_zip, self._db.zips[zip_id]['path'], list(zipped_files['files']))
             self._file_system.unlink(temp_zip)
             file_downloader.mark_unpacked_zip(zip_id, self._db.zips[zip_id]['base_files_url'])
             if zip_id not in filtered_zip_data:
@@ -413,8 +415,11 @@ class _OnlineDatabaseImporter:
         self._session.files_that_failed.extend(zip_downloader.errors())
 
     def create_folders(self):
-        for folder in self._db.folders:
+        for folder in sorted(self._db.folders):
+            description = self._db.folders[folder]
             self._assert_valid_path(folder)
+            if 'path' in description and description['path'] == 'system':
+                self._file_system.add_system_path(folder)
             self._file_system.make_dirs(folder)
 
         self._session.dbs_folders |= set(self._db.folders)

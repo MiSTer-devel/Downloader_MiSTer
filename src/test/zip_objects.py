@@ -151,7 +151,7 @@ def summary_json_from_cheats_folder():
 def zipped_files_from_cheats_folder():
     return {
         'files': cheats_folder_files(url=False, zip_id=False, tags=False),
-        'folders': list(cheats_folder_folders()),
+        'folders': cheats_folder_folders(),
     }
 
 
