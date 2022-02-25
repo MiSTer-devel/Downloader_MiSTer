@@ -76,7 +76,8 @@ class GamesdirAutoResolver:
         return result
 
     def _is_gamesdir_not_empty_on_drive(self, drive):
-        return self._file_system.is_folder(drive) and self._file_system.folder_has_items(drive)
+        return self._file_system.is_folder(drive)
+        # TODO: Reevaluate this -> and self._file_system.folder_has_items(drive)
 
     def _check_if_folder_exists(self, folder):
         return self._file_system.is_folder(folder)

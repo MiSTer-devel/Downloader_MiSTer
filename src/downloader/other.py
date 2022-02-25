@@ -108,20 +108,41 @@ def test_only(func):
 
 
 def cache(func):
-    cache_dict = {}
+    arguments = func.__code__.co_argcount
+
+    if arguments == 0:
+        return _cached_function(func)
+    elif arguments == 1:
+        return _cached_method(func)
+
+    raise Exception('Could not cache this: %s' % func.__name__)
+
+
+def _cached_function(func):
+    func_cached_value = None
+
+    def wrapper():
+        nonlocal func_cached_value
+        if func_cached_value is None:
+            func_cached_value = func()
+
+        return func_cached_value
+
+    return wrapper
+
+
+def _cached_method(func):
+    attr_name = '%s_cached_value' % func.__name__
 
     def wrapper(*args):
-        if len(args) > 1 or (len(args) == 1 and not isinstance(args[0], object)):
+        self = args[0]
+        if not isinstance(self, object):
             raise Exception('cache decorator should only be used with functions and methods with empty arguments')
 
-        idx = 0 if len(args) == 0 else id(args[0])
+        if not hasattr(self, attr_name):
+            setattr(self, attr_name, func(*args))
 
-        nonlocal cache_dict
-
-        if idx not in cache_dict:
-            cache_dict[idx] = func(*args)
-
-        return cache_dict[idx]
+        return getattr(self, attr_name)
 
     return wrapper
 
