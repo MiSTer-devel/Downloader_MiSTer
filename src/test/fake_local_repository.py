@@ -15,23 +15,13 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-
-from pathlib import Path
-
-from downloader.config import default_config
-from downloader.constants import K_CONFIG_PATH
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
+from test.objects import config_with
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_logger import NoLogger
 
 
 class LocalRepository(ProductionLocalRepository):
     def __init__(self, config=None, file_system=None):
-        self.file_system = FileSystemFactory().create_for_system_scope() if file_system is None else file_system
-        super().__init__(_config() if config is None else config, NoLogger(), self.file_system)
-
-
-def _config():
-    config = default_config()
-    config[K_CONFIG_PATH] = Path('')
-    return config
+        file_system = FileSystemFactory().create_for_system_scope() if file_system is None else file_system
+        super().__init__(config_with(config_path='') if config is None else config, NoLogger(), file_system)

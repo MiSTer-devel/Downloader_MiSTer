@@ -15,14 +15,18 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+from downloader.config import default_config
 
-class FactoryStub:
-    def __init__(self, instance):
-        self._instance = instance
 
-    def create(self, *_, **__):
-        return self._instance
+class ImporterImplicitInputs:
+    def __init__(self, files=None, folders=None, system_paths=None, base_path=None, config=None, problematic_files=None, actual_description=None, missing_files=None):
+        config = default_config() if config is None else config
 
-    def has(self, func):
-        func(self._instance)
-        return self
+        self.files = files
+        self.folders = folders
+        self.system_paths = system_paths
+        self.base_path = base_path
+        self.config = config
+        self.problematic_files = problematic_files
+        self.actual_description = actual_description
+        self.missing_files = missing_files

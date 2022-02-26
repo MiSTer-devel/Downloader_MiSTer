@@ -22,6 +22,7 @@ from downloader.config import default_config
 from downloader.constants import K_DATABASES, K_DB_URL, K_SECTION, K_VERBOSE, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, KENV_COMMIT, \
     KENV_UPDATE_LINUX, KENV_FAIL_ON_FILE_ERROR
 from downloader.full_run_service import FullRunService as ProductionFullRunService
+from fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_db_gateway import DbGateway
 from test.fake_file_system_factory import FileSystemFactory
@@ -38,16 +39,17 @@ from test.fake_certificates_fix import CertificatesFix
 
 class FullRunService(ProductionFullRunService):
     def __init__(self, env, config, db_gateway, file_system_factory=None):
-        self.file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
-        self.system_file_system = self.file_system_factory.create_for_system_scope()
+        file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
+        system_file_system = file_system_factory.create_for_system_scope()
+        file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory)
         super().__init__(env, config,
                          NoLogger(),
-                         LocalRepository(config=config, file_system=self.system_file_system),
+                         LocalRepository(config=config, file_system=system_file_system),
                          db_gateway,
-                         OfflineImporter(file_system_factory=file_system_factory),
+                         OfflineImporter(file_downloader_factory=file_downloader_factory),
                          OnlineImporter(file_system_factory=file_system_factory),
-                         LinuxUpdater(self.system_file_system),
-                         RebootCalculator(file_system=self.system_file_system),
+                         LinuxUpdater(system_file_system),
+                         RebootCalculator(file_system=system_file_system),
                          StoreMigrator(),
                          BasePathRelocator(),
                          CertificatesFix())

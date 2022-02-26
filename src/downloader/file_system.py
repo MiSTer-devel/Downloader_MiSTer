@@ -202,7 +202,8 @@ class _FileSystem(FileSystem):
         return self._makedirs(self._path(path))
 
     def make_dirs_parent(self, path):
-        return self._makedirs(str(Path(self._path(path)).parent))
+        directory = str(Path(self._path(path)).parent)
+        return self._makedirs(directory)
 
     def _makedirs(self, target):
         try:

@@ -20,17 +20,18 @@ from downloader.config import default_config
 from downloader.constants import FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version
 from downloader.importer_command import ImporterCommand
 from downloader.linux_updater import LinuxUpdater as ProductionLinuxUpdater
-from test.fake_file_downloader import FileDownloaderFactory
+from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_logger import NoLogger
 
 
 class LinuxUpdater(ProductionLinuxUpdater):
-    def __init__(self, file_downloader_factory=None, file_system=None):
-        self.file_system = FileSystemFactory().create_for_system_scope() if file_system is None else file_system
-        self.file_downloader_factory = FileDownloaderFactory(self.file_system) if file_downloader_factory is None else file_downloader_factory
+    def __init__(self, file_downloader_factory=None, file_system=None, file_system_factory=None):
+        file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
+        self.file_system = file_system_factory.create_for_system_scope() if file_system is None else file_system
+        file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory) if file_downloader_factory is None else file_downloader_factory
         self._importer_command = ImporterCommand({}, [])
-        super().__init__(default_config(), self.file_system, self.file_downloader_factory, NoLogger())
+        super().__init__(default_config(), self.file_system, file_downloader_factory, NoLogger())
 
     def add_db(self, db):
         self._importer_command.add_db(db, {}, {})

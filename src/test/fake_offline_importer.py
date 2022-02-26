@@ -19,21 +19,25 @@
 from downloader.config import default_config
 from downloader.importer_command import ImporterCommand
 from downloader.offline_importer import OfflineImporter as ProductionOfflineImporter
-from test.fake_file_downloader import FileDownloaderFactory
-from test.fake_file_system_factory import FileSystemFactory
+from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_logger import NoLogger
 
 
 class OfflineImporter(ProductionOfflineImporter):
-    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None):
-        self.config = default_config() if config is None else config
-        self.fsf = FileSystemFactory(config=config) if file_system_factory is None else file_system_factory
-        self.file_system = self.fsf.create_for_system_scope()
-        self._importer_command = ImporterCommand(self.config, [])
+    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, implicit_inputs=None):
+        self._config = default_config() if config is None else config
+        file_downloader_factory = FileDownloaderFactory.tester_from(implicit_inputs=implicit_inputs, config=self._config, file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory)
+        self._file_system_factory = file_downloader_factory.file_system_factory
+        self.file_system = self._file_system_factory.create_for_config(self._config)
+        self._importer_command = ImporterCommand(self._config, [])
         super().__init__(
-            self.fsf,
-            FileDownloaderFactory(self.file_system) if file_downloader_factory is None else file_downloader_factory,
+            self._file_system_factory,
+            file_downloader_factory,
             NoLogger())
+
+    @property
+    def fs_data(self):
+        return self._file_system_factory.data
 
     def apply(self):
         self.apply_offline_databases(self._importer_command)

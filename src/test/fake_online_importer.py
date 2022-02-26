@@ -16,32 +16,31 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.config import default_config
 from downloader.file_filter import FileFilterFactory
 from downloader.importer_command import ImporterCommand
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
-from test.fake_file_downloader import FileDownloaderFactory
-from test.fake_file_system_factory import FileSystemFactory
+from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_logger import NoLogger
 
 
 class OnlineImporter(ProductionOnlineImporter):
-    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, network=None):
-        self.config = default_config() if config is None else config
-        if file_system_factory is not None:
-            self.file_system_factory = file_system_factory
-        else:
-            self.file_system_factory = FileSystemFactory(config=self.config)
-
-        self.file_system = self.file_system_factory.create_for_system_scope()
+    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, implicit_inputs=None):
+        file_downloader_factory = FileDownloaderFactory.tester_from(implicit_inputs=implicit_inputs, config=config, file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory)
+        self._config = file_downloader_factory.config
+        self._file_system_factory = file_downloader_factory.file_system_factory
+        self.file_system = self._file_system_factory.create_for_system_scope()
 
         super().__init__(
             FileFilterFactory(),
-            self.file_system_factory,
-            FileDownloaderFactory(self.file_system) if file_downloader_factory is None else file_downloader_factory,
+            self._file_system_factory,
+            file_downloader_factory,
             NoLogger())
 
-        self._importer_command = ImporterCommand(self.config, [])
+        self._importer_command = ImporterCommand(self._config, [])
+
+    @property
+    def fs_data(self):
+        return self._file_system_factory.data
 
     def download(self, full_resync):
         self.download_dbs_contents(self._importer_command, full_resync)

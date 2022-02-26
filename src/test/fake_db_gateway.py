@@ -15,21 +15,22 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-
+from downloader.config import default_config
 from downloader.db_gateway import DbGateway as ProductionDbGateway
 from test.fake_file_system_factory import FileSystemFactory
-from test.fake_file_downloader import FileDownloaderFactory
+from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_logger import NoLogger
 
 
 class DbGateway(ProductionDbGateway):
     def __init__(self, config=None, file_system_factory=None, file_downloader_factory=None):
-        self.file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
-        self.file_system = self.file_system_factory.create_for_system_scope()
+        self._config = default_config() if config is None else config
+        self._file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
+        self.file_system = self._file_system_factory.create_for_system_scope()
         super().__init__(
-            config,
+            self._config,
             self.file_system,
-            FileDownloaderFactory(file_system=self.file_system) if file_downloader_factory is None else file_downloader_factory,
+            FileDownloaderFactory(file_system_factory=self._file_system_factory) if file_downloader_factory is None else file_downloader_factory,
             NoLogger())
 
     @staticmethod

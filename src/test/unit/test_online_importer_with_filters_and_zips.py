@@ -20,6 +20,7 @@ import unittest
 
 from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD
 from downloader.online_importer import WrongDatabaseOptions
+from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data, FileSystemFactory
 from test.objects import db_test_descr, store_test_descr, config_with_filter, empty_test_store
 from test.fake_online_importer import OnlineImporter
@@ -44,7 +45,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
         actual_store = self.download_zipped_cheats_folder(empty_test_store(), '!cheats')
 
         self.assertEqual(store_with_filtered_cheats_zip_data(), actual_store)
-        self.assertEqual(fs_data(), self.sut.file_system_factory.data)
+        self.assertEqual(fs_data(), self.sut.fs_data)
 
     def test_download_zipped_cheats_folder___with_empty_store_and_filter_none___installs_zips_and_files(self):
         actual_store = self.download_zipped_cheats_folder(empty_test_store(), None)
@@ -59,12 +60,12 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
         self.assertAllFilesAreInstalled()
 
     def test_download_zipped_cheats_folder___with_filtered_nes_zip_data_in_store_and_negative_cheats_filter___expands_zip_and_filtered_data_with_sms_and_installs_nothing(self):
-        actual_store = self.download_zipped_cheats_folder(store_with_filtered_nes_zip_data(), '!cheats', file_system_factory=FileSystemFactory(
+        actual_store = self.download_zipped_cheats_folder(store_with_filtered_nes_zip_data(), '!cheats', implicit_inputs=ImporterImplicitInputs(
             files={cheats_folder_sms_file_path: cheats_folder_sms_folder_descr()},
         ))
 
         self.assertEqual(store_with_filtered_cheats_zip_data(), actual_store)
-        self.assertEqual(fs_data(), self.sut.file_system_factory.data)
+        self.assertEqual(fs_data(), self.sut.fs_data)
 
     def test_download_zipped_cheats_folder___with_filtered_nes_zip_data_in_store_and_negative_nes_filter___keeps_zip_and_filtered_data_and_installs_only_sms_file(self):
         actual_store = self.download_zipped_cheats_folder(store_with_filtered_nes_zip_data(), '!nes')
@@ -76,7 +77,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
         actual_store = self.download_zipped_cheats_folder(
             store_with_cheats_non_filtered(),
             'all',
-            file_system_factory=FileSystemFactory(files={
+            implicit_inputs=ImporterImplicitInputs(files={
                 cheats_folder_nes_file_path: {'hash': cheats_folder_nes_file_hash, 'size': cheats_folder_nes_file_size},
                 cheats_folder_sms_file_path: {'hash': cheats_folder_sms_file_hash, 'size': cheats_folder_sms_file_size}
             }),
@@ -96,7 +97,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
         actual_store = self.download_cheat_files_without_zip(store_with_filtered_nes_zip_data(), '!cheats', file_system_factory=FileSystemFactory(files={cheats_folder_sms_file_path: {}}))
 
         self.assertEqual(empty_test_store(), actual_store)
-        self.assertEqual(fs_data(), self.sut.file_system_factory.data)
+        self.assertEqual(fs_data(), self.sut.fs_data)
 
     def test_download_cheat_files_without_zip___with_filtered_nes_zip_data_in_store_but_filter_none___install_files_and_removes_filtered_zip_data(self):
         actual_store = self.download_cheat_files_without_zip(store_with_filtered_nes_zip_data(), None)
@@ -107,11 +108,12 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
     def test_download_cheat_files_without_zip___with_filtered_nes_zip_data_in_store_but_filter_empty_string___install_files_and_removes_filtered_zip_data(self):
         self.assertRaises(WrongDatabaseOptions, lambda: self.download_cheat_files_without_zip(store_with_filtered_nes_zip_data(), ''))
 
-    def download_zipped_cheats_folder(self, store, filter_value, summary=None, summary_hash=None, file_system_factory=None):
-        config = config_with_filter(filter_value)
-        config[K_ZIP_FILE_COUNT_THRESHOLD] = 0  # This will cause to unzip the contents
+    def download_zipped_cheats_folder(self, store, filter_value, summary=None, summary_hash=None, implicit_inputs=None):
+        implicit_inputs = implicit_inputs if implicit_inputs is not None else ImporterImplicitInputs()
+        implicit_inputs.config = config_with_filter(filter_value)
+        implicit_inputs.config[K_ZIP_FILE_COUNT_THRESHOLD] = 0  # This will cause to unzip the contents
 
-        self.sut = OnlineImporter(config=config, file_system_factory=file_system_factory)
+        self.sut = OnlineImporter(implicit_inputs=implicit_inputs)
 
         summary = summary_json_from_cheats_folder() if summary is None else summary
 
@@ -134,13 +136,13 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
         self.assertEqual(fs_data(
             files={cheats_folder_nes_file_path: {"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size}},
             folders=[cheats_folder_name, cheats_folder_nes_folder_name]
-        ), self.sut.file_system_factory.data)
+        ), self.sut.fs_data)
 
     def assertOnlySmsFileIsInstalled(self):
         self.assertEqual(fs_data(
             files={cheats_folder_sms_file_path: {"hash": cheats_folder_sms_file_hash, "size": cheats_folder_sms_file_size}},
             folders=[cheats_folder_name, cheats_folder_sms_folder_name]
-        ), self.sut.file_system_factory.data)
+        ), self.sut.fs_data)
 
     def assertAllFilesAreInstalled(self):
         self.assertEqual(fs_data(
@@ -149,7 +151,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
                 cheats_folder_nes_file_path: {"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size}
             },
             folders=[cheats_folder_name, cheats_folder_sms_folder_name, cheats_folder_nes_folder_name]
-        ), self.sut.file_system_factory.data)
+        ), self.sut.fs_data)
 
 
 def store_with_filtered_nes_zip_data():

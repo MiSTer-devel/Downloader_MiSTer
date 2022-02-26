@@ -18,6 +18,7 @@
 
 import unittest
 
+from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_file_system_factory import fs_data, FileSystemFactory
 from test.objects import file_test_json_zip, db_test_descr, empty_test_store
 from test.zip_objects import cheats_folder_nes_file_hash, cheats_folder_nes_file_size, cheats_folder_nes_file_path, \
@@ -36,19 +37,25 @@ class TestOfflineImporterWithZips(unittest.TestCase):
         self.assert_apply_offline_db_with_zips___when_a_zipped_file_is_present_with_correct_hash___adds_existing_a_file_to_the_store(is_summary_internal=True)
 
     def assert_apply_offline_db_with_zips___when_a_zipped_file_is_present_with_correct_hash___adds_existing_a_file_to_the_store(self, is_summary_internal):
-        sut = OfflineImporter(file_system_factory=FileSystemFactory(
-            files={
-                file_test_json_zip: {
-                    'hash': file_test_json_zip,
-                    'unzipped_json': db_test_descr(zips={
-                        cheats_folder_id: cheats_folder_zip_desc(summary=summary_json_from_cheats_folder(), is_summary_internal=is_summary_internal)
-                    }).testable
+        file_downloader_factory = FileDownloaderFactory(
+            file_system_factory=FileSystemFactory(
+                files={
+                    file_test_json_zip: {
+                        'hash': file_test_json_zip,
+                        'unzipped_json': db_test_descr(zips={
+                            cheats_folder_id: cheats_folder_zip_desc(summary=summary_json_from_cheats_folder(),
+                                                                     is_summary_internal=is_summary_internal)
+                        }).testable
+                    },
+                    cheats_folder_nes_file_path: {"hash": cheats_folder_nes_file_hash,
+                                                  "size": cheats_folder_nes_file_size},
+                    cheats_folder_sms_file_path: {"hash": cheats_folder_sms_file_hash,
+                                                  "size": cheats_folder_sms_file_size}
                 },
-                cheats_folder_nes_file_path: {"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size},
-                cheats_folder_sms_file_path: {"hash": cheats_folder_sms_file_hash, "size": cheats_folder_sms_file_size}
-            },
-            folders=[cheats_folder_nes_folder_name, cheats_folder_sms_folder_name, cheats_folder_name]
-        ))
+                folders=[cheats_folder_nes_folder_name, cheats_folder_sms_folder_name, cheats_folder_name]
+            )
+        )
+        sut = OfflineImporter(file_downloader_factory=file_downloader_factory)
         store = self.apply_db_test_with_cheats_folder_nes_zip(sut)
 
         self.assertEqual(fs_data(
@@ -57,7 +64,7 @@ class TestOfflineImporterWithZips(unittest.TestCase):
                 cheats_folder_sms_file_path: {"hash": cheats_folder_sms_file_hash, "size": cheats_folder_sms_file_size}
             },
             folders=[cheats_folder_nes_folder_name, cheats_folder_sms_folder_name, cheats_folder_name]
-        ), sut.fsf.data)
+        ), sut.fs_data)
 
         self.assertEqual(store_with_unzipped_cheats(url=False, online_database_imported=[file_test_json_zip], is_summary_internal=is_summary_internal), store)
 
