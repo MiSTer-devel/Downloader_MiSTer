@@ -63,7 +63,7 @@ class TestRealisticMigrations(unittest.TestCase):
 
     def test_migrate___on_empty_store_with_file_mister_old___file_mister_old_gets_removed(self):
         file = 'Scripts/.config/downloader/MiSTer.old'
-        sut = StoreMigrator(file_system_factory=FileSystemFactory(files={file: file_descr()}))
+        sut = StoreMigrator(file_system_factory=FileSystemFactory.from_state(files={file: file_descr()}))
         sut.migrate({})
         self.assertEqual(fs_data(system_paths=[file]), sut.system_file_system.data)
 

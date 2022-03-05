@@ -24,7 +24,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     K_PARALLEL_UPDATE, K_UPDATE_LINUX, K_DOWNLOADER_SIZE_MB_LIMIT, K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, \
     K_DOWNLOADER_RETRIES, K_FILTER, K_DATABASES, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, \
     KENV_ALLOW_REBOOT, KENV_DEBUG, \
-    MEDIA_FAT, K_BASE_SYSTEM_PATH, K_CONFIG_PATH
+    MEDIA_FAT, K_BASE_SYSTEM_PATH, K_CONFIG_PATH, K_ZIP_FILE_COUNT_THRESHOLD
 from downloader.db_options import DbOptions, DbOptionsKind
 from downloader.other import empty_store
 from test.fake_db_entity import DbEntity
@@ -63,7 +63,7 @@ def config_test(base_path=MEDIA_FAT):
     return {K_DATABASES: {db_test: {}}, K_BASE_PATH: base_path}
 
 
-def config_with(filter_value=None, base_path=None, base_system_path=None, config_path=None):
+def config_with(filter_value=None, base_path=None, base_system_path=None, config_path=None, zip_file_count_threshold=None):
     config = default_config()
     if filter_value is not None:
         config[K_FILTER] = filter_value
@@ -73,6 +73,8 @@ def config_with(filter_value=None, base_path=None, base_system_path=None, config
         config[K_BASE_SYSTEM_PATH] = base_system_path.lower()
     if config_path is not None:
         config[K_CONFIG_PATH] = Path(config_path)
+    if zip_file_count_threshold is not None:
+        config[K_ZIP_FILE_COUNT_THRESHOLD] = zip_file_count_threshold
     return config
 
 

@@ -31,7 +31,7 @@ class TestCertificatesFix(unittest.TestCase):
         self.assertFalse(sut.download_ran)
 
     def test_fix_certificates_if_needed___when_is_not_needed_because_cacert_file_is_already_there___it_doesnt_download_anything(self):
-        sut = CertificatesFix(file_system_factory=FileSystemFactory(files={DEFAULT_CACERT_FILE: {}}))
+        sut = CertificatesFix(file_system_factory=FileSystemFactory.from_state(files={DEFAULT_CACERT_FILE: {}}))
         sut.fix_certificates_if_needed()
         self.assertFalse(sut.download_ran)
 
@@ -50,7 +50,7 @@ class TestCertificatesFix(unittest.TestCase):
         old_hash = 'old'
         new_hash = DEFAULT_CACERT_FILE
 
-        sut = CertificatesFix(test_query_fails=True, file_system_factory=FileSystemFactory(files={DEFAULT_CACERT_FILE: {'hash': old_hash}}))
+        sut = CertificatesFix(test_query_fails=True, file_system_factory=FileSystemFactory.from_state(files={DEFAULT_CACERT_FILE: {'hash': old_hash}}))
 
         sut.fix_certificates_if_needed()
         self.assertTrue(sut.download_ran)
@@ -58,7 +58,7 @@ class TestCertificatesFix(unittest.TestCase):
         self.assertEqual(fs_data(files={DEFAULT_CACERT_FILE: {'hash': new_hash, 'size': 1}}), sut.file_system.data)
 
     def test_fix_certificates_if_needed___when_is_needed_but_cacert_and_download_fails___it_tries_to_test_and_download_but_doesnt_install_anything(self):
-        sut = CertificatesFix(test_query_fails=True, download_fails=True, file_system_factory=FileSystemFactory(files={DEFAULT_CACERT_FILE: {'hash': 'old'}}))
+        sut = CertificatesFix(test_query_fails=True, download_fails=True, file_system_factory=FileSystemFactory.from_state(files={DEFAULT_CACERT_FILE: {'hash': 'old'}}))
         sut.fix_certificates_if_needed()
         self.assertTrue(sut.download_ran)
         self.assertTrue(sut.test_query_ran)

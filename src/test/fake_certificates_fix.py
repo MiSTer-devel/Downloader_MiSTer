@@ -25,7 +25,7 @@ from test.fake_logger import NoLogger
 class CertificatesFix(ProductionCertificatesFix):
     def __init__(self, config=None, download_fails=False, test_query_fails=False, file_system_factory=None):
         self.config = _config() if config is None else config
-        self.file_system = FileSystemFactory(config=self.config).create_for_system_scope() if file_system_factory is None else file_system_factory.create_for_system_scope()
+        self.file_system = FileSystemFactory.from_state(config=self.config).create_for_system_scope() if file_system_factory is None else file_system_factory.create_for_system_scope()
         self.download_ran = False
         self.test_query_ran = False
         super().__init__(self.config, self.file_system, NoLogger())

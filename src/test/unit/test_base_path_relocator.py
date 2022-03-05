@@ -21,11 +21,12 @@ import unittest
 from downloader.base_path_relocator import RelocatorError
 from downloader.constants import MEDIA_FAT, MEDIA_USB0
 from downloader.other import empty_store
+from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_importer_command import ImporterCommand
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_file_system_factory import FileSystemFactory
 from test.objects import db_test_with_file_a, store_test_with_file_a_descr, store_test_with_file, file_a, \
-    empty_config, config_test
+    empty_config, config_test, file_a_descr
 
 
 def media_fat_store():
@@ -39,7 +40,8 @@ def media_fat_store_with_system_file():
 class TestBasePathRelocator(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.file_system_factory = FileSystemFactory()
+        self.file_system_state = FileSystemState()
+        self.file_system_factory = FileSystemFactory(state=self.file_system_state)
         self.media_fat_file_system = self.file_system_factory.create_for_config(config_test(base_path=MEDIA_FAT))
         self.media_usb0_file_system = self.file_system_factory.create_for_config(config_test(base_path=MEDIA_USB0))
         self.sut = BasePathRelocator(self.file_system_factory)
@@ -58,7 +60,7 @@ class TestBasePathRelocator(unittest.TestCase):
         self.assertEqual(1, len(self.sut.relocating_base_paths(importer_command)))
 
     def test_relocate_non_system_files___with_package_with_system_file_moved_from_fat_to_usb0___causes_system_file_to_stay_at_fat(self):
-        self.media_fat_file_system.test_data.with_file_a()
+        self.file_system_state.add_file_a(MEDIA_FAT)
 
         self.relocate_non_system_files_to_media_usb0(store=media_fat_store_with_system_file())
 
@@ -66,7 +68,7 @@ class TestBasePathRelocator(unittest.TestCase):
         self.assertTrue(self.media_fat_file_system.is_file(file_a))
 
     def test_relocate_non_system_files___on_buggy_filesystem___raises_error(self):
-        self.media_fat_file_system.test_data.with_file_a()
+        self.file_system_state.add_file_a(MEDIA_FAT)
         self.media_usb0_file_system.set_copy_buggy()
 
         self.assertRaises(RelocatorError, lambda: self.relocate_non_system_files_to_media_usb0(store=media_fat_store()))
@@ -74,7 +76,7 @@ class TestBasePathRelocator(unittest.TestCase):
         self.assertFalse(self.media_usb0_file_system.is_file(file_a))
 
     def test_relocate_non_system_files___with_package_with_file_a_moved_from_fat_to_usb0___causes_file_a_to_move_to_usb0(self):
-        self.media_fat_file_system.test_data.with_file_a()
+        self.file_system_state.add_file_a(MEDIA_FAT)
 
         self.relocate_non_system_files_to_media_usb0(store=media_fat_store())
 

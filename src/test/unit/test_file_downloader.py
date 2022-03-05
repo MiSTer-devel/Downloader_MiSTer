@@ -21,6 +21,7 @@ import unittest
 from downloader.constants import FILE_MiSTer, FILE_MiSTer_new
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from downloader.target_path_repository import downloader_in_progress_postfix
+from test.fake_importer_implicit_inputs import NetworkState, FileSystemState
 from test.fake_logger import NoLogger
 from test.fake_file_system_factory import fs_data, FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
@@ -30,10 +31,15 @@ from test.objects import file_menu_rbf, hash_menu_rbf, file_one, hash_one, hash_
 
 class TestFileDownloader(unittest.TestCase):
 
+    installed_path = '/installed'
+    installed_system_path = '/installed_system'
+
     def setUp(self) -> None:
-        config = config_with(base_path='/installed', base_system_path='/installed_system')
-        file_system_factory = FileSystemFactory(config=config)
-        self.file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory)
+        config = config_with(base_path=self.installed_path, base_system_path=self.installed_system_path)
+        self.network_state = NetworkState()
+        self.file_system_state = FileSystemState(config=config)
+        file_system_factory = FileSystemFactory(state=self.file_system_state)
+        self.file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory, network_state=self.network_state)
         self.file_system = file_system_factory.create_for_config(config)
         self.local_repository = ProductionLocalRepository(config, NoLogger(), self.file_system)
         self.sut = self.file_downloader_factory.create(config, True)
@@ -47,13 +53,13 @@ class TestFileDownloader(unittest.TestCase):
         self.assertDownloaded([file_one], [file_one])
 
     def test_download_files_one___from_scratch_with_retry___returns_correctly_downloaded_one_and_no_errors(self):
-        self.file_downloader_factory.test_data.errors_at(file_one, 2)
+        self.network_state.remote_failures[file_one] = 2
         self.download_one()
         self.assertDownloaded([file_one], [file_one, file_one])
 
     def test_download_big_file___when_big_file_already_present_with_different_hash___gets_downloaded_through_a_downloader_in_progress_file_and_then_correctly_installed(self):
         downloader_in_progress_file = file_big + downloader_in_progress_postfix
-        self.file_system.test_data.with_file(file_big, {'hash': hash_big})
+        self.file_system_state.add_file(self.installed_path, file_big, {'hash': hash_big})
 
         self.download_big_file(hash_updated_big)
         self.assertEqual(
@@ -69,17 +75,17 @@ class TestFileDownloader(unittest.TestCase):
         ], self.file_system.write_records)
 
     def test_download_files_one___from_scratch_could_not_download___return_errors(self):
-        self.file_downloader_factory.test_data.errors_at(file_one)
+        self.network_state.remote_failures[file_one] = 99
         self.download_one()
         self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
 
     def test_download_files_one___from_scratch_no_matching_hash___return_errors(self):
-        self.file_downloader_factory.test_data.brings_file(file_one, {'hash': 'wrong'})
+        self.network_state.remote_files[file_one] = {'hash': 'wrong'}
         self.download_one()
         self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
 
     def test_download_files_one___from_scratch_no_file_exists___return_errors(self):
-        self.file_downloader_factory.test_data.misses_file(file_one)
+        self.network_state.storing_problems.add(file_one)
         self.download_one()
         self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
 
@@ -89,27 +95,28 @@ class TestFileDownloader(unittest.TestCase):
 
     def test_download_reboot_file___update_no_issues___needs_reboot(self):
         self.file_system.add_system_path(file_menu_rbf)
-        self.file_system.test_data.with_file(file_menu_rbf, {'hash': 'old', 'size': 23})
+        self.file_system_state.add_file(self.installed_system_path, file_menu_rbf, {'hash': 'old', 'size': 23})
         self.download_reboot()
         self.assertDownloaded([file_menu_rbf], [file_menu_rbf], need_reboot=True)
 
     def test_download_reboot_file___no_changes_no_issues___no_need_to_reboot(self):
         self.file_system.add_system_path(file_menu_rbf)
-        self.file_system.test_data.with_file(file_menu_rbf, {'hash': hash_menu_rbf})
+        self.file_system_state.add_file(self.installed_system_path, file_menu_rbf, {'hash': hash_menu_rbf})
+
         self.download_reboot()
         self.assertDownloaded([file_menu_rbf])
 
     def test_download_mister_file___from_scratch_no_issues___stores_it_as_mister(self):
         self.file_system.add_system_path(FILE_MiSTer)
-        self.file_system.test_data.with_old_mister_binary()
+        self.file_system_state.add_old_mister_binary(self.installed_system_path)
         self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_MiSTer, 'reboot': True, 'path': 'system'}, FILE_MiSTer)
         self.sut.download_files(False)
         self.assertDownloaded([FILE_MiSTer], [FILE_MiSTer], need_reboot=True)
         self.assertTrue(self.file_system.is_file(FILE_MiSTer))
 
     def test_download_mister_file___from_scratch_no_issues___adds_the_three_mister_files_on_system_paths(self):
+        self.file_system_state.add_old_mister_binary(self.installed_system_path)
         self.file_system.add_system_path(FILE_MiSTer)
-        self.file_system.test_data.with_old_mister_binary()
         self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_MiSTer, 'reboot': True, 'path': 'system'}, FILE_MiSTer)
         self.sut.download_files(False)
         self.assertEqual([FILE_MiSTer, FILE_MiSTer_new, self.local_repository.old_mister_path], list(self.file_system.data['system_paths']))

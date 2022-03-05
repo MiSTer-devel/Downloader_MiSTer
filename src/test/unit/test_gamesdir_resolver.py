@@ -20,18 +20,18 @@ from pathlib import Path
 
 from downloader.constants import K_BASE_PATH, K_GAMESDIR_PATH
 from downloader.gamesdir_resolver import GamesdirError
+from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_gamesdir_resolver import GamesdirResolver
 
 
 def fs(input_folders):
-    result = FileSystemFactory().create_for_system_scope()
-    actual_folders = []
+    state = FileSystemState()
     for folder in input_folders:
-        actual_folders.append(str(Path(folder).parent))
-        actual_folders.append(folder)
-    result.test_data.with_folders(actual_folders)
-    return result
+        state.add_full_folder_path(str(Path(folder).parent))
+        state.add_full_folder_path(folder)
+
+    return FileSystemFactory(state=state).create_for_system_scope()
 
 
 def gamesdir_config_media_fat():

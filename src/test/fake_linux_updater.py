@@ -20,16 +20,16 @@ from downloader.config import default_config
 from downloader.constants import FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version
 from downloader.importer_command import ImporterCommand
 from downloader.linux_updater import LinuxUpdater as ProductionLinuxUpdater
-from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_file_system_factory import FileSystemFactory
+from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_logger import NoLogger
 
 
 class LinuxUpdater(ProductionLinuxUpdater):
     def __init__(self, file_downloader_factory=None, file_system=None, file_system_factory=None):
-        file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
-        self.file_system = file_system_factory.create_for_system_scope() if file_system is None else file_system
-        file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory) if file_downloader_factory is None else file_downloader_factory
+        self._file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
+        file_downloader_factory = FileDownloaderFactory(file_system_factory=self._file_system_factory) if file_downloader_factory is None else file_downloader_factory
+        self.file_system = self._file_system_factory.create_for_system_scope() if file_system is None else file_system
         self._importer_command = ImporterCommand({}, [])
         super().__init__(default_config(), self.file_system, file_downloader_factory, NoLogger())
 

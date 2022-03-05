@@ -19,10 +19,12 @@
 from pathlib import Path
 
 from downloader.config import default_config
-from downloader.constants import K_DATABASES, K_DB_URL, K_SECTION, K_VERBOSE, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, KENV_COMMIT, \
-    KENV_UPDATE_LINUX, KENV_FAIL_ON_FILE_ERROR
+from downloader.constants import K_DATABASES, K_DB_URL, K_SECTION, K_VERBOSE, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, \
+    KENV_COMMIT, \
+    KENV_UPDATE_LINUX, KENV_FAIL_ON_FILE_ERROR, K_BASE_PATH
 from downloader.full_run_service import FullRunService as ProductionFullRunService
-from fake_file_downloader_factory import FileDownloaderFactory
+from test.fake_file_downloader_factory import FileDownloaderFactory
+from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_db_gateway import DbGateway
 from test.fake_file_system_factory import FileSystemFactory
@@ -71,13 +73,14 @@ class FullRunService(ProductionFullRunService):
             K_USER_DEFINED_OPTIONS: []
         })
 
-        db_gateway = DbGateway(config)
-        db_gateway.file_system.test_data.with_file(db_empty, {'unzipped_json': {}})
+        file_system_state = FileSystemState(files={db_empty: {'unzipped_json': {}}})
+        file_system_factory = FileSystemFactory(state=file_system_state)
 
         return FullRunService(
             {KENV_COMMIT: 'test', KENV_UPDATE_LINUX: 'false', KENV_FAIL_ON_FILE_ERROR: 'true'},
             config,
-            db_gateway,
+            DbGateway(config, file_system_factory=file_system_factory),
+            file_system_factory=file_system_factory
         )
 
     @staticmethod

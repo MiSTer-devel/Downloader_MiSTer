@@ -38,6 +38,10 @@ cheats_folder_nes_file_hash = "8c02595fef1096a9dd160e59067f4f4"
 cheats_folder_nes_file_size = 1020
 
 
+def cheats_folder_nes_file_description():
+    return {"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size}
+
+
 def cheats_folder_nes_tags():
     return [0, 1]
 
@@ -47,6 +51,10 @@ cheats_folder_sms_file_path = cheats_folder_sms_folder_name + '/Sonic The Hedgeh
 cheats_folder_sms_file_url = f'https://{cheats_folder_sms_folder_name}/Sonic%20The%20Hedgehog%20%28World%29.zip'
 cheats_folder_sms_file_hash = "1c111111111096a9dd160e59067f4f4"
 cheats_folder_sms_file_size = 2048
+
+
+def cheats_folder_sms_file_description():
+    return {"hash": cheats_folder_sms_file_hash, "size": cheats_folder_sms_file_size}
 
 
 def cheats_folder_sms_tags():
@@ -155,13 +163,13 @@ def zipped_files_from_cheats_folder():
     }
 
 
-def with_installed_cheats_folder_on_fs(file_system):
-    file_system.test_data \
-        .with_folders(cheats_folder_folders()) \
-        .with_file(cheats_folder_nes_file_path,
-                   {"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size}) \
-        .with_file(cheats_folder_sms_file_path,
-                   {"hash": cheats_folder_sms_file_hash, "size": cheats_folder_sms_file_size})
+def with_installed_cheats_folder_on_fs(file_system_state):
+    file_system_state \
+        .add_folders(cheats_folder_folders())\
+        .add_file(base_path=None, file=cheats_folder_nes_file_path,
+                   description={"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size}) \
+        .add_file(base_path=None, file=cheats_folder_sms_file_path,
+                   description={"hash": cheats_folder_sms_file_hash, "size": cheats_folder_sms_file_size})
 
 
 def tweak_descr(o, zip_id=True, tags=True, url=True):

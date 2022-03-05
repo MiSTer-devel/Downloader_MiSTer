@@ -32,3 +32,21 @@ class NoLogger(Logger):
 
     def enable_verbose_mode(self):
         pass
+
+
+class SpyLogger(Logger):
+    def __init__(self):
+        self.printCalls = []
+        self.debugCalls = []
+
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
+        self.printCalls.append(args)
+
+    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
+        self.debugCalls.append(args)
+
+    def set_local_repository(self, local_repository):
+        pass
+
+    def enable_verbose_mode(self):
+        pass

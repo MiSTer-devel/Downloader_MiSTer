@@ -51,8 +51,9 @@ def make_full_run_service(env, logger, ini_path):
     file_filter_factory = FileFilterFactory()
     file_downloader_factory = make_file_downloader_factory(file_system_factory, local_repository, logger)
     db_gateway = DbGateway(config, system_file_system, file_downloader_factory, logger)
+    waiter = Waiter()
     offline_importer = OfflineImporter(file_system_factory, file_downloader_factory, logger)
-    online_importer = OnlineImporter(file_filter_factory, file_system_factory, file_downloader_factory, logger)
+    online_importer = OnlineImporter(file_filter_factory, file_system_factory, file_downloader_factory, waiter, logger)
     linux_updater = LinuxUpdater(config, system_file_system, file_downloader_factory, logger)
     store_migrator = StoreMigrator(migrations(config, file_system_factory), logger)
 
@@ -67,6 +68,6 @@ def make_full_run_service(env, logger, ini_path):
         linux_updater,
         RebootCalculator(config, logger, system_file_system),
         store_migrator,
-        BasePathRelocator(file_system_factory, Waiter(), logger),
+        BasePathRelocator(file_system_factory, waiter, logger),
         CertificatesFix(config, system_file_system, logger)
     )

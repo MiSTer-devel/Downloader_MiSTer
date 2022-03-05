@@ -15,28 +15,38 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-
+from downloader.config import default_config
 from downloader.file_filter import FileFilterFactory
 from downloader.importer_command import ImporterCommand
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
+from test.fake_waiter import NoWaiter
+from test.fake_importer_implicit_inputs import ImporterImplicitInputs
+from test.fake_file_system_factory import FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_logger import NoLogger
 
 
 class OnlineImporter(ProductionOnlineImporter):
-    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, implicit_inputs=None):
-        file_downloader_factory = FileDownloaderFactory.tester_from(implicit_inputs=implicit_inputs, config=config, file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory)
-        self._config = file_downloader_factory.config
-        self._file_system_factory = file_downloader_factory.file_system_factory
+    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, waiter=None, logger=None):
+        self._config = config if config is not None else default_config()
+        self._file_system_factory = FileSystemFactory.from_state(config=self._config) if file_system_factory is None else file_system_factory
+        file_downloader_factory = FileDownloaderFactory(config=config, file_system_factory=self._file_system_factory) if file_downloader_factory is None else file_downloader_factory
         self.file_system = self._file_system_factory.create_for_system_scope()
 
         super().__init__(
             FileFilterFactory(),
             self._file_system_factory,
             file_downloader_factory,
-            NoLogger())
+            NoWaiter() if waiter is None else waiter,
+            NoLogger() if logger is None else logger)
 
         self._importer_command = ImporterCommand(self._config, [])
+
+    @staticmethod
+    def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs):
+        file_downloader_factory, file_system_factory, config = FileDownloaderFactory.from_implicit_inputs(implicit_inputs)
+
+        return OnlineImporter(config=config, file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory)
 
     @property
     def fs_data(self):

@@ -19,6 +19,7 @@
 import unittest
 
 from downloader.constants import K_SECTION, K_DB_URL
+from test.fake_importer_implicit_inputs import NetworkState
 from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.objects import db_test_descr, db_test
 from test.fake_db_gateway import DbGateway
@@ -33,15 +34,15 @@ class TestDbGateway(unittest.TestCase):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
 
         file_system_factory = FileSystemFactory()
-        factory = FileDownloaderFactory(file_system_factory=file_system_factory)
-        factory.test_data.brings_file(first_fake_temp_file, db_description)
+        factory = FileDownloaderFactory(file_system_factory=file_system_factory, network_state=NetworkState(
+            remote_files={first_fake_temp_file: db_description}))
 
         self.assertEqual(db_test_descr().testable, fetch_all(http_db_url, file_system_factory, factory))
 
     def test_fetch_all___db_with_fs_path___returns_expected_db(self):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
 
-        file_system_factory = FileSystemFactory(files={fs_db_path: db_description})
+        file_system_factory = FileSystemFactory.from_state(files={fs_db_path: db_description})
 
         self.assertEqual(db_test_descr().testable, fetch_all(fs_db_path, file_system_factory))
 
@@ -49,8 +50,7 @@ class TestDbGateway(unittest.TestCase):
         self.assertEqual(None, fetch_all(http_db_url))
 
     def test_fetch_all___db_with_failing_http_uri___returns_none(self):
-        factory = FileDownloaderFactory()
-        factory.test_data.errors_at(first_fake_temp_file)
+        factory = FileDownloaderFactory(network_state=NetworkState(storing_problems={first_fake_temp_file: 99}))
         self.assertEqual(None, fetch_all(http_db_url, factory=factory))
 
 

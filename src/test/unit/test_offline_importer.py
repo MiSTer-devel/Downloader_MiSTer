@@ -17,6 +17,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
+
+from test.fake_file_system_factory import FileSystemFactory
+from test.fake_importer_implicit_inputs import FileSystemState
 from test.objects import db_test_with_file_a, file_test_json_zip_descr, file_test_json_zip, file_a, empty_test_store
 from test.fake_offline_importer import OfflineImporter
 
@@ -24,21 +27,18 @@ from test.fake_offline_importer import OfflineImporter
 class TestOfflineImporter(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.sut = OfflineImporter()
+        self.file_system_state = FileSystemState()
+        self.sut = OfflineImporter(file_system_factory=FileSystemFactory(state=self.file_system_state))
 
     def test_apply_offline_databases___for_test_db_when_a_file_is_present_with_correct_hash___adds_existing_a_file_to_the_store(self):
-        self.sut.file_system.test_data\
-            .with_test_json_zip()\
-            .with_file_a()
+        self.file_system_state.add_test_json_zip().add_file_a()
 
         store = self.apply_db_test_with_file_a()
         self.assertTrue(file_a in store['files'])
         self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
 
     def test_apply_offline_databases___for_test_db_when_a_file_is_present_with_incorrect_hash___adds_nothing_to_the_store(self):
-        self.sut.file_system.test_data\
-            .with_test_json_zip()\
-            .with_file_a({'hash': 'incorrect'})
+        self.file_system_state.add_test_json_zip().add_file_a(description={'hash': 'incorrect'})
 
         store = self.apply_db_test_with_file_a()
         self.assertFalse(file_a in store['files'])
@@ -47,32 +47,32 @@ class TestOfflineImporter(unittest.TestCase):
     def test_apply_offline_databases___for_test_db_when_a_file_is_present_with_ignore_hash___adds_existing_a_file_to_the_store(self):
         json_zip_db = file_test_json_zip_descr()
         json_zip_db['unzipped_json']['files'][file_a]['hash'] = 'ignore'
-        self.sut.file_system.test_data\
-            .with_test_json_zip(json_zip_db)\
-            .with_file_a({'hash': 'incorrect'})
+        self.file_system_state.add_test_json_zip()\
+            .add_file_a(description={'hash': 'incorrect'})\
+            .add_test_json_zip(description=json_zip_db)
 
         store = self.apply_db_test_with_file_a()
         self.assertTrue(file_a in store['files'])
         self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
 
     def test_apply_offline_databases___when_empty___adds_nothing_to_the_store(self):
-        self.sut.file_system.test_data.with_test_json_zip()
+        self.file_system_state.add_test_json_zip()
 
         store = self.apply_db_test_with_file_a()
         self.assertFalse(file_a in store['files'])
         self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
 
     def test_apply_offline_databases___always___adds_db_file_to_offline_databases_imported(self):
-        self.sut.file_system.test_data.with_test_json_zip()
+        self.file_system_state.add_test_json_zip()
 
         store = self.apply_db_test_with_file_a()
         self.assertTrue(file_test_json_zip in store['offline_databases_imported'])
         self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
 
     def test_apply_offline_databases___when_db_has_file_a_but_is_already_at_offline_databases_imported___just_deletes_db_file(self):
-        self.sut.file_system.test_data\
-            .with_test_json_zip()\
-            .with_file_a()
+        self.file_system_state\
+            .add_file_a()\
+            .add_test_json_zip()
 
         store = empty_test_store()
         store['offline_databases_imported'].append(file_test_json_zip)
@@ -88,8 +88,7 @@ class TestOfflineImporter(unittest.TestCase):
         self.assertFalse(self.sut.file_system.is_file(file_test_json_zip))
 
     def test_apply_offline_databases___when_db_id_does_not_match___does_nothing(self):
-        self.sut.file_system.test_data\
-            .with_test_json_zip({'hash': file_test_json_zip, 'unzipped_json': {'db_id': 'does_not_match'}})
+        self.file_system_state.add_test_json_zip(description={'hash': file_test_json_zip, 'unzipped_json': {'db_id': 'does_not_match'}})
 
         store = self.apply_db_test_with_file_a()
         self.assertTrue(file_test_json_zip not in store['offline_databases_imported'])
@@ -100,8 +99,7 @@ class TestOfflineImporter(unittest.TestCase):
         unzipped_json = db_test_with_file_a().testable
         unzipped_json['db_id'] = 'TEST'
 
-        self.sut.file_system.test_data\
-            .with_test_json_zip({'hash': file_test_json_zip, 'unzipped_json': unzipped_json})
+        self.file_system_state.add_test_json_zip(description={'hash': file_test_json_zip, 'unzipped_json': unzipped_json})
 
         store = self.apply_db_test_with_file_a()
         self.assertTrue(file_test_json_zip in store['offline_databases_imported'])
@@ -111,8 +109,7 @@ class TestOfflineImporter(unittest.TestCase):
         unzipped_json = db_test_with_file_a().testable
         unzipped_json.pop('db_id')
 
-        self.sut.file_system.test_data\
-            .with_test_json_zip({'hash': file_test_json_zip, 'unzipped_json': unzipped_json})
+        self.file_system_state.add_test_json_zip(description={'hash': file_test_json_zip, 'unzipped_json': unzipped_json})
 
         store = self.apply_db_test_with_file_a()
         self.assertTrue(file_test_json_zip not in store['offline_databases_imported'])

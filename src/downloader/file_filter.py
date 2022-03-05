@@ -147,7 +147,7 @@ class FileFilter:
 
         keep_folders = set()
 
-        for folder_path in reversed(list(db.folders.keys())):
+        for folder_path in reversed(sorted(db.folders.keys(), key=len)):
             if folder_path in keep_folders:
                 continue
 

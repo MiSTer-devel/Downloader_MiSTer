@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.config import default_config
 from downloader.db_gateway import DbGateway as ProductionDbGateway
+from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_logger import NoLogger
@@ -35,6 +36,6 @@ class DbGateway(ProductionDbGateway):
 
     @staticmethod
     def with_single_db(db_id, descr, config=None) -> ProductionDbGateway:
-        db_gateway = DbGateway(config=config)
-        db_gateway.file_system.test_data.with_file(db_id, {'unzipped_json': descr})
+        state = FileSystemState(config=config, files={db_id: {'unzipped_json': descr}})
+        db_gateway = DbGateway(config=config, file_system_factory=FileSystemFactory(state=state))
         return db_gateway

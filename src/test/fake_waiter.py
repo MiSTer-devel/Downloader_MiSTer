@@ -16,5 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 class NoWaiter:
-    def sleep(self, _):
-        pass
+    def __init__(self):
+        self.registeredWaits = []
+
+    def sleep(self, wait):
+        self.registeredWaits.append(wait)
