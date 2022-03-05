@@ -43,10 +43,11 @@ class _Session:
 
 
 class OnlineImporter:
-    def __init__(self, file_filter_factory, file_system_factory, file_downloader_factory, logger):
+    def __init__(self, file_filter_factory, file_system_factory, file_downloader_factory, waiter, logger):
         self._file_filter_factory = file_filter_factory
         self._file_system_factory = file_system_factory
         self._file_downloader_factory = file_downloader_factory
+        self._waiter = waiter
         self._logger = logger
         self._unused_filter_tags = []
         self._sessions = dict()
@@ -118,7 +119,7 @@ class OnlineImporter:
             self._logger.print('################################################################################')
             for line in db.header:
                 if isinstance(line, float):
-                    time.sleep(line)
+                    self._waiter.sleep(line)
                 else:
                     self._logger.print(line, end='')
         else:
@@ -179,7 +180,7 @@ class _OnlineZipSummaries:
             elif 'internal_summary' in db_zip_desc:
                 zip_ids_from_internal_summary.append(zip_id)
             else:
-                raise UnreachableException('Unreachable code path for: %s.%s' % (self._db.db_id, zip_id))
+                raise UnreachableException('Unreachable code path for: %s.%s' % (self._db.db_id, zip_id)) # pragma: no cover
 
         if len(zip_ids_from_internal_summary) > 0:
             self._import_zip_ids_from_internal_summaries(zip_ids_from_internal_summary)
