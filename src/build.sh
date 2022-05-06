@@ -35,7 +35,7 @@ export DOWNLOADER_LAUNCHER_PATH="\${DOWNLOADER_LAUNCHER_PATH:-\${0}}"
 ${EXPORTS}
 ${UUDECODE_CMD} "\${0}" | xzcat -d -c > "${BIN}"
 chmod a+x "${BIN}"
-"${BIN}"
+"${BIN}" "\${1:-}"
 exit 0
 EOF
 

@@ -21,4 +21,8 @@ sshpass -p "${MISTER_PW}" scp -o StrictHostKeyChecking=no "${TEMP_SCRIPT}" "root
 sshpass -p "${MISTER_PW}" scp -o StrictHostKeyChecking=no downloader.sh "root@${MISTER_IP}:/media/fat/Scripts/downloader.sh"
 rm "${TEMP_SCRIPT}"
 
-echo "OK"
+if [[ "${1:-}" == 'run' ]] ; then
+  sshpass -p "${MISTER_PW}" ssh -o StrictHostKeyChecking=no "root@${MISTER_IP}" "/media/fat/downloader.sh ${2:-}"
+else
+  echo "OK"
+fi

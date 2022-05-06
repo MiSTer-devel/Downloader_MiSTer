@@ -18,9 +18,11 @@
 
 import unittest
 
-from downloader.constants import FILE_MiSTer, FILE_MiSTer_new
+from downloader.constants import FILE_MiSTer
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from downloader.target_path_repository import downloader_in_progress_postfix
+from test.fake_store_migrator import StoreMigrator
+from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_importer_implicit_inputs import NetworkState, FileSystemState
 from test.fake_logger import NoLogger
 from test.fake_file_system_factory import fs_data, FileSystemFactory
@@ -41,7 +43,8 @@ class TestFileDownloader(unittest.TestCase):
         file_system_factory = FileSystemFactory(state=self.file_system_state)
         self.file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory, network_state=self.network_state)
         self.file_system = file_system_factory.create_for_config(config)
-        self.local_repository = ProductionLocalRepository(config, NoLogger(), self.file_system)
+        external_drives_repository = ExternalDrivesRepository(file_system = self.file_system)
+        self.local_repository = ProductionLocalRepository(config, NoLogger(), self.file_system, StoreMigrator(), external_drives_repository)
         self.sut = self.file_downloader_factory.create(config, True)
 
     def test_download_nothing___from_scratch_no_issues___nothing_downloaded_no_errors(self):
@@ -70,7 +73,7 @@ class TestFileDownloader(unittest.TestCase):
             self.file_system.data
         )
         self.assertEqual([
-            {"scope": "copy", "data": ('/installed/' + downloader_in_progress_file, '/installed/' + file_big)},
+            {"scope": "copy", "data": ['/installed/' + downloader_in_progress_file, '/installed/' + file_big]},
             {"scope": "unlink", "data": '/installed/' + downloader_in_progress_file},
         ], self.file_system.write_records)
 
@@ -94,32 +97,22 @@ class TestFileDownloader(unittest.TestCase):
         self.assertDownloaded([file_menu_rbf], [file_menu_rbf], need_reboot=True)
 
     def test_download_reboot_file___update_no_issues___needs_reboot(self):
-        self.file_system.add_system_path(file_menu_rbf)
         self.file_system_state.add_file(self.installed_system_path, file_menu_rbf, {'hash': 'old', 'size': 23})
         self.download_reboot()
         self.assertDownloaded([file_menu_rbf], [file_menu_rbf], need_reboot=True)
 
     def test_download_reboot_file___no_changes_no_issues___no_need_to_reboot(self):
-        self.file_system.add_system_path(file_menu_rbf)
         self.file_system_state.add_file(self.installed_system_path, file_menu_rbf, {'hash': hash_menu_rbf})
 
         self.download_reboot()
         self.assertDownloaded([file_menu_rbf])
 
     def test_download_mister_file___from_scratch_no_issues___stores_it_as_mister(self):
-        self.file_system.add_system_path(FILE_MiSTer)
         self.file_system_state.add_old_mister_binary(self.installed_system_path)
         self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_MiSTer, 'reboot': True, 'path': 'system'}, FILE_MiSTer)
         self.sut.download_files(False)
         self.assertDownloaded([FILE_MiSTer], [FILE_MiSTer], need_reboot=True)
         self.assertTrue(self.file_system.is_file(FILE_MiSTer))
-
-    def test_download_mister_file___from_scratch_no_issues___adds_the_three_mister_files_on_system_paths(self):
-        self.file_system_state.add_old_mister_binary(self.installed_system_path)
-        self.file_system.add_system_path(FILE_MiSTer)
-        self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_MiSTer, 'reboot': True, 'path': 'system'}, FILE_MiSTer)
-        self.sut.download_files(False)
-        self.assertEqual([FILE_MiSTer, FILE_MiSTer_new, self.local_repository.old_mister_path], list(self.file_system.data['system_paths']))
 
     def assertDownloaded(self, oks, run=None, errors=None, need_reboot=False):
         self.assertEqual(oks, self.sut.correctly_downloaded_files())

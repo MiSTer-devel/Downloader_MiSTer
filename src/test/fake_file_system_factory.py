@@ -15,15 +15,16 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+import json
 import re
 from pathlib import Path
 
 from downloader.config import AllowDelete
-from downloader.constants import K_BASE_PATH, K_ALLOW_DELETE, K_BASE_SYSTEM_PATH
-from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem
-from downloader.other import ClosableValue
+from downloader.constants import K_BASE_PATH, K_ALLOW_DELETE, K_BASE_SYSTEM_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE
+from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
+    absolute_parent_folder
+from downloader.other import ClosableValue, UnreachableException
 from test.fake_importer_implicit_inputs import FileSystemState
-from test.objects import file_a, file_a_descr, folder_a
 from test.fake_logger import NoLogger
 
 fake_temp_file = '/tmp/temp_file'
@@ -31,15 +32,15 @@ first_fake_temp_file = '/tmp/temp_file0'
 
 
 def make_production_filesystem_factory(config) -> ProductionFileSystemFactory:
-    return ProductionFileSystemFactory(config, NoLogger())
+    return ProductionFileSystemFactory(config, {}, NoLogger())
 
 
-def fs_data(files=None, folders=None, system_paths=None, base_path=None):
-    return FileSystemFactory(state=FileSystemState(files, folders, system_paths, base_path)).data
+def fs_data(files=None, folders=None, base_path=None):
+    return FileSystemFactory(state=FileSystemState(files, folders, base_path)).data
 
 
-def fsf_test_with_file_a_descr():
-    return FileSystemFactory(state=FileSystemState(files={file_a: file_a_descr()}, folders=[folder_a]))
+def fs_records(records):
+    return json.loads(json.dumps(records).lower())
 
 
 class FileSystemFactory:
@@ -58,11 +59,16 @@ class FileSystemFactory:
     def data(self):
         data = self._state.__dict__.copy()
         del data['config']
+        del data['path_dictionary']
         return data
 
+    @property
+    def records(self):
+        return [record.__dict__.copy() for record in self._write_records]
+
     @staticmethod
-    def from_state(files=None, folders=None, system_paths=None, config=None, base_path=None):
-        return FileSystemFactory(state=FileSystemState(files=files, folders=folders, system_paths=system_paths, config=config, base_path=base_path))
+    def from_state(files=None, folders=None, config=None, base_path=None, path_dictionary=None):
+        return FileSystemFactory(state=FileSystemState(files=files, folders=folders, config=config, base_path=base_path, path_dictionary=path_dictionary))
 
 
 class _FileSystem(ProductionFileSystem):
@@ -83,6 +89,7 @@ class _FileSystem(ProductionFileSystem):
     def data(self):
         data = self._state.__dict__.copy()
         del data['config']
+        del data['path_dictionary']
         return data
 
     def _fix_paths(self, paths):
@@ -106,15 +113,17 @@ class _FileSystem(ProductionFileSystem):
     def resolve(self, path):
         return self._path(path)
 
-    def add_system_path(self, path):
-        self._write_records.append(_Record('add_system_path', path))
-        self._state.system_paths[path] = True
-
     def is_file(self, path):
         return self._path(path) in self._state.files
 
     def is_folder(self, path):
-        return self._path(path) in self._state.folders
+        path = self._path(path)
+        if path in self._state.folders:
+            return True
+
+        entries = tuple(self._state.files) + tuple(self._state.folders)
+
+        return path in STORAGE_PATHS_PRIORITY_SEQUENCE and any(entry.lower().startswith(path) for entry in entries)
 
     def read_file_contents(self, path):
         return self._state.files[self._path(path)]['content']
@@ -160,16 +169,20 @@ class _FileSystem(ProductionFileSystem):
         self._write_records.append(_Record('make_dirs', folder))
 
     def make_dirs_parent(self, path):
-        parent = str(Path(self._path(path)).parent)
-        if parent == self._base_path(path) or parent == '/tmp':
+        path_object = Path(self._path(path))
+        if len(path_object.parents) <= 3:
             return
+        parent = str(path_object.parent)
         self._state.folders[parent] = {}
         self._write_records.append(_Record('make_dirs_parent', parent))
+
+    def _parent_folder(self, path):
+        return absolute_parent_folder(self._path(path))
 
     def folder_has_items(self, path):
         path = self._path(path)
         for p in self._state.files:
-            if p in path:
+            if path in p:
                 return True
 
         for p in self._state.folders:
@@ -183,7 +196,8 @@ class _FileSystem(ProductionFileSystem):
 
     def remove_folder(self, path):
         folder = self._path(path)
-        self._state.folders.pop(folder)
+        if folder in self._state.folders:
+            self._state.folders.pop(folder)
         self._write_records.append(_Record('make_dirs', folder))
 
     def download_target_path(self, path):
@@ -191,19 +205,22 @@ class _FileSystem(ProductionFileSystem):
 
     def unlink(self, path, verbose=True):
         file = self._path(path)
-        self._state.files.pop(file)
-        self._write_records.append(_Record('unlink', file))
+        if file in self._state.files:
+            self._state.files.pop(file)
+            self._write_records.append(_Record('unlink', file))
+            return True
+        else:
+            return False
 
     def delete_previous(self, file):
         if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
             return True
 
-        path = Path(self._path(file))
-        if not self.is_folder(str(path.parent)):
+        if not self.is_folder(self._parent_folder(file)):
             return
 
         regex = re.compile("^(.+_)[0-9]{8}([.][a-zA-Z0-9]+)$", )
-        m = regex.match(path.name)
+        m = regex.match(Path(file).name)
         if m is None:
             return
 
@@ -221,7 +238,13 @@ class _FileSystem(ProductionFileSystem):
                 self._write_records.append(_Record('delete_previous', file))
 
     def load_dict_from_file(self, path, suffix=None):
-        return self._state.files[self._path(path)]['unzipped_json']
+        file_description = self._state.files[self._path(path)]
+        if 'unzipped_json' in file_description:
+            return file_description['unzipped_json']
+        elif 'json' in file_description:
+            return file_description['json']
+        else:
+            raise UnreachableException('Should not reach this!')
 
     def save_json_on_zip(self, db, path):
         if self._path(path) not in self._state.files:
@@ -229,6 +252,13 @@ class _FileSystem(ProductionFileSystem):
         file = self._path(path)
         self._state.files[file]['unzipped_json'] = db
         self._write_records.append(_Record('save_json_on_zip', file))
+
+    def save_json(self, db, path):
+        if self._path(path) not in self._state.files:
+            self.touch(path)
+        file = self._path(path)
+        self._state.files[file]['json'] = db
+        self._write_records.append(_Record('save_json', file))
 
     def unzip_contents(self, file_path, zip_target_path, contained_files):
         contents = self._state.files[self._path(file_path)]['zipped_files']
@@ -248,19 +278,24 @@ class _FileSystem(ProductionFileSystem):
         return False
 
     def _path(self, path):
-        if path[0] == '/':
-            return path.lower()
+        path = path.lower()
 
-        return ('%s/%s' % (self._base_path(path), path)).lower()
+        if path[0] == '/':
+            return path
+
+        if path in self._state.path_dictionary:
+            return '%s/%s' % (self._state.path_dictionary[path], path)
+
+        return ('%s/%s' % (self._base_path(path), path))
 
     def _base_path(self, path):
-        return self._config[K_BASE_SYSTEM_PATH] if path in self._state.system_paths else self._config[K_BASE_PATH]
+        return self._config[K_BASE_PATH]
 
 
 class _Record:
     def __init__(self, scope, data):
         self.scope = scope
-        self.data = data
+        self.data = [d for d in data] if isinstance(data, tuple) else data
 
 
 class _FakeTempFile:

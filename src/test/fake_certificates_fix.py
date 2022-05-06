@@ -18,6 +18,7 @@
 from downloader.certificates_fix import CertificatesFix as ProductionCertificatesFix
 from downloader.config import default_config
 from downloader.constants import DEFAULT_CURL_SSL_OPTIONS, K_CURL_SSL
+from test.fake_waiter import NoWaiter
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_logger import NoLogger
 
@@ -28,7 +29,7 @@ class CertificatesFix(ProductionCertificatesFix):
         self.file_system = FileSystemFactory.from_state(config=self.config).create_for_system_scope() if file_system_factory is None else file_system_factory.create_for_system_scope()
         self.download_ran = False
         self.test_query_ran = False
-        super().__init__(self.config, self.file_system, NoLogger())
+        super().__init__(self.config, self.file_system, NoWaiter(), NoLogger())
         self._download_fails = download_fails
         self._test_query_fails = test_query_fails
 

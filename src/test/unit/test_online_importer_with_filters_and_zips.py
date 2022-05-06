@@ -17,13 +17,11 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-
-from downloader.config import default_config
 from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_FILTER
 from downloader.online_importer import WrongDatabaseOptions
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data, FileSystemFactory
-from test.objects import db_test_descr, store_test_descr, config_with_filter, empty_test_store, config_with
+from test.objects import db_test_descr, store_descr, config_with_filter, empty_test_store
 from test.fake_online_importer import OnlineImporter
 from test.zip_objects import cheats_folder_zip_desc, cheats_folder_tag_dictionary, cheats_folder_id, \
     cheats_folder_nes_file_path, cheats_folder_nes_folder_name, cheats_folder_sms_file_path, \
@@ -52,7 +50,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
         self.assertEqual(store_with_filtered_nes_zip_data(), actual_store)
         self.assertOnlySmsFileIsInstalled()
 
-    def test_download_zipped_cheats_folder___with_store_and_fs_that_had_sms_filtered___when_sms_filter_is_applied___installs_filtered_nes_zip_data_and_only_sms_file(self):
+    def test_download_zipped_cheats_folder___with_store_and_fs_that_had_sms_filtered___when_sms_filter_is_applied___installs_filtered_nes_zip_data_and_only_sms_files(self):
         store = self.download_zipped_cheats_folder(store_with_filtered_sms_zip_data(), 'sms', implicit_inputs=ImporterImplicitInputs(
             files={cheats_folder_nes_file_path: cheats_folder_nes_file_description()},
             folders=[cheats_folder_name, cheats_folder_nes_folder_name]
@@ -73,7 +71,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
             files={cheats_folder_sms_file_path: cheats_folder_sms_file_description()},
             folders=[cheats_folder_name, cheats_folder_sms_folder_name, cheats_folder_nes_folder_name, personal_nes_folder]
         ), self.sut.fs_data)
-        self.assertEqual(store_with_filtered_nes_zip_data(), store)
+        self.assertEqual(store_with_filtered_nes_zip_data_keeping_nes_folder(), store)
 
     def test_download_zipped_cheats_folder___with_empty_store_and_negative_cheats_filter___installs_filtered_cheats_zip_data_but_no_files(self):
         actual_store = self.download_zipped_cheats_folder(empty_test_store(), '!cheats')
@@ -96,6 +94,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
     def test_download_zipped_cheats_folder___with_filtered_nes_zip_data_in_store_and_negative_cheats_filter___expands_zip_and_filtered_data_with_sms_and_installs_nothing(self):
         actual_store = self.download_zipped_cheats_folder(store_with_filtered_nes_zip_data(), '!cheats', implicit_inputs=ImporterImplicitInputs(
             files={cheats_folder_sms_file_path: cheats_folder_sms_folder_descr()},
+            folders=[cheats_folder_name, cheats_folder_sms_folder_name]
         ))
 
         self.assertEqual(store_with_filtered_cheats_zip_data(), actual_store)
@@ -128,7 +127,10 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
         self.assertOnlySmsFileIsInstalled()
 
     def test_download_cheat_files_without_zip___with_filtered_nes_zip_data_in_store_and_negative_cheats_filter___removes_filtered_zip_data_and_installs_nothing(self):
-        actual_store = self.download_cheat_files_without_zip(store_with_filtered_nes_zip_data(), '!cheats', file_system_factory=FileSystemFactory.from_state(files={cheats_folder_sms_file_path: {}}))
+        actual_store = self.download_cheat_files_without_zip(store_with_filtered_nes_zip_data(), '!cheats', file_system_factory=FileSystemFactory.from_state(
+            files={cheats_folder_sms_file_path: {}},
+            folders=[cheats_folder_name, cheats_folder_sms_folder_name]
+        ))
 
         self.assertEqual(empty_test_store(), actual_store)
         self.assertEqual(fs_data(), self.sut.fs_data)
@@ -199,7 +201,7 @@ def _append_tag_to_store(tag, store):
 
 
 def store_with_cheats_non_filtered():
-    store = store_test_descr(zips={
+    store = store_descr(zips={
         cheats_folder_id: cheats_folder_zip_desc()
     }, files={
         cheats_folder_sms_file_path: cheats_folder_sms_file_descr(url=False),
@@ -220,7 +222,7 @@ def store_with_cheats_non_filtered_and_filter_x():
 
 
 def store_with_filtered_cheats_zip_data():
-    store = store_test_descr(zips={
+    store = store_descr(zips={
         cheats_folder_id: cheats_folder_zip_desc()
     })
 
@@ -232,7 +234,7 @@ def store_with_filtered_cheats_zip_data():
 
 
 def store_with_filtered_nes_zip_data():
-    store = store_test_descr(zips={
+    store = store_descr(zips={
         cheats_folder_id: cheats_folder_zip_desc()
     }, files={
         cheats_folder_sms_file_path: cheats_folder_sms_file_descr(url=False)
@@ -253,8 +255,32 @@ def store_with_filtered_nes_zip_data():
     return store
 
 
+def store_with_filtered_nes_zip_data_keeping_nes_folder():
+    store = store_descr(zips={
+        cheats_folder_id: cheats_folder_zip_desc()
+    }, files={
+        cheats_folder_sms_file_path: cheats_folder_sms_file_descr(url=False)
+    }, folders={
+        cheats_folder_sms_folder_name: cheats_folder_sms_folder_descr(),
+        cheats_folder_nes_folder_name: cheats_folder_nes_folder_descr(),
+        cheats_folder_name: cheats_folder_descr(),
+    })
+
+    store['filtered_zip_data'] = {
+        cheats_folder_id: {
+            'files': {
+                cheats_folder_nes_file_path: cheats_folder_nes_file_descr(url=False)
+            },
+            'folders': {cheats_folder_nes_folder_name: cheats_folder_nes_folder_descr()}
+        }
+    }
+
+    return store
+
+
+
 def store_with_filtered_sms_zip_data():
-    store = store_test_descr(zips={
+    store = store_descr(zips={
         cheats_folder_id: cheats_folder_zip_desc()
     }, files={
         cheats_folder_nes_file_path: cheats_folder_nes_file_descr(url=False)
@@ -276,7 +302,7 @@ def store_with_filtered_sms_zip_data():
 
 
 def store_with_sms_file_only():
-    return store_test_descr(files={
+    return store_descr(files={
         cheats_folder_sms_file_path: cheats_folder_sms_file_descr(zip_id=False, tags=False)
     }, folders={
         cheats_folder_sms_folder_name: {},
@@ -285,11 +311,11 @@ def store_with_sms_file_only():
 
 
 def store_with_installed_files_and_zips_but_no_filtered_data():
-    store = store_test_descr(zips={
+    store = store_descr(zips={
         cheats_folder_id: cheats_folder_zip_desc()
     }, files=cheats_folder_files(url=False), folders=cheats_folder_folders())
     return store
 
 
 def store_with_installed_files_without_zips_and_no_filtered_data():
-    return store_test_descr(files=cheats_folder_files(zip_id=False, tags=False), folders=cheats_folder_folders(zip_id=False, tags=False))
+    return store_descr(files=cheats_folder_files(zip_id=False, tags=False), folders=cheats_folder_folders(zip_id=False, tags=False))

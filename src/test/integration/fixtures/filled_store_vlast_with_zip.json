@@ -38,5 +38,6 @@
       }
     }
   },
-  "migration_version": -1
+  "migration_version": -1,
+  "internal": true
 }

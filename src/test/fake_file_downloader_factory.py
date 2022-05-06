@@ -21,6 +21,8 @@ from typing import List
 from downloader.file_downloader import CurlDownloaderAbstract, FileDownloaderFactory as ProductionFileDownloaderFactory
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from downloader.target_path_repository import TargetPathRepository
+from test.fake_store_migrator import StoreMigrator
+from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs, NetworkState
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_logger import NoLogger
@@ -85,15 +87,17 @@ class _FileDownloaderWithRealFileSystem(CurlDownloaderAbstract):
 
 
 class FileDownloaderFactory(ProductionFileDownloaderFactory):
-    def __init__(self, file_system_factory=None, local_repository=None, config=None, network_state=None):
+    def __init__(self, file_system_factory=None, local_repository=None, config=None, network_state=None, external_drives_repository=None):
         self._file_system_factory = file_system_factory if file_system_factory is not None else FileSystemFactory.from_state(config=config)
         self._is_fake_file_system = isinstance(self._file_system_factory, FileSystemFactory)
         self._local_repository = local_repository
+        self._external_drives_repository = external_drives_repository
         self._network_state = NetworkState() if network_state is None else network_state
 
     def create(self, config, parallel_update, silent=False, hash_check=True):
         file_system = self._file_system_factory.create_for_config(config)
-        local_repository = self._local_repository if self._local_repository is not None else ProductionLocalRepository(config, NoLogger(), file_system)
+        external_drives_repository = self._external_drives_repository if self._external_drives_repository is not None else ExternalDrivesRepository(file_system=file_system)
+        local_repository = self._local_repository if self._local_repository is not None else ProductionLocalRepository(config, NoLogger(), file_system, StoreMigrator(), external_drives_repository)
         if self._is_fake_file_system:
             return _FileDownloaderWithFakeFileSystem(config, file_system, local_repository, self._network_state, self._file_system_factory._state)
         else:

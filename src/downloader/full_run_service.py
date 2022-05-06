@@ -18,19 +18,19 @@
 
 import datetime
 import time
-import json
 
-from downloader.constants import K_BASE_PATH, K_VERBOSE, K_DATABASES, K_UPDATE_LINUX, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, \
-    KENV_UPDATE_LINUX, KENV_FAIL_ON_FILE_ERROR, KENV_COMMIT
+from downloader.config import UpdateLinuxEnvironment
+from downloader.constants import K_DATABASES, K_UPDATE_LINUX, \
+    K_USER_DEFINED_OPTIONS, K_UPDATE_LINUX_ENVIRONMENT, K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME
 from downloader.importer_command import ImporterCommand
-from downloader.other import format_files_message, empty_store
+from downloader.other import format_files_message
 
 
 class FullRunService:
-    def __init__(self, env, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, store_migrator, base_path_relocator, certificates_fix):
+    def __init__(self, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository):
+        self._external_drives_repository = external_drives_repository
         self._certificates_fix = certificates_fix
         self._base_path_relocator = base_path_relocator
-        self._store_migrator = store_migrator
         self._reboot_calculator = reboot_calculator
         self._linux_updater = linux_updater
         self._online_importer = online_importer
@@ -38,34 +38,41 @@ class FullRunService:
         self._db_gateway = db_gateway
         self._local_repository = local_repository
         self._logger = logger
-        self._env = env
         self._config = config
 
+    def print_drives(self):
+        self._logger.bench('Print Drives start.')
+
+        self._local_repository.set_logfile_path('/tmp/print_drives.log')
+        self._logger.print('\nPrinting External Drives:')
+        for drive in self._external_drives_repository.connected_drives():
+            self._logger.print(drive)
+
+        self._logger.bench('Print Drives done.')
+
     def full_run(self):
-        start_time = time.time()
+        self._logger.bench('Full Run start.')
+        result = self._full_run_impl()
+        self._logger.bench('Full Run done.')
+        return result
 
-        if self._config[K_VERBOSE]:
-            self._logger.enable_verbose_mode()
+    def _full_run_impl(self):
+        if not self._certificates_fix.fix_certificates_if_needed():
+            return 1
 
-        self._debug_log_initial_state()
-        self._certificates_fix.fix_certificates_if_needed()
-
-        local_store = self._local_repository.load_store(self._store_migrator)
+        local_store = self._local_repository.load_store()
 
         databases, failed_dbs = self._db_gateway.fetch_all(self._config[K_DATABASES])
 
         importer_command = ImporterCommand(self._config, self._config[K_USER_DEFINED_OPTIONS])
         for db in databases:
-            if db.db_id not in local_store['dbs']:
-                local_store['dbs'][db.db_id] = empty_store(self._config[K_BASE_PATH])
-
-            store = local_store['dbs'][db.db_id]
+            store = local_store.store_by_id(db.db_id, self._config)
             description = self._config[K_DATABASES][db.db_id]
 
             importer_command.add_db(db, store, description)
 
-        update_only_linux = self._env[KENV_UPDATE_LINUX] == 'only'
-        update_linux = self._env[KENV_UPDATE_LINUX] != 'false' and self._config.get(K_UPDATE_LINUX, True)
+        update_only_linux = self._config[K_UPDATE_LINUX_ENVIRONMENT] == UpdateLinuxEnvironment.ONLY
+        update_linux = self._config[K_UPDATE_LINUX_ENVIRONMENT] != UpdateLinuxEnvironment.FALSE and self._config[K_UPDATE_LINUX]
 
         if not update_only_linux:
             for relocation_package in self._base_path_relocator.relocating_base_paths(importer_command):
@@ -84,7 +91,7 @@ class FullRunService:
                                   self._online_importer.files_that_failed() + failed_dbs,
                                   self._online_importer.unused_filter_tags(),
                                   self._online_importer.new_files_not_overwritten(),
-                                  start_time)
+                                  self._config[K_START_TIME])
 
         self._logger.print()
 
@@ -96,7 +103,7 @@ class FullRunService:
         elif update_only_linux:
             self._logger.print('update_linux is set to false, skipping...\n')
 
-        if self._env[KENV_FAIL_ON_FILE_ERROR] == 'true' and len(self._online_importer.files_that_failed()) > 0:
+        if self._config[K_FAIL_ON_FILE_ERROR] and len(self._online_importer.files_that_failed()) > 0:
             self._logger.debug('Length of files_that_failed: %d' % len(self._online_importer.files_that_failed()))
             self._logger.debug('Length of failed_dbs: %d' % len(failed_dbs))
             return 1
@@ -107,18 +114,12 @@ class FullRunService:
 
         return 0
 
-    def _debug_log_initial_state(self):
-        self._logger.debug('env: ' + json.dumps(self._env, indent=4))
-        config = self._config.copy()
-        config[K_CONFIG_PATH] = str(config[K_CONFIG_PATH])
-        self._logger.debug('config: ' + json.dumps(config, default=lambda o: o.__dict__, indent=4))
-
     def _display_summary(self, installed_files, failed_files, unused_filter_tags, new_files_not_installed, start_time):
         run_time = str(datetime.timedelta(seconds=time.time() - start_time))[0:-4]
 
         self._logger.print()
         self._logger.print('===========================')
-        self._logger.print('Downloader 1.4 (%s) by theypsilon. Run time: %ss' % (self._env[KENV_COMMIT], run_time))
+        self._logger.print('Downloader 1.5 (%s) by theypsilon. Run time: %ss' % (self._config[K_COMMIT], run_time))
         self._logger.print('Log: %s' % self._local_repository.logfile_path)
         if len(unused_filter_tags) > 0:
             self._logger.print()

@@ -18,11 +18,11 @@
 
 from pathlib import Path
 
-from downloader.config import default_config
+from downloader.config import default_config, UpdateLinuxEnvironment
 from downloader.constants import K_DATABASES, K_DB_URL, K_SECTION, K_VERBOSE, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, \
-    KENV_COMMIT, \
-    KENV_UPDATE_LINUX, KENV_FAIL_ON_FILE_ERROR, K_BASE_PATH
+    K_COMMIT, K_UPDATE_LINUX_ENVIRONMENT, K_FAIL_ON_FILE_ERROR, K_UPDATE_LINUX
 from downloader.full_run_service import FullRunService as ProductionFullRunService
+from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_base_path_relocator import BasePathRelocator
@@ -34,27 +34,27 @@ from test.fake_logger import NoLogger
 from test.fake_online_importer import OnlineImporter
 from test.fake_offline_importer import OfflineImporter
 from test.fake_reboot_calculator import RebootCalculator
-from test.fake_store_migrator import StoreMigrator
 from test.objects import db_empty
 from test.fake_certificates_fix import CertificatesFix
 
 
 class FullRunService(ProductionFullRunService):
-    def __init__(self, env, config, db_gateway, file_system_factory=None):
+    def __init__(self, config, db_gateway, file_system_factory=None, linux_updater=None):
         file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
         system_file_system = file_system_factory.create_for_system_scope()
         file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory)
-        super().__init__(env, config,
+        linux_updater = linux_updater or LinuxUpdater(system_file_system)
+        super().__init__(config,
                          NoLogger(),
                          LocalRepository(config=config, file_system=system_file_system),
                          db_gateway,
                          OfflineImporter(file_downloader_factory=file_downloader_factory),
                          OnlineImporter(file_system_factory=file_system_factory),
-                         LinuxUpdater(system_file_system),
+                         linux_updater,
                          RebootCalculator(file_system=system_file_system),
-                         StoreMigrator(),
                          BasePathRelocator(),
-                         CertificatesFix())
+                         CertificatesFix(),
+                         ExternalDrivesRepository(file_system=system_file_system))
 
     @staticmethod
     def with_single_empty_db() -> ProductionFullRunService:
@@ -70,21 +70,22 @@ class FullRunService(ProductionFullRunService):
             },
             K_VERBOSE: False,
             K_CONFIG_PATH: Path(''),
-            K_USER_DEFINED_OPTIONS: []
+            K_USER_DEFINED_OPTIONS: [],
+            K_COMMIT: 'test', K_UPDATE_LINUX_ENVIRONMENT: UpdateLinuxEnvironment.TRUE, K_FAIL_ON_FILE_ERROR: True
         })
 
         file_system_state = FileSystemState(files={db_empty: {'unzipped_json': {}}})
         file_system_factory = FileSystemFactory(state=file_system_state)
 
         return FullRunService(
-            {KENV_COMMIT: 'test', KENV_UPDATE_LINUX: 'false', KENV_FAIL_ON_FILE_ERROR: 'true'},
             config,
             DbGateway(config, file_system_factory=file_system_factory),
             file_system_factory=file_system_factory
         )
 
     @staticmethod
-    def with_single_db(db_id, db_descr) -> ProductionFullRunService:
+    def with_single_db(db_id, db_descr, linux_updater=None, linux_update_environment=None, update_linux=None) -> ProductionFullRunService:
+        update_linux = update_linux if update_linux is not None else True
         config = default_config()
         config.update({
                 K_DATABASES: {
@@ -97,20 +98,26 @@ class FullRunService(ProductionFullRunService):
                 },
                 K_VERBOSE: False,
                 K_USER_DEFINED_OPTIONS: [],
-                K_CONFIG_PATH: Path('')
+                K_CONFIG_PATH: Path(''),
+                K_COMMIT: 'test',
+                K_UPDATE_LINUX: update_linux,
+                K_UPDATE_LINUX_ENVIRONMENT: linux_update_environment or UpdateLinuxEnvironment.TRUE,
+                K_FAIL_ON_FILE_ERROR: True
             })
         return FullRunService(
-            {KENV_COMMIT: 'test', KENV_UPDATE_LINUX: 'false', KENV_FAIL_ON_FILE_ERROR: 'true'},
             config,
             DbGateway.with_single_db(db_id, db_descr, config=config),
+            linux_updater=linux_updater
         )
 
     @staticmethod
     def with_no_dbs() -> ProductionFullRunService:
         config = default_config()
-        config.update({K_DATABASES: {}, K_VERBOSE: False, K_CONFIG_PATH: Path(''), K_USER_DEFINED_OPTIONS: []})
+        config.update({
+            K_DATABASES: {}, K_VERBOSE: False, K_CONFIG_PATH: Path(''), K_USER_DEFINED_OPTIONS: [],
+            K_COMMIT: 'test', K_UPDATE_LINUX_ENVIRONMENT: UpdateLinuxEnvironment.TRUE, K_FAIL_ON_FILE_ERROR: True
+        })
         return FullRunService(
-            {KENV_COMMIT: 'test', KENV_UPDATE_LINUX: 'false', KENV_FAIL_ON_FILE_ERROR: 'true'},
             config,
             DbGateway(config),
         )

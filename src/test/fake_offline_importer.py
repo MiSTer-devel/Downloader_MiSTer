@@ -18,6 +18,7 @@
 
 from downloader.config import default_config
 from downloader.importer_command import ImporterCommand
+from test.fake_local_store_wrapper import StoreWrapper
 from downloader.offline_importer import OfflineImporter as ProductionOfflineImporter
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
@@ -51,5 +52,5 @@ class OfflineImporter(ProductionOfflineImporter):
         return self
 
     def add_db(self, db, store, description=None):
-        self._importer_command.add_db(db, store, {} if description is None else description)
+        self._importer_command.add_db(db, StoreWrapper(store), {} if description is None else description)
         return self

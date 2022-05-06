@@ -15,13 +15,14 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import DISTRIBUTION_MISTER_DB_ID, K_DATABASES, K_OPTIONS
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, K_DATABASES, K_OPTIONS, PathType
 from downloader.store_migrator import MigrationBase
 
 
 class MigrationV5(MigrationBase):
-    def __init__(self, file_system_factory, config):
+    def __init__(self, file_system_factory, path_resolver_factory, config):
         self._file_system_factory = file_system_factory
+        self._path_resolver_factory = path_resolver_factory
         self._config = config
 
     version = 5
@@ -40,13 +41,16 @@ class MigrationV5(MigrationBase):
 
         file_system = self._file_system_factory.create_for_config(config)
 
-        migrate_file_mister_old(file_system)
+        storage_priority_top_folders = {}
+
+        migrate_file_mister_old(file_system, self._path_resolver_factory.create(config, storage_priority_top_folders))
 
 
-def migrate_file_mister_old(file_system):
+def migrate_file_mister_old(file_system, path_resolver):
     file_MiSTer_old = 'Scripts/.config/downloader/MiSTer.old'
 
-    file_system.add_system_path(file_MiSTer_old)
+    path_resolver.add_system_path(file_MiSTer_old)
+    path_resolver.resolve_file_path(file_MiSTer_old)
 
     if file_system.is_file(file_MiSTer_old):
         file_system.unlink(file_MiSTer_old)

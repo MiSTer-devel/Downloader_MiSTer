@@ -42,8 +42,7 @@ class TestOfflineImporterWithZips(unittest.TestCase):
                 file_test_json_zip: {
                     'hash': file_test_json_zip,
                     'unzipped_json': db_test_descr(zips={
-                        cheats_folder_id: cheats_folder_zip_desc(summary=summary_json_from_cheats_folder(),
-                                                                 is_summary_internal=is_summary_internal)
+                        cheats_folder_id: cheats_folder_zip_desc(summary=summary_json_from_cheats_folder(), is_summary_internal=is_summary_internal)
                     }).testable
                 },
                 cheats_folder_nes_file_path: {"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size},

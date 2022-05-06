@@ -20,13 +20,14 @@ import unittest
 
 from downloader.base_path_relocator import RelocatorError
 from downloader.constants import MEDIA_FAT, MEDIA_USB0
+from test.fake_local_store_wrapper import StoreWrapper
 from downloader.other import empty_store
 from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_importer_command import ImporterCommand
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_file_system_factory import FileSystemFactory
 from test.objects import db_test_with_file_a, store_test_with_file_a_descr, store_test_with_file, file_a, \
-    empty_config, config_test, file_a_descr
+    empty_config, config_test
 
 
 def media_fat_store():
@@ -98,5 +99,5 @@ class TestBasePathRelocator(unittest.TestCase):
 
 def command(input_store, base_path):
     importer_command = ImporterCommand(config_test(base_path=base_path))
-    importer_command.add_db(db=db_test_with_file_a(), store=input_store, ini_description={})
+    importer_command.add_db(db=db_test_with_file_a(), store=StoreWrapper(input_store), ini_description={})
     return importer_command

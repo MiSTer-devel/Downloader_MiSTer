@@ -16,12 +16,15 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
+from test.fake_store_migrator import StoreMigrator
+from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.objects import config_with
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_logger import NoLogger
 
 
 class LocalRepository(ProductionLocalRepository):
-    def __init__(self, config=None, file_system=None):
+    def __init__(self, config=None, file_system=None, store_migrator=None, external_drive_repository=None):
         file_system = FileSystemFactory().create_for_system_scope() if file_system is None else file_system
-        super().__init__(config_with(config_path='') if config is None else config, NoLogger(), file_system)
+        external_drive_repository = ExternalDrivesRepository(file_system=file_system) if external_drive_repository is None else external_drive_repository
+        super().__init__(config_with(config_path='') if config is None else config, NoLogger(), file_system, store_migrator or StoreMigrator(), external_drive_repository)

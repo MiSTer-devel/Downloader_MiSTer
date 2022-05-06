@@ -18,14 +18,15 @@
 
 import unittest
 
-from downloader.constants import K_BASE_PATH, K_DOWNLOADER_RETRIES, K_PARALLEL_UPDATE, K_OPTIONS
+from downloader.config import default_config
+from downloader.constants import K_BASE_PATH, K_DOWNLOADER_RETRIES, K_PARALLEL_UPDATE, K_OPTIONS, K_STORAGE_PRIORITY
 from downloader.db_options import DbOptionsKind, DbOptions
 from test.fake_importer_command import ImporterCommand
-from test.objects import db_entity, empty_config
+from test.objects import db_entity, config_with
 
 nil = {}
-config = {'x': 'y'}
-config_with_options = {"downloader_retries": 42}
+config = config_with(storage_priority='prefer_external')
+config_with_options = config_with(downloader_retries=42)
 db = db_entity()
 db_with_options = db_entity(default_options={K_DOWNLOADER_RETRIES: 1})
 ini_options = DbOptions({K_DOWNLOADER_RETRIES: 8}, kind=DbOptionsKind.INI_SECTION)
@@ -51,8 +52,8 @@ class TestImporterCommand(unittest.TestCase):
             .add_db(db, nil, {K_OPTIONS: DbOptions({K_PARALLEL_UPDATE: False}, kind=DbOptionsKind.INI_SECTION)})\
             .read_dbs()
 
-        self.assert_config({K_BASE_PATH: 'abc', 'x': 'y'}, actual[0])
-        self.assert_config({K_PARALLEL_UPDATE: False, 'x': 'y'}, actual[1])
+        self.assert_config({K_BASE_PATH: 'abc', K_STORAGE_PRIORITY: 'prefer_external'}, actual[0])
+        self.assert_config({K_PARALLEL_UPDATE: False, K_STORAGE_PRIORITY: 'prefer_external'}, actual[1])
 
     def test_read_dbs___with_config_options___returns_config_with_options(self):
         actual = ImporterCommand(config_with_options)\
@@ -69,7 +70,7 @@ class TestImporterCommand(unittest.TestCase):
         self.assert_config(ini_options.testable, actual[0])
 
     def test_read_dbs___with_db_options___returns_db_options(self):
-        actual = ImporterCommand(empty_config())\
+        actual = ImporterCommand(default_config())\
             .add_db(db_with_options, nil, nil)\
             .read_dbs()[0]
 
@@ -89,8 +90,27 @@ class TestImporterCommand(unittest.TestCase):
 
         self.assert_config(ini_options.testable, actual)
 
+    def test_read_dbs___after_adding_default_db_first___returns_default_db_first(self):
+        actual = ImporterCommand(config_with(default_db_id='default_db_id')) \
+            .add_db(db_entity(db_id='default_db_id'), nil, nil) \
+            .add_db(db_entity(db_id='x'), nil, nil) \
+            .read_dbs()[0][0].db_id
+
+        self.assertEqual('default_db_id', actual)
+
+    def test_read_dbs___after_adding_default_db_last___returns_default_db_first(self):
+        actual = ImporterCommand(config_with(default_db_id='default_db_id'))\
+            .add_db(db_entity(db_id='x'), nil, nil) \
+            .add_db(db_entity(db_id='default_db_id'), nil, nil) \
+            .read_dbs()[0][0].db_id
+
+        self.assertEqual('default_db_id', actual)
+
     def assert_command(self, expected_db, expected_store, expected_config, actual):
         self.assertEqual((expected_db, expected_store, expected_config), actual)
 
     def assert_config(self, expected_config, actual):
-        self.assertEqual(expected_config, actual[2], "config")
+        config = default_config()
+        for key in expected_config:
+            config[key] = expected_config[key]
+        self.assertEqual(config, actual[2], "config")

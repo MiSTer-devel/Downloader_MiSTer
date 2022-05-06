@@ -17,6 +17,8 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 # Default SSL option
+from enum import unique, Enum, auto
+
 DEFAULT_CACERT_FILE = '/etc/ssl/certs/cacert.pem'
 DEFAULT_CURL_SSL_OPTIONS = '--cacert %s' % DEFAULT_CACERT_FILE
 
@@ -48,6 +50,7 @@ FOLDER_screenshots = 'screenshots'
 
 # Downloader files
 FILE_downloader_storage = 'Scripts/.config/downloader/downloader.json.zip'
+FILE_downloader_external_storage = '.downloader_db.json'
 FILE_downloader_last_successful_run = 'Scripts/.config/downloader/%s.last_successful_run'
 FILE_downloader_log = 'Scripts/.config/downloader/%s.log'
 FILE_downloader_ini = '/media/fat/downloader.ini'
@@ -72,8 +75,8 @@ MEDIA_USB5 = '/media/usb5'
 MEDIA_FAT_CIFS = '/media/fat/cifs'
 MEDIA_FAT = '/media/fat'
 
-# Games Directory Priority
-GAMESDIR_PRIORITY = [
+# Storage Priority Resolution Sequence
+STORAGE_PATHS_PRIORITY_SEQUENCE = [
     MEDIA_USB0,
     MEDIA_USB1,
     MEDIA_USB2,
@@ -81,6 +84,7 @@ GAMESDIR_PRIORITY = [
     MEDIA_USB4,
     MEDIA_USB5,
     MEDIA_FAT_CIFS,
+    MEDIA_FAT
 ]
 
 
@@ -89,7 +93,7 @@ GAMESDIR_PRIORITY = [
 # Config
 K_BASE_PATH = 'base_path'
 K_BASE_SYSTEM_PATH = 'base_system_path'
-K_GAMESDIR_PATH = 'gamesdir_path'
+K_STORAGE_PRIORITY = 'storage_priority'
 K_DATABASES = 'databases'
 K_ALLOW_DELETE = 'allow_delete'
 K_ALLOW_REBOOT = 'allow_reboot'
@@ -110,6 +114,11 @@ K_DB_URL = 'db_url'
 K_SECTION = 'section'
 K_OPTIONS = 'options'
 K_DEBUG = 'debug'
+K_FAIL_ON_FILE_ERROR = 'fail_on_file_error'
+K_COMMIT = 'commit'
+K_UPDATE_LINUX_ENVIRONMENT = 'update_linux_environment'
+K_DEFAULT_DB_ID = 'default_db_id'
+K_START_TIME = 'start_time'
 
 # Env
 KENV_DOWNLOADER_LAUNCHER_PATH = 'DOWNLOADER_LAUNCHER_PATH'
@@ -123,3 +132,9 @@ KENV_DEFAULT_DB_ID = 'DEFAULT_DB_ID'
 KENV_DEFAULT_BASE_PATH = 'DEFAULT_BASE_PATH'
 KENV_DEBUG = 'DEBUG'
 KENV_FAIL_ON_FILE_ERROR = 'FAIL_ON_FILE_ERROR'
+
+
+@unique
+class PathType(Enum):
+    FILE = auto()
+    FOLDER = auto()

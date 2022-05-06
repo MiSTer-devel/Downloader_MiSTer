@@ -20,6 +20,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, K_DATABASES, K_OPTIO
 from downloader.db_options import DbOptionsKind
 from downloader.migrations import migrations
 from downloader.store_migrator import StoreMigrator as ProductionStoreMigrator
+from test.fake_path_resolver import PathResolverFactory
 from test.objects import db_options
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_logger import NoLogger
@@ -34,8 +35,9 @@ def default_config_with_distribution_mister():
 
 
 class StoreMigrator(ProductionStoreMigrator):
-    def __init__(self, maybe_migrations=None, config=None, file_system_factory=None):
+    def __init__(self, maybe_migrations=None, config=None, file_system_factory=None, path_resolver_factory=None):
         self.config = default_config_with_distribution_mister() if config is None else config
         file_system_factory = file_system_factory if file_system_factory is not None else FileSystemFactory.from_state(config=self.config)
         self.system_file_system = file_system_factory.create_for_system_scope()
-        super().__init__(migrations(self.config, file_system_factory) if maybe_migrations is None else maybe_migrations, NoLogger())
+        path_resolver_factory = path_resolver_factory if path_resolver_factory is not None else PathResolverFactory(file_system_factory=file_system_factory)
+        super().__init__(migrations(self.config, file_system_factory, path_resolver_factory) if maybe_migrations is None else maybe_migrations, NoLogger())

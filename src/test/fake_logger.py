@@ -27,26 +27,35 @@ class NoLogger(Logger):
     def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
         pass
 
-    def set_local_repository(self, local_repository):
+    def bench(self, _label):
         pass
 
-    def enable_verbose_mode(self):
+    def configure(self, _config):
+        pass
+
+    def finalize(self):
         pass
 
 
-class SpyLogger(Logger):
-    def __init__(self):
+class SpyLoggerDecorator(Logger):
+    def __init__(self, decorated_logger):
+        self._decorated_logger = decorated_logger
         self.printCalls = []
         self.debugCalls = []
 
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
+        self._decorated_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
         self.printCalls.append(args)
 
     def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
+        self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
         self.debugCalls.append(args)
 
-    def set_local_repository(self, local_repository):
-        pass
+    def bench(self, label):
+        self._decorated_logger.bench(label)
 
-    def enable_verbose_mode(self):
-        pass
+    def configure(self, config):
+        self._decorated_logger.configure(config)
+
+    def finalize(self):
+        self._decorated_logger.finalize()

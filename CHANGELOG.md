@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Version 1.5 - 2022-05-06
+
+### Added
+- Support for **Storage Priority Resolution**: External Storage will be used for installing new files under certain conditions. More info [in the options section](README.md#options).
+- `base_path` as a database-scoped option.
+- Routine for fixing certificates when they are not working correctly.
+- Support for PDFViewer, glow and lesskey (for reading docs files).
+- Documentation for `tag` property on the Custom Databases documentation page (useful for filtering).
+- Verbose option in `downloader.ini` for printing debug output while running Downloader.
+- Critical parts of the script are benchmarked, and the resulting output is printed when the verbose option is activated.
+- New entrypoint for displaying connected external drives by calling the launcher with the argument `--print-drives`.
+
+### Changed
+- Internal DB save is not attempted when no changes have been detected. This change saves time and spares writes on the SD.
+- Many optimizations have been performed, taking advantage of the information provided by the new benchmarks.
+- Improved readability of custom database documentation (tonurics).
+- Fields `base_files_url`, `db_files`, `zips`, `default_options` are now not mandatory on Custom Databases.
+- Download Filter terms can now start with numbers.
+- Fixed INI path resolution when Downloader was called from unusual locations.
+- Improved internal implementation for zip summaries.
+- Other general improvements: refactors, fixes, test coverage, code cleanup...
+
+### Removed
+- Removed `url_safe_characters` option as it's no longer useful. Now database URLs need to be strictly correct.
+
 ## Version 1.4 - 2022-01-21
 
 ### Added

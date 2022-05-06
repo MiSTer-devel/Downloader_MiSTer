@@ -20,9 +20,27 @@ Here you can see the default parameters and the options that you may change:
 
 ```ini
 [MiSTer]
-; base_path is where most files will be installed
-;   Useful for setups with USB storage, for example: '/media/usb0/'
+; base_path is where most commonly installed files will be placed (cores, MRAs, Scripts, etc).
 base_path = '/media/fat/'
+
+; storage_priority defines how this tool will use external storage during the installation
+;         of files that are designed for external locations (usually games & docs files).
+;         
+;         * Examples of external storage are USB Drives or CIFS partitions detected by MiSTer.
+;
+;         * When you have more than one external storage, the one used will be determined
+;           by the first path match following the path priority described here:
+;             https://mister-devel.github.io/MkDocs_MiSTer/cores/paths/
+;
+; Options:
+;   'prefer_sd' -> This tool will install new files on a external location if a parent folder
+;                  is present. (Parent folder examples: games/NES, docs/AO486)
+;
+;   'prefer_external' -> This tool will always install new files on a external location
+;                        even if no parent folders are present.
+;
+;   'off' -> Disables this feature. Affected files will always be installed in your base_path.
+storage_priority = 'prefer_sd'
 
 ; base_system_path is where system files such as 'MiSTer' and 'menu.rbf' will be installed.
 ;   Warning: It is recommended to NOT change this setting regardless of your setup.
@@ -57,6 +75,10 @@ downloader_timeout = 300
 ; downloader_retries: Can be tweaked to increase the retries per failed download
 ;   It is useful to increase this value for users with very unstable connections.
 downloader_retries = 3
+
+; verbose: when true, will make Downloader output to display additional debug information
+;   This is also necessary to be active to display benchmark information.
+verbose = false
 ```
 
 ### Roadmap
@@ -65,7 +87,7 @@ downloader_retries = 3
 - [x] [Cheats](https://gamehacking.org/mister/) fetching
 - [x] First-run optimisations
 - [x] Configurable custom download filters
-- [ ] Games folders resolution auto-detecting connected drives
+- [x] Storage Priority Resolution for auto-detecting connected drives
 - [ ] Integration with *MiSTer* binary
 
 Check the [CHANGELOG](CHANGELOG.md) for more information about past releases.
@@ -89,7 +111,7 @@ More information about *Download Filters* [here](docs/download-filters.md).
 
 ### Supporters+ shout-out!
 
-Antonio Villena, Hard Rich, Matt Hargett, and MiSTerFPGA.co.uk
+Antonio Villena, atrac17, Hard Rich, and MiSTerFPGA.co.uk
 
 Thank you so much for supporting this project! If you would like to show up here, join us as **Supporter+** on Patreon:
 

@@ -15,28 +15,40 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.config import default_config
+from downloader.constants import MEDIA_USB0
 from downloader.file_filter import FileFilterFactory
 from downloader.importer_command import ImporterCommand
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
+from test.fake_local_store_wrapper import StoreWrapper
+from test.fake_external_drives_repository import ExternalDrivesRepository
+from test.fake_local_repository import LocalRepository
+from test.fake_path_resolver import PathResolverFactory
+from test.objects import config_with
 from test.fake_waiter import NoWaiter
-from test.fake_importer_implicit_inputs import ImporterImplicitInputs
+from test.fake_importer_implicit_inputs import ImporterImplicitInputs, FileSystemState
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_logger import NoLogger
 
 
 class OnlineImporter(ProductionOnlineImporter):
-    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, waiter=None, logger=None):
-        self._config = config if config is not None else default_config()
-        self._file_system_factory = FileSystemFactory.from_state(config=self._config) if file_system_factory is None else file_system_factory
+    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, path_resolver_factory=None, local_repository=None, waiter=None, logger=None):
+        self._config = config if config is not None else config_with(base_system_path=MEDIA_USB0)
+        file_system_state = FileSystemState(config=self._config)
+        self._file_system_factory = FileSystemFactory(state=file_system_state) if file_system_factory is None else file_system_factory
         file_downloader_factory = FileDownloaderFactory(config=config, file_system_factory=self._file_system_factory) if file_downloader_factory is None else file_downloader_factory
         self.file_system = self._file_system_factory.create_for_system_scope()
+        path_resolver_factory = PathResolverFactory(path_dictionary=file_system_state.path_dictionary) if path_resolver_factory is None else path_resolver_factory
+
+        self.needs_save = False
 
         super().__init__(
             FileFilterFactory(),
             self._file_system_factory,
             file_downloader_factory,
+            path_resolver_factory,
+            LocalRepository(config=self._config, file_system=self.file_system) if local_repository is None else local_repository,
+            ExternalDrivesRepository(file_system=self.file_system),
             NoWaiter() if waiter is None else waiter,
             NoLogger() if logger is None else logger)
 
@@ -46,21 +58,27 @@ class OnlineImporter(ProductionOnlineImporter):
     def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs):
         file_downloader_factory, file_system_factory, config = FileDownloaderFactory.from_implicit_inputs(implicit_inputs)
 
-        return OnlineImporter(config=config, file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory)
+        path_resolver_factory = PathResolverFactory.from_file_system_state(implicit_inputs.file_system_state)
+
+        return OnlineImporter(config=config, file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory, path_resolver_factory=path_resolver_factory)
 
     @property
     def fs_data(self):
         return self._file_system_factory.data
 
+    @property
+    def fs_records(self):
+        return self._file_system_factory.records
+
     def download(self, full_resync):
         self.download_dbs_contents(self._importer_command, full_resync)
         for _, store, _ in self._importer_command.read_dbs():
-            self._clean_store(store)
+            self._clean_store(store.unwrap_store())
 
         return self
 
     def add_db(self, db, store, description=None):
-        self._importer_command.add_db(db, store, {} if description is None else description)
+        self._importer_command.add_db(db, StoreWrapper(store, crate=self), {} if description is None else description)
         return self
 
     def download_db(self, db, store, full_resync=False):

@@ -20,6 +20,8 @@ import unittest
 import json
 
 from downloader.constants import K_BASE_PATH, DISTRIBUTION_MISTER_DB_ID
+from test.fake_importer_implicit_inputs import FileSystemState
+from test.fake_path_resolver import PathResolverFactory
 from test.fake_file_system_factory import fs_data, FileSystemFactory
 from test.objects import file_descr
 from test.fake_store_migrator import StoreMigrator
@@ -35,6 +37,9 @@ class TestRealisticMigrations(unittest.TestCase):
 
     filled_store_v1_with_zip = 'test/integration/fixtures/filled_store_v1_with_zip.json'
     filled_store_vlast_with_zip = 'test/integration/fixtures/filled_store_vlast_with_zip.json'
+
+    empty_store_external_v9 = 'test/integration/fixtures/empty_store_external_v9.json'
+    empty_store_external_vlast = 'test/integration/fixtures/empty_store_external_vlast.json'
 
     def test_migrate___on_v0_filled_store___returns_expected_store(self):
         self.assert_versions_change_as_expected(self.filled_store_v0, self.filled_store_vlast)
@@ -55,6 +60,9 @@ class TestRealisticMigrations(unittest.TestCase):
         StoreMigrator().migrate(store)
         self.assertEqual(v7_base_path, store['dbs'][DISTRIBUTION_MISTER_DB_ID][K_BASE_PATH])
 
+    def test_migrate___on_v9_empty_store_external___returns_expected_store(self):
+        self.assert_versions_change_as_expected(self.empty_store_external_v9, self.empty_store_external_vlast)
+
     def test_migrate___on_v1_with_zip_filled_store___returns_expected_store(self):
         self.assert_versions_change_as_expected(self.filled_store_v1_with_zip, self.filled_store_vlast_with_zip)
 
@@ -63,9 +71,13 @@ class TestRealisticMigrations(unittest.TestCase):
 
     def test_migrate___on_empty_store_with_file_mister_old___file_mister_old_gets_removed(self):
         file = 'Scripts/.config/downloader/MiSTer.old'
-        sut = StoreMigrator(file_system_factory=FileSystemFactory.from_state(files={file: file_descr()}))
+        file_system_state = FileSystemState(files={file: file_descr()})
+        sut = StoreMigrator(
+            file_system_factory=FileSystemFactory(file_system_state),
+            path_resolver_factory=PathResolverFactory.from_file_system_state(file_system_state)
+        )
         sut.migrate({})
-        self.assertEqual(fs_data(system_paths=[file]), sut.system_file_system.data)
+        self.assertEqual(fs_data(), sut.system_file_system.data)
 
     def assert_versions_change_as_expected(self, initial_file, expected_file):
         store = load_file(initial_file)

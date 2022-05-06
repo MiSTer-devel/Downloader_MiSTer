@@ -182,6 +182,16 @@ Once a database has been published it's very important that it's ID is **NEVER**
 
 2. Only fields documented here should be used.
 
+### External Paths
+
+Files and folders paths can be defined as *potentially external* paths. That way, thanks to the **Storage Priority Resolution** feature, files can be installed on external storage, thus saving space on the main SD card.
+
+For a path to be considered as potentially external, it must be prepended with the symbol `|`.
+
+Example paths: `|games/PSX/tomb_raider.chd`, `|docs/AO486/Manual.pdf`
+
+In practice, downloader will install both files at `games/PSX/tomb_raider.chd` and `docs/AO486/Manual.pdf`, but these relative paths can be located on external storages if the circumstances specified on the `storage_priority` [documentation](../README.md#options) occur.
+
 ### Default Options
 
 Options for a repository can be defined in `/media/fat/downloader.ini` following the `db_url` entry. Here is an example that sets "_parallel_update_" option for the *custom_db_id* repository:

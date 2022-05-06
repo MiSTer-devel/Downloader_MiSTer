@@ -15,7 +15,7 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import K_OPTIONS
+from downloader.constants import K_OPTIONS, K_DEFAULT_DB_ID
 
 
 class ImporterCommand:
@@ -34,7 +34,13 @@ class ImporterCommand:
         if K_OPTIONS in ini_description:
             ini_description[K_OPTIONS].apply_to_config(config)
 
-        self._parameters.append((db, store, config))
+        entry = (db, store, config)
+
+        if db.db_id == self._config[K_DEFAULT_DB_ID]:
+            self._parameters = [entry, *self._parameters]
+        else:
+            self._parameters.append(entry)
+
         return self
 
     def read_dbs(self):

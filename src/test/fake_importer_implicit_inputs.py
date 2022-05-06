@@ -15,9 +15,9 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import K_BASE_PATH, FILE_MiSTer
+from downloader.constants import K_BASE_PATH, FILE_MiSTer, MEDIA_USB0
 from test.objects import config_with, file_a, file_a_descr, hash_MiSTer_old, file_mister_descr, file_test_json_zip, \
-    file_test_json_zip_descr
+    file_test_json_zip_descr, remove_priority_path
 
 
 class NetworkState:
@@ -28,18 +28,23 @@ class NetworkState:
 
 
 class FileSystemState:
-    def __init__(self, files=None, folders=None, system_paths=None, base_path=None, config=None):
-        self.config = config if config is not None else config_with(base_path=base_path)
+    def __init__(self, files=None, folders=None, base_path=None, config=None, path_dictionary=None, base_system_path=None):
+        self.path_dictionary = path_dictionary if path_dictionary is not None else {}
+        self.config = config if config is not None else config_with(base_path=base_path, base_system_path=MEDIA_USB0 if base_system_path is None else base_system_path)
         base_path = _fix_base_path(self.config[K_BASE_PATH])
         self.files = _fs_paths(files, base_path) if files is not None else {}
         self.folders = _fs_folders(folders, base_path) if folders is not None else {}
-        self.system_paths = _fs_system_paths(system_paths) if system_paths is not None else {}
 
     def add_file(self, base_path, file, description):
         if base_path is None:
             base_path = self.config[K_BASE_PATH]
 
-        self.files[base_path.lower() + '/' + file.lower()] = self.fix_description(file, description)
+        if base_path is not self.config[K_BASE_PATH]:
+            self.path_dictionary[file] = base_path
+
+        path = file.lower() if file[0] == '/' else base_path.lower() + '/' + file.lower()
+
+        self.files[path] = self.fix_description(file, description)
         return self
 
     def add_full_file_path(self, path, fixed_description):
@@ -66,7 +71,9 @@ class FileSystemState:
         if base_path is None:
             base_path = self.config[K_BASE_PATH]
 
-        self.folders[base_path.lower() + '/' + folder.lower()] = {} if description is None else description
+        path = folder.lower() if folder[0] == '/' else base_path.lower() + '/' + folder.lower()
+
+        self.folders[path] = {} if description is None else description
         return self
 
     def add_folders(self, folders):
@@ -94,12 +101,13 @@ class FileSystemState:
 
         return fixed_description
 
+
 def _fs_paths(paths, base_path):
-    return {k.lower() if k[0] == '/' else base_path + k.lower(): _clean_description(v) for k, v in paths.items()}
+    return {k.lower() if k[0] == '/' else base_path + remove_priority_path(k.lower()): _clean_description(v) for k, v in paths.items()}
 
 
 def _fs_folders(paths, base_path):
-    return {(base_path + p.lower()): {} for p in paths}
+    return {p.lower() if p[0] == '/' else base_path + remove_priority_path(p.lower()): {} for p in paths}
 
 
 def _fix_base_path(base_path):
@@ -127,13 +135,13 @@ def _clean_description(description):
 
 
 class ImporterImplicitInputs:
-    def __init__(self, files=None, folders=None, system_paths=None, base_path=None, config=None, remote_failures=None, remote_files=None, storing_problems=None):
+    def __init__(self, files=None, folders=None, base_path=None, config=None, remote_failures=None, remote_files=None, storing_problems=None, path_dictionary=None):
         self.file_system_state = FileSystemState(
             files=files,
             folders=folders,
-            system_paths=system_paths,
             base_path=base_path,
-            config=config
+            config=config,
+            path_dictionary=path_dictionary
         )
 
         self.network_state = NetworkState(

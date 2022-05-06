@@ -24,7 +24,10 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     K_PARALLEL_UPDATE, K_UPDATE_LINUX, K_DOWNLOADER_SIZE_MB_LIMIT, K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, \
     K_DOWNLOADER_RETRIES, K_FILTER, K_DATABASES, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, \
     KENV_ALLOW_REBOOT, KENV_DEBUG, \
-    MEDIA_FAT, K_BASE_SYSTEM_PATH, K_CONFIG_PATH, K_ZIP_FILE_COUNT_THRESHOLD
+    MEDIA_FAT, K_BASE_SYSTEM_PATH, K_CONFIG_PATH, K_ZIP_FILE_COUNT_THRESHOLD, K_STORAGE_PRIORITY, MEDIA_USB0, \
+    MEDIA_USB1, \
+    MEDIA_USB2, KENV_FAIL_ON_FILE_ERROR, KENV_UPDATE_LINUX, KENV_CURL_SSL, KENV_COMMIT, DEFAULT_CURL_SSL_OPTIONS, \
+    K_DEFAULT_DB_ID, K_OPTIONS, MEDIA_USB3
 from downloader.db_options import DbOptions, DbOptionsKind
 from downloader.other import empty_store
 from test.fake_db_entity import DbEntity
@@ -35,8 +38,15 @@ file_test_json_zip = 'test.json.zip'
 file_a = 'a/A'
 file_b = 'b/B'
 file_c = 'c/C'
+file_nes_smb1 = '|games/NES/smb.nes'
+file_nes_contra = '|games/NES/contra.nes'
+file_nes_palette_a = '|games/NES/Palette/a.pal'
+file_nes_manual = '|docs/NES/nes.md'
 file_boot_rom = 'boot.rom'
 file_menu_rbf = 'menu.rbf'
+file_s32x_md = '|docs/S32X/S32X.md'
+file_neogeo_md = '|docs/NeoGeo/NeoGeo.md'
+file_foo = 'foo.txt'
 hash_menu_rbf = 'menu.rbf'
 hash_MiSTer = FILE_MiSTer_new
 hash_PDFViewer = 'pdfviewer'
@@ -45,7 +55,17 @@ hash_real_test_file = '3de8f8b0dc94b8c2230fab9ec0ba0506'
 folder_a = 'a'
 folder_b = 'b'
 folder_c = 'c'
+folder_games = '|games'
+folder_games_nes = '|games/NES'
+folder_games_nes_palettes = '|games/NES/Palette'
+folder_docs = '|docs'
+folder_docs_nes = '|docs/NES'
+folder_docs_neogeo = '|docs/NeoGeo'
+folder_docs_s32x = '|docs/S32X'
 db_test = 'test'
+db_demo = 'demo'
+db_id_external_drives_1 = 'external_drives_1'
+db_id_external_drives_2 = 'external_drives_2'
 file_one = 'one'
 hash_one = 'one'
 file_big = 'big'
@@ -55,15 +75,43 @@ db_empty = 'empty'
 big_size = 100_000_000
 
 
+def media_fat(path):
+    return media_drive(MEDIA_FAT, path)
+
+
+def media_usb0(path):
+    return media_drive(MEDIA_USB0, path)
+
+
+def media_usb1(path):
+    return media_drive(MEDIA_USB1, path)
+
+
+def media_usb2(path):
+    return media_drive(MEDIA_USB2, path)
+
+
+def media_usb3(path):
+    return media_drive(MEDIA_USB3, path)
+
+
+def media_drive(drive, path):
+    if isinstance(path, list):
+        return map(lambda p: media_drive(drive, p), path)
+    return '%s/%s' % (drive, remove_priority_path(path))
+
+
 def empty_config():
     return {}
 
 
 def config_test(base_path=MEDIA_FAT):
-    return {K_DATABASES: {db_test: {}}, K_BASE_PATH: base_path}
+    config = config_with(base_path=base_path)
+    config[K_DATABASES] = {db_test: {}}
+    return config
 
 
-def config_with(filter_value=None, base_path=None, base_system_path=None, config_path=None, zip_file_count_threshold=None):
+def config_with(filter_value=None, base_path=None, base_system_path=None, storage_priority=None, config_path=None, zip_file_count_threshold=None, downloader_retries=None, default_db_id=None):
     config = default_config()
     if filter_value is not None:
         config[K_FILTER] = filter_value
@@ -71,10 +119,16 @@ def config_with(filter_value=None, base_path=None, base_system_path=None, config
         config[K_BASE_PATH] = base_path.lower()
     if base_system_path is not None:
         config[K_BASE_SYSTEM_PATH] = base_system_path.lower()
+    if storage_priority is not None:
+        config[K_STORAGE_PRIORITY] = storage_priority.lower()
     if config_path is not None:
         config[K_CONFIG_PATH] = Path(config_path)
     if zip_file_count_threshold is not None:
         config[K_ZIP_FILE_COUNT_THRESHOLD] = zip_file_count_threshold
+    if downloader_retries is not None:
+        config[K_DOWNLOADER_RETRIES] = downloader_retries
+    if default_db_id is not None:
+        config[K_DEFAULT_DB_ID] = default_db_id
     return config
 
 
@@ -135,6 +189,7 @@ def empty_zip_summary():
         "folders_count": 0,
     }
 
+
 def db_test_descr(zips=None, folders=None, files=None, db_files=None, tag_dictionary=None):
     return db_entity(
         db_id=db_test,
@@ -149,23 +204,57 @@ def db_test_descr(zips=None, folders=None, files=None, db_files=None, tag_dictio
     )
 
 
-def store_test_descr(zips=None, folders=None, files=None, db_files=None):
-    return db_to_store(db_entity(
-        db_id=db_test,
-        db_files=db_files if db_files is not None else [],
-        files=files if files is not None else {},
-        folders=folders if folders is not None else {},
-        base_files_url='https://',
-        zips=zips if zips is not None else {},
-        default_options={},
-        timestamp=0
-    ))
+def store_descr(zips=None, folders=None, files=None, folders_usb0=None, files_usb0=None, folders_usb1=None, files_usb1=None, folders_usb2=None, files_usb2=None, db_files=None, db_id=None, timestamp=None, base_path=None):
+    store = db_to_store(db_entity(
+        db_id=db_id,
+        db_files=db_files,
+        files=remove_all_priority_paths(files),
+        folders=remove_all_priority_paths(folders),
+        zips=zips,
+        timestamp=timestamp
+    ), base_path=base_path)
+    _add_external_drive_to_store(store, '/media/usb0', folders_usb0, files_usb0)
+    _add_external_drive_to_store(store, '/media/usb1', folders_usb1, files_usb1)
+    _add_external_drive_to_store(store, '/media/usb2', folders_usb2, files_usb2)
+    return store
 
 
-def db_to_store(db):
+def _add_external_drive_to_store(store, drive, folders=None, files=None):
+    if files is None and folders is None:
+        return
+
+    external = {}
+    if files is not None:
+        external['files'] = remove_all_priority_paths(files)
+
+    if folders is not None:
+        external['folders'] = remove_all_priority_paths(folders)
+
+    if 'external' not in store:
+        store['external'] = {}
+
+    store['external'][drive] = external
+
+
+def remove_all_priority_paths(container):
+    if isinstance(container, dict):
+        container = {remove_priority_path(k): v for k, v in container.items()}
+    elif isinstance(container, list):
+        container = [remove_priority_path(k) for k in container]
+    return container
+
+
+def remove_priority_path(path):
+    if path[0] == '|':
+        return path[1:]
+    else:
+        return path
+
+
+def db_to_store(db, base_path=None):
     raw_db = db.testable
     return {
-        K_BASE_PATH: "/media/fat",
+        K_BASE_PATH: "/media/fat" if base_path is None else base_path,
         "zips": raw_db["zips"],
         "folders": raw_db["folders"],
         "files": raw_db["files"],
@@ -178,7 +267,7 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
         'db_id': db_id if db_id is not None else db_test,
         'db_files': db_files if db_files is not None else [],
         'files': files if files is not None else {},
-        'folders': folders if folders is not None else {},
+        'folders': _fix_folders(folders) if folders is not None else {},
         'base_files_url': base_files_url if base_files_url is not None else '',
         'zips': zips if zips is not None else {},
         'default_options': default_options if default_options is not None else {},
@@ -191,6 +280,12 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
     if header is not None:
         db_raw['header'] = header
     return DbEntity(db_raw, section if section is not None else db_id if db_id is not None else db_test)
+
+
+def _fix_folders(folders):
+    if isinstance(folders, list):
+        folders = {f: {} for f in folders}
+    return folders
 
 
 def raw_db_empty_with_linux_descr():
@@ -266,6 +361,11 @@ def file_pdfviewer_descr():
     }
 
 
+def with_base_path(description, base_path):
+    description['base_path'] = base_path
+    return description
+
+
 def file_mister_descr():
     return {
         "delete": [],
@@ -297,7 +397,72 @@ def file_a_descr(delete=None):
     }
 
 
-def file_descr(delete=None, hash_code=None, size=None, url=None, reboot=None, path=None, tags=None):
+def file_b_descr(delete=None):
+    return {
+        "delete": delete if delete is not None else [],
+        "hash": file_b,
+        "size": 1915040,
+        "url": "https://two.rbf"
+    }
+
+
+def file_nes_smb1_descr():
+    return {
+        "hash": file_nes_smb1[1:],
+        "size": 2915020,
+        "url": "https://smb.nes"
+    }
+
+
+def file_nes_manual_descr():
+    return {
+        "hash": file_nes_manual[1:],
+        "size": 22125020,
+        "url": "https://nes.md"
+    }
+
+
+def file_nes_contra_descr():
+    return {
+        "hash": file_nes_contra[1:],
+        "size": 2915010,
+        "url": "https://contra.nes"
+    }
+
+
+def file_nes_palette_a_descr():
+    return {
+        "hash": file_nes_palette_a[1:],
+        "size": 2905020,
+        "url": "https://a.pal"
+    }
+
+
+def file_neogeo_md_descr():
+    return {
+        "hash": file_neogeo_md[1:],
+        "size": 2905029,
+        "url": "https://neogeo.md"
+    }
+
+
+def file_s32x_md_descr():
+    return {
+        "hash": file_s32x_md[1:],
+        "size": 2905019,
+        "url": "https://s32x.md"
+    }
+
+
+def file_foo_descr():
+    return {
+        "hash": file_foo,
+        "size": 2305019,
+        "url": "https://file.foo"
+    }
+
+
+def file_descr(delete=None, hash_code=None, size=None, url=None, reboot=None, path=None, tags=None, unzipped_json=None, json=None):
     result = {
         "delete": delete if delete is not None else [],
         "hash": hash_code if hash_code is not None else file_a,
@@ -308,6 +473,10 @@ def file_descr(delete=None, hash_code=None, size=None, url=None, reboot=None, pa
     }
     if tags is not None:
         result["tags"] = tags
+    if unzipped_json is not None:
+        result["unzipped_json"] = unzipped_json
+    if json is not None:
+        result["json"] = json
     return result
 
 
@@ -332,7 +501,7 @@ def boot_rom_descr():
     }
 
 
-def overwrite_file(descr, overwrite):
+def with_overwrite(descr, overwrite):
     result = copy.deepcopy(descr)
     result['overwrite'] = overwrite
     return result
@@ -395,7 +564,7 @@ def _not_file(file):
     return file
 
 
-default_base_path = '/tmp/default_base_path/'
+default_base_path = '/tmp/default_base_path'
 
 
 def default_env():
@@ -404,7 +573,11 @@ def default_env():
         KENV_DEFAULT_DB_ID: DISTRIBUTION_MISTER_DB_ID,
         KENV_DEFAULT_BASE_PATH: default_base_path,
         KENV_ALLOW_REBOOT: None,
-        KENV_DEBUG: 'false'
+        KENV_DEBUG: 'false',
+        KENV_CURL_SSL: DEFAULT_CURL_SSL_OPTIONS,
+        KENV_UPDATE_LINUX: 'true',
+        KENV_FAIL_ON_FILE_ERROR: 'false',
+        KENV_COMMIT: 'unknown',
     }
 
 
@@ -412,3 +585,7 @@ def debug_env():
     env = default_env()
     env[KENV_DEBUG] = 'true'
     return env
+
+
+def path_with(path, added_part):
+    return '%s/%s' % (path, added_part)

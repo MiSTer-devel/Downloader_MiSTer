@@ -25,7 +25,7 @@ from pathlib import Path
 from downloader.constants import FILE_MiSTer, K_BASE_PATH, K_BASE_SYSTEM_PATH, K_ALLOW_DELETE
 from downloader.file_system import FileSystemFactory
 from test.fake_logger import NoLogger
-from test.objects import temp_name, file_a, file_b
+from test.objects import temp_name
 from test.fake_file_system_factory import make_production_filesystem_factory
 from downloader.config import AllowDelete, default_config
 
@@ -122,17 +122,8 @@ class TestFileSystem(unittest.TestCase):
         self.sut().unlink(empty_file)
         self.assertFalse(self.sut().is_file(empty_file))
 
-    def test_curl_path_x___after_add_system_path_x_with_system_path_b___returns_b_plus_x(self):
-        sut = self.sut({K_BASE_PATH: 'a', K_BASE_SYSTEM_PATH: 'b'})
-        sut.add_system_path('x')
-        self.assertEqual(sut.download_target_path('x'), 'b/x')
-
-    def test_curl_path_x___with_system_path_a___returns_a_plus_x(self):
-        sut = self.sut({K_BASE_PATH: 'a', K_BASE_SYSTEM_PATH: 'b'})
-        self.assertEqual(sut.download_target_path('x'), 'a/x')
-
     def test_curl_path_temp_x___always___returns_temp_plus_x(self):
-        self.assertEqual(self.sut().download_target_path('/tmp/x'), '/tmp/x')
+        self.assertEqual('/tmp/x', self.sut().download_target_path('/tmp/x'))
 
     def test_makedirs___on_missing_folder___creates_it(self):
         self.sut().make_dirs('foo')
@@ -142,28 +133,6 @@ class TestFileSystem(unittest.TestCase):
         json_file = 'foo.json'
         self.sut().write_file_contents(json_file, json.dumps(foo_bar_json))
         self.assertEqual(foo_bar_json.copy(), self.sut().load_dict_from_file(json_file))
-
-    def test_system_paths_on_fs_1_and_2_created_by_same_factory___when_fs_1_adds_system_path_file_a___fs_2_download_target_path_returns_system_path_for_file_a(self):
-        fs_1, fs_2 = self.fs_1_and_2_by_same_factory()
-        fs_1.add_system_path(file_a)
-
-        self.assertEqual(f'{K_BASE_SYSTEM_PATH}/{file_a}', fs_2.download_target_path(file_a))
-
-    def test_system_paths_on_fs_1_and_2_created_by_same_factory___when_fs_1_adds_system_path_file_a___fs_2_and_fs_1_download_target_path_are_the_same_for_file_a(self):
-        fs_1, fs_2 = self.fs_1_and_2_by_same_factory()
-        fs_1.add_system_path(file_a)
-
-        self.assertEqual(fs_1.download_target_path(file_a), fs_2.download_target_path(file_a))
-
-    def test_system_paths_on_fs_1_and_2_created_by_same_factory___when_no_system_path_is_added___fs_2_download_target_path_returns_base_path_for_file_a(self):
-        fs_1, fs_2 = self.fs_1_and_2_by_same_factory()
-        self.assertEqual(f'{K_BASE_PATH}/{file_a}', fs_2.download_target_path(file_a))
-
-    def test_system_paths_on_fs_1_and_2_created_by_same_factory___when_fs_1_adds_system_path_file_a___fs_2_download_target_path_returns_base_path_for_file_b(self):
-        fs_1, fs_2 = self.fs_1_and_2_by_same_factory()
-        fs_1.add_system_path(file_a)
-
-        self.assertEqual(f'{K_BASE_PATH}/{file_b}', fs_2.download_target_path(file_b))
 
     @unittest.skipIf(sys.platform.startswith("win"), "requires Linux")
     def test_load_dict_from_file___on_zipped_json___returns_json_dict(self):
@@ -184,7 +153,6 @@ class TestFileSystem(unittest.TestCase):
     def default_test_config(self, allow_delete=None):
         actual_config = default_config()
         actual_config[K_BASE_PATH] = self.tempdir.name
-        actual_config[K_BASE_SYSTEM_PATH] = self.tempdir.name
         if allow_delete is not None:
             actual_config[K_ALLOW_DELETE] = allow_delete
         return actual_config

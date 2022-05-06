@@ -15,29 +15,20 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-
-import unittest
-import shutil
 import os
-import json
+import shutil
 from pathlib import Path
-from downloader.config import ConfigReader
-from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, K_CURL_SSL, KENV_UPDATE_LINUX, \
-    KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR
-from test.fake_file_system_factory import make_production_filesystem_factory
-from test.objects import debug_env, default_base_path
-from test.fake_logger import NoLogger
+from downloader.constants import K_BASE_PATH, FILE_mister_downloader_needs_reboot
+from test.system.quick.sandbox_test_base import SandboxTestBase, tmp_delme_sandbox, local_store_files, load_json, hashes, cleanup
 from test.fake_store_migrator import StoreMigrator
 from downloader.file_system import hash_file
-from downloader.main import main
-from downloader.local_repository import LocalRepository
-from downloader.store_migrator import make_new_local_store
 
 
-class TestSandboxedInstall(unittest.TestCase):
+class TestSandboxedInstall(SandboxTestBase):
     sandbox_ini = "test/system/fixtures/sandboxed_install/sandbox.ini"
     sandbox_db_json = 'test/system/fixtures/sandboxed_install/sandbox_db.json'
-    tmp_delme = '/tmp/delme_sandbox/'
+
+    tmp_delme = tmp_delme_sandbox
 
     foo_file = 'test/system/fixtures/sandboxed_install/files/foo.txt'
     bar_file = 'test/system/fixtures/sandboxed_install/files/bar.txt'
@@ -49,7 +40,7 @@ class TestSandboxedInstall(unittest.TestCase):
     def test_sandbox_db___installs_correctly(self):
         db = load_json(self.sandbox_db_json)
         self.assertExecutesCorrectly(self.sandbox_ini, {
-            'local_store': self.local_store_files([('sandbox', db['files'])]),
+            'local_store': local_store_files([('sandbox', db['files'])]),
             'files': hashes(self.tmp_delme, db['files'])
         })
 
@@ -61,7 +52,7 @@ class TestSandboxedInstall(unittest.TestCase):
     def test_sandbox_db_with_delete_previous___installs_correctly(self):
         db = load_json('test/system/fixtures/sandboxed_install/db_with_delete_previous/sandbox_db.json')
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_delete_previous/sandbox.ini', {
-            'local_store': self.local_store_files([('sandbox', db['files'])]),
+            'local_store': local_store_files([('sandbox', db['files'])]),
             'files': hashes(self.tmp_delme, db['files'])
         })
 
@@ -69,7 +60,7 @@ class TestSandboxedInstall(unittest.TestCase):
         db = load_json(self.sandbox_db_json)
         self.assertExecutesCorrectly(self.sandbox_ini)
         self.assertExecutesCorrectly(self.sandbox_ini, {
-            'local_store': self.local_store_files([('sandbox', db['files'])]),
+            'local_store': local_store_files([('sandbox', db['files'])]),
             'files': hashes(self.tmp_delme, db['files'])
         })
 
@@ -80,7 +71,7 @@ class TestSandboxedInstall(unittest.TestCase):
 
         minus_one_file_db = load_json('test/system/fixtures/sandboxed_install/minus_one_file/sandbox_db.json')
         self.assertExecutesCorrectly("test/system/fixtures/sandboxed_install/minus_one_file/sandbox.ini", {
-            'local_store': self.local_store_files([('sandbox', minus_one_file_db['files'])]),
+            'local_store': local_store_files([('sandbox', minus_one_file_db['files'])]),
             'files': hashes(self.tmp_delme, minus_one_file_db['files']),
             'files_count': 1
         })
@@ -110,7 +101,7 @@ class TestSandboxedInstall(unittest.TestCase):
 
         db = load_json(self.sandbox_db_json)
         self.assertExecutesCorrectly(self.sandbox_ini, {
-            'local_store': self.local_store_files([('sandbox', db['files'])]),
+            'local_store': local_store_files([('sandbox', db['files'])]),
             'files': hashes(self.tmp_delme, db['files'])
         })
 
@@ -125,19 +116,21 @@ class TestSandboxedInstall(unittest.TestCase):
         shutil.copy2(self.bar_file, self.tmp_delme)
         shutil.copy2(self.baz_file, self.tmp_delme)
 
-        baz_exists_before = Path(self.baz_file).is_file()
+        tmp_bar_file = self.tmp_delme + '/baz.txt'
+
+        baz_exists_before = Path(tmp_bar_file).is_file()
 
         db = load_json(self.sandbox_db_json)
         files_plus_extra = db['files'].copy()
         files_plus_extra['baz.txt'] = {'hash': 'c15bc5117b800187ea76873b5491e1db'}
 
         self.assertExecutesCorrectly(self.sandbox_ini, {
-            'local_store': self.local_store_files([('sandbox', db['files'])]),
+            'local_store': local_store_files([('sandbox', db['files'])]),
             'files': hashes(self.tmp_delme, files_plus_extra),
             'files_count': 3
         })
 
-        baz_exists_after = Path(self.baz_file).is_file()
+        baz_exists_after = Path(tmp_bar_file).is_file()
 
         self.assertEqual(baz_exists_before, baz_exists_after)
 
@@ -156,7 +149,7 @@ class TestSandboxedInstall(unittest.TestCase):
         baz_exists_before = Path(tmp_baz_file).is_file()
 
         db = load_json('test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox_db.json')
-        expected_local_store = self.local_store_files([('sandbox', db['files'])])
+        expected_local_store = local_store_files([('sandbox', db['files'])])
         expected_local_store['dbs']['sandbox']['offline_databases_imported'] = ['5fce72d14b3b32291f60ee5eea925f35']
 
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox.ini', {
@@ -177,7 +170,7 @@ class TestSandboxedInstall(unittest.TestCase):
     installed_system_folders = {'Scripts': {}, 'Scripts/.config': {}, 'Scripts/.config/downloader': {}}
 
     def test_sandbox_db___installs_expected_folders(self):
-        expected_local_store = self.local_store_files([('sandbox', {})])
+        expected_local_store = local_store_files([('sandbox', {})])
         expected_local_store['dbs']['sandbox']['folders'] = {'foo': {}, 'bar': {}, 'foo/sub_foo': {}, 'bar/sub_bar': {},
                                                              'bar/sub_bar/sub_sub_bar': {}, 'baz': {}}
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_folders/sandbox.ini', {
@@ -193,7 +186,7 @@ class TestSandboxedInstall(unittest.TestCase):
         })
 
         remaining_folders = {'bar': {}, 'bar/sub_bar': {}}
-        expected_local_store = self.local_store_files([('sandbox', {})])
+        expected_local_store = local_store_files([('sandbox', {})])
         expected_local_store['dbs']['sandbox']['folders'] = remaining_folders
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_less_folders/sandbox.ini', {
             'local_store': expected_local_store,
@@ -210,8 +203,8 @@ class TestSandboxedInstall(unittest.TestCase):
         self.file_system.touch('foo/something')
         self.file_system.make_dirs('baz/something')
 
-        expected_local_store = self.local_store_files([('sandbox', {})])
-        expected_local_store['dbs']['sandbox']['folders'] = {'bar': {}, 'bar/sub_bar': {}}
+        expected_local_store = local_store_files([('sandbox', {})])
+        expected_local_store['dbs']['sandbox']['folders'] = {'bar': {}, 'bar/sub_bar': {}, 'baz': {}, 'foo': {}}
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/db_with_less_folders/sandbox.ini', {
             'local_store': expected_local_store,
             'folders': {'bar': {}, 'bar/sub_bar': {}, 'baz': {}, 'baz/something': {}, 'foo': {}},
@@ -236,115 +229,14 @@ class TestSandboxedInstall(unittest.TestCase):
                         'zips': {}
                     }
                 },
-            'migration_version': StoreMigrator().latest_migration_version()}
+                'migration_version': StoreMigrator().latest_migration_version(),
+                'internal': True
+            },
         })
 
         self.assertFalse(Path('/tmp/delme_sandbox/foo.txt').is_file())
         self.assertTrue(Path('/tmp/delme_relocated/foo.txt').is_file())
 
-    def assertExecutesCorrectly(self, ini_path, expected=None):
-        self.maxDiff = None
-        exit_code = self.run_main(ini_path)
-        self.assertEqual(exit_code, 0)
-
-        if expected is None:
-            return
-
-        config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
-        self.file_system = make_production_filesystem_factory(config).create_for_system_scope()
-        counter = 0
-        if 'local_store' in expected:
-            counter += 1
-            actual_store = LocalRepository(config, NoLogger(), self.file_system).load_store(StoreMigrator())
-            self.assertEqual(expected['local_store'], actual_store)
-
-        if 'files' in expected:
-            counter += 1
-            self.assertEqual(expected['files'], self.find_all_files(config[K_BASE_PATH]))
-
-        if 'files_count' in expected:
-            counter += 1
-            self.assertEqual(expected['files_count'], len(self.find_all_files(config[K_BASE_PATH])))
-
-        if 'system_files' in expected:
-            counter += 1
-            self.assertEqual(expected['system_files'], self.find_all_files(config[K_BASE_SYSTEM_PATH]))
-
-        if 'system_files_count' in expected:
-            counter += 1
-            self.assertEqual(expected['system_files_count'], len(self.find_all_files(config[K_BASE_PATH])))
-
-        if 'folders' in expected:
-            counter += 1
-            self.assertEqual(sorted(list(expected['folders'])), self.find_all_folders(config[K_BASE_PATH]))
-
-        if 'system_folders' in expected:
-            counter += 1
-            self.assertEqual(sorted(list(expected['system_folders'])), self.find_all_folders(config[K_BASE_SYSTEM_PATH]))
-
-        self.assertEqual(len(expected), counter)
-
-    @staticmethod
-    def run_main(ini_path):
-        return main({
-            KENV_DOWNLOADER_LAUNCHER_PATH: str(Path(ini_path).with_suffix('.sh')),
-            KENV_CURL_SSL: '',
-            KENV_UPDATE_LINUX: 'false',
-            KENV_ALLOW_REBOOT: None,
-            KENV_COMMIT: 'quick system test',
-            KENV_DEFAULT_DB_URL: '',
-            KENV_DEFAULT_DB_ID: '',
-            KENV_DEFAULT_BASE_PATH: default_base_path,
-            KENV_DEBUG: 'true',
-            KENV_FAIL_ON_FILE_ERROR: 'true'
-        })
-
-    def find_all_files(self, directory):
-        return sorted(self._scan_files(directory), key=lambda t: t[0].lower())
-
-    def _scan_files(self, directory):
-        for entry in os.scandir(directory):
-            if entry.is_dir(follow_symlinks=False):
-                yield from self._scan_files(entry.path)
-            else:
-                yield entry.path, hash_file(entry.path)
-
-    def find_all_folders(self, directory):
-        if not directory.endswith('/'):
-            directory = directory + '/'
-        return sorted(self._scan_folders(directory, directory), key=str.casefold)
-
-    def _scan_folders(self, directory, base):
-        for entry in os.scandir(directory):
-            if entry.is_dir(follow_symlinks=False):
-                yield from self._scan_folders(entry.path, base)
-                yield entry.path[len(base):]
-
-    @staticmethod
-    def local_store_files(tuples):
-        store = make_new_local_store(StoreMigrator())
-        for store_id, files in tuples:
-            store['dbs'][store_id] = {
-                K_BASE_PATH: TestSandboxedInstall.tmp_delme[0:-1],
-                'folders': {},
-                'files': files,
-                'offline_databases_imported': [],
-                'zips': {}
-            }
-        return store
-
-def cleanup(ini_path):
-    config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
-    shutil.rmtree(config[K_BASE_PATH], ignore_errors=True)
-    shutil.rmtree(config[K_BASE_SYSTEM_PATH], ignore_errors=True)
-    Path(config[K_BASE_PATH]).mkdir(parents=True, exist_ok=True)
-    Path(config[K_BASE_SYSTEM_PATH]).mkdir(parents=True, exist_ok=True)
-
-
-def hashes(base_path, files):
-    return sorted([(base_path + f, files[f]['hash']) for f in files])
-
-
-def load_json(file_path):
-    with open(file_path, "r") as f:
-        return json.loads(f.read())
+    def test_small_db_3(self):
+        self.assertExecutesCorrectly("test/system/fixtures/small_db_install/small_db_3.ini")
+        self.assertFalse(os.path.isfile(FILE_mister_downloader_needs_reboot))

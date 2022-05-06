@@ -28,11 +28,15 @@ class OfflineImporter:
         self._logger = logger
 
     def apply_offline_databases(self, importer_command):
+        self._logger.bench('Offline Importer start.')
+
         for db, store, config in importer_command.read_dbs():
             for db_file in db.db_files:
                 db_importer = _OfflineDatabaseImporter(config, self._file_system_factory.create_for_config(config), self._file_downloader_factory, self._logger)
                 db_importer.update_store_from_offline_db(db.db_id, db_file, store)
-                store[K_BASE_PATH] = config[K_BASE_PATH]
+                store.write_only().set_base_path(config[K_BASE_PATH])
+
+        self._logger.bench('Offline Importer done.')
 
 
 class _OfflineDatabaseImporter:
@@ -43,11 +47,14 @@ class _OfflineDatabaseImporter:
         self._logger = logger
 
     def update_store_from_offline_db(self, store_id, db_file, store):
+        write_store = store.write_only()
+        read_store = store.read_only()
+
         if not self._file_system.is_file(db_file):
             return
 
         hash_db_file = self._file_system.hash(db_file)
-        if hash_db_file in store['offline_databases_imported']:
+        if hash_db_file in read_store.offline_databases_imported:
             self._remove_db_file(db_file)
             return
 
@@ -63,26 +70,26 @@ class _OfflineDatabaseImporter:
 
         self._logger.print('Importing %s into the local store.' % db_file)
 
-        self._import_folders(db.folders, store['folders'])
-        self._import_files(db.files, store['files'])
+        self._import_folders(db.folders, read_store, write_store)
+        self._import_files(db.files, read_store, write_store)
 
         errors = []
         if len(db.zips) > 0:
-            errors.extend(self._update_from_zips(db, store))
+            errors.extend(self._update_from_zips(db, read_store, write_store))
 
         if len(db.files) > 0:
             self._logger.print()
         self._logger.print()
 
         if len(errors) == 0:
-            store['offline_databases_imported'].append(hash_db_file)
+            write_store.add_imported_offline_database(hash_db_file)
             self._remove_db_file(db_file)
         else:
             for e in errors:
                 self._logger.print('Offline importer error: ' + e)
             self._logger.print()
 
-    def _update_from_zips(self, db, store):
+    def _update_from_zips(self, db, read_store, write_store):
         summary_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE])
         zip_ids_by_temp_zip = dict()
 
@@ -97,10 +104,10 @@ class _OfflineDatabaseImporter:
 
         for zip_id in zip_ids_from_internal_summary:
             summary = db.zips[zip_id]['internal_summary']
-            self._import_folders(summary['folders'], store['folders'])
-            self._import_files(summary['files'], store['files'])
-            store['zips'][zip_id] = db.zips[zip_id]
-            store['zips'][zip_id].pop('internal_summary')
+            self._import_folders(summary['folders'], read_store, write_store)
+            self._import_files(summary['files'], read_store, write_store)
+            db.zips[zip_id].pop('internal_summary')
+            write_store.add_zip(zip_id, db.zips[zip_id])
 
         for zip_id in zip_ids_to_download:
             temp_zip = '/tmp/%s.json.zip' % zip_id
@@ -121,26 +128,26 @@ class _OfflineDatabaseImporter:
             if 'summary_file' in db.zips[zip_id] and 'unzipped_json' in db.zips[zip_id]['summary_file']:
                 db.zips[zip_id]['summary_file'].pop('unzipped_json')
 
-            store['zips'][zip_id] = db.zips[zip_id]
-            self._import_folders(summary['folders'], store['folders'])
-            self._import_files(summary['files'], store['files'])
+            write_store.add_zip(zip_id, db.zips[zip_id])
+            self._import_folders(summary['folders'], read_store, write_store)
+            self._import_files(summary['files'], read_store, write_store)
             self._file_system.unlink(temp_zip)
 
         return summary_downloader.errors()
 
-    def _import_files(self, files, store_files):
+    def _import_files(self, files, read_store, write_store):
         for file_path, file_description in files.items():
             if self._file_system.is_file(file_path) and \
                     (file_description['hash'] == 'ignore' or self._file_system.hash(file_path) == file_description['hash']) and \
-                    file_path not in store_files:
-                store_files[file_path] = file_description
+                    file_path not in read_store.files:
+                write_store.add_file(file_path, file_description)
 
                 self._logger.print('+', end='', flush=True)
 
-    def _import_folders(self, db_folders, store_folders):
+    def _import_folders(self, db_folders, read_store, write_store):
         for folder_path, folder_description in db_folders.items():
-            if self._file_system.is_folder(folder_path) and folder_path not in store_folders:
-                store_folders[folder_path] = folder_description
+            if self._file_system.is_folder(folder_path) and folder_path not in read_store.folders:
+                write_store.add_folder(folder_path, folder_description)
 
     def _remove_db_file(self, db_file):
         if self._config[K_ALLOW_DELETE] == AllowDelete.ALL:

@@ -22,10 +22,10 @@ import sys
 import time
 from abc import ABC, abstractmethod
 
-from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, K_DOWNLOADER_RETRIES, K_DOWNLOADER_SIZE_MB_LIMIT, \
-    K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_CURL_SSL, K_DEBUG
-from downloader.logger import SilentLogger
-from downloader.other import calculate_url, NoArgumentsToComputeUrlError
+from downloader.constants import K_DOWNLOADER_RETRIES, K_DOWNLOADER_SIZE_MB_LIMIT, \
+    K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_CURL_SSL, K_DEBUG, FILE_MiSTer_new, FILE_MiSTer
+from downloader.logger import DebugOnlyLoggerDecorator
+from downloader.other import calculate_url
 from downloader.target_path_repository import TargetPathRepository
 
 
@@ -46,7 +46,7 @@ class _FileDownloaderFactoryImpl(FileDownloaderFactory):
         self._logger = logger
 
     def create(self, config, parallel_update, silent=False, hash_check=True):
-        logger = SilentLogger(self._logger) if silent else self._logger
+        logger = DebugOnlyLoggerDecorator(self._logger) if silent else self._logger
         file_system = self._file_system_factory.create_for_config(config)
         if parallel_update:
             return _CurlCustomParallelDownloader(config, file_system, self._local_repository, logger, hash_check, TargetPathRepository(config, file_system))
@@ -137,32 +137,28 @@ class CurlDownloaderAbstract(FileDownloader):
         self._logger.print("Downloading %d files:" % len(self._curl_list))
 
         for path in sorted(self._curl_list):
-            if 'path' in self._curl_list[path] and self._curl_list[path]['path'] == 'system':
-                self._file_system.add_system_path(path)
-                if path == FILE_MiSTer:
-                    self._file_system.add_system_path(FILE_MiSTer_new)
-
+            description = self._curl_list[path]
             if self._hash_check and self._file_system.is_file(path):
                 path_hash = self._file_system.hash(path)
-                if path_hash == self._curl_list[path]['hash']:
-                    if 'zip_id' in self._curl_list[path] and self._curl_list[path]['zip_id'] in self._unpacked_zips:
+                if path_hash == description['hash']:
+                    if 'zip_id' in description and description['zip_id'] in self._unpacked_zips:
                         self._logger.print('Unpacked: %s' % path)
                     else:
                         self._logger.print('No changes: %s' % path)
                     self._correct_downloads.append(path)
                     continue
                 else:
-                    self._logger.debug('%s: %s != %s' % (path, self._curl_list[path]['hash'], path_hash))
+                    self._logger.debug('%s: %s != %s' % (path, description['hash'], path_hash))
 
             if first_run:
-                if 'delete' in self._curl_list[path]:
-                    for _ in self._curl_list[path]['delete']:
+                if 'delete' in description:
+                    for _ in description['delete']:
                         self._file_system.delete_previous(path)
                         break
-                elif 'delete_previous' in self._curl_list[path] and self._curl_list[path]['delete_previous']:
+                elif 'delete_previous' in description and description['delete_previous']:
                     self._file_system.delete_previous(path)
 
-            self._download(path, self._curl_list[path])
+            self._download(path, description)
 
         self._wait()
         self._check_hashes()

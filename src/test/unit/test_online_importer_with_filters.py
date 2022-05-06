@@ -21,7 +21,7 @@ import unittest
 from downloader.config import default_config
 from downloader.online_importer import WrongDatabaseOptions
 from downloader.other import empty_store
-from test.objects import db_test_descr, store_test_descr, file_descr, file_b, file_a, file_c, folder_a, folder_b, \
+from test.objects import db_test_descr, store_descr, file_descr, file_b, file_a, file_c, folder_a, folder_b, \
     folder_c, config_with_filter, file_one, empty_test_store
 from test.fake_online_importer import OnlineImporter
 
@@ -150,29 +150,29 @@ def db_with_files_a_b_c():
 
 
 def store_with_files_a_b_c():
-    return store_test_descr(files={
+    return store_descr(files={
         file_a: file_descr(),
         file_b: file_descr(),
         file_c: file_descr()
     }, folders={folder_a: {}, folder_b: {}, folder_c: {}})
 
 def store_with_file_a():
-    return store_test_descr(files={file_a: file_descr()}, folders={folder_a: {}})
+    return store_descr(files={file_a: file_descr()}, folders={folder_a: {}})
 
 def store_with_files_a_and_b():
-    return store_test_descr(files={file_a: file_descr(), file_b: file_descr()}, folders={folder_a: {}, folder_b: {}})
+    return store_descr(files={file_a: file_descr(), file_b: file_descr()}, folders={folder_a: {}, folder_b: {}})
 
 def store_with_files_a_and_c():
-    return store_test_descr(files={file_a: file_descr(), file_c: file_descr()}, folders={folder_a: {}, folder_c: {}})
+    return store_descr(files={file_a: file_descr(), file_c: file_descr()}, folders={folder_a: {}, folder_c: {}})
 
 def store_with_file_b():
-    return store_test_descr(files={file_b: file_descr()}, folders={folder_b: {}})
+    return store_descr(files={file_b: file_descr()}, folders={folder_b: {}})
 
 def store_with_files_b_and_c():
-    return store_test_descr(files={file_b: file_descr(), file_c: file_descr()}, folders={folder_b: {}, folder_c: {}})
+    return store_descr(files={file_b: file_descr(), file_c: file_descr()}, folders={folder_b: {}, folder_c: {}})
 
 def store_with_file_c():
-    return store_test_descr(files={file_c: file_descr()}, folders={folder_c: {}})
+    return store_descr(files={file_c: file_descr()}, folders={folder_c: {}})
 
 file_nes_cheat = 'nes_cheat'
 file_gb_cheat = 'gb_cheat'
@@ -203,7 +203,7 @@ def db_with_cheats_and_console_files():
     })
 
 def store_with_cheats_and_console_files():
-    return store_test_descr(files={
+    return store_descr(files={
         file_nes_cheat: file_descr(),
         file_gb_cheat: file_descr(),
         file_nes_game: file_descr(),
@@ -217,10 +217,10 @@ def store_with_cheats_and_console_files():
     })
 
 def store_with_just_cheats_folder():
-    return store_test_descr(folders={'cheats': {}})
+    return store_descr(folders={'cheats': {}})
 
 def store_with_console_files_only():
-    return store_test_descr(files={
+    return store_descr(files={
         file_nes_game: file_descr(),
         file_gb_game: file_descr(),
     }, folders={
@@ -229,7 +229,7 @@ def store_with_console_files_only():
     })
 
 def store_with_cheats_files_only():
-    return store_test_descr(files={
+    return store_descr(files={
         file_nes_cheat: file_descr(),
         file_gb_cheat: file_descr(),
     }, folders={
@@ -239,7 +239,7 @@ def store_with_cheats_files_only():
     })
 
 def store_with_all_nes_files():
-    return store_test_descr(files={
+    return store_descr(files={
         file_nes_cheat: file_descr(),
         file_nes_game: file_descr(),
     }, folders={
@@ -249,7 +249,7 @@ def store_with_all_nes_files():
     })
 
 def store_with_all_gb_files():
-    return store_test_descr(files={
+    return store_descr(files={
         file_gb_cheat: file_descr(),
         file_gb_game: file_descr(),
     }, folders={
@@ -259,29 +259,29 @@ def store_with_all_gb_files():
     })
 
 def store_with_file_nes_cheat():
-    return store_test_descr(files={file_nes_cheat: file_descr()}, folders={
+    return store_descr(files={file_nes_cheat: file_descr()}, folders={
         'cheats': {},
         'cheats/nes': {},
     })
 
 def store_with_file_gb_cheat():
-    return store_test_descr(files={file_gb_cheat: file_descr()}, folders={
+    return store_descr(files={file_gb_cheat: file_descr()}, folders={
         'cheats': {},
         'cheats/gb': {}
     })
 
 def store_with_file_nes_game():
-    return store_test_descr(files={file_nes_game: file_descr()}, folders={
+    return store_descr(files={file_nes_game: file_descr()}, folders={
         'nes': {},
     })
 
 def store_with_file_gb_game():
-    return store_test_descr(files={file_gb_game: file_descr()}, folders={
+    return store_descr(files={file_gb_game: file_descr()}, folders={
         'gb': {},
     })
 
 def store_with_all_cheats_and_nes_game():
-    return store_test_descr(files={
+    return store_descr(files={
         file_nes_cheat: file_descr(),
         file_gb_cheat: file_descr(),
         file_nes_game: file_descr(),
@@ -293,7 +293,7 @@ def store_with_all_cheats_and_nes_game():
     })
 
 def store_with_all_cheats_and_gb_game():
-    return store_test_descr(files={
+    return store_descr(files={
         file_nes_cheat: file_descr(),
         file_gb_cheat: file_descr(),
         file_gb_game: file_descr(),
@@ -323,7 +323,7 @@ def db_with_essential_and_cheats_files():
 
 
 def store_with_essential_and_nes_files():
-    return store_test_descr(files={
+    return store_descr(files={
         file_one: file_descr(),
         file_nes_cheat: file_descr(),
     }, folders={
@@ -342,7 +342,7 @@ def db_with_one_non_tagged_file_and_file_a():
 
 
 def store_with_one_non_tagged_file_and_file_a():
-    return store_test_descr(files={
+    return store_descr(files={
         file_a: file_descr(),
         file_one: file_descr(),
     }, folders={
@@ -355,4 +355,4 @@ def db_with_file_with_tag_foobar():
 
 
 def store_with_file_with_tag_foobar():
-    return store_test_descr(files={file_one: file_descr()})
+    return store_descr(files={file_one: file_descr()})

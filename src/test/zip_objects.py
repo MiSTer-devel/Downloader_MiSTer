@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import K_BASE_PATH
-from test.objects import zip_desc
+from test.objects import zip_desc, media_fat
 
 
 def cheats_folder_tag_dictionary():
@@ -127,8 +127,8 @@ def cheats_folder_descr(zip_id=True, tags=True):
 def store_with_unzipped_cheats(url=True, folders=True, zip_id=True, zips=True, tags=True, online_database_imported=None, summary_hash=None, is_summary_internal=False):
     o = {
         K_BASE_PATH: "/media/fat",
-        "files": cheats_folder_files(url=url, zip_id=zip_id, tags=tags),
-        'folders': cheats_folder_folders(zip_id=zip_id, tags=tags),
+        "files": {k: v for k, v in cheats_folder_files(url=url, zip_id=zip_id, tags=tags).items()},
+        'folders': {k: v for k, v in cheats_folder_folders(zip_id=zip_id, tags=tags).items()},
         'offline_databases_imported': online_database_imported if online_database_imported is not None else [],
         "zips": {
             cheats_folder_id: cheats_folder_zip_desc(summary_hash=summary_hash, is_summary_internal=is_summary_internal)

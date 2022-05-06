@@ -15,18 +15,14 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.config import default_config
-from downloader.gamesdir_resolver import GamesdirResolverFactory, GamesdirAutoResolver
+from downloader.external_drives_repository import ExternalDrivesRepository as ProductionExternalDrivesRepository
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_logger import NoLogger
 
 
-class GamesdirResolver:
-    def __init__(self, config=None, file_system=None):
-        auto_resolver = GamesdirAutoResolver(FileSystemFactory().create_for_system_scope() if file_system is None else file_system, NoLogger())
-        factory = GamesdirResolverFactory(auto_resolver)
-        self._resolver = factory.create(default_config() if config is None else config)
+class ExternalDrivesRepository(ProductionExternalDrivesRepository):
+    def __init__(self, file_system=None):
+        super().__init__(file_system if file_system is not None else FileSystemFactory().create_for_system_scope(), NoLogger())
 
-    def translate_path(self, path):
-        return self._resolver.translate_path(path)
-
+    def _retrieve_connected_drives_list(self):
+        return self._drives_from_fs()

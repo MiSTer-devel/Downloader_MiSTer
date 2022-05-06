@@ -15,9 +15,15 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+from downloader.config import default_config
 from downloader.importer_command import ImporterCommand as ProductionImporterCommand
 
 
 class ImporterCommand(ProductionImporterCommand):
     def __init__(self, input_config):
-        super().__init__(input_config, list(input_config))
+        user_defined_config = []
+        for key, value in default_config().items():
+            if key in input_config and value != input_config[key]:
+                user_defined_config.append(key)
+
+        super().__init__(input_config, user_defined_config)

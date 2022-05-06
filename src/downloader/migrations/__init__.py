@@ -24,16 +24,18 @@ from downloader.migrations.migration_v5 import MigrationV5
 from downloader.migrations.migration_v6 import MigrationV6
 from downloader.migrations.migration_v7 import MigrationV7
 from downloader.migrations.migration_v8 import MigrationV8
+from downloader.migrations.migration_v9 import MigrationV9
 
 
-def migrations(config, file_system_factory):
+def migrations(config, file_system_factory, path_resolver_factory):
     return [
         MigrationV1(),
         MigrationV2(),
         MigrationV3(),
         MigrationV4(),
-        MigrationV5(file_system_factory, config),
+        MigrationV5(file_system_factory, path_resolver_factory, config),
         MigrationV6(file_system_factory),
         MigrationV7(config),
-        MigrationV8()
+        MigrationV8(),
+        MigrationV9()
     ]
