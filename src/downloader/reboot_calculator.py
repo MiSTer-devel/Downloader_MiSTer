@@ -39,7 +39,7 @@ class RebootCalculator:
         elif self._config[K_ALLOW_REBOOT] == AllowReboot.ALWAYS:
             will_reboot = linux_needs_reboot or importer_needs_reboot
         else:
-            raise Exception('AllowReboot.%s not recognized' % AllowReboot.name)
+            raise Exception('AllowReboot.%s not recognized' % AllowReboot.name)  # pragma: no cover
 
         if will_reboot:
             return True

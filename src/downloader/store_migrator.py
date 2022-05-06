@@ -25,8 +25,11 @@ class StoreMigrator:
         self._logger = logger
 
     def migrate(self, local_store):
+        self._logger.bench('Migration start.')
+
         current_version = local_store.get('migration_version', 0)
         if current_version >= len(self._migrations):
+            self._logger.bench('Migration not necessary, early return.')
             return
 
         for i in range(current_version, len(self._migrations), 1):
@@ -38,12 +41,18 @@ class StoreMigrator:
 
         local_store['migration_version'] = self.latest_migration_version()
 
+        self._logger.bench('Migration done.')
+
     def latest_migration_version(self):
         return len(self._migrations)
 
 
 def make_new_local_store(store_migrator):
-    return {'dbs': {}, 'migration_version': store_migrator.latest_migration_version()}
+    return {
+        'dbs': {},
+        'migration_version': store_migrator.latest_migration_version(),
+        'internal': True
+    }
 
 
 class WrongMigrationException(Exception):

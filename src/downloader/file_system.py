@@ -26,15 +26,15 @@ import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 from downloader.config import AllowDelete
-from downloader.constants import K_BASE_SYSTEM_PATH, K_BASE_PATH, K_ALLOW_DELETE
+from downloader.constants import K_ALLOW_DELETE, K_BASE_PATH
 from downloader.other import ClosableValue
 
 
 class FileSystemFactory:
-    def __init__(self, config, logger):
+    def __init__(self, config, path_dictionary, logger):
         self._config = config
+        self._path_dictionary = path_dictionary
         self._logger = logger
-        self._system_paths = set()
         self._unique_temp_filenames = set()
         self._unique_temp_filenames.add(None)
 
@@ -42,7 +42,7 @@ class FileSystemFactory:
         return self.create_for_config(self._config)
 
     def create_for_config(self, config):
-        return _FileSystem(config, self._logger, self._system_paths, self._unique_temp_filenames)
+        return _FileSystem(config, self._path_dictionary, self._logger, self._unique_temp_filenames)
 
 
 class FileSystem(ABC):
@@ -57,10 +57,6 @@ class FileSystem(ABC):
 
     @abstractmethod
     def resolve(self, path):
-        """interface"""
-
-    @abstractmethod
-    def add_system_path(self, path):
         """interface"""
 
     @abstractmethod
@@ -139,15 +135,19 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
+    def save_json(self, db, path):
+        """interface"""
+
+    @abstractmethod
     def unzip_contents(self, file, path, contained_files):
         """interface"""
 
 
 class _FileSystem(FileSystem):
-    def __init__(self, config, logger, system_paths, unique_temp_filenames):
+    def __init__(self, config, path_dictionary, logger, unique_temp_filenames):
         self._config = config
+        self._path_dictionary = path_dictionary
         self._logger = logger
-        self._system_paths = system_paths
         self._unique_temp_filenames = unique_temp_filenames
 
     def temp_file(self):
@@ -162,9 +162,6 @@ class _FileSystem(FileSystem):
 
     def resolve(self, path):
         return str(Path(path).resolve())
-
-    def add_system_path(self, path):
-        self._system_paths.add(path)
 
     def is_file(self, path):
         return os.path.isfile(self._path(path))
@@ -184,7 +181,7 @@ class _FileSystem(FileSystem):
         return Path(self._path(path)).touch()
 
     def move(self, source, target):
-        self._makedirs(str(Path(self._path(target)).parent))
+        self._makedirs(self._parent_folder(target))
         os.replace(self._path(source), self._path(target))
 
     def copy(self, source, target):
@@ -202,8 +199,10 @@ class _FileSystem(FileSystem):
         return self._makedirs(self._path(path))
 
     def make_dirs_parent(self, path):
-        directory = str(Path(self._path(path)).parent)
-        return self._makedirs(directory)
+        return self._makedirs(self._parent_folder(path))
+
+    def _parent_folder(self, path):
+        return absolute_parent_folder(self._path(path))
 
     def _makedirs(self, target):
         try:
@@ -295,6 +294,10 @@ class _FileSystem(FileSystem):
 
         self._unlink(json_path, False)
 
+    def save_json(self, db, path):
+        with open(self._path(path), 'w') as f:
+            json.dump(db, f)
+
     def unzip_contents(self, file, path, contained_files):
         result = subprocess.run(['unzip', '-q', '-o', self._path(file), '-d', self._path(path)], shell=False, stderr=subprocess.STDOUT)
         if result.returncode != 0:
@@ -311,15 +314,17 @@ class _FileSystem(FileSystem):
             return False
 
     def _path(self, path):
-        if os.name == 'nt' and path.startswith('C:\\'):
-            return path
-
         if path[0] == '/':
             return path
 
-        base_path = self._config[K_BASE_SYSTEM_PATH] if path in self._system_paths else self._config[K_BASE_PATH]
+        if path.lower() in self._path_dictionary:
+            return '%s/%s' % (self._path_dictionary[path.lower()], path)
 
-        return '%s/%s' % (base_path, path)
+        return '%s/%s' % (self._config[K_BASE_PATH], path)
+
+
+class InvalidFileResolution(Exception):
+    pass
 
 
 def hash_file(path):
@@ -330,6 +335,10 @@ def hash_file(path):
             file_hash.update(chunk)
             chunk = f.read(8192)
         return file_hash.hexdigest()
+
+
+def absolute_parent_folder(absolute_path):
+    return str(Path(absolute_path).parent)
 
 
 def _load_json_from_zip(path):

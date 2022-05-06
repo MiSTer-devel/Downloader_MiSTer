@@ -23,28 +23,41 @@ import traceback
 import sys
 from pathlib import Path
 
-from downloader.config import config_file_path
-from downloader.logger import FileLogger
-from downloader.full_run_service_factory import make_full_run_service
+from downloader.config import ConfigReader
+from downloader.local_repository import LocalRepositoryProvider
+from downloader.logger import FileLoggerDecorator, PrintLogger
+from downloader.full_run_service_factory import FullRunServiceFactory
 
 
 def main(env):
-    logger = FileLogger()
+    local_repository_provider = LocalRepositoryProvider()
+    logger = FileLoggerDecorator(PrintLogger(), local_repository_provider)
     # noinspection PyBroadException
     try:
-        exit_code = execute_full_run(env, logger)
+        exit_code = execute_full_run(
+            FullRunServiceFactory(logger, local_repository_provider=local_repository_provider),
+            ConfigReader(logger, env),
+            logger
+        )
     except Exception as _:
         logger.print(traceback.format_exc())
         exit_code = 1
 
-    logger.close_logfile()
+    logger.finalize()
     return exit_code
 
 
-def execute_full_run(env, logger):
-    runner = make_full_run_service(env, logger, config_file_path(env, str(Path().resolve())))
+def execute_full_run(full_run_service_factory, config_reader, logger):
+    logger.print('START!')
+    logger.print()
 
-    exit_code = runner.full_run()
+    config = config_reader.read_config(config_reader.calculate_config_path(str(Path().resolve())))
+    runner = full_run_service_factory.create(config)
+
+    if len(sys.argv) == 2 and (sys.argv[1] == '--print-drives' or sys.argv[1] == '-pd'):
+        exit_code = runner.print_drives()
+    else:
+        exit_code = runner.full_run()
 
     if runner.needs_reboot():
         logger.print()

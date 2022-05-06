@@ -28,6 +28,8 @@ class TargetPathRepository:
         self._file_system = file_system
         self._registry = {}
         self._tempfiles = {}
+        self._file_mister = None
+        self._file_mister_new = None
 
     def create_target(self, path, description):
         path, skips_registry = self._fix_path(path)

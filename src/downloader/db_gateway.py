@@ -33,6 +33,8 @@ class DbGateway:
 
     def fetch_all(self, descriptions):
 
+        self._logger.bench('DB Gateway start.')
+
         with TempFilesPool(self._file_system) as temp_files_pool:
 
             descriptions_by_file, local_files, remote_files = self._categorize_files_on_db_url(descriptions, temp_files_pool)
@@ -42,6 +44,8 @@ class DbGateway:
             files_by_section = {descriptions_by_file[file][K_SECTION]: file for file in chain(downloaded_files, local_files)}
 
             dbs, db_errors = self._read_dbs(descriptions, files_by_section)
+
+        self._logger.bench('DB Gateway done.')
 
         return dbs, db_errors + self._identify_download_errors(download_errors, descriptions_by_file)
 

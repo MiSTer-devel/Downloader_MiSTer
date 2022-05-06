@@ -28,7 +28,7 @@ class BasePathRelocator:
     def relocating_base_paths(self, importer_command):
         result = []
         for db, store, config in importer_command.read_dbs():
-            from_base_path = store[K_BASE_PATH]
+            from_base_path = store.read_only().base_path
             to_base_path = config[K_BASE_PATH]
 
             if to_base_path == from_base_path:
@@ -51,8 +51,12 @@ class BasePathRelocator:
         return result
 
     def relocate_non_system_files(self, package):
+        self._logger.bench('Base Path Relocator start.')
+
         package.relocate_non_system_files()
         package.update_store()
+
+        self._logger.bench('Base Path Relocator done.')
 
 
 class BasePathRelocatorPackage:
@@ -67,7 +71,7 @@ class BasePathRelocatorPackage:
 
     def relocate_non_system_files(self):
         files_to_relocate = []
-        for file, description in self._store['files'].items():
+        for file, description in self._store.read_only().files.items():
             if 'path' in description and description['path'] == 'system':
                 continue
 
@@ -113,7 +117,7 @@ class BasePathRelocatorPackage:
         self._logger.print('Cleaning up old folders...')
         folders_to_clean = []
 
-        for folder in self._store['folders']:
+        for folder in self._store.read_only().folders:
             if not self._from_file_system.is_folder(folder):
                 continue
 
@@ -142,11 +146,11 @@ class BasePathRelocatorPackage:
             self._logger.print('Restored: %s' % file)
 
     def update_store(self):
-        self._store[K_BASE_PATH] = self._to_base_path
+        self._store.write_only().set_base_path(self._to_base_path)
 
     @property
     def _from_base_path(self):
-        return self._store[K_BASE_PATH]
+        return self._store.read_only().base_path
 
     @property
     def _to_base_path(self):

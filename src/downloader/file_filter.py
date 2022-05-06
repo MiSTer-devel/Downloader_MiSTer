@@ -122,27 +122,16 @@ class FileFilter:
     def __init__(self, filter_calculator):
         self._filter_calculator = filter_calculator
 
-    def select_filtered_files(self, db, store):
-        if 'filtered_zip_data' in store:
-            for zip_id, zip_data in list(store['filtered_zip_data'].items()):
-                if zip_id not in db.zips:
-                    continue
-
-                for file_path, file_description in zip_data['files'].items():
-                    db.files[file_path] = file_description
-
-                for folder_path, folder_description in zip_data['folders'].items():
-                    db.folders[folder_path] = folder_description
-
-            store.pop('filtered_zip_data')
+    def select_filtered_files(self, db):
+        filtered_zip_data = {}
 
         if self._filter_calculator is None:
-            return db
+            return db, filtered_zip_data
 
         for file_path, file_description in list(db.files.items()):
             if self._filter_calculator.is_filtered(file_description):
                 if 'zip_id' in file_description:
-                    self._add_file_to_store(store, file_path, file_description)
+                    self._add_filtered_file_in_zip(filtered_zip_data, file_path, file_description['zip_id'], file_description)
                 db.files.pop(file_path)
 
         keep_folders = set()
@@ -155,34 +144,26 @@ class FileFilter:
 
             if self._filter_calculator.is_filtered(folder_description):
                 if 'zip_id' in folder_description:
-                    self._add_folder_to_store(store, folder_path, folder_description)
+                    self._add_filtered_folder_in_zip(filtered_zip_data, folder_path, folder_description['zip_id'], folder_description)
                 db.folders.pop(folder_path)
             else:
                 for parent in Path(folder_path).parents:
                     keep_folders.add(str(parent))
 
-        return db
+        return db, filtered_zip_data
 
-    def _add_file_to_store(self, store, file_path, file_description):
-        zip_id = file_description['zip_id']
-        filtered_zip_data = self._filtered_zip_data_by_id(store, zip_id)
-        filtered_zip_data[zip_id]['files'][file_path] = file_description
-
-    def _add_folder_to_store(self, store, folder_path, folder_description):
-        zip_id = folder_description['zip_id']
-        filtered_zip_data = self._filtered_zip_data_by_id(store, zip_id)
-        filtered_zip_data[zip_id]['folders'][folder_path] = folder_description
-
-    def _filtered_zip_data_by_id(self, store, zip_id):
-        filtered_zip_data = self._filtered_zip_data(store)
+    def _filtered_zip_data_by_id(self, filtered_zip_data, zip_id):
         if zip_id not in filtered_zip_data:
             filtered_zip_data[zip_id] = {'files': {}, 'folders': {}}
-        return filtered_zip_data
+        return filtered_zip_data[zip_id]
 
-    def _filtered_zip_data(self, store):
-        if 'filtered_zip_data' not in store:
-            store['filtered_zip_data'] = {}
-        return store['filtered_zip_data']
+    def _add_filtered_file_in_zip(self, filtered_zip_data, file_path, zip_id, file_description):
+        zip = self._filtered_zip_data_by_id(filtered_zip_data, zip_id)
+        zip['files'][file_path] = file_description
+
+    def _add_filtered_folder_in_zip(self, filtered_zip_data, folder_path, zip_id, folder_description):
+        zip = self._filtered_zip_data_by_id(filtered_zip_data, zip_id)
+        zip['folders'][folder_path] = folder_description
 
 
 class FilterCalculator:
