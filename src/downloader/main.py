@@ -64,7 +64,7 @@ def execute_full_run(full_run_service_factory, config_reader, logger):
         logger.print("Rebooting in 10 seconds...")
         sys.stdout.flush()
         time.sleep(2)
-        logger.close_logfile()
+        logger.finalize()
         sys.stdout.flush()
         time.sleep(4)
         subprocess.run(['sync'], shell=False, stderr=subprocess.STDOUT)
