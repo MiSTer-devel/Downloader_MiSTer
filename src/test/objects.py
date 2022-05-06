@@ -27,7 +27,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     MEDIA_FAT, K_BASE_SYSTEM_PATH, K_CONFIG_PATH, K_ZIP_FILE_COUNT_THRESHOLD, K_STORAGE_PRIORITY, MEDIA_USB0, \
     MEDIA_USB1, \
     MEDIA_USB2, KENV_FAIL_ON_FILE_ERROR, KENV_UPDATE_LINUX, KENV_CURL_SSL, KENV_COMMIT, DEFAULT_CURL_SSL_OPTIONS, \
-    K_DEFAULT_DB_ID, K_OPTIONS, MEDIA_USB3
+    K_DEFAULT_DB_ID, MEDIA_USB3
 from downloader.db_options import DbOptions, DbOptionsKind
 from downloader.other import empty_store
 from test.fake_db_entity import DbEntity
@@ -460,6 +460,16 @@ def file_foo_descr():
         "size": 2305019,
         "url": "https://file.foo"
     }
+
+
+def tweak_descr(o, zip_id=True, tags=True, url=True):
+    if not url:
+        o.pop('url')
+    if not zip_id:
+        o.pop('zip_id')
+    if not tags:
+        o.pop('tags')
+    return o
 
 
 def file_descr(delete=None, hash_code=None, size=None, url=None, reboot=None, path=None, tags=None, unzipped_json=None, json=None):

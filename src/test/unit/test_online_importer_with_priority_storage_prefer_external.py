@@ -22,16 +22,65 @@ from test.fake_file_system_factory import fs_data
 from test.objects import empty_test_store, file_nes_smb1, folder_games_nes, media_usb1, config_with, file_s32x_md, \
     media_usb0, file_neogeo_md, file_foo, file_s32x_md_descr, file_neogeo_md_descr, file_nes_contra, \
     db_id_external_drives_2, store_descr, db_id_external_drives_1, folder_games, media_usb2, folder_docs, \
-    folder_docs_s32x, folder_docs_neogeo, media_usb3
+    folder_docs_s32x, folder_docs_neogeo, media_usb3, zip_desc, file_nes_palette_a, \
+    folder_games_nes_palettes
 from test.unit.online_importer_with_priority_storage_test_base import fs_files_smb1_on_usb1, store_smb1_on_usb1, \
     fs_folders_games_on_usb1_usb2_and_fat, fs_folders_nes_on_fat_and_usb1, fs_folders_nes_on_fat_games_on_fat_usb1, \
     OnlineImporterWithPriorityStorageTestBase, fs_folders_nes_on_usb1_and_usb2, _store_files_foo, \
     _store_folders_nes, _store_files_contra, _store_files_neogeo_md, \
     _store_folders_docs_neogeo, _store_files_smb1, _store_files_s32x_md, _store_folders_docs_s32x, \
-    fs_files_smb1_and_contra_on_usb0
+    fs_files_smb1_and_contra_on_usb0, fs_files_nes_palettes_on_fat, fs_folders_nes_palettes_on_fat, \
+    fs_files_nes_palettes_on_usb1, fs_folders_nes_palettes_on_usb1
+from test.zip_objects import zipped_nes_palettes_id, file_nes_palette_a_descr_zipped
 
 
 class TestOnlineImporterWithPriorityStoragePreferExternal(OnlineImporterWithPriorityStorageTestBase):
+    def test_download_zipped_nes_palettes_db___on_empty_setup___downloads_gb_palettes_on_fat(self):
+        store = empty_test_store()
+
+        sut = self.download_zipped_nes_palettes_db(store, fs())
+
+        expected_store = store_descr(
+            files={file_nes_palette_a: file_nes_palette_a_descr_zipped()},
+            folders={
+                folder_games: {"zip_id": zipped_nes_palettes_id},
+                folder_games_nes: {"zip_id": zipped_nes_palettes_id},
+                folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id},
+            },
+            zips={zipped_nes_palettes_id: zip_desc(
+                ["Palettes"],
+                "|games/NES/",
+                "games/NES/Palettes"
+            )}
+        )
+
+        self.assertEqual(expected_store, store)
+        self.assertEqual(fs_data(files=fs_files_nes_palettes_on_fat(), folders=fs_folders_nes_palettes_on_fat()), sut.fs_data)
+        self.assertReports(sut, [file_nes_palette_a])
+
+    def test_download_zipped_nes_palettes_db___on_empty_store_with_games_folder_on_usb1___downloads_gb_palettes_on_usb1(self):
+        store = empty_test_store()
+
+        sut = self.download_zipped_nes_palettes_db(store, fs(folders=[media_usb1(folder_games)]))
+
+        expected_store = store_descr(
+            files_usb1={file_nes_palette_a: file_nes_palette_a_descr_zipped()},
+            folders_usb1={
+                folder_games: {"zip_id": zipped_nes_palettes_id},
+                folder_games_nes: {"zip_id": zipped_nes_palettes_id},
+                folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id},
+            },
+            zips={zipped_nes_palettes_id: zip_desc(
+                ["Palettes"],
+                "|games/NES/",
+                "games/NES/Palettes"
+            )}
+        )
+
+        self.assertEqual(expected_store, store)
+        self.assertEqual(fs_data(files=fs_files_nes_palettes_on_usb1(), folders=fs_folders_nes_palettes_on_usb1()), sut.fs_data)
+        self.assertReports(sut, [file_nes_palette_a])
+
     def test_download_smb1_db___on_empty_store_with_nes_folder_on_usb1_and_usb2___downloads_smb1_on_usb1(self):
         store = empty_test_store()
 
@@ -106,4 +155,9 @@ class TestOnlineImporterWithPriorityStoragePreferExternal(OnlineImporterWithPrio
 
 
 def fs(files=None, folders=None, base_path=None):
-    return ImporterImplicitInputs(config=config_with(storage_priority="prefer_external", base_system_path=MEDIA_FAT), files=files, folders=folders, base_path=base_path)
+    return ImporterImplicitInputs(
+        config=config_with(storage_priority="prefer_external", base_system_path=MEDIA_FAT, zip_file_count_threshold=0),
+        files=files,
+        folders=folders,
+        base_path=base_path
+    )

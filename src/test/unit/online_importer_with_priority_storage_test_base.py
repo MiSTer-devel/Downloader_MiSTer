@@ -24,8 +24,9 @@ from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1
     folder_games_nes_palettes, db_test, file_nes_manual, file_nes_manual_descr, folder_docs, folder_docs_nes, db_demo, \
     db_id_external_drives_1, db_id_external_drives_2, file_neogeo_md, file_neogeo_md_descr, file_s32x_md, \
     file_s32x_md_descr, \
-    folder_docs_neogeo, folder_docs_s32x, file_foo, file_foo_descr, media_usb0
+    folder_docs_neogeo, folder_docs_s32x, file_foo, file_foo_descr, media_usb0, zip_desc
 from test.fake_online_importer import OnlineImporter
+from test.zip_objects import zipped_nes_palettes_id, file_nes_palette_a_descr_zipped
 
 
 class OnlineImporterWithPriorityStorageTestBase(unittest.TestCase):
@@ -44,6 +45,9 @@ class OnlineImporterWithPriorityStorageTestBase(unittest.TestCase):
 
     def download_pdfviewer_db(self, store, inputs):
         return self._download_db(db_with_pdfviewer(), store, inputs)
+
+    def download_zipped_nes_palettes_db(self, store, inputs):
+        return self._download_db(db_with_zipped_nes_palettes(), store, inputs)
 
     def download_smb1_in_db_test_and_nes_manual_in_db_demo(self, inputs):
         local_store_dbs = {
@@ -175,3 +179,23 @@ def db_with_smb1_and_palettes(): return db_entity(files=_store_files_smb1_and_ne
 def db_with_pdfviewer(): return db_entity(db_id=DISTRIBUTION_MISTER_DB_ID, files=_store_files_pdfviewer(), folders=_store_folders_linux())
 def db_external_drives_1(): return db_entity(db_id=db_id_external_drives_1, files=_store_files_foo_smb1_and_s32_md(), folders=[*_store_folders_nes(), *_store_folders_docs_s32x()])
 def db_external_drives_2(): return db_entity(db_id=db_id_external_drives_2, files=_store_files_contra_and_neogeo_md(), folders=[*_store_folders_nes(), *_store_folders_docs_neogeo()])
+def db_with_zipped_nes_palettes(): return db_entity(
+    folders=_store_folders_nes(),
+    zips={zipped_nes_palettes_id: zip_desc(
+        ["Palettes"],
+        "|games/NES/",
+        "games/NES/Palettes",
+        summary={
+            "files": {file_nes_palette_a: file_nes_palette_a_descr_zipped()},
+            "folders": {
+                folder_games: {"zip_id": zipped_nes_palettes_id},
+                folder_games_nes: {"zip_id": zipped_nes_palettes_id},
+                folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id},
+            }
+        },
+        zipped_files={
+            "files": {file_nes_palette_a[1:]: file_nes_palette_a_descr()},
+            "folders": {}
+        }
+    )}
+)

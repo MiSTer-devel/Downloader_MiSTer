@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import K_BASE_PATH
-from test.objects import zip_desc, media_fat
+from test.objects import zip_desc, file_nes_palette_a, tweak_descr
 
 
 def cheats_folder_tag_dictionary():
@@ -24,6 +24,7 @@ def cheats_folder_tag_dictionary():
 
 
 cheats_folder_id = 'cheats_id'
+zipped_nes_palettes_id = 'zipped_nes_palettes_id'
 cheats_folder_name = 'Cheats'
 
 
@@ -163,6 +164,16 @@ def zipped_files_from_cheats_folder():
     }
 
 
+
+def file_nes_palette_a_descr_zipped():
+    return {
+        "hash": file_nes_palette_a[1:],
+        "size": 2905020,
+        "url": "https://a.pal",
+        "zip_id": zipped_nes_palettes_id
+    }
+
+
 def with_installed_cheats_folder_on_fs(file_system_state):
     file_system_state \
         .add_folders(cheats_folder_folders())\
@@ -171,12 +182,3 @@ def with_installed_cheats_folder_on_fs(file_system_state):
         .add_file(base_path=None, file=cheats_folder_sms_file_path,
                    description={"hash": cheats_folder_sms_file_hash, "size": cheats_folder_sms_file_size})
 
-
-def tweak_descr(o, zip_id=True, tags=True, url=True):
-    if not url:
-        o.pop('url')
-    if not zip_id:
-        o.pop('zip_id')
-    if not tags:
-        o.pop('tags')
-    return o
