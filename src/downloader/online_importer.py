@@ -254,7 +254,7 @@ class OnlineImporter:
             for drive in read_store.external_drives:
                 delete_folders = []
                 for folder_path, folder_description in read_store.external_folders(drive).items():
-                    if folder_path in db.folders:
+                    if folder_path in db_folders:
                         continue
                     base_path = config[K_BASE_PATH]
                     if 'path' in folder_description and folder_description['path'] == 'system':
@@ -393,6 +393,17 @@ class _Resolver:
                 priority_files[file_path] = base_path
 
             self._db.files[file_path] = description
+
+        for zip_id, zip_description in self._db.zips.items():
+            folder_path = zip_description['path']
+
+            base_path = self._path_resolver.resolve_folder_path(folder_path)
+
+            if folder_path[0] == '|':
+                folder_path = folder_path[1:]
+
+            if base_path is not None and self._read_only_store.base_path != base_path:
+                priority_sub_folders[folder_path] = base_path
 
         return self._db
 
@@ -627,10 +638,12 @@ class _OnlineDatabaseImporter:
             zip_id = zip_ids_by_temp_zip[temp_zip]
             zipped_files = needed_zips[zip_id]
 
-            path = self._db.zips[zip_id]['path']
+            zip_path = self._db.zips[zip_id]['path']
+            if zip_path[0] == '|':
+                zip_path = zip_path[1:]
             contents = ', '.join(self._db.zips[zip_id]['contents'])
-            self._logger.print('Unpacking %s at %s' % (contents, 'the root' if path == './' else path))
-            self._file_system.unzip_contents(temp_zip, self._db.zips[zip_id]['path'], list(zipped_files['files']))
+            self._logger.print('Unpacking %s at %s' % (contents, 'the root' if zip_path == './' else zip_path))
+            self._file_system.unzip_contents(temp_zip, zip_path, list(zipped_files['files']))
             self._file_system.unlink(temp_zip)
             file_downloader.mark_unpacked_zip(zip_id, self._db.zips[zip_id]['base_files_url'])
 
@@ -678,6 +691,8 @@ class _OnlineDatabaseImporter:
 
             elif folder_path in priority_sub_folders:
                 drive = priority_sub_folders[folder_path]
+                full_folder_path = '%s/%s' % (drive, folder_path)
+                self._file_system.make_dirs(full_folder_path)
                 self._write_only_store.add_external_folder(drive, folder_path, folder_description)
                 if folder_path in self._read_only_store.folders and not self._file_system.is_folder(folder_path):
                     self._write_only_store.remove_folder(folder_path)
