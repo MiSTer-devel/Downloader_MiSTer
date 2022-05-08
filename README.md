@@ -2,10 +2,6 @@
 
 This tool installs and **updates all the cores** and other extra files for your *MiSTer*. It also updates the menu core, the MiSTer firmware and the Linux system. The source for all downloads is the [MiSTer Distribution](https://github.com/MiSTer-devel/Distribution_MiSTer) repository.
 
-The **MiSTer Downloader** is a substitute for the [MiSTer Updater](https://github.com/MiSTer-devel/Updater_script_MiSTer), and is meant to offer a more safe and robust experience, while being much faster.
-
-As a drawback, the **Downloader** is not backwards compatible with the old INI files that were configured for the [MiSTer Updater](https://github.com/MiSTer-devel/Updater_script_MiSTer). In fact, as of today, this tool doesn't implement many fine-grained features that allow you to customize the updating process in depth. In case you value these features, consider to keep using the [MiSTer Updater](https://github.com/MiSTer-devel/Updater_script_MiSTer) as usual. Both tools will coexist in the near future.
-
 ### Setup and Usage
 
 Download this [ZIP file](https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/MiSTer_Downloader.zip) and extract `downloader.sh` to your `/Scripts` folder on your primary SD card (create that folder if it doesn't exist). You only need to perform this operation once, since this tool self-updates itself.
