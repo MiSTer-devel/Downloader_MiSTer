@@ -43,16 +43,19 @@ class LocalStoreWrapper:
 
 class StoreWrapper:
     def __init__(self, store, local_store_wrapper):
+        externals = set()
         if 'external' in store:
             for drive, external in store['external'].items():
                 if 'files' in external:
                     store['files'].update(external['files'])
+                    externals.update(external['files'])
                 if 'folders' in external:
                     store['folders'].update(external['folders'])
+                    externals.update(external['folders'])
 
         self._store = store
         self._local_store_wrapper = local_store_wrapper
-        self._read_only = _ReadOnlyStoreAdapter(self._store)
+        self._read_only = _ReadOnlyStoreAdapter(self._store, externals)
         self._write_only = _WriteOnlyStoreAdapter(self._store, self._local_store_wrapper)
 
     def unwrap_store(self):
@@ -213,8 +216,9 @@ class _WriteOnlyStoreAdapter:
 
 
 class _ReadOnlyStoreAdapter:
-    def __init__(self, store):
+    def __init__(self, store, externals):
         self._store = store
+        self._externals = externals
 
     def hash_file(self, file):
         if file not in self._store['files']:
@@ -288,7 +292,16 @@ class _ReadOnlyStoreAdapter:
         return self._store['zips'][zip_id] if zip_id in self._store['zips'] else {}
 
     def entries_in_zip(self, entry_kind, zip_ids):
-        return {path: fd for path, fd in self._store[entry_kind].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids}
+        result = {}
+        for path, fd in self._store[entry_kind].items():
+            if 'zip_id' not in fd or fd['zip_id'] not in zip_ids:
+                continue
+            if path in self._externals:
+                result['|' + path] = fd
+            else:
+                result[path] = fd
+
+        return result
 
     @property
     def base_path(self):
@@ -300,4 +313,35 @@ class _ReadOnlyStoreAdapter:
 
 
 def equal_dicts(a, b):
+    if len(a) != len(b):
+        return False
+
+    for key, value in a.items():
+        if key not in b:
+            return False
+
+        if not equal_values(value, b[key]):
+            return False
+
+    return True
+
+
+def equal_lists(a, b):
+    if len(a) != len(b):
+        return False
+
+    for index, value in enumerate(a):
+        if not equal_values(value, b[index]):
+            return False
+
+    return True
+
+
+def equal_values(a, b):
+    if isinstance(a, dict) and not equal_dicts(a, b):
+        return False
+
+    if isinstance(a, list) and not equal_lists(a, b):
+        return False
+
     return a == b
