@@ -22,7 +22,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, FILE_PDFViewer, FILE
     K_PARALLEL_UPDATE, K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, FOLDER_screenshots, \
     FOLDER_savestates, FOLDER_saves, FOLDER_linux, FILE_MiSTer_new, FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, \
     FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, \
-    FILE_downloader_launcher_script, FILE_MiSTer_old, K_BASE_SYSTEM_PATH, K_START_TIME
+    FILE_downloader_launcher_script, FILE_MiSTer_old, K_BASE_SYSTEM_PATH
 from downloader.file_filter import BadFileFilterPartException
 from downloader.other import UnreachableException, cache
 
@@ -43,7 +43,8 @@ class _Session:
 
 
 class OnlineImporter:
-    def __init__(self, file_filter_factory, file_system_factory, file_downloader_factory, path_resolver_factory, local_repository, external_drives_repository, waiter, logger):
+    def __init__(self, file_filter_factory, file_system_factory, file_downloader_factory, path_resolver_factory,
+                 local_repository, external_drives_repository, waiter, logger):
         self._file_filter_factory = file_filter_factory
         self._file_system_factory = file_system_factory
         self._file_downloader_factory = file_downloader_factory
@@ -70,7 +71,9 @@ class OnlineImporter:
             restored_db = _OnlineFilteredZipData(db, read_only_store).restore_filtered_zip_data()
 
             self._logger.bench('Expanding summaries...')
-            zip_summaries = _OnlineZipSummaries(restored_db, write_only_store, read_only_store, full_resync, config, file_system, self._file_downloader_factory, self._logger, self._base_session)
+            zip_summaries = _OnlineZipSummaries(restored_db, write_only_store, read_only_store, full_resync, config,
+                                                file_system, self._file_downloader_factory, self._logger,
+                                                self._base_session)
             expanded_db = zip_summaries.expand_summaries()
 
             self._logger.bench('Filtering Database...')
@@ -84,10 +87,13 @@ class OnlineImporter:
 
             self._logger.bench('Translating paths...')
             path_resolver = self._path_resolver_factory.create(config, externals['priority_top_folders'])
-            resolver = _Resolver(filtered_db, read_only_store, config, path_resolver, self._local_repository, self._logger, self._base_session, externals)
+            resolver = _Resolver(filtered_db, read_only_store, config, path_resolver, self._local_repository,
+                                 self._logger, self._base_session, externals)
             resolved_db = resolver.translate_paths()
 
-            db_importer = _OnlineDatabaseImporter(resolved_db, write_only_store, read_only_store, externals, full_resync, config, file_system, self._file_downloader_factory, self._logger, self._base_session, self._external_drives_repository)
+            db_importer = _OnlineDatabaseImporter(resolved_db, write_only_store, read_only_store, externals,
+                                                  full_resync, config, file_system, self._file_downloader_factory,
+                                                  self._logger, self._base_session, self._external_drives_repository)
 
             self._logger.bench('Selecting changed files...')
             changed_files, needed_zips = db_importer.select_changed_files()
@@ -286,7 +292,8 @@ class OnlineImporter:
         try:
             return self._file_filter_factory.create(db, config)
         except BadFileFilterPartException as e:
-            raise WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e)))
+            raise WrongDatabaseOptions(
+                "Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e)))
 
     def files_that_failed(self):
         return self._base_session.files_that_failed
@@ -317,7 +324,8 @@ class _DatabaseValidator:
 
     def _assert_valid_path(self, path):
         if not isinstance(path, str):
-            raise InvalidDownloaderPath("Path is not a string '%s', contact with the author of the database." % str(path))
+            raise InvalidDownloaderPath(
+                "Path is not a string '%s', contact with the author of the database." % str(path))
 
         if path == '' or path[0] == '/' or path[0] == '.' or path[0] == '\\':
             raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
@@ -425,7 +433,8 @@ class _OnlineFilteredZipData:
 
 
 class _OnlineZipSummaries:
-    def __init__(self, db, write_only_store, read_only_store, full_resync, config, file_system, file_downloader_factory, logger, session):
+    def __init__(self, db, write_only_store, read_only_store, full_resync, config, file_system, file_downloader_factory,
+                 logger, session):
         self._db = db
         self._write_only_store = write_only_store
         self._read_only_store = read_only_store
@@ -462,7 +471,8 @@ class _OnlineZipSummaries:
             elif 'internal_summary' in db_zip_desc:
                 zip_ids_from_internal_summary.append(zip_id)
             else:
-                raise UnreachableException('Unreachable code path for: %s.%s' % (self._db.db_id, zip_id)) # pragma: no cover
+                raise UnreachableException(
+                    'Unreachable code path for: %s.%s' % (self._db.db_id, zip_id))  # pragma: no cover
 
         if len(zip_ids_from_internal_summary) > 0:
             self._import_zip_ids_from_internal_summaries(zip_ids_from_internal_summary)
@@ -499,7 +509,8 @@ class _OnlineZipSummaries:
             summary_downloader.queue_file(self._db.zips[zip_id]['summary_file'], temp_zip)
 
         summary_downloader.download_files(self._is_first_run())
-        downloaded_summaries = [(zip_ids_by_temp_zip[temp_zip], temp_zip) for temp_zip in summary_downloader.correctly_downloaded_files()]
+        downloaded_summaries = [(zip_ids_by_temp_zip[temp_zip], temp_zip) for temp_zip in
+                                summary_downloader.correctly_downloaded_files()]
         failed_zip_ids = [zip_ids_by_temp_zip[temp_zip] for temp_zip in summary_downloader.errors()]
 
         self._logger.print()
@@ -525,14 +536,16 @@ class _OnlineZipSummaries:
         self._db.folders.update(self._read_only_store.entries_in_zip('folders', zip_ids))
 
     def _entries_from_store(self, entry_kind, zip_ids):
-        return {path: fd for path, fd in self._read_only_store[entry_kind].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids}
+        return {path: fd for path, fd in self._read_only_store[entry_kind].items() if
+                'zip_id' in fd and fd['zip_id'] in zip_ids}
 
     def _is_first_run(self):
         return self._read_only_store.has_no_files
 
 
 class _OnlineDatabaseImporter:
-    def __init__(self, db, write_only_store, read_only_store, externals, full_resync, config, file_system, file_downloader_factory, logger, session, external_drives_repository):
+    def __init__(self, db, write_only_store, read_only_store, externals, full_resync, config, file_system,
+                 file_downloader_factory, logger, session, external_drives_repository):
         self._db = db
         self._write_only_store = write_only_store
         self._read_only_store = read_only_store
@@ -555,14 +568,24 @@ class _OnlineDatabaseImporter:
                 self._logger.print('Already been processed by database: %s' % self._session.processed_files[file_path])
                 continue
 
-            if not self._full_resync and self._read_only_store.hash_file(file_path) == file_description['hash'] and self._file_system.is_file(file_path):
-                self._add_file_to_store(file_path, file_description)
-                continue
+            if self._file_system.is_file(file_path):
+                store_hash = self._read_only_store.hash_file(file_path)
 
-            if 'overwrite' in file_description and not file_description['overwrite'] and self._file_system.is_file(file_path):
-                if self._file_system.hash(file_path) != file_description['hash']:
-                    self._session.add_new_file_not_overwritten(self._db.db_id, file_path)
-                continue
+                if not self._full_resync and store_hash == file_description['hash']:
+                    self._add_file_to_store(file_path, file_description)
+                    continue
+
+                if store_hash == 'file_does_not_exist_so_cant_get_hash' and self._file_system.hash(file_path) == file_description['hash']:
+                    self._logger.print('No changes: %s' % file_path)
+                    self._add_file_to_store(file_path, file_description)
+                    self._session.correctly_installed_files.append(file_path)
+                    self._session.processed_files[file_path] = self._db.db_id
+                    continue
+
+                if 'overwrite' in file_description and not file_description['overwrite']:
+                    if self._file_system.hash(file_path) != file_description['hash']:
+                        self._session.add_new_file_not_overwritten(self._db.db_id, file_path)
+                    continue
 
             changed_files[file_path] = file_description
 
@@ -620,7 +643,8 @@ class _OnlineDatabaseImporter:
             zipped_files = needed_zips[zip_id]
 
             less_file_count = len(zipped_files['files']) < self._config[K_ZIP_FILE_COUNT_THRESHOLD]
-            less_accumulated_mbs = zipped_files['total_size'] < (1000 * 1000 * self._config[K_ZIP_ACCUMULATED_MB_THRESHOLD])
+            less_accumulated_mbs = zipped_files['total_size'] < (
+                        1000 * 1000 * self._config[K_ZIP_ACCUMULATED_MB_THRESHOLD])
 
             if less_file_count and less_accumulated_mbs:
                 continue
@@ -686,7 +710,8 @@ class _OnlineDatabaseImporter:
                         self._write_only_store.add_folder(folder_path, folder_description)
                     else:
                         self._write_only_store.add_external_folder(drive, folder_path, folder_description)
-                        if folder_path in self._read_only_store.folders and not self._file_system.is_folder(folder_path):
+                        if folder_path in self._read_only_store.folders and not self._file_system.is_folder(
+                                folder_path):
                             self._write_only_store.remove_folder(folder_path)
 
             elif folder_path in priority_sub_folders:
@@ -741,7 +766,9 @@ def no_distribution_mister_invalid_paths():
 
 @cache
 def invalid_paths():
-    return tuple(item.lower() for item in [FILE_MiSTer_ini, FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, FILE_downloader_launcher_script, FILE_MiSTer_new])
+    return tuple(item.lower() for item in
+                 [FILE_MiSTer_ini, FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini,
+                  FILE_MiSTer_alt_3_ini, FILE_downloader_launcher_script, FILE_MiSTer_new])
 
 
 @cache

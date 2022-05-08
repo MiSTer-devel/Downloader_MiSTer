@@ -35,6 +35,16 @@ from test.zip_objects import zipped_nes_palettes_id, file_nes_palette_a_descr_zi
 
 
 class TestOnlineImporterWithPriorityStoragePreferExternal(OnlineImporterWithPriorityStorageTestBase):
+
+    # @TODO: missing case
+    # 1. setup with games and docs on fat
+    # 2. copied all files to usb0
+    # 3. run -> palettes get installed at fat instead of usb0
+    # 4. problem was -> _import_zip_ids_from_store is used to recover summaries from the store, but there
+    #                   paths are not stored with | symbol. Needed to change entries_in_zip to account for that.
+    # This is not yet covered in a unit test, because externals are handled in a different layer
+    # Need to do a system test at the very least
+
     def test_download_zipped_nes_palettes_db___on_empty_setup___downloads_gb_palettes_on_fat(self):
         store = empty_test_store()
 

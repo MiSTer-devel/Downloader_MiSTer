@@ -144,7 +144,7 @@ class CurlDownloaderAbstract(FileDownloader):
                     if 'zip_id' in description and description['zip_id'] in self._unpacked_zips:
                         self._logger.print('Unpacked: %s' % path)
                     else:
-                        self._logger.print('No changes: %s' % path)
+                        self._logger.print('No changes: %s' % path)  # @TODO This scenario might be redundant now, since it's also checked in the Online Importer
                     self._correct_downloads.append(path)
                     continue
                 else:
