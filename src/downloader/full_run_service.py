@@ -52,6 +52,7 @@ class FullRunService:
             self._logger.print(drive)
 
         self._logger.bench('Print Drives done.')
+        return 0
 
     def full_run(self):
         self._logger.bench('Full Run start.')

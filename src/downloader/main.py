@@ -34,7 +34,8 @@ def main(env):
     try:
         exit_code = execute_full_run(
             FullRunServiceFactory(logger, local_repository_provider=local_repository_provider),
-            ConfigReader(logger, env)
+            ConfigReader(logger, env),
+            sys.argv
         )
     except Exception as _:
         logger.print(traceback.format_exc())
@@ -44,11 +45,11 @@ def main(env):
     return exit_code
 
 
-def execute_full_run(full_run_service_factory, config_reader):
+def execute_full_run(full_run_service_factory, config_reader, argv):
     config = config_reader.read_config(config_reader.calculate_config_path(str(Path().resolve())))
     runner = full_run_service_factory.create(config)
 
-    if len(sys.argv) == 2 and (sys.argv[1] == '--print-drives' or sys.argv[1] == '-pd'):
+    if len(argv) == 2 and (argv[1] == '--print-drives' or argv[1] == '-pd'):
         exit_code = runner.print_drives()
     else:
         exit_code = runner.full_run()
