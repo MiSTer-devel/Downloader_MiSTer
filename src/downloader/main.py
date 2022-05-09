@@ -17,8 +17,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import time
-import subprocess
 import traceback
 import sys
 from pathlib import Path
@@ -36,8 +34,7 @@ def main(env):
     try:
         exit_code = execute_full_run(
             FullRunServiceFactory(logger, local_repository_provider=local_repository_provider),
-            ConfigReader(logger, env),
-            logger
+            ConfigReader(logger, env)
         )
     except Exception as _:
         logger.print(traceback.format_exc())
@@ -47,10 +44,7 @@ def main(env):
     return exit_code
 
 
-def execute_full_run(full_run_service_factory, config_reader, logger):
-    logger.print('START!')
-    logger.print()
-
+def execute_full_run(full_run_service_factory, config_reader):
     config = config_reader.read_config(config_reader.calculate_config_path(str(Path().resolve())))
     runner = full_run_service_factory.create(config)
 
@@ -58,19 +52,5 @@ def execute_full_run(full_run_service_factory, config_reader, logger):
         exit_code = runner.print_drives()
     else:
         exit_code = runner.full_run()
-
-    if runner.needs_reboot():
-        logger.print()
-        logger.print("Rebooting in 10 seconds...")
-        sys.stdout.flush()
-        time.sleep(2)
-        logger.finalize()
-        sys.stdout.flush()
-        time.sleep(4)
-        subprocess.run(['sync'], shell=False, stderr=subprocess.STDOUT)
-        time.sleep(4)
-        subprocess.run(['sync'], shell=False, stderr=subprocess.STDOUT)
-        time.sleep(30)
-        subprocess.run(['reboot', 'now'], shell=False, stderr=subprocess.STDOUT)
 
     return exit_code

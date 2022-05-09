@@ -15,8 +15,6 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-import datetime
-import time
 
 from downloader.constants import DISTRIBUTION_MISTER_DB_ID, FILE_PDFViewer, FILE_lesskey, FILE_glow, K_BASE_PATH, \
     K_PARALLEL_UPDATE, K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, FOLDER_screenshots, \
@@ -536,8 +534,7 @@ class _OnlineZipSummaries:
         self._db.folders.update(self._read_only_store.entries_in_zip('folders', zip_ids))
 
     def _entries_from_store(self, entry_kind, zip_ids):
-        return {path: fd for path, fd in self._read_only_store[entry_kind].items() if
-                'zip_id' in fd and fd['zip_id'] in zip_ids}
+        return {path: fd for path, fd in self._read_only_store[entry_kind].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids}
 
     def _is_first_run(self):
         return self._read_only_store.has_no_files
@@ -722,7 +719,7 @@ class _OnlineDatabaseImporter:
                 if folder_path in self._read_only_store.folders and not self._file_system.is_folder(folder_path):
                     self._write_only_store.remove_folder(folder_path)
             else:
-                raise UnreachableException('Why!')
+                raise UnreachableException('Why!')  # pragma: no cover
 
     def remove_deleted_files(self):
         files_to_delete = self._read_only_store.list_missing_files(self._db.files)
