@@ -114,7 +114,7 @@ class SandboxTestBase(unittest.TestCase):
         #return contextlib.suppress()
         return self.subTest(message)
 
-    def run_execute_full_run(self, ini_path, external_drives_repository_factory, logger):
+    def run_execute_full_run(self, ini_path, external_drives_repository_factory, logger, argv=None):
         env = default_env()
         env[KENV_DOWNLOADER_LAUNCHER_PATH] = str(Path(ini_path).with_suffix('.sh'))
         env[KENV_UPDATE_LINUX] = 'false'
@@ -127,7 +127,7 @@ class SandboxTestBase(unittest.TestCase):
 
         config_reader = ConfigReader(logger, env)
         factory = FullRunServiceFactory(logger, LocalRepositoryProvider(), external_drives_repository_factory=external_drives_repository_factory)
-        return execute_full_run(factory, config_reader)
+        return execute_full_run(factory, config_reader, argv or [])
 
     def find_all_files(self, directory):
         return sorted(self._scan_files(directory), key=lambda t: t[0].lower())

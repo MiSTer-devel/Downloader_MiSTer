@@ -19,6 +19,8 @@ import os
 import shutil
 from pathlib import Path
 from downloader.constants import K_BASE_PATH, FILE_mister_downloader_needs_reboot
+from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
+from downloader.logger import PrintLogger
 from test.system.quick.sandbox_test_base import SandboxTestBase, tmp_delme_sandbox, local_store_files, load_json, hashes, cleanup
 from test.fake_store_migrator import StoreMigrator
 from downloader.file_system import hash_file
@@ -240,3 +242,8 @@ class TestSandboxedInstall(SandboxTestBase):
     def test_small_db_3(self):
         self.assertExecutesCorrectly("test/system/fixtures/small_db_install/small_db_3.ini")
         self.assertFalse(os.path.isfile(FILE_mister_downloader_needs_reboot))
+
+
+    def test_print_drives(self):
+        exit_code = self.run_execute_full_run(self.sandbox_ini, ExternalDrivesRepositoryFactory(), PrintLogger(), ['', '--print-drives'])
+        self.assertEqual(0, exit_code)

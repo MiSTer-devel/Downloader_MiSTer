@@ -1,0 +1,13 @@
+/dev/loop8 / ext4 rw,noatime,nodiratime 0 0
+/dev/root /media/fat exfat rw,sync,dirsync,noatime,nodiratime,fmask=0022,dmask=0022,iocharset=utf8,namecase=0,errors=remount-ro 0 0
+devtmpfs /dev devtmpfs rw,relatime,size=252176k,nr_inodes=63044,mode=755 0 0
+proc /proc proc rw,relatime 0 0
+devpts /dev/pts devpts rw,relatime,gid=5,mode=620,ptmxmode=666 0 0
+tmpfs /dev/shm tmpfs rw,relatime,mode=777 0 0
+tmpfs /tmp tmpfs rw,relatime 0 0
+tmpfs /run tmpfs rw,nosuid,nodev,relatime,mode=755 0 0
+sysfs /sys sysfs rw,relatime 0 0
+tmpfs /var/lib/samba tmpfs rw,relatime 0 0
+/dev/loop0 /var/lib/bluetooth ext4 rw,sync,dirsync,noatime,nodiratime 0 0
+//10.181.41.132/MiSTer /media/fat/cifs cifs rw,relatime,vers=default,cache=strict,username=jose,uid=0,noforceuid,gid=0,noforcegid,addr=10.181.41.132,file_mode=0755,dir_mode=0755,soft,nounix,serverino,mapposix,rsize=4194304,wsize=4194304,bsize=1048576,echo_interval=60,actimeo=1 0 0
+/dev/sda1 /media/usb0 exfat rw,sync,nodev,noexec,noatime,nodiratime,fmask=0022,dmask=0022,iocharset=utf8,namecase=0,errors=remount-ro 0 0
