@@ -127,7 +127,7 @@ class SandboxTestBase(unittest.TestCase):
 
         config_reader = ConfigReader(logger, env)
         factory = FullRunServiceFactory(logger, LocalRepositoryProvider(), external_drives_repository_factory=external_drives_repository_factory)
-        return execute_full_run(factory, config_reader, logger)
+        return execute_full_run(factory, config_reader)
 
     def find_all_files(self, directory):
         return sorted(self._scan_files(directory), key=lambda t: t[0].lower())

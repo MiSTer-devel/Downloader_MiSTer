@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import datetime
+import sys
 import time
 
 from downloader.config import UpdateLinuxEnvironment
@@ -27,7 +28,9 @@ from downloader.other import format_files_message
 
 
 class FullRunService:
-    def __init__(self, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository):
+    def __init__(self, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter):
+        self._waiter = waiter
+        self._os_utils = os_utils
         self._external_drives_repository = external_drives_repository
         self._certificates_fix = certificates_fix
         self._base_path_relocator = base_path_relocator
@@ -54,9 +57,27 @@ class FullRunService:
         self._logger.bench('Full Run start.')
         result = self._full_run_impl()
         self._logger.bench('Full Run done.')
+
+        if self._needs_reboot():
+            self._logger.print()
+            self._logger.print("Rebooting in 10 seconds...")
+            sys.stdout.flush()
+            self._waiter.sleep(2)
+            self._logger.finalize()
+            sys.stdout.flush()
+            self._waiter.sleep(4)
+            self._os_utils.sync()
+            self._waiter.sleep(4)
+            self._os_utils.sync()
+            self._waiter.sleep(30)
+            self._os_utils.reboot()
+
         return result
 
     def _full_run_impl(self):
+        self._logger.print('START!')
+        self._logger.print()
+
         if not self._certificates_fix.fix_certificates_if_needed():
             return 1
 
@@ -145,5 +166,5 @@ class FullRunService:
         self._logger.print()
         self._logger.print(' * Delete any protected file that you wish to install, and run this again.')
 
-    def needs_reboot(self):
+    def _needs_reboot(self):
         return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.needs_reboot())

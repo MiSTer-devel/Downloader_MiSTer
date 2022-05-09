@@ -23,6 +23,7 @@ from downloader.file_downloader import make_file_downloader_factory
 from downloader.file_filter import FileFilterFactory
 from downloader.file_system import FileSystemFactory
 from downloader.full_run_service import FullRunService
+from downloader.os_utils import LinuxOsUtils
 from downloader.storage_priority_resolver import StoragePriorityResolver
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository
@@ -73,5 +74,7 @@ class FullRunServiceFactory:
             RebootCalculator(config, self._logger, system_file_system),
             BasePathRelocator(file_system_factory, waiter, self._logger),
             CertificatesFix(config, system_file_system, waiter, self._logger),
-            external_drives_repository
+            external_drives_repository,
+            LinuxOsUtils(),
+            waiter
         )

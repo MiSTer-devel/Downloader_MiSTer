@@ -17,9 +17,10 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 from downloader.config import UpdateLinuxEnvironment
+from test.fake_os_utils import SpyOsUtils
 from test.fake_full_run_service import FullRunService
 from test.objects import raw_db_empty_descr, raw_db_empty_with_linux_descr, raw_db_wrong_descr, db_empty
 
@@ -41,32 +42,61 @@ class TestFullRunService(unittest.TestCase):
         exit_code = FullRunService.with_single_empty_db().full_run()
         self.assertEqual(exit_code, 1)
 
-    def test_full_run___database_with_new_linux___calls_update_linux_and_returns_0(self):
-        linux_updater = Mock()
-        exit_code = FullRunService.with_single_db(db_empty, raw_db_empty_with_linux_descr(), linux_updater=linux_updater).full_run()
+    def test_full_run___database_with_old_linux___calls_update_linux_and_returns_0(self):
+        os_utils = SpyOsUtils()
+        linux_updater = old_linux()
+
+        exit_code = FullRunService.with_single_db(db_empty, raw_db_empty_with_linux_descr(), linux_updater=linux_updater, os_utils=os_utils).full_run()
+
         self.assertEqual(exit_code, 0)
         linux_updater.update_linux.assert_called()
+        self.assertEqual(0, os_utils.calls_to_reboot)
 
-    def test_full_run___database_with_new_linux_and_linux_update_environment_only___calls_update_linux_and_returns_0(self):
-        linux_updater = Mock()
+    def test_full_run___database_with_new_linux___calls_update_linux_and_reboots(self):
+        os_utils = SpyOsUtils()
+        linux_updater = new_linux()
+
+        FullRunService.with_single_db(db_empty, raw_db_empty_with_linux_descr(), linux_updater=linux_updater, os_utils=os_utils).full_run()
+
+        self.assertEqual(1, os_utils.calls_to_reboot)
+
+    def test_full_run___database_with_old_linux_and_linux_update_environment_only___calls_update_linux_and_returns_0(self):
+        linux_updater = old_linux()
+
         exit_code = FullRunService.with_single_db(db_empty, raw_db_empty_with_linux_descr(), linux_updater=linux_updater, linux_update_environment=UpdateLinuxEnvironment.ONLY).full_run()
+
         self.assertEqual(exit_code, 0)
         linux_updater.update_linux.assert_called()
 
     def test_full_run___database_with_old_linux_and_linux_update_environment_only___calls_update_linux_and_returns_0(self):
-        linux_updater = Mock()
-        linux_updater.needs_reboot.return_value = False
+        linux_updater = old_linux()
+
         exit_code = FullRunService.with_single_db(db_empty, raw_db_empty_with_linux_descr(), linux_updater=linux_updater, linux_update_environment=UpdateLinuxEnvironment.ONLY).full_run()
+
         self.assertEqual(exit_code, 0)
         linux_updater.update_linux.assert_called()
 
-    def test_full_run___database_with_nwe_linux_and_linux_update_disabled_but_environment_only___doesnt_call_update_linux_and_returns_0(self):
-        linux_updater = Mock()
+    def test_full_run___database_with_old_linux_and_linux_update_disabled_but_environment_only___doesnt_call_update_linux_and_returns_0(self):
+        linux_updater = old_linux()
+
         exit_code = FullRunService.with_single_db(db_empty,
                                                   raw_db_empty_with_linux_descr(),
                                                   linux_updater=linux_updater,
                                                   linux_update_environment=UpdateLinuxEnvironment.ONLY,
                                                   update_linux=False
                                                   ).full_run()
+        
         self.assertEqual(exit_code, 0)
         linux_updater.update_linux.assert_not_called()
+
+
+def new_linux():
+    linux_updater = Mock()
+    linux_updater.needs_reboot.return_value = True
+    return linux_updater
+
+
+def old_linux():
+    linux_updater = Mock()
+    linux_updater.needs_reboot.return_value = False
+    return linux_updater

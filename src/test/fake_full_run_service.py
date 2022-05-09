@@ -22,6 +22,8 @@ from downloader.config import default_config, UpdateLinuxEnvironment
 from downloader.constants import K_DATABASES, K_DB_URL, K_SECTION, K_VERBOSE, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, \
     K_COMMIT, K_UPDATE_LINUX_ENVIRONMENT, K_FAIL_ON_FILE_ERROR, K_UPDATE_LINUX
 from downloader.full_run_service import FullRunService as ProductionFullRunService
+from test.fake_os_utils import SpyOsUtils
+from test.fake_waiter import NoWaiter
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_importer_implicit_inputs import FileSystemState
@@ -39,7 +41,7 @@ from test.fake_certificates_fix import CertificatesFix
 
 
 class FullRunService(ProductionFullRunService):
-    def __init__(self, config, db_gateway, file_system_factory=None, linux_updater=None):
+    def __init__(self, config, db_gateway, file_system_factory=None, linux_updater=None, os_utils=None):
         file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
         system_file_system = file_system_factory.create_for_system_scope()
         file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory)
@@ -54,7 +56,9 @@ class FullRunService(ProductionFullRunService):
                          RebootCalculator(file_system=system_file_system),
                          BasePathRelocator(),
                          CertificatesFix(),
-                         ExternalDrivesRepository(file_system=system_file_system))
+                         ExternalDrivesRepository(file_system=system_file_system),
+                         os_utils or SpyOsUtils(),
+                         NoWaiter())
 
     @staticmethod
     def with_single_empty_db() -> ProductionFullRunService:
@@ -84,7 +88,7 @@ class FullRunService(ProductionFullRunService):
         )
 
     @staticmethod
-    def with_single_db(db_id, db_descr, linux_updater=None, linux_update_environment=None, update_linux=None) -> ProductionFullRunService:
+    def with_single_db(db_id, db_descr, linux_updater=None, linux_update_environment=None, update_linux=None, os_utils=None) -> ProductionFullRunService:
         update_linux = update_linux if update_linux is not None else True
         config = default_config()
         config.update({
@@ -107,7 +111,8 @@ class FullRunService(ProductionFullRunService):
         return FullRunService(
             config,
             DbGateway.with_single_db(db_id, db_descr, config=config),
-            linux_updater=linux_updater
+            linux_updater=linux_updater,
+            os_utils=os_utils
         )
 
     @staticmethod
