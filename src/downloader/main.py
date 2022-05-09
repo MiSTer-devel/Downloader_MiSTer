@@ -30,6 +30,8 @@ from downloader.full_run_service_factory import FullRunServiceFactory
 def main(env):
     local_repository_provider = LocalRepositoryProvider()
     logger = FileLoggerDecorator(PrintLogger(), local_repository_provider)
+    logger.print('START!')
+    logger.print()
     # noinspection PyBroadException
     try:
         exit_code = execute_full_run(
