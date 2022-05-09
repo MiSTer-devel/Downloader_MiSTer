@@ -76,9 +76,6 @@ class FullRunService:
         return result
 
     def _full_run_impl(self):
-        self._logger.print('START!')
-        self._logger.print()
-
         if not self._certificates_fix.fix_certificates_if_needed():
             return 1
 
