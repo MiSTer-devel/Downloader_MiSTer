@@ -497,7 +497,7 @@ class _OnlineZipSummaries:
             self._db.zips[zip_id].pop('internal_summary')
 
     def _import_zip_ids_from_network(self, zip_ids_to_download):
-        summary_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE])
+        summary_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE], silent=True)
         zip_ids_by_temp_zip = dict()
 
         for zip_id in zip_ids_to_download:
