@@ -226,7 +226,11 @@ class _FileSystem(FileSystem):
             return
 
         self._logger.print('Deleting empty folder %s' % path)
-        os.rmdir(self._path(path))
+        try:
+            os.rmdir(self._path(path))
+        except FileNotFoundError as e:
+            self._logger.debug(e)
+            self._logger.debug('Ignoring error.')
 
     def download_target_path(self, path):
         return self._path(path)
