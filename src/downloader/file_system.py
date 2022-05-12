@@ -213,10 +213,15 @@ class _FileSystem(FileSystem):
             raise e
 
     def folder_has_items(self, path):
-        result = False
-        for _ in os.scandir(self._path(path)):
-            result = True
-        return result
+        try:
+            for _ in os.scandir(self._path(path)):
+                return True
+
+        except FileNotFoundError as e:
+            self._logger.debug(e)
+            self._logger.debug('Ignoring error.')
+
+        return False
 
     def folders(self):
         raise Exception('folders Not implemented')
