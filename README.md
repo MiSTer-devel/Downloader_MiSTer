@@ -60,7 +60,7 @@ allow_reboot = 1
 update_linux = true
 
 ; parallel_update options:
-;   true -> Tries to more than one file simultaneously.
+;   true -> Tries to download more than one file simultaneously.
 ;   false -> Will only download one file at a time.
 parallel_update = true
 
