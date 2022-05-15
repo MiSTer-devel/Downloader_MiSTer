@@ -21,7 +21,7 @@ from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_FILTER
 from downloader.online_importer import WrongDatabaseOptions
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data, FileSystemFactory
-from test.objects import db_test_descr, store_descr, config_with_filter, empty_test_store
+from test.objects import db_test_descr, store_descr, config_with_filter, empty_test_store, db_entity
 from test.fake_online_importer import OnlineImporter
 from test.zip_objects import cheats_folder_zip_desc, cheats_folder_tag_dictionary, cheats_folder_id, \
     cheats_folder_nes_file_path, cheats_folder_nes_folder_name, cheats_folder_sms_file_path, \
@@ -143,6 +143,40 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
 
     def test_download_cheat_files_without_zip___with_filtered_nes_zip_data_in_store_but_filter_empty_string___install_files_and_removes_filtered_zip_data(self):
         self.assertRaises(WrongDatabaseOptions, lambda: self.download_cheat_files_without_zip(store_with_filtered_nes_zip_data(), ''))
+
+    """NeoGeo UniBios Test cases"""
+    def test_download_unibios_from_official_url___on_empty_store___extracts_single_file_to_the_specified_zip_path(self):
+        sut = OnlineImporter()
+        store = empty_test_store()
+
+        sut.add_db(db_with_unibios_from_official_url(), store).download(False)
+
+        self.assertEqual(store_with_unibios_from_zip(), store)
+        self.assertEqual(fs_data(files=fs_files_neogeo_bios(), folders=fs_folders_neogeo_bios()), sut.fs_data)
+        self.assertEqual(list(fs_files_neogeo_bios()), sorted(sut.correctly_installed_files()))
+        self.assertEqual([], sut.files_that_failed())
+
+    def test_download_unibios_from_official_url___on_second_run___extracts_single_file_to_the_specified_zip_path(self):
+        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files=fs_files_neogeo_bios(), folders=fs_folders_neogeo_bios()))
+        store = store_with_unibios_from_zip()
+
+        sut.add_db(db_with_unibios_from_official_url(), store).download(False)
+
+        self.assertEqual(store_with_unibios_from_zip(), store)
+        self.assertEqual(fs_data(files=fs_files_neogeo_bios(), folders=fs_folders_neogeo_bios()), sut.fs_data)
+        self.assertEqual([], sorted(sut.correctly_installed_files()))
+        self.assertEqual([], sut.files_that_failed())
+
+    def test_download_empty_db___after_installing_db_with_unibios_from_official_url___extracts_single_file_to_the_specified_zip_path(self):
+        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files=fs_files_neogeo_bios(), folders=fs_folders_neogeo_bios()))
+        store = store_with_unibios_from_zip()
+
+        sut.add_db(db_entity(), store).download(False)
+
+        self.assertEqual(empty_test_store(), store)
+        self.assertEqual(fs_data(), sut.fs_data)
+        self.assertEqual([], sorted(sut.correctly_installed_files()))
+        self.assertEqual([], sut.files_that_failed())
 
     def download_zipped_cheats_folder(self, store, filter_value, summary=None, summary_hash=None, implicit_inputs=None):
         implicit_inputs = implicit_inputs if implicit_inputs is not None else ImporterImplicitInputs()
@@ -319,3 +353,87 @@ def store_with_installed_files_and_zips_but_no_filtered_data():
 
 def store_with_installed_files_without_zips_and_no_filtered_data():
     return store_descr(files=cheats_folder_files(zip_id=False, tags=False), folders=cheats_folder_folders(zip_id=False, tags=False))
+
+
+""""Uni Bios Data Fixtures:"""
+
+
+def db_with_unibios_from_official_url():
+    return db_entity(
+        files={
+            'games/NeoGeo/000-lo.lo': {
+                "hash": "fc7599f3f871578fe9a0453662d1c966",
+                "size": 131072,
+                "url": "https://myurl.whatever/mister-console-bios-pack_theypsilon/NeoGeo.zip/000-lo.lo",
+            }
+        },
+        folders={
+            'games': {},
+            'games/NeoGeo': {}
+        },
+        zips={
+            'neogeo_unibios': {
+                "kind": "extract_single_files",
+                "description": "Extracting NeoGeo UniBios from http://unibios.free.fr",
+                "internal_summary": {
+                    "files": {
+                        'games/NeoGeo/uni-bios.rom': {
+                            "hash": "4f0aeda8d2d145f596826b62d563c4ef",
+                            "size": 131072,
+                            "zip_id": "neogeo_unibios",
+                            "zip_path": "uni-bios.rom",
+                        }
+                    },
+                    "folders": {}
+                },
+                "contents_file": {
+                    "hash": "1986c39676354d19ae648a914bd914f7",
+                    "size": 101498,
+                    "url": "http://unibios.free.fr/download/uni-bios-40.zip",
+                    "zipped_files": {
+                        "files": {
+                            "/tmp/downloader_zip_neogeo_unibios/uni-bios.rom": {
+                                "hash": "4f0aeda8d2d145f596826b62d563c4ef", "size": 131072}
+                        },
+                        "folders": {}
+                    }
+                },
+                "files_count": 1,
+                "folders_count": 0,
+                "raw_files_size": 131072,
+            }
+        }
+    )
+
+
+def store_with_unibios_from_zip():
+    return {'base_path': '/media/fat',
+            'files': {
+                'games/NeoGeo/000-lo.lo': {"hash": "fc7599f3f871578fe9a0453662d1c966",
+                                           "size": 131072,
+                                           "url": "https://myurl.whatever/mister-console-bios-pack_theypsilon/NeoGeo.zip/000-lo.lo"},
+                'games/NeoGeo/uni-bios.rom': {'hash': '4f0aeda8d2d145f596826b62d563c4ef',
+                                              'size': 131072,
+                                              'zip_id': 'neogeo_unibios',
+                                              'zip_path': 'uni-bios.rom'}},
+            'folders': {'games': {}, 'games/NeoGeo': {}},
+            'offline_databases_imported': [],
+            'zips': {'neogeo_unibios': {'description': 'Extracting NeoGeo UniBios from http://unibios.free.fr',
+                                        'contents_file': {'hash': '1986c39676354d19ae648a914bd914f7',
+                                                          'size': 101498,
+                                                          'url': 'http://unibios.free.fr/download/uni-bios-40.zip'},
+                                        'files_count': 1,
+                                        'folders_count': 0,
+                                        'kind': 'extract_single_files',
+                                        'raw_files_size': 131072}}}
+
+
+def fs_files_neogeo_bios():
+    return {
+        'games/NeoGeo/000-lo.lo': {'hash': 'fc7599f3f871578fe9a0453662d1c966', 'size': 131072},
+        'games/NeoGeo/uni-bios.rom': {'hash': '4f0aeda8d2d145f596826b62d563c4ef', 'size': 131072}
+    }
+
+
+def fs_folders_neogeo_bios():
+    return ['games', 'games/NeoGeo']

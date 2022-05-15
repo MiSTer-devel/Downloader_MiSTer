@@ -200,6 +200,16 @@ class _FileSystem(ProductionFileSystem):
             self._state.folders.pop(folder)
         self._write_records.append(_Record('make_dirs', folder))
 
+    def remove_non_empty_folder(self, folder_path):
+        path = self._path(folder_path)
+        for folder_path in list(self._state.folders):
+            if folder_path.startswith(path):
+                self._state.folders.pop(folder_path)
+
+        for file_path in list(self._state.files):
+            if file_path.startswith(path):
+                self._state.files.pop(file_path)
+
     def download_target_path(self, path):
         return self._path(path)
 

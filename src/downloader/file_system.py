@@ -115,6 +115,10 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
+    def remove_non_empty_folder(self, path):
+        """interface"""
+
+    @abstractmethod
     def download_target_path(self, path):
         """interface"""
 
@@ -234,6 +238,16 @@ class _FileSystem(FileSystem):
         try:
             os.rmdir(self._path(path))
         except FileNotFoundError as e:
+            self._logger.debug(e)
+            self._logger.debug('Ignoring error.')
+
+    def remove_non_empty_folder(self, path):
+        if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
+            return
+
+        try:
+            shutil.rmtree(self._path(path))
+        except Exception as e:
             self._logger.debug(e)
             self._logger.debug('Ignoring error.')
 
