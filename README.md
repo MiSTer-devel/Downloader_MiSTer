@@ -105,6 +105,8 @@ More information about *Download Filters* [here](docs/download-filters.md).
 
 *Custom Databases* give users the ability to download [more file collections](docs/custom-databases.md).
 
+NOTE: If you manually add custom databases, you might want to make sure that you also have a [distribution_mister] section. That way you'll still be downloading the content from [MiSTer Distribution](https://github.com/MiSTer-devel/Distribution_MiSTer) together with the content from the custom database/s that you introduced.
+
 ### Supporters+ shout-out!
 
 Antonio Villena, atrac17, Hard Rich, and MiSTerFPGA.co.uk
