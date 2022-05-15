@@ -152,7 +152,7 @@ class CurlDownloaderAbstract(FileDownloader):
 
             if first_run:
                 if 'delete' in description:
-                    for _ in description['delete']:
+                    for _ in description['delete']:  # @TODO This is Deprecated
                         self._file_system.delete_previous(path)
                         break
                 elif 'delete_previous' in description and description['delete_previous']:
@@ -201,6 +201,9 @@ class CurlDownloaderAbstract(FileDownloader):
         self._logger.print()
 
     def _download(self, path, description):
+        if 'zip_path' in description:
+            raise FileDownloaderError('zip_path is not a valid field for the file "%s", please contain the DB maintainer' % path)
+
         self._logger.print(path)
         self._file_system.make_dirs_parent(path)
 
@@ -353,3 +356,7 @@ class _HttpOks:
 
     def none(self):
         return len(self._oks) == 0
+
+
+class FileDownloaderError(Exception):
+    pass

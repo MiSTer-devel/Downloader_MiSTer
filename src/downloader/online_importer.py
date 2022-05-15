@@ -361,20 +361,20 @@ class _Resolver:
 
         input_folders = self._db.folders
         self._db.folders = {}
-        for folder_path, description in input_folders.items():
+        for target_folder_path, description in input_folders.items():
             is_system_path = 'path' in description and description['path'] == 'system'
             if is_system_path:
-                self._path_resolver.add_system_path(folder_path)
+                self._path_resolver.add_system_path(target_folder_path)
 
-            base_path = self._path_resolver.resolve_folder_path(folder_path)
+            base_path = self._path_resolver.resolve_folder_path(target_folder_path)
 
-            if folder_path[0] == '|':
-                folder_path = folder_path[1:]
+            if target_folder_path[0] == '|':
+                target_folder_path = target_folder_path[1:]
 
             if base_path is not None and self._read_only_store.base_path != base_path and not is_system_path:
-                priority_sub_folders[folder_path] = base_path
+                priority_sub_folders[target_folder_path] = base_path
 
-            self._db.folders[folder_path] = description
+            self._db.folders[target_folder_path] = description
 
         input_files = self._db.files
         self._db.files = {}
@@ -401,15 +401,23 @@ class _Resolver:
             self._db.files[file_path] = description
 
         for zip_id, zip_description in self._db.zips.items():
-            folder_path = zip_description['path']
+            kind = zip_description.get('kind', 'extract_all_contents')
 
-            base_path = self._path_resolver.resolve_folder_path(folder_path)
+            if kind == 'extract_all_contents':
+                target_folder_path = zip_description['path']
 
-            if folder_path[0] == '|':
-                folder_path = folder_path[1:]
+                base_path = self._path_resolver.resolve_folder_path(target_folder_path)
 
-            if base_path is not None and self._read_only_store.base_path != base_path:
-                priority_sub_folders[folder_path] = base_path
+                if target_folder_path[0] == '|':
+                    target_folder_path = target_folder_path[1:]
+
+                if base_path is not None and self._read_only_store.base_path != base_path:
+                    priority_sub_folders[target_folder_path] = base_path
+
+            elif kind == 'extract_single_files':
+                pass
+            else:
+                raise UnreachableException('Wrong kind of zip: %s' % kind)  # pragma: no cover
 
         return self._db
 
@@ -639,11 +647,11 @@ class _OnlineDatabaseImporter:
         for zip_id in needed_zips:
             zipped_files = needed_zips[zip_id]
 
+            needs_extracting_single_files = 'kind' in self._db.zips[zip_id] and self._db.zips[zip_id]['kind'] == 'extract_single_files'
             less_file_count = len(zipped_files['files']) < self._config[K_ZIP_FILE_COUNT_THRESHOLD]
-            less_accumulated_mbs = zipped_files['total_size'] < (
-                        1000 * 1000 * self._config[K_ZIP_ACCUMULATED_MB_THRESHOLD])
+            less_accumulated_mbs = zipped_files['total_size'] < (1000 * 1000 * self._config[K_ZIP_ACCUMULATED_MB_THRESHOLD])
 
-            if less_file_count and less_accumulated_mbs:
+            if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
                 continue
 
             temp_zip = '/tmp/%s_contents.zip' % zip_id
@@ -658,31 +666,64 @@ class _OnlineDatabaseImporter:
         for temp_zip in sorted(zip_downloader.correctly_downloaded_files()):
             zip_id = zip_ids_by_temp_zip[temp_zip]
             zipped_files = needed_zips[zip_id]
+            zip_description = self._db.zips[zip_id]
 
-            zip_path = self._db.zips[zip_id]['path']
-            if zip_path[0] == '|':
-                zip_path = zip_path[1:]
-            contents = ', '.join(self._db.zips[zip_id]['contents'])
-            self._logger.print('Unpacking %s at %s' % (contents, 'the root' if zip_path == './' else zip_path))
-            self._file_system.unzip_contents(temp_zip, zip_path, list(zipped_files['files']))
-            self._file_system.unlink(temp_zip)
-            file_downloader.mark_unpacked_zip(zip_id, self._db.zips[zip_id]['base_files_url'])
+            kind = zip_description.get('kind', 'extract_all_contents')
+            if kind == 'extract_all_contents':
+                zip_path = zip_description['target_folder_path'] if 'target_folder_path' in zip_description else zip_description['path']
+                if zip_path[0] == '|':
+                    zip_path = zip_path[1:]
 
-            filtered_files = filtered_zip_data[zip_id]['files'] if zip_id in filtered_zip_data else []
-            for file_path in filtered_files:
-                self._file_system.unlink(file_path)
+                self._logger.print(self._zip_description_message(zip_description, zip_path))
+                self._file_system.unzip_contents(temp_zip, zip_path, list(zipped_files['files']))
+                self._file_system.unlink(temp_zip)
+                file_downloader.mark_unpacked_zip(zip_id, zip_description['base_files_url'])
 
-            # TODO: Add this back when adding official support fort zips
-            # for folder_path in sorted(filtered_zip_data[zip_id]['folders'].keys(), key=len, reverse=True):
-            #     if not self._file_system.is_folder(folder_path):
-            #         continue
-            #     if self._file_system.folder_has_items(folder_path):
-            #         continue
-            #
-            #     self._file_system.remove_folder(folder_path)
+                filtered_files = filtered_zip_data[zip_id]['files'] if zip_id in filtered_zip_data else []
+                for file_path in filtered_files:
+                    self._file_system.unlink(file_path)
+
+                # TODO: Add this back when adding official support fort zips
+                # for folder_path in sorted(filtered_zip_data[zip_id]['folders'].keys(), key=len, reverse=True):
+                #     if not self._file_system.is_folder(folder_path):
+                #         continue
+                #     if self._file_system.folder_has_items(folder_path):
+                #         continue
+                #
+                #     self._file_system.remove_folder(folder_path)
+
+            elif kind == 'extract_single_files':
+                self._logger.print(self._zip_description_message(zip_description, None))
+                tmp_path = '/tmp/downloader_zip_%s/' % zip_id
+                self._file_system.unzip_contents(temp_zip, tmp_path, list(zipped_files['files']))
+                for file_path, file_description in zipped_files['files'].items():
+                    self._file_system.copy('%s%s' % (tmp_path, file_description['zip_path']), file_path)
+                self._file_system.unlink(temp_zip)
+                self._file_system.remove_non_empty_folder(tmp_path)
+                file_downloader.mark_unpacked_zip(zip_id, 'whatever')
+            else:
+                raise UnreachableException('Wrong kind of zip: %s' % kind)  # pragma: no cover
 
         self._logger.print()
         self._session.files_that_failed.extend(zip_downloader.errors())
+
+    def _zip_description_message(self, zip_description, zip_path):
+        if 'description' in zip_description:
+            return zip_description['description']
+
+        if zip_path is None:
+            raise UnreachableException('zip_path should not be none at this point.')
+
+        contents = ', '.join(zip_description['contents'])
+
+        if zip_path == './':
+            path_message = 'the root'
+        elif zip_path == 'tmp':
+            path_message = 'temporary folder'
+        else:
+            path_message = zip_path
+
+        return 'Unpacking %s at %s' % (contents, path_message)
 
     def create_folders(self):
         priority_top_folders = self._externals['priority_top_folders']
