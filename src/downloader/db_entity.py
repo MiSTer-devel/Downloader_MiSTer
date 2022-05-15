@@ -110,10 +110,24 @@ def _is_valid_zips(zips):
     if not isinstance(zips, dict):
         return False
 
-    for zip_id, zip_desc in zips.items():
-        if 'internal_summary' in zip_desc or 'summary_file' in zip_desc:
-            continue
+    mandatory_fields = [
+        'kind',
+        'description',
+        'contents_file',
+#        'files_count',
+#        'folders_count',
+#        'raw_files_size'
+    ]
 
-        return False
+    for zip_id, zip_desc in zips.items():
+        for field in mandatory_fields:
+            if field not in zip_desc:
+                raise DbEntityValidationException('ERROR: db "DB_ID" has invalid ZIP "%s" with missing field "%s", contact the db maintainer.' % (zip_id, field))
+
+        if 'internal_summary' not in zip_desc and 'summary_file' not in zip_desc:
+            raise DbEntityValidationException('ERROR: db "DB_ID" has invalid ZIP "%s" with missing summary field, contact the db maintainer.' % zip_id)
+
+        if zip_desc['kind'] == 'extract_all_contents' and 'target_folder_path' not in zip_desc:
+            raise DbEntityValidationException('ERROR: db "DB_ID" has invalid ZIP "%s" with missing target_folder_path field, contact the db maintainer.' % zip_id)
 
     return True

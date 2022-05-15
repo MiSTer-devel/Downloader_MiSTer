@@ -58,9 +58,8 @@ class TestOnlineImporterWithPriorityStoragePreferExternal(OnlineImporterWithPrio
                 folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id},
             },
             zips={zipped_nes_palettes_id: zip_desc(
-                ["Palettes"],
+                "Extracting Palettes",
                 "|games/NES/",
-                "games/NES/Palettes"
             )}
         )
 
@@ -81,9 +80,8 @@ class TestOnlineImporterWithPriorityStoragePreferExternal(OnlineImporterWithPrio
                 folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id},
             },
             zips={zipped_nes_palettes_id: zip_desc(
-                ["Palettes"],
+                "Extracting Palettes",
                 "|games/NES/",
-                "games/NES/Palettes"
             )}
         )
 

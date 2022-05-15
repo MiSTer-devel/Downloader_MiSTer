@@ -146,7 +146,7 @@ def store_with_unzipped_cheats(url=True, folders=True, zip_id=True, zips=True, t
 
 
 def cheats_folder_zip_desc(zipped_files=None, summary=None, summary_hash=None, is_summary_internal=False):
-    json = zip_desc(["NES"], "Cheats/", "Cheats/NES", summary_hash=summary_hash, zipped_files=zipped_files, summary=summary, is_summary_internal=is_summary_internal)
+    json = zip_desc("Extracting NES Cheats folder", "Cheats/", summary_hash=summary_hash, zipped_files=zipped_files, summary=summary, is_summary_internal=is_summary_internal)
     return json
 
 

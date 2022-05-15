@@ -87,7 +87,7 @@ class TestOnlineImporterWithZips(unittest.TestCase):
         different_folder = "Different"
 
         store = self.download(db_test_descr(zips={
-            different_zip_id: zip_desc([different_folder], "./", different_folder, summary={
+            different_zip_id: zip_desc(different_folder, "./", summary={
                 "files": {file_a: zipped_file_a_descr(different_zip_id)},
                 "files_count": 1,
                 "folders": {different_folder: {"zip_id": different_zip_id}},
@@ -101,7 +101,7 @@ class TestOnlineImporterWithZips(unittest.TestCase):
             "files": {file_a: zipped_file_a_descr(different_zip_id, url=True)},
             "offline_databases_imported": [],
             "folders": {different_folder: {"zip_id": different_zip_id}},
-            "zips": {different_zip_id: zip_desc([different_folder], "./", different_folder)}
+            "zips": {different_zip_id: zip_desc(different_folder, "./")}
         }, store)
         self.assertFalse(self.sut.file_system.is_file(cheats_folder_nes_file_path))
         self.assertFalse(self.sut.file_system.is_file(cheats_folder_sms_file_path))
