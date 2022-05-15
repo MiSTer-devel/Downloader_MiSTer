@@ -21,6 +21,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, FILE_PDFViewer, FILE
     FOLDER_savestates, FOLDER_saves, FOLDER_linux, FILE_MiSTer_new, FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, \
     FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, \
     FILE_downloader_launcher_script, FILE_MiSTer_old, K_BASE_SYSTEM_PATH
+from downloader.db_entity import DbEntityValidationException
 from downloader.file_filter import BadFileFilterPartException
 from downloader.other import UnreachableException, cache
 
@@ -401,10 +402,10 @@ class _Resolver:
             self._db.files[file_path] = description
 
         for zip_id, zip_description in self._db.zips.items():
-            kind = zip_description.get('kind', 'extract_all_contents')
+            kind = zip_description['kind']
 
             if kind == 'extract_all_contents':
-                target_folder_path = zip_description['path']
+                target_folder_path = zip_description['target_folder_path']
 
                 base_path = self._path_resolver.resolve_folder_path(target_folder_path)
 
@@ -417,7 +418,7 @@ class _Resolver:
             elif kind == 'extract_single_files':
                 pass
             else:
-                raise UnreachableException('Wrong kind of zip: %s' % kind)  # pragma: no cover
+                raise DbEntityValidationException('ERROR: ZIP %s has wrong field kind "%s", contact the db maintainer.' % (zip_id, kind))
 
         return self._db
 
@@ -668,14 +669,14 @@ class _OnlineDatabaseImporter:
             zipped_files = needed_zips[zip_id]
             zip_description = self._db.zips[zip_id]
 
-            kind = zip_description.get('kind', 'extract_all_contents')
+            kind = zip_description['kind']
             if kind == 'extract_all_contents':
-                zip_path = zip_description['target_folder_path'] if 'target_folder_path' in zip_description else zip_description['path']
-                if zip_path[0] == '|':
-                    zip_path = zip_path[1:]
+                target_folder_path = zip_description['target_folder_path']
+                if target_folder_path[0] == '|':
+                    target_folder_path = target_folder_path[1:]
 
-                self._logger.print(self._zip_description_message(zip_description, zip_path))
-                self._file_system.unzip_contents(temp_zip, zip_path, list(zipped_files['files']))
+                self._logger.print(zip_description['description'])
+                self._file_system.unzip_contents(temp_zip, target_folder_path, list(zipped_files['files']))
                 self._file_system.unlink(temp_zip)
                 file_downloader.mark_unpacked_zip(zip_id, zip_description['base_files_url'])
 
@@ -693,7 +694,7 @@ class _OnlineDatabaseImporter:
                 #     self._file_system.remove_folder(folder_path)
 
             elif kind == 'extract_single_files':
-                self._logger.print(self._zip_description_message(zip_description, None))
+                self._logger.print(zip_description['description'])
                 tmp_path = '/tmp/downloader_zip_%s/' % zip_id
                 self._file_system.unzip_contents(temp_zip, tmp_path, list(zipped_files['files']))
                 for file_path, file_description in zipped_files['files'].items():
@@ -702,28 +703,10 @@ class _OnlineDatabaseImporter:
                 self._file_system.remove_non_empty_folder(tmp_path)
                 file_downloader.mark_unpacked_zip(zip_id, 'whatever')
             else:
-                raise UnreachableException('Wrong kind of zip: %s' % kind)  # pragma: no cover
+                raise DbEntityValidationException('ERROR: ZIP %s has wrong field kind "%s", contact the db maintainer.' % (zip_id, kind))
 
         self._logger.print()
         self._session.files_that_failed.extend(zip_downloader.errors())
-
-    def _zip_description_message(self, zip_description, zip_path):
-        if 'description' in zip_description:
-            return zip_description['description']
-
-        if zip_path is None:
-            raise UnreachableException('zip_path should not be none at this point.')
-
-        contents = ', '.join(zip_description['contents'])
-
-        if zip_path == './':
-            path_message = 'the root'
-        elif zip_path == 'tmp':
-            path_message = 'temporary folder'
-        else:
-            path_message = zip_path
-
-        return 'Unpacking %s at %s' % (contents, path_message)
 
     def create_folders(self):
         priority_top_folders = self._externals['priority_top_folders']
