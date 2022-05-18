@@ -17,9 +17,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import FILE_MiSTer_old, FILE_downloader_storage, FILE_downloader_log, \
     FILE_downloader_last_successful_run, K_CONFIG_PATH, K_BASE_SYSTEM_PATH, \
-    FILE_downloader_external_storage
+    FILE_downloader_external_storage, K_BASE_PATH
 from downloader.local_store_wrapper import LocalStoreWrapper
-from downloader.other import UnreachableException, empty_store, empty_store_without_base_path
+from downloader.other import UnreachableException, empty_store_without_base_path
 from downloader.store_migrator import make_new_local_store
 
 

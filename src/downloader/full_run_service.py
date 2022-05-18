@@ -85,10 +85,9 @@ class FullRunService:
 
         importer_command = ImporterCommand(self._config, self._config[K_USER_DEFINED_OPTIONS])
         for db in databases:
-            store = local_store.store_by_id(db.db_id, self._config)
             description = self._config[K_DATABASES][db.db_id]
 
-            importer_command.add_db(db, store, description)
+            importer_command.add_db(db, local_store, description)
 
         update_only_linux = self._config[K_UPDATE_LINUX_ENVIRONMENT] == UpdateLinuxEnvironment.ONLY
         update_linux = self._config[K_UPDATE_LINUX_ENVIRONMENT] != UpdateLinuxEnvironment.FALSE and self._config[K_UPDATE_LINUX]
