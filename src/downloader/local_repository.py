@@ -95,7 +95,7 @@ class LocalRepository:
                 continue
 
             for db_id, external in external_store['dbs'].items():
-                if db_id not in local_store['dbs']:
+                if db_id not in local_store['dbs'] or len(local_store['dbs'][db_id]) == 0:
                     local_store['dbs'][db_id] = empty_store_without_base_path()
                 local_store['dbs'][db_id]['external'] = local_store['dbs'][db_id].get('external', {})
                 local_store['dbs'][db_id]['external'][drive] = external
