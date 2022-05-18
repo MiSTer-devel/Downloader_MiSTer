@@ -28,8 +28,11 @@ from downloader.constants import FILE_MiSTer, K_BASE_PATH
 
 
 def empty_store(base_path):
+    return {K_BASE_PATH: base_path, **empty_store_without_base_path()}
+
+
+def empty_store_without_base_path():
     return {
-        K_BASE_PATH: base_path,
         'zips': {},
         'folders': {},
         'files': {},

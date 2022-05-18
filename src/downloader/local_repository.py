@@ -19,7 +19,7 @@ from downloader.constants import FILE_MiSTer_old, FILE_downloader_storage, FILE_
     FILE_downloader_last_successful_run, K_CONFIG_PATH, K_BASE_SYSTEM_PATH, \
     FILE_downloader_external_storage
 from downloader.local_store_wrapper import LocalStoreWrapper
-from downloader.other import UnreachableException
+from downloader.other import UnreachableException, empty_store, empty_store_without_base_path
 from downloader.store_migrator import make_new_local_store
 
 
@@ -65,15 +65,15 @@ class LocalRepository:
     def load_store(self):
         self._logger.bench('Loading store...')
 
-        if not self._file_system.is_file(self._storage_path):
-            return LocalStoreWrapper(make_new_local_store(self._store_migrator))
-
-        try:
-            local_store = self._file_system.load_dict_from_file(self._storage_path)
-        except Exception as e:
-            self._logger.debug(e)
-            self._logger.print('Could not load store')
-            return LocalStoreWrapper(make_new_local_store(self._store_migrator))
+        if self._file_system.is_file(self._storage_path):
+            try:
+                local_store = self._file_system.load_dict_from_file(self._storage_path)
+            except Exception as e:
+                self._logger.debug(e)
+                self._logger.print('Could not load store')
+                local_store = make_new_local_store(self._store_migrator)
+        else:
+            local_store = make_new_local_store(self._store_migrator)
 
         self._store_migrator.migrate(local_store)  # exception must be fixed, users are not modifying this by hand
 
@@ -95,7 +95,8 @@ class LocalRepository:
                 continue
 
             for db_id, external in external_store['dbs'].items():
-                local_store['dbs'][db_id] = local_store['dbs'].get(db_id, {})
+                if db_id not in local_store['dbs']:
+                    local_store['dbs'][db_id] = empty_store_without_base_path()
                 local_store['dbs'][db_id]['external'] = local_store['dbs'][db_id].get('external', {})
                 local_store['dbs'][db_id]['external'][drive] = external
 
