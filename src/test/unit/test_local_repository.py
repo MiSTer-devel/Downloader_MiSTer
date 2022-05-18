@@ -15,7 +15,7 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-
+import json
 import unittest
 
 from downloader.constants import MEDIA_FAT, MEDIA_USB0, FILE_downloader_storage, FILE_downloader_external_storage
@@ -110,6 +110,10 @@ class TestLocalRepository(unittest.TestCase):
         store = load_store(fs(files=db_files_internal_a_docs_usb0_b_games()))
         self.assertEqual(store_usb0_b_games_internal_a_docs(), store)
 
+    def test_load_store___on_empty_internal_but_usb0_birdybro_db___returns_birdy_store_with_fixed_files_and_folders(self):
+        store = load_store(fs(files={usb0_db_json_file: birdy_cifs_json_db()}))
+        self.assertEqual(birdy_store_with_fixed_files_and_folders(), store)
+
 
 def save_store(fs_objects, input_local_store):
     file_system, fs_state = fs_objects
@@ -138,7 +142,7 @@ def fs(files=None, folders=None):
     file_system = FileSystemFactory(state=fs_state).create_for_system_scope()
 
     for file_path, dbs in files.items():
-        store = local_store(dbs)
+        store = local_store(dbs, internal=not file_path.startswith('/media/usb'))
         if FILE_downloader_storage.lower() in file_path:
             file_system.save_json_on_zip(store, file_path)
         else:
@@ -147,9 +151,10 @@ def fs(files=None, folders=None):
     return [file_system, fs_state]
 
 
-def local_store(dbs=None):
+def local_store(dbs=None, internal=True):
     result_local_store = make_new_local_store(StoreMigrator())
     result_local_store['dbs'] = {} if dbs is None else dbs
+    result_local_store['internal'] = internal
     return result_local_store
 
 
@@ -167,3 +172,33 @@ def store_to_db_files(store, base_path=None):
         del result[base_path][db_id]['external']
 
     return result
+
+
+def birdy_store_with_fixed_files_and_folders():
+    return {
+        'theypsilon_unofficial_distribution': {
+            'external': {
+                '/media/usb0': {
+                    'files': {},
+                    'folders': {'games': {}, 'games/hbmame': {}, 'games/mame': {}}
+                }
+            },
+            'files': {},
+            'folders': {},
+            'offline_databases_imported': [],
+            'zips': {}
+        }
+    }
+
+
+def birdy_cifs_json_db(): return json.loads('''
+{
+    "theypsilon_unofficial_distribution": {
+        "files": {},
+        "folders": {
+            "games": {},
+            "games/hbmame": {},
+            "games/mame": {}
+        }
+    }
+}''')
