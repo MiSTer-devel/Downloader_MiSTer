@@ -24,7 +24,7 @@ class ImporterCommand:
         self._user_defined_options = user_defined_options
         self._parameters = []
 
-    def add_db(self, db, store, ini_description):
+    def add_db(self, db, local_store, ini_description):
         config = self._config.copy()
 
         for key, option in db.default_options.items():
@@ -34,7 +34,7 @@ class ImporterCommand:
         if K_OPTIONS in ini_description:
             ini_description[K_OPTIONS].apply_to_config(config)
 
-        entry = (db, store, config)
+        entry = (db, local_store.store_by_id(db.db_id, config), config)
 
         if db.db_id == self._config[K_DEFAULT_DB_ID]:
             self._parameters = [entry, *self._parameters]

@@ -19,7 +19,7 @@ from downloader.constants import MEDIA_USB0
 from downloader.file_filter import FileFilterFactory
 from downloader.importer_command import ImporterCommand
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
-from test.fake_local_store_wrapper import StoreWrapper
+from test.fake_local_store_wrapper import StoreWrapper, LocalStoreWrapper
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_local_repository import LocalRepository
 from test.fake_path_resolver import PathResolverFactory
@@ -78,7 +78,7 @@ class OnlineImporter(ProductionOnlineImporter):
         return self
 
     def add_db(self, db, store, description=None):
-        self._importer_command.add_db(db, StoreWrapper(store, crate=self), {} if description is None else description)
+        self._importer_command.add_db(db, LocalStoreWrapper.from_store(db.db_id, store, crate=self), {} if description is None else description)
         return self
 
     def download_db(self, db, store, full_resync=False):

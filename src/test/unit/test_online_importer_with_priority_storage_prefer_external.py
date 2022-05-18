@@ -62,7 +62,7 @@ class TestOnlineImporterWithPriorityStoragePreferExternal(OnlineImporterWithPrio
         local_store = LocalStoreWrapper({'dbs': {db_palettes: db_palettes_store}})
         config = default_config()
         importer_command = ImporterCommand(config)
-        importer_command.add_db(db_with_zipped_nes_palettes(), local_store.store_by_id(db_palettes, config), {})
+        importer_command.add_db(db_with_zipped_nes_palettes(), db_palettes_store, {})
         sut = OnlineImporter()
         sut.download_dbs_contents(importer_command, True)
 

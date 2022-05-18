@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.config import default_config
 from downloader.importer_command import ImporterCommand as ProductionImporterCommand
+from test.fake_local_store_wrapper import LocalStoreWrapper
 
 
 class ImporterCommand(ProductionImporterCommand):
@@ -27,3 +28,9 @@ class ImporterCommand(ProductionImporterCommand):
                 user_defined_config.append(key)
 
         super().__init__(input_config, user_defined_config)
+
+    def add_db(self, db, local_store, ini_description):
+        if isinstance(local_store, dict):
+            return super().add_db(db, LocalStoreWrapper.from_store(db.db_id, local_store), ini_description)
+        else:
+            return super().add_db(db, local_store, ini_description)

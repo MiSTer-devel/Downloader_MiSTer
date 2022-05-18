@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import K_BASE_PATH
-from downloader.other import empty_store
+from downloader.other import empty_store_without_base_path
 
 
 class LocalStoreWrapper:
@@ -32,11 +32,14 @@ class LocalStoreWrapper:
 
     def store_by_id(self, db_id, config):
         if db_id not in self._local_store['dbs']:
-            store = empty_store(config[K_BASE_PATH])
+            self._local_store['dbs'][db_id] = empty_store_without_base_path()
 
-            self._local_store['dbs'][db_id] = store
+        store = self._local_store['dbs'][db_id]
 
-        return StoreWrapper(self._local_store['dbs'][db_id], self)
+        if K_BASE_PATH not in store:
+            store[K_BASE_PATH] = config[K_BASE_PATH]
+
+        return StoreWrapper(store, self)
 
     def needs_save(self):
         return self._dirty

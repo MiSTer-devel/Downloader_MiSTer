@@ -18,7 +18,7 @@
 
 from downloader.config import default_config
 from downloader.constants import FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version
-from downloader.importer_command import ImporterCommand
+from test.fake_importer_command import ImporterCommand
 from downloader.linux_updater import LinuxUpdater as ProductionLinuxUpdater
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
@@ -31,7 +31,7 @@ class LinuxUpdater(ProductionLinuxUpdater):
         file_downloader_factory = FileDownloaderFactory(file_system_factory=self._file_system_factory) if file_downloader_factory is None else file_downloader_factory
         self.file_system = self._file_system_factory.create_for_system_scope() if file_system is None else file_system
         config = config or default_config()
-        self._importer_command = ImporterCommand(config, [])
+        self._importer_command = ImporterCommand(config)
         super().__init__(config, self.file_system, file_downloader_factory, NoLogger())
 
     def add_db(self, db):
