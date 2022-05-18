@@ -35,10 +35,18 @@ class LocalStoreWrapper:
             store = empty_store(config[K_BASE_PATH])
 
             self._local_store['dbs'][db_id] = store
-        return StoreWrapper(self._local_store['dbs'][db_id], self)
+
+        try:
+            return StoreWrapper(self._local_store['dbs'][db_id], self)
+        except KeyError as e:
+            raise BadStoreException("Store for DB with id '%s' could not be created." % db_id, e, self._local_store['dbs'][db_id])
 
     def needs_save(self):
         return self._dirty
+
+
+class BadStoreException(Exception):
+    pass
 
 
 class StoreWrapper:
