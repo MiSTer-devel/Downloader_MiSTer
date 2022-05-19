@@ -75,8 +75,24 @@ class FullRunService:
 
         return result
 
+    def _check_certificates(self):
+        for i in range(3):
+            if i != 0:
+                self._logger.print()
+                self._logger.print("Attempting again in 10 seconds...")
+                self._waiter.sleep(10)
+                self._logger.print()
+
+            if self._certificates_fix.fix_certificates_if_needed():
+                return True
+
+        return False
+
     def _full_run_impl(self):
-        if not self._certificates_fix.fix_certificates_if_needed():
+        if not self._check_certificates():
+            self._logger.print()
+            self._logger.print("Please, reboot your system and try again.")
+            self._waiter.sleep(50)
             return 1
 
         local_store = self._local_repository.load_store()
@@ -87,7 +103,7 @@ class FullRunService:
         for db in databases:
             description = self._config[K_DATABASES][db.db_id]
 
-            importer_command.add_db(db, local_store, description)
+            importer_command.add_db(db, local_store.store_by_id(db.db_id), description)
 
         update_only_linux = self._config[K_UPDATE_LINUX_ENVIRONMENT] == UpdateLinuxEnvironment.ONLY
         update_linux = self._config[K_UPDATE_LINUX_ENVIRONMENT] != UpdateLinuxEnvironment.FALSE and self._config[K_UPDATE_LINUX]
