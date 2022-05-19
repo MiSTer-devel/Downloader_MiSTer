@@ -60,13 +60,15 @@ class TestFullRunService(unittest.TestCase):
 
         self.assertEqual(1, os_utils.calls_to_reboot)
 
-    def test_full_run___database_with_old_linux_and_linux_update_environment_only___calls_update_linux_and_returns_0(self):
-        linux_updater = old_linux()
+    def test_full_run___when_certificates_check_fails___returns_exit_code_1(self):
+        certificates_fix = Mock()
+        certificates_fix.fix_certificates_if_needed.return_value = False
 
-        exit_code = FullRunService.with_single_db(db_empty, raw_db_empty_with_linux_descr(), linux_updater=linux_updater, linux_update_environment=UpdateLinuxEnvironment.ONLY).full_run()
+        exit_code = FullRunService\
+            .with_single_db(db_empty, raw_db_empty_with_linux_descr(), certificates_fix=certificates_fix)\
+            .full_run()
 
-        self.assertEqual(exit_code, 0)
-        linux_updater.update_linux.assert_called()
+        self.assertEqual(1, exit_code)
 
     def test_full_run___database_with_old_linux_and_linux_update_environment_only___calls_update_linux_and_returns_0(self):
         linux_updater = old_linux()

@@ -41,7 +41,7 @@ from test.fake_certificates_fix import CertificatesFix
 
 
 class FullRunService(ProductionFullRunService):
-    def __init__(self, config, db_gateway, file_system_factory=None, linux_updater=None, os_utils=None):
+    def __init__(self, config, db_gateway, file_system_factory=None, linux_updater=None, os_utils=None, certificates_fix=None):
         file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
         system_file_system = file_system_factory.create_for_system_scope()
         file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory)
@@ -55,7 +55,7 @@ class FullRunService(ProductionFullRunService):
                          linux_updater,
                          RebootCalculator(file_system=system_file_system),
                          BasePathRelocator(),
-                         CertificatesFix(),
+                         certificates_fix or CertificatesFix(),
                          ExternalDrivesRepository(file_system=system_file_system),
                          os_utils or SpyOsUtils(),
                          NoWaiter())
@@ -88,7 +88,7 @@ class FullRunService(ProductionFullRunService):
         )
 
     @staticmethod
-    def with_single_db(db_id, db_descr, linux_updater=None, linux_update_environment=None, update_linux=None, os_utils=None) -> ProductionFullRunService:
+    def with_single_db(db_id, db_descr, linux_updater=None, linux_update_environment=None, update_linux=None, os_utils=None, certificates_fix=None) -> ProductionFullRunService:
         update_linux = update_linux if update_linux is not None else True
         config = default_config()
         config.update({
@@ -112,7 +112,8 @@ class FullRunService(ProductionFullRunService):
             config,
             DbGateway.with_single_db(db_id, db_descr, config=config),
             linux_updater=linux_updater,
-            os_utils=os_utils
+            os_utils=os_utils,
+            certificates_fix=certificates_fix
         )
 
     @staticmethod
