@@ -30,16 +30,11 @@ class LocalStoreWrapper:
     def mark_force_save(self):
         self._dirty = True
 
-    def store_by_id(self, db_id, config):
+    def store_by_id(self, db_id):
         if db_id not in self._local_store['dbs']:
             self._local_store['dbs'][db_id] = empty_store_without_base_path()
 
-        store = self._local_store['dbs'][db_id]
-
-        if K_BASE_PATH not in store:
-            store[K_BASE_PATH] = config[K_BASE_PATH]
-
-        return StoreWrapper(store, self)
+        return StoreWrapper(self._local_store['dbs'][db_id], self)
 
     def needs_save(self):
         return self._dirty
@@ -156,11 +151,13 @@ class _WriteOnlyStoreAdapter:
         self._top_wrapper.mark_force_save()
 
     def set_base_path(self, base_path):
-        if self._store[K_BASE_PATH] == base_path:
+        if K_BASE_PATH in self._store and self._store[K_BASE_PATH] == base_path:
             return
 
+        if K_BASE_PATH in self._store:
+            self._top_wrapper.mark_force_save()
+
         self._store[K_BASE_PATH] = base_path
-        self._top_wrapper.mark_force_save()
 
     def remove_zip_ids(self, removed_zip_ids):
         if not len(removed_zip_ids):
@@ -291,6 +288,9 @@ class _ReadOnlyStoreAdapter:
     @property
     def base_path(self):
         return self._store[K_BASE_PATH]
+
+    def has_base_path(self):
+        return K_BASE_PATH in self._store
 
     def zip_description(self, zip_id):
         return self._store['zips'][zip_id] if zip_id in self._store['zips'] else {}

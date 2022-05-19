@@ -78,7 +78,7 @@ class OnlineImporter(ProductionOnlineImporter):
         return self
 
     def add_db(self, db, store, description=None):
-        self._importer_command.add_db(db, LocalStoreWrapper.from_store(db.db_id, store, crate=self), {} if description is None else description)
+        self._importer_command.add_db(db, StoreWrapper(store, crate=self), {} if description is None else description)
         return self
 
     def download_db(self, db, store, full_resync=False):

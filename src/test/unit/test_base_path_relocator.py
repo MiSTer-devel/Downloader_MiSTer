@@ -99,5 +99,5 @@ class TestBasePathRelocator(unittest.TestCase):
 
 def command(input_store, base_path):
     importer_command = ImporterCommand(config_test(base_path=base_path))
-    importer_command.add_db(db=db_test_with_file_a(), local_store=LocalStoreWrapper.from_store(db_test, input_store), ini_description={})
+    importer_command.add_db(db=db_test_with_file_a(), store=StoreWrapper(input_store), ini_description={})
     return importer_command

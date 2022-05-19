@@ -65,8 +65,7 @@ class CertificatesFix:
         if not self._unlink(cacert_path):
             return False
 
-        self._get_new_cacert(cacert_path)
-        return True
+        return self._get_new_cacert(cacert_path)
 
     def _unlink(self, path):
         try:
@@ -78,9 +77,6 @@ class CertificatesFix:
 
             self._logger.debug(err)
             self._logger.print("ERROR: Your filesystem is mounted incorrectly.")
-            self._logger.print()
-            self._logger.print("Please, reboot your system and try again.")
-            self._waiter.sleep(50)
             return False
 
     def _get_new_cacert(self, cacert_path):
@@ -88,7 +84,7 @@ class CertificatesFix:
             self._file_system.touch(cacert_path)
         except OSError as _:
             self._logger.print('ERROR: cacert path is invalid!')
-            return
+            return False
 
         self._logger.print()
         self._logger.print('Downloading new cacert file...')
@@ -96,11 +92,12 @@ class CertificatesFix:
         result = self._download(cacert_path)
         if result.returncode != 0:
             self._logger.print('ERROR: Download failed! %d' % result.returncode)
-            return
+            return False
 
         self._logger.print()
         self._logger.print('New cacert file has been installed at "%s" successfully.' % cacert_path)
         self._logger.print()
+        return True
 
     def _test_query(self, path):
         return subprocess.run(['curl', '--cacert', path, self.cacert_pem_url], stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)

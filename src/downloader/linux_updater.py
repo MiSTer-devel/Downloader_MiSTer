@@ -31,8 +31,11 @@ class LinuxUpdater:
         self._linux_descriptions = []
 
     def update_linux(self, importer_command):
-        self._logger.debug('Running update_linux')
+        self._logger.bench('Update Linux start.')
+        self._update_linux_impl(importer_command)
+        self._logger.bench('Update Linux done.')
 
+    def _update_linux_impl(self, importer_command):
         for db, _, _ in importer_command.read_dbs():
             if db.linux is not None:
                 self._linux_descriptions.append({

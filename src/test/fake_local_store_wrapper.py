@@ -30,10 +30,6 @@ class LocalStoreWrapper(ProductionLocalStoreWrapper):
             self._crate.needs_save = True
         super().mark_force_save()
 
-    @staticmethod
-    def from_store(db_id, store, crate=None):
-        return LocalStoreWrapper({"dbs": {db_id: store}}, crate=crate)
-
 
 class StoreWrapper(ProductionStoreWrapper):
     def __init__(self, store, top_wrapper=None, crate=None):
