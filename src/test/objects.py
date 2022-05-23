@@ -29,7 +29,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     MEDIA_USB2, KENV_FAIL_ON_FILE_ERROR, KENV_UPDATE_LINUX, KENV_CURL_SSL, KENV_COMMIT, DEFAULT_CURL_SSL_OPTIONS, \
     K_DEFAULT_DB_ID, MEDIA_USB3
 from downloader.db_options import DbOptions, DbOptionsKind
-from downloader.other import empty_store
+from downloader.other import empty_store_without_base_path
 from test.fake_db_entity import DbEntity
 import copy
 import tempfile
@@ -63,6 +63,7 @@ folder_docs_nes = '|docs/NES'
 folder_docs_neogeo = '|docs/NeoGeo'
 folder_docs_s32x = '|docs/S32X'
 db_test = 'test'
+db_palettes = 'db_palettes'
 db_demo = 'demo'
 db_id_external_drives_1 = 'external_drives_1'
 db_id_external_drives_2 = 'external_drives_2'
@@ -179,6 +180,14 @@ def zip_desc(description, target_folder_path, zipped_files=None, summary=None, s
         json['contents_file']['zipped_files'] = zipped_files
 
     return json
+
+
+def clean_zip_test_fields(store):
+    for zip_desc in store['zips'].values():
+        del zip_desc['contents_file']['zipped_files']
+        del zip_desc['summary_file']['unzipped_json']
+
+    return store
 
 
 def empty_zip_summary():
@@ -542,6 +551,10 @@ def db_with_folders(db_id, folders):
     if isinstance(folders, list):
         folders = {f: {} for f in folders}
     return db_entity(db_id=db_id, db_files=[db_id + '.json.zip'], folders=folders)
+
+
+def empty_store(base_path):
+    return {K_BASE_PATH: base_path, **empty_store_without_base_path()}
 
 
 def empty_test_store():

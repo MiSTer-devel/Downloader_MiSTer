@@ -21,9 +21,8 @@ import tempfile
 import os
 from downloader.config import default_config
 from downloader.constants import K_ALLOW_DELETE, K_BASE_SYSTEM_PATH, K_BASE_PATH
-from downloader.other import empty_store
 from test.fake_path_resolver import make_production_path_resolver_factory
-from test.objects import db_test_with_file, file_descr, hash_real_test_file
+from test.objects import db_test_with_file, file_descr, hash_real_test_file, empty_store
 from test.fake_online_importer import OnlineImporter
 from test.fake_file_system_factory import make_production_filesystem_factory
 

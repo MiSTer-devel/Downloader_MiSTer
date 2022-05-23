@@ -17,13 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.constants import FILE_PDFViewer, MEDIA_FAT
-from downloader.other import empty_store
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data
 from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1, folder_games, \
-    folder_games_nes, media_usb1, media_usb2, config_with, file_nes_contra, file_nes_palette_a, file_nes_manual,\
-    folder_docs, db_id_external_drives_1, db_id_external_drives_2, file_neogeo_md, file_neogeo_md_descr, file_s32x_md,\
-    file_s32x_md_descr, media_usb0, folder_docs_neogeo, folder_docs_s32x, file_foo
+    folder_games_nes, media_usb1, media_usb2, config_with, file_nes_contra, file_nes_palette_a, file_nes_manual, \
+    folder_docs, db_id_external_drives_1, db_id_external_drives_2, file_neogeo_md, file_neogeo_md_descr, file_s32x_md, \
+    file_s32x_md_descr, media_usb0, folder_docs_neogeo, folder_docs_s32x, file_foo, empty_store
 from test.unit.online_importer_with_priority_storage_test_base import fs_folders_nes_on_usb1_and_usb2, \
     fs_files_smb1_on_usb1, store_smb1_on_usb1, fs_folders_nes_on_usb2, store_smb1_on_usb2, fs_files_smb1_on_usb2, \
     store_smb1_on_usb1_and_usb2, fs_files_smb1_on_usb1_and_usb2, fs_folders_games_on_usb1_and_usb2, \

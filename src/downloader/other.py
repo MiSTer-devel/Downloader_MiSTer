@@ -24,11 +24,7 @@ from urllib.parse import urlparse
 if 'unittest' in sys.modules.keys():
     import inspect
 from pathlib import Path
-from downloader.constants import FILE_MiSTer, K_BASE_PATH
-
-
-def empty_store(base_path):
-    return {K_BASE_PATH: base_path, **empty_store_without_base_path()}
+from downloader.constants import FILE_MiSTer
 
 
 def empty_store_without_base_path():

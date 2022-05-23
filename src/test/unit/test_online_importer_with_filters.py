@@ -20,7 +20,6 @@ import unittest
 
 from downloader.config import default_config
 from downloader.online_importer import WrongDatabaseOptions
-from downloader.other import empty_store
 from test.objects import db_test_descr, store_descr, file_descr, file_b, file_a, file_c, folder_a, folder_b, \
     folder_c, config_with_filter, file_one, empty_test_store
 from test.fake_online_importer import OnlineImporter

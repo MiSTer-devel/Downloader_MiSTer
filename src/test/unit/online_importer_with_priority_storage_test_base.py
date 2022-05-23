@@ -179,11 +179,13 @@ def db_with_smb1_and_palettes(): return db_entity(files=_store_files_smb1_and_ne
 def db_with_pdfviewer(): return db_entity(db_id=DISTRIBUTION_MISTER_DB_ID, files=_store_files_pdfviewer(), folders=_store_folders_linux())
 def db_external_drives_1(): return db_entity(db_id=db_id_external_drives_1, files=_store_files_foo_smb1_and_s32_md(), folders=[*_store_folders_nes(), *_store_folders_docs_s32x()])
 def db_external_drives_2(): return db_entity(db_id=db_id_external_drives_2, files=_store_files_contra_and_neogeo_md(), folders=[*_store_folders_nes(), *_store_folders_docs_neogeo()])
+
+
 def db_with_zipped_nes_palettes(): return db_entity(
     folders=_store_folders_nes(),
     zips={zipped_nes_palettes_id: zip_desc(
         "Extracting Palettes",
-        "|games/NES/",
+        folder_games_nes,
         summary={
             "files": {file_nes_palette_a: file_nes_palette_a_descr_zipped()},
             "folders": {
@@ -198,3 +200,30 @@ def db_with_zipped_nes_palettes(): return db_entity(
         }
     )}
 )
+
+
+def store_nes_zipped_palettes_on_usb1():
+    return store_descr(
+        zips=_store_zips_nes_zipped_palettes(),
+        files_usb1=_store_files_nes_zipped_palettes(),
+        folders_usb1=_store_folders_nes_zipped_palettes()
+    )
+
+
+def store_nes_zipped_palettes_on_fat():
+    return store_descr(
+        zips=_store_zips_nes_zipped_palettes(),
+        files=_store_files_nes_zipped_palettes(),
+        folders=_store_folders_nes_zipped_palettes()
+    )
+
+
+def _store_zips_nes_zipped_palettes(): return {zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes)}
+def _store_files_nes_zipped_palettes(): return {file_nes_palette_a[1:]: {"zip_id": zipped_nes_palettes_id, **file_nes_palette_a_descr_zipped()}}
+
+
+def _store_folders_nes_zipped_palettes(): return {
+        folder_games[1:]: {"zip_id": zipped_nes_palettes_id},
+        folder_games_nes[1:]: {"zip_id": zipped_nes_palettes_id},
+        folder_games_nes_palettes[1:]: {"zip_id": zipped_nes_palettes_id},
+    }
