@@ -356,6 +356,11 @@ class _Resolver:
         self._session = session
         self._externals = externals
 
+    def _is_external_zip(self, path, description):
+        return path[0] != '|' and 'zip_id' in description and \
+                self._db.zips[description['zip_id']]['kind'] == 'extract_all_contents' and \
+                self._db.zips[description['zip_id']]['target_folder_path'][0] == '|'
+
     def translate_paths(self):
         priority_files = self._externals['priority_files']
         priority_sub_folders = self._externals['priority_sub_folders']
@@ -363,6 +368,9 @@ class _Resolver:
         input_folders = self._db.folders
         self._db.folders = {}
         for target_folder_path, description in input_folders.items():
+            if self._is_external_zip(target_folder_path, description):
+                target_folder_path = '|' + target_folder_path
+
             is_system_path = 'path' in description and description['path'] == 'system'
             if is_system_path:
                 self._path_resolver.add_system_path(target_folder_path)
@@ -380,6 +388,9 @@ class _Resolver:
         input_files = self._db.files
         self._db.files = {}
         for file_path, description in input_files.items():
+            if self._is_external_zip(file_path, description):
+                file_path = '|' + file_path
+
             is_system_path = 'path' in description and description['path'] == 'system'
             if is_system_path:
                 self._path_resolver.add_system_path(file_path)

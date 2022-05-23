@@ -42,19 +42,16 @@ class LocalStoreWrapper:
 
 class StoreWrapper:
     def __init__(self, store, local_store_wrapper):
-        externals = set()
         if 'external' in store:
             for drive, external in store['external'].items():
                 if 'files' in external:
                     store['files'].update(external['files'])
-                    externals.update(external['files'])
                 if 'folders' in external:
                     store['folders'].update(external['folders'])
-                    externals.update(external['folders'])
 
         self._store = store
         self._local_store_wrapper = local_store_wrapper
-        self._read_only = _ReadOnlyStoreAdapter(self._store, externals)
+        self._read_only = _ReadOnlyStoreAdapter(self._store)
         self._write_only = _WriteOnlyStoreAdapter(self._store, self._local_store_wrapper)
 
     def unwrap_store(self):
@@ -217,9 +214,8 @@ class _WriteOnlyStoreAdapter:
 
 
 class _ReadOnlyStoreAdapter:
-    def __init__(self, store, externals):
+    def __init__(self, store):
         self._store = store
-        self._externals = externals
 
     def hash_file(self, file):
         if file not in self._store['files']:
@@ -296,16 +292,7 @@ class _ReadOnlyStoreAdapter:
         return self._store['zips'][zip_id] if zip_id in self._store['zips'] else {}
 
     def entries_in_zip(self, entry_kind, zip_ids):
-        result = {}
-        for path, fd in self._store[entry_kind].items():
-            if 'zip_id' not in fd or fd['zip_id'] not in zip_ids:
-                continue
-            if path in self._externals:
-                result['|' + path] = fd
-            else:
-                result[path] = fd
-
-        return result
+        return {path: fd for path, fd in self._store[entry_kind].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids}
 
     @property
     def base_path(self):
