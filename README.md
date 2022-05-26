@@ -38,10 +38,6 @@ base_path = '/media/fat/'
 ;   'off' -> Disables this feature. Affected files will always be installed in your base_path.
 storage_priority = 'prefer_sd'
 
-; base_system_path is where system files such as 'MiSTer' and 'menu.rbf' will be installed.
-;   Warning: It is recommended to NOT change this setting regardless of your setup.
-base_system_path = '/media/fat/'
-
 ; allow_delete options:
 ;   0 -> Don't allow this tool to delete anything at all.
 ;   1 -> Allow this tool to delete any old file from previous updates.
