@@ -41,7 +41,8 @@ from test.fake_certificates_fix import CertificatesFix
 
 
 class FullRunService(ProductionFullRunService):
-    def __init__(self, config, db_gateway, file_system_factory=None, linux_updater=None, os_utils=None, certificates_fix=None):
+    def __init__(self, config=None, db_gateway=None, file_system_factory=None, linux_updater=None, os_utils=None, certificates_fix=None, external_drives_repository=None):
+        config = config or default_config()
         file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
         system_file_system = file_system_factory.create_for_system_scope()
         file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory)
@@ -49,14 +50,14 @@ class FullRunService(ProductionFullRunService):
         super().__init__(config,
                          NoLogger(),
                          LocalRepository(config=config, file_system=system_file_system),
-                         db_gateway,
+                         db_gateway or DbGateway(config, file_system_factory=file_system_factory),
                          OfflineImporter(file_downloader_factory=file_downloader_factory),
                          OnlineImporter(file_system_factory=file_system_factory),
                          linux_updater,
                          RebootCalculator(file_system=system_file_system),
                          BasePathRelocator(),
                          certificates_fix or CertificatesFix(),
-                         ExternalDrivesRepository(file_system=system_file_system),
+                         external_drives_repository or ExternalDrivesRepository(file_system=system_file_system),
                          os_utils or SpyOsUtils(),
                          NoWaiter())
 

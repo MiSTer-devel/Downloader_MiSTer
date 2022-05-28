@@ -20,6 +20,7 @@ import unittest
 from unittest.mock import Mock
 
 from downloader.config import UpdateLinuxEnvironment
+from fake_external_drives_repository import ExternalDrivesRepositoryStub
 from test.fake_os_utils import SpyOsUtils
 from test.fake_full_run_service import FullRunService
 from test.objects import raw_db_empty_descr, raw_db_empty_with_linux_descr, raw_db_wrong_descr, db_empty
@@ -90,6 +91,9 @@ class TestFullRunService(unittest.TestCase):
         
         self.assertEqual(exit_code, 0)
         linux_updater.update_linux.assert_not_called()
+
+    def test_print_drives___when_there_are_external_drives___returns_0(self):
+        self.assertEqual(0, FullRunService(external_drives_repository=ExternalDrivesRepositoryStub(['/wtf'])).print_drives())
 
 
 def new_linux():
