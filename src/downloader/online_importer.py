@@ -357,9 +357,15 @@ class _Resolver:
         self._externals = externals
 
     def _is_external_zip(self, path, description):
-        return path[0] != '|' and 'zip_id' in description and \
-                self._db.zips[description['zip_id']]['kind'] == 'extract_all_contents' and \
-                self._db.zips[description['zip_id']]['target_folder_path'][0] == '|'
+        if path[0] == '|' or 'zip_id' not in description:
+            return False
+
+        zip_id = description['zip_id']
+        zip_descr = self._db.zips[zip_id]
+        if 'target_folder_path' not in zip_descr or len(zip_descr['target_folder_path']) == 0:
+            return False
+
+        return zip_descr['target_folder_path'][0] == '|'
 
     def translate_paths(self):
         priority_files = self._externals['priority_files']
@@ -552,9 +558,6 @@ class _OnlineZipSummaries:
     def _import_zip_ids_from_store(self, zip_ids):
         self._db.files.update(self._read_only_store.entries_in_zip('files', zip_ids))
         self._db.folders.update(self._read_only_store.entries_in_zip('folders', zip_ids))
-
-    def _entries_from_store(self, entry_kind, zip_ids):
-        return {path: fd for path, fd in self._read_only_store[entry_kind].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids}
 
     def _is_first_run(self):
         return self._read_only_store.has_no_files

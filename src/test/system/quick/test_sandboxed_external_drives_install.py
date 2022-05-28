@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from pathlib import Path
 
+from test.fake_external_drives_repository import ExternalDrivesRepositoryFactoryStub
 from test.objects import path_with
 from sandbox_test_base import local_store_files, hashes, \
     create_folder, load_json, SandboxTestBase, tmp_delme_sandbox, delete_folder, cleanup
@@ -282,15 +283,4 @@ class TestSandboxedExternalDrivesInstall(SandboxTestBase):
             db_ids.add(db_id)
 
         return sorted(list(files)), sorted(list(db_ids))
-
-
-class ExternalDrivesRepositoryStub:
-    def __init__(self, drives): self._drives = drives
-    def connected_drives(self): return self._drives
-    def connected_drives_except_base_path_drives(self, _): return self._drives
-
-
-class ExternalDrivesRepositoryFactoryStub:
-    def __init__(self, drives): self._drives = drives
-    def create(self, _1, _2): return ExternalDrivesRepositoryStub(self._drives)
 

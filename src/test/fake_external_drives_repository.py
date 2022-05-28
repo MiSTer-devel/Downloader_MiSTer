@@ -26,3 +26,14 @@ class ExternalDrivesRepository(ProductionExternalDrivesRepository):
 
     def _retrieve_connected_drives_list(self):
         return self._drives_from_fs()
+
+
+class ExternalDrivesRepositoryStub:
+    def __init__(self, drives): self._drives = drives
+    def connected_drives(self): return self._drives
+    def connected_drives_except_base_path_drives(self, _): return self._drives
+
+
+class ExternalDrivesRepositoryFactoryStub:
+    def __init__(self, drives): self._drives = drives
+    def create(self, _1, _2): return ExternalDrivesRepositoryStub(self._drives)
