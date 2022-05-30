@@ -40,12 +40,15 @@ class FileSystemState:
             base_path = self.config[K_BASE_PATH]
 
         if base_path is not self.config[K_BASE_PATH]:
-            self.path_dictionary[file] = base_path
+            self.set_non_base_path(base_path, file)
 
         path = file.lower() if file[0] == '/' else base_path.lower() + '/' + file.lower()
 
         self.files[path] = self.fix_description(file, description)
         return self
+
+    def set_non_base_path(self, base, file):
+        self.path_dictionary[file.lower()] = base
 
     def add_full_file_path(self, path, fixed_description):
         self.files[path.lower()] = fixed_description

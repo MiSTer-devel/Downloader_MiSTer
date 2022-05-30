@@ -340,8 +340,9 @@ class _FileSystem(FileSystem):
         if path[0] == '/':
             return path
 
-        if path.lower() in self._path_dictionary:
-            return '%s/%s' % (self._path_dictionary[path.lower()], path)
+        path_lower = path.lower()
+        if path_lower in self._path_dictionary:
+            return '%s/%s' % (self._path_dictionary[path_lower], path)
 
         return '%s/%s' % (self._config[K_BASE_PATH], path)
 

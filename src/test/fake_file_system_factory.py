@@ -20,7 +20,7 @@ import re
 from pathlib import Path
 
 from downloader.config import AllowDelete
-from downloader.constants import K_BASE_PATH, K_ALLOW_DELETE, K_BASE_SYSTEM_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE
+from downloader.constants import K_BASE_PATH, K_ALLOW_DELETE, STORAGE_PATHS_PRIORITY_SEQUENCE
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
     absolute_parent_folder
 from downloader.other import ClosableValue, UnreachableException
@@ -102,7 +102,7 @@ class _FileSystem(ProductionFileSystem):
         return _FakeTempFile(result)
 
     def unique_temp_filename(self):
-        name = 'unique_temp_filename_%d' % self.unique_temp_filename_index
+        name = '/tmp/unique_temp_filename_%d' % self.unique_temp_filename_index
         self.unique_temp_filename_index += 1
         self._write_records.append(_Record('unique_temp_filename', name))
         return ClosableValue(name, lambda: True)

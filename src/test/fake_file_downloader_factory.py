@@ -20,7 +20,7 @@ from typing import List
 
 from downloader.file_downloader import CurlDownloaderAbstract, FileDownloaderFactory as ProductionFileDownloaderFactory
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
-from downloader.target_path_repository import TargetPathRepository
+from test.fake_target_path_repository import TargetPathRepository
 from test.fake_store_migrator import StoreMigrator
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs, NetworkState
@@ -29,11 +29,11 @@ from test.fake_logger import NoLogger
 
 
 class _FileDownloaderWithFakeFileSystem(CurlDownloaderAbstract):
-    def __init__(self, config, file_system, local_repository, network_state, file_system_state):
+    def __init__(self, config, file_system, local_repository, network_state, file_system_state, target_path_repository):
         self._file_system_state = file_system_state
         self._file_system = file_system
         self._local_repository = local_repository
-        super().__init__(config, self._file_system, self._local_repository, NoLogger(), True, TargetPathRepository(config, self._file_system))
+        super().__init__(config, self._file_system, self._local_repository, NoLogger(), True, target_path_repository)
         self._network_state = network_state
         self._run_files = []
 
@@ -71,10 +71,10 @@ class _FileDownloaderWithFakeFileSystem(CurlDownloaderAbstract):
 
 
 class _FileDownloaderWithRealFileSystem(CurlDownloaderAbstract):
-    def __init__(self, config, file_system, local_repository):
+    def __init__(self, config, file_system, local_repository, target_path_repository):
         self._file_system = file_system
         self._local_repository = local_repository
-        super().__init__(config, self._file_system, self._local_repository, NoLogger(), True, TargetPathRepository(config, self._file_system))
+        super().__init__(config, self._file_system, self._local_repository, NoLogger(), True, target_path_repository)
 
     def _run(self, description, target_path: str, file: str) -> None:
         self._file_system.write_file_contents(target_path, 'This is a test file.')  # Generates a file with hash: test.objects.hash_real_test_file
@@ -98,10 +98,11 @@ class FileDownloaderFactory(ProductionFileDownloaderFactory):
         file_system = self._file_system_factory.create_for_config(config)
         external_drives_repository = self._external_drives_repository if self._external_drives_repository is not None else ExternalDrivesRepository(file_system=file_system)
         local_repository = self._local_repository if self._local_repository is not None else ProductionLocalRepository(config, NoLogger(), file_system, StoreMigrator(), external_drives_repository)
+        target_path_repository = TargetPathRepository(config, file_system)
         if self._is_fake_file_system:
-            return _FileDownloaderWithFakeFileSystem(config, file_system, local_repository, self._network_state, self._file_system_factory._state)
+            return _FileDownloaderWithFakeFileSystem(config, file_system, local_repository, self._network_state, self._file_system_factory._state, target_path_repository)
         else:
-            return _FileDownloaderWithRealFileSystem(config, file_system, local_repository)
+            return _FileDownloaderWithRealFileSystem(config, file_system, local_repository, target_path_repository)
 
     @staticmethod
     def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs):

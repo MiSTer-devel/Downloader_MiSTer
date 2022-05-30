@@ -31,8 +31,8 @@ class TargetPathRepository:
         self._file_mister = None
         self._file_mister_new = None
 
-    def create_target(self, path, description):
-        path, skips_registry = self._fix_path(path)
+    def create_target(self, input_path, description):
+        path, skips_registry = self._fix_path(input_path)
         if skips_registry:
             return path
 

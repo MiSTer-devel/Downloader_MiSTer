@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from downloader.constants import FILE_MiSTer_old, FILE_MiSTer, FILE_PDFViewer, FILE_MiSTer_new, FOLDER_linux, MEDIA_USB0
+from downloader.constants import FILE_MiSTer_old, FILE_MiSTer, FILE_PDFViewer, FILE_MiSTer_new, FOLDER_linux
 from downloader.online_importer import InvalidDownloaderPath, invalid_folders, invalid_paths, no_distribution_mister_invalid_paths
 from test.fake_logger import SpyLoggerDecorator, NoLogger
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
@@ -171,7 +171,7 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertEqual(empty_test_store(), store)
         self.assertReportsNothing(sut)
 
-    def test_download_distribution_mister_with_mister___needs_reboot(self):
+    def test_download_distribution_mister_with_mister___on_empty_store___needs_reboot(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(
             files={media_usb0(FILE_MiSTer): {'hash': hash_MiSTer_old}},
         ))
@@ -193,6 +193,16 @@ class TestOnlineImporter(unittest.TestCase):
         ]), sut.fs_records)
         self.assertReports(sut, [FILE_MiSTer], needs_reboot=True)
 
+    def test_download_test_db___with_mister___raises_invalid_downloader_path_exception(self):
+        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={FILE_MiSTer: {'hash': hash_MiSTer_old}}))
+        store = empty_test_store()
+
+        sut.add_db(db_test_with_file(FILE_MiSTer, file_mister_descr()), store)
+        self.assertRaises(InvalidDownloaderPath, lambda: sut.download(False))
+
+        self.assertEqual(fs_data(files={FILE_MiSTer: {'hash': hash_MiSTer_old}}), sut.fs_data)
+        self.assertReportsNothing(sut)
+
     def test_download_distribution_mister_with_pdfviewer___on_empty_store_and_fs___needs_reboot(self):
         sut = OnlineImporter()
         store = empty_test_store()
@@ -210,16 +220,6 @@ class TestOnlineImporter(unittest.TestCase):
             folders=[media_usb0(FOLDER_linux)],
         ), sut.fs_data)
         self.assertReports(sut, [FILE_PDFViewer], needs_reboot=False)
-
-    def test_download_test_db___with_mister___raises_invalid_downloader_path_exception(self):
-        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={FILE_MiSTer: {'hash': hash_MiSTer_old}}))
-        store = empty_test_store()
-
-        sut.add_db(db_test_with_file(FILE_MiSTer, file_mister_descr()), store)
-        self.assertRaises(InvalidDownloaderPath, lambda: sut.download(False))
-
-        self.assertEqual(fs_data(files={FILE_MiSTer: {'hash': hash_MiSTer_old}}), sut.fs_data)
-        self.assertReportsNothing(sut)
 
     def test_download_dbs_contents___with_stored_file_a_and_download_error___store_deletes_file_a_but_not_folder_a_and_fs_is_unchanged(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, storing_problems={file_a: 99}))

@@ -33,7 +33,6 @@ class LocalRepository:
         self._storage_path_value = None
         self._last_successful_run_value = None
         self._logfile_path_value = None
-        self._old_mister_path = None
 
     @property
     def _storage_path(self):
@@ -55,12 +54,6 @@ class LocalRepository:
 
     def set_logfile_path(self, value):
         self._logfile_path_value = value
-
-    @property
-    def old_mister_path(self):
-        if self._old_mister_path is None:
-            self._old_mister_path = '%s/%s' % (self._config[K_BASE_SYSTEM_PATH], FILE_MiSTer_old)
-        return self._old_mister_path
 
     def load_store(self):
         self._logger.bench('Loading store...')
