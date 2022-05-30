@@ -23,7 +23,7 @@ import time
 from abc import ABC, abstractmethod
 
 from downloader.constants import K_DOWNLOADER_RETRIES, K_DOWNLOADER_SIZE_MB_LIMIT, \
-    K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_CURL_SSL, K_DEBUG, FILE_MiSTer_new, FILE_MiSTer
+    K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_CURL_SSL, K_DEBUG, FILE_MiSTer_new, FILE_MiSTer, FILE_MiSTer_old
 from downloader.logger import DebugOnlyLoggerDecorator
 from downloader.other import calculate_url
 from downloader.target_path_repository import TargetPathRepository
@@ -48,10 +48,11 @@ class _FileDownloaderFactoryImpl(FileDownloaderFactory):
     def create(self, config, parallel_update, silent=False, hash_check=True):
         logger = DebugOnlyLoggerDecorator(self._logger) if silent else self._logger
         file_system = self._file_system_factory.create_for_config(config)
+        target_path_repository = TargetPathRepository(config, file_system)
         if parallel_update:
-            return _CurlCustomParallelDownloader(config, file_system, self._local_repository, logger, hash_check, TargetPathRepository(config, file_system))
+            return _CurlCustomParallelDownloader(config, file_system, self._local_repository, logger, hash_check, target_path_repository)
         else:
-            return _CurlSerialDownloader(config, file_system, self._local_repository, logger, hash_check, TargetPathRepository(config, file_system))
+            return _CurlSerialDownloader(config, file_system, self._local_repository, logger, hash_check, target_path_repository)
 
 
 class FileDownloader(ABC):
@@ -116,7 +117,7 @@ class CurlDownloaderAbstract(FileDownloader):
             self._logger.print()
             self._logger.print('Copying new MiSTer binary:')
             if self._file_system.is_file(FILE_MiSTer):
-                self._file_system.move(FILE_MiSTer, self._local_repository.old_mister_path)
+                self._file_system.move(FILE_MiSTer, FILE_MiSTer_old)
             self._file_system.move(FILE_MiSTer_new, FILE_MiSTer)
 
             if self._file_system.is_file(FILE_MiSTer):
