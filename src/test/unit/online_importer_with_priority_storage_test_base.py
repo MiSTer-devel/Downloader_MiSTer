@@ -26,7 +26,7 @@ from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1
     file_s32x_md_descr, \
     folder_docs_neogeo, folder_docs_s32x, file_foo, file_foo_descr, media_usb0, zip_desc
 from test.fake_online_importer import OnlineImporter
-from test.zip_objects import zipped_nes_palettes_id, file_nes_palette_a_descr_zipped
+from test.zip_objects import zipped_nes_palettes_id, file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc
 
 
 class OnlineImporterWithPriorityStorageTestBase(unittest.TestCase):
@@ -183,22 +183,7 @@ def db_external_drives_2(): return db_entity(db_id=db_id_external_drives_2, file
 
 def db_with_zipped_nes_palettes(): return db_entity(
     folders=_store_folders_nes(),
-    zips={zipped_nes_palettes_id: zip_desc(
-        "Extracting Palettes",
-        folder_games_nes,
-        summary={
-            "files": {file_nes_palette_a: file_nes_palette_a_descr_zipped()},
-            "folders": {
-                folder_games: {"zip_id": zipped_nes_palettes_id},
-                folder_games_nes: {"zip_id": zipped_nes_palettes_id},
-                folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id},
-            }
-        },
-        zipped_files={
-            "files": {file_nes_palette_a[1:]: file_nes_palette_a_descr()},
-            "folders": {}
-        }
-    )}
+    zips={zipped_nes_palettes_id: zipped_nes_palettes_desc()}
 )
 
 

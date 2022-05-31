@@ -95,6 +95,19 @@ class TestOnlineImporterWithPriorityStoragePreferExternal(OnlineImporterWithPrio
         self.assertEqual(fs_data(files=fs_files_nes_palettes_on_usb1(), folders=fs_folders_nes_palettes_on_usb1()), sut.fs_data)
         self.assertReports(sut, [file_nes_palette_a], save=False)
 
+    def test_download_palettes_db_from_local_store_pov___on_store_with_palettes_on_fat_but_empty_fs_usb1___installs_all_in_fs_usb12(self):
+        local_store = LocalStoreWrapper({'dbs': {db_palettes: store_nes_zipped_palettes_on_fat()}})
+        inputs = fs(folders=[media_usb1(folder_games)])
+        config = inputs.config
+        importer_command = ImporterCommand(config)
+        importer_command.add_db(db_with_zipped_nes_palettes(), local_store.store_by_id(db_palettes), {})
+        sut = OnlineImporter.from_implicit_inputs(inputs)
+        sut.download_dbs_contents(importer_command, False)
+
+        self.assertEqual(store_nes_zipped_palettes_on_usb1(), local_store.unwrap_local_store()['dbs'][db_palettes])
+        self.assertEqual(fs_data(files=fs_files_nes_palettes_on_usb1(), folders=fs_folders_nes_palettes_on_usb1()), sut.fs_data)
+        self.assertReports(sut, [file_nes_palette_a], save=False)
+
     def test_download_palettes_db_from_local_store_pov___on_store_with_palettes_on_usb1_and_fs___installs_nothing(self):
         local_store = LocalStoreWrapper({'dbs': {db_palettes: store_nes_zipped_palettes_on_usb1()}})
         inputs = fs(files=fs_files_nes_palettes_on_usb1(), folders=fs_folders_nes_palettes_on_usb1())

@@ -21,7 +21,6 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, FILE_PDFViewer, FILE
     FOLDER_savestates, FOLDER_saves, FOLDER_linux, FILE_MiSTer_new, FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, \
     FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, \
     FILE_downloader_launcher_script, FILE_MiSTer_old, K_BASE_SYSTEM_PATH
-from downloader.db_entity import DbEntityValidationException
 from downloader.file_filter import BadFileFilterPartException
 from downloader.other import UnreachableException, cache
 
@@ -70,9 +69,7 @@ class OnlineImporter:
             restored_db = _OnlineFilteredZipData(db, read_only_store).restore_filtered_zip_data()
 
             self._logger.bench('Expanding summaries...')
-            zip_summaries = _OnlineZipSummaries(restored_db, write_only_store, read_only_store, full_resync, config,
-                                                file_system, self._file_downloader_factory, self._logger,
-                                                self._base_session)
+            zip_summaries = _OnlineZipSummaries(restored_db, write_only_store, read_only_store, full_resync, config, file_system, self._file_downloader_factory, self._logger, self._base_session)
             expanded_db = zip_summaries.expand_summaries()
 
             self._logger.bench('Filtering Database...')
@@ -86,13 +83,10 @@ class OnlineImporter:
 
             self._logger.bench('Translating paths...')
             path_resolver = self._path_resolver_factory.create(config, externals['priority_top_folders'])
-            resolver = _Resolver(filtered_db, read_only_store, config, path_resolver, self._local_repository,
-                                 self._logger, self._base_session, externals)
+            resolver = _Resolver(filtered_db, read_only_store, config, path_resolver, self._local_repository, self._logger, self._base_session, externals)
             resolved_db = resolver.translate_paths()
 
-            db_importer = _OnlineDatabaseImporter(resolved_db, write_only_store, read_only_store, externals,
-                                                  full_resync, config, file_system, self._file_downloader_factory,
-                                                  self._logger, self._base_session, self._external_drives_repository)
+            db_importer = _OnlineDatabaseImporter(resolved_db, write_only_store, read_only_store, externals, full_resync, config, file_system, self._file_downloader_factory, self._logger, self._base_session, self._external_drives_repository)
 
             self._logger.bench('Selecting changed files...')
             changed_files, needed_zips = db_importer.select_changed_files()
@@ -264,6 +258,7 @@ class OnlineImporter:
                     base_path = config[K_BASE_PATH]
                     if 'path' in folder_description and folder_description['path'] == 'system':
                         base_path = config[K_BASE_SYSTEM_PATH]
+
                     full_folder_path = '%s/%s' % (base_path, folder_path)
                     if system_file_system.folder_has_items(full_folder_path):
                         continue
@@ -421,21 +416,18 @@ class _Resolver:
         for zip_id, zip_description in self._db.zips.items():
             kind = zip_description['kind']
 
-            if kind == 'extract_all_contents':
-                target_folder_path = zip_description['target_folder_path']
+            if kind != 'extract_all_contents':
+                continue
 
-                base_path = self._path_resolver.resolve_folder_path(target_folder_path)
+            target_folder_path = zip_description['target_folder_path']
 
-                if target_folder_path[0] == '|':
-                    target_folder_path = target_folder_path[1:]
+            base_path = self._path_resolver.resolve_folder_path(target_folder_path)
 
-                if base_path is not None and self._read_only_store.base_path != base_path:
-                    priority_sub_folders[target_folder_path] = base_path
+            if target_folder_path[0] == '|':
+                target_folder_path = target_folder_path[1:]
 
-            elif kind == 'extract_single_files':
-                pass
-            else:
-                raise DbEntityValidationException('ERROR: ZIP %s has wrong field kind "%s", contact the db maintainer.' % (zip_id, kind))
+            if base_path is not None and self._read_only_store.base_path != base_path:
+                priority_sub_folders[target_folder_path] = base_path
 
         return self._db
 
@@ -717,7 +709,7 @@ class _OnlineDatabaseImporter:
                 self._file_system.remove_non_empty_folder(tmp_path)
                 file_downloader.mark_unpacked_zip(zip_id, 'whatever')
             else:
-                raise DbEntityValidationException('ERROR: ZIP %s has wrong field kind "%s", contact the db maintainer.' % (zip_id, kind))
+                raise UnreachableException('ERROR: ZIP %s has wrong field kind "%s", contact the db maintainer.' % (zip_id, kind))  # pragma: no cover
 
         self._logger.print()
         self._session.files_that_failed.extend(zip_downloader.errors())
@@ -732,32 +724,26 @@ class _OnlineDatabaseImporter:
             if 'tags' in folder_description and 'zip_id' not in folder_description:
                 folder_description.pop('tags')
 
-            if folder_path not in priority_top_folders and folder_path not in priority_sub_folders:
-                self._file_system.make_dirs(folder_path)
-                self._write_only_store.add_folder(folder_path, folder_description)
-                continue
-
             if folder_path in priority_top_folders:
                 for drive in priority_top_folders[folder_path].drives:
-                    full_folder_path = '%s/%s' % (drive, folder_path)
-                    self._file_system.make_dirs(full_folder_path)
-                    if drive == self._config[K_BASE_PATH]:
-                        self._write_only_store.add_folder(folder_path, folder_description)
-                    else:
-                        self._write_only_store.add_external_folder(drive, folder_path, folder_description)
-                        if folder_path in self._read_only_store.folders and not self._file_system.is_folder(
-                                folder_path):
-                            self._write_only_store.remove_folder(folder_path)
-
+                    self._write_folder(drive, folder_path, folder_description)
             elif folder_path in priority_sub_folders:
                 drive = priority_sub_folders[folder_path]
-                full_folder_path = '%s/%s' % (drive, folder_path)
-                self._file_system.make_dirs(full_folder_path)
-                self._write_only_store.add_external_folder(drive, folder_path, folder_description)
-                if folder_path in self._read_only_store.folders and not self._file_system.is_folder(folder_path):
-                    self._write_only_store.remove_folder(folder_path)
+                self._write_folder(drive, folder_path, folder_description)
             else:
-                raise UnreachableException('Why!')  # pragma: no cover
+                self._file_system.make_dirs(folder_path)
+                self._write_only_store.add_folder(folder_path, folder_description)
+
+    def _write_folder(self, drive, folder_path, folder_description):
+        full_folder_path = '%s/%s' % (drive, folder_path)
+        self._file_system.make_dirs(full_folder_path)
+        if drive == self._config[K_BASE_PATH]:
+            self._write_only_store.add_folder(folder_path, folder_description)
+            return
+
+        self._write_only_store.add_external_folder(drive, folder_path, folder_description)
+        if folder_path in self._read_only_store.folders and not self._file_system.is_folder(folder_path):
+            self._write_only_store.remove_folder(folder_path)
 
     def remove_deleted_files(self):
         files_to_delete = self._read_only_store.list_missing_files(self._db.files)

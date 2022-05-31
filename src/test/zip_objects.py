@@ -16,7 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import K_BASE_PATH
-from test.objects import zip_desc, file_nes_palette_a, tweak_descr
+from test.objects import zip_desc, file_nes_palette_a, tweak_descr, folder_games_nes, folder_games, \
+    folder_games_nes_palettes, file_nes_palette_a_descr
 
 
 def cheats_folder_tag_dictionary():
@@ -26,6 +27,25 @@ def cheats_folder_tag_dictionary():
 cheats_folder_id = 'cheats_id'
 zipped_nes_palettes_id = 'zipped_nes_palettes_id'
 cheats_folder_name = 'Cheats'
+
+
+def zipped_nes_palettes_desc():
+    return zip_desc(
+        "Extracting Palettes",
+        folder_games_nes,
+        summary={
+            "files": {file_nes_palette_a: file_nes_palette_a_descr_zipped()},
+            "folders": {
+                folder_games: {"zip_id": zipped_nes_palettes_id},
+                folder_games_nes: {"zip_id": zipped_nes_palettes_id},
+                folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id},
+            }
+        },
+        zipped_files={
+            "files": {file_nes_palette_a[1:]: file_nes_palette_a_descr()},
+            "folders": {}
+        }
+    )
 
 
 def cheats_folder_tags():
