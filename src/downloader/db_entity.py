@@ -106,11 +106,8 @@ def _create_default_options(options, _):
         raise DbEntityValidationException('ERROR: db "DB_ID" has invalid default options [%s], contact the db maintainer.' % e.fields_to_string())
 
 
-def _is_valid_zips(zips):
-    if not isinstance(zips, dict):
-        return False
-
-    mandatory_fields = [
+def zip_mandatory_fields():
+    return [
         'kind',
         'description',
         'contents_file',
@@ -119,6 +116,13 @@ def _is_valid_zips(zips):
 #        'raw_files_size'
     ]
 
+
+def _is_valid_zips(zips):
+    if not isinstance(zips, dict):
+        return False
+
+    mandatory_fields = zip_mandatory_fields()
+
     for zip_id, zip_desc in zips.items():
         for field in mandatory_fields:
             if field not in zip_desc:
@@ -126,6 +130,9 @@ def _is_valid_zips(zips):
 
         if 'internal_summary' not in zip_desc and 'summary_file' not in zip_desc:
             raise DbEntityValidationException('ERROR: db "DB_ID" has invalid ZIP "%s" with missing summary field, contact the db maintainer.' % zip_id)
+
+        if zip_desc['kind'] not in {'extract_all_contents', 'extract_single_files'}:
+            raise DbEntityValidationException('ERROR: db "DB_ID" has invalid ZIP "%s" with wrong kind "%s".' % (zip_id, zip_desc['kind']))
 
         if zip_desc['kind'] == 'extract_all_contents' and 'target_folder_path' not in zip_desc:
             raise DbEntityValidationException('ERROR: db "DB_ID" has invalid ZIP "%s" with missing target_folder_path field, contact the db maintainer.' % zip_id)
