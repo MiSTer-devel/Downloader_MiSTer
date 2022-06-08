@@ -49,7 +49,7 @@ class DbEntity:
 
     @property
     @test_only
-    def testable(self):
+    def testable(self):  # pragma: no cover
         result = self.__dict__.copy()
         result['default_options'] = result['default_options'].testable
         if result['linux'] is None:

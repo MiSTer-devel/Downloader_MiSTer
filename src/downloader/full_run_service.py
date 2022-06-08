@@ -89,6 +89,8 @@ class FullRunService:
         return False
 
     def _full_run_impl(self):
+        self._logger.debug('Linux Version: %s' % self._linux_updater.get_current_linux_version())
+
         if not self._check_certificates():
             self._logger.print()
             self._logger.print("Please, reboot your system and try again.")
