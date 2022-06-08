@@ -63,10 +63,7 @@ class LinuxUpdater:
 
         self._logger.debug('linux: ' + json.dumps(linux, indent=4))
 
-        current_linux_version = 'unknown'
-        if self._file_system.is_file(FILE_MiSTer_version):
-            current_linux_version = self._file_system.read_file_contents(FILE_MiSTer_version)
-
+        current_linux_version = self.get_current_linux_version()
         if current_linux_version == linux['version'][-6:]:
             self._logger.debug('current_linux_version "%s" matches db linux: %s' % (current_linux_version, linux['version']))
             return
@@ -99,6 +96,9 @@ class LinuxUpdater:
             return
 
         self._run_subprocesses(linux, linux_path)
+
+    def get_current_linux_version(self):
+        return self._file_system.read_file_contents(FILE_MiSTer_version) if self._file_system.is_file(FILE_MiSTer_version) else 'unknown'
 
     def _run_subprocesses(self, linux, linux_path):
         if self._file_system.is_file('/media/fat/linux/7za.gz'):
