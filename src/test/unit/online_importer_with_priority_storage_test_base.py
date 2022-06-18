@@ -148,7 +148,7 @@ def store_nes_folder_on_usb1(): return store_descr(folders_usb1=_store_folders_n
 def store_nes_folder_on_usb2(): return store_descr(folders_usb2=_store_folders_nes())
 def store_nes_folder(): return store_descr(folders=_store_folders_nes())
 def store_smb1_and_games_folder_on_usb1_too(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes(), folders_usb1=_store_folders_games())
-def store_pdfviewer_on_base_system_path_hidden(): return store_descr(files=_store_files_pdfviewer(), folders=_store_folders_linux())
+def store_pdfviewer_on_base_system_path_hidden(): return store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files=_store_files_pdfviewer(), folders=_store_folders_linux())
 def store_smb1_and_contra(): return store_descr(files=_store_files_smb1_and_contra(), folders=_store_folders_nes())
 def store_nes_manual_on_usb2(): return store_descr(files_usb2=_store_files_nes_manual(), folders_usb2=_store_folders_docs_nes())
 def store_smb1_on_usb1_and_nes_manual_on_usb2(): return {db_test: store_smb1_on_usb1(), db_demo: store_nes_manual_on_usb2()}

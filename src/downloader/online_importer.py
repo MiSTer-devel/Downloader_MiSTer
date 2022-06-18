@@ -16,13 +16,10 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import DISTRIBUTION_MISTER_DB_ID, FILE_PDFViewer, FILE_lesskey, FILE_glow, K_BASE_PATH, \
-    K_PARALLEL_UPDATE, K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, FOLDER_screenshots, \
-    FOLDER_savestates, FOLDER_saves, FOLDER_linux, FILE_MiSTer_new, FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, \
-    FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, \
-    FILE_downloader_launcher_script, FILE_MiSTer_old, K_BASE_SYSTEM_PATH
+from downloader.constants import K_BASE_PATH, K_PARALLEL_UPDATE, K_ZIP_FILE_COUNT_THRESHOLD,\
+    K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_new, FILE_MiSTer, FILE_MiSTer_old, K_BASE_SYSTEM_PATH
 from downloader.file_filter import BadFileFilterPartException
-from downloader.other import UnreachableException, cache
+from downloader.other import UnreachableException
 
 
 class _Session:
@@ -75,9 +72,6 @@ class OnlineImporter:
             self._logger.bench('Filtering Database...')
             file_filter = self._create_file_filter(expanded_db, config)
             filtered_db, filtered_zip_data = file_filter.select_filtered_files(expanded_db)
-
-            self._logger.bench('Validating paths...')
-            _DatabaseValidator(filtered_db).validate_paths()
 
             externals = {'priority_files': {}, 'priority_sub_folders': {}, 'priority_top_folders': {}}
 
@@ -303,41 +297,6 @@ class OnlineImporter:
 
     def new_files_not_overwritten(self):
         return self._base_session.new_files_not_overwritten
-
-
-class _DatabaseValidator:
-    def __init__(self, db):
-        self._db = db
-
-    def validate_paths(self):
-        for file_path in self._db.files:
-            self._assert_valid_path(file_path)
-
-        for folder in sorted(self._db.folders):
-            self._assert_valid_path(folder)
-
-    def _assert_valid_path(self, path):
-        if not isinstance(path, str):
-            raise InvalidDownloaderPath(
-                "Path is not a string '%s', contact with the author of the database." % str(path))
-
-        if path == '' or path[0] == '/' or path[0] == '.' or path[0] == '\\':
-            raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
-
-        lower_path = path.lower()
-
-        if self._db.db_id == DISTRIBUTION_MISTER_DB_ID and lower_path in distribution_mister_exceptional_paths():
-            return
-
-        if lower_path in invalid_paths():
-            raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
-
-        if self._db.db_id != DISTRIBUTION_MISTER_DB_ID and lower_path in no_distribution_mister_invalid_paths():
-            raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
-
-        parts = lower_path.split('/')
-        if '..' in parts or len(parts) == 0 or parts[0] in invalid_folders():
-            raise InvalidDownloaderPath("Invalid path '%s', contact with the author of the database." % path)
 
 
 class _Resolver:
@@ -772,31 +731,6 @@ class _OnlineDatabaseImporter:
             self._logger.print()
 
 
-class InvalidDownloaderPath(Exception):
-    pass
-
-
 class WrongDatabaseOptions(Exception):
     pass
 
-
-@cache
-def no_distribution_mister_invalid_paths():
-    return tuple(item.lower() for item in [FILE_MiSTer, FILE_menu_rbf])
-
-
-@cache
-def invalid_paths():
-    return tuple(item.lower() for item in
-                 [FILE_MiSTer_ini, FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini,
-                  FILE_MiSTer_alt_3_ini, FILE_downloader_launcher_script, FILE_MiSTer_new])
-
-
-@cache
-def invalid_folders():
-    return tuple(item.lower() for item in [FOLDER_linux, FOLDER_saves, FOLDER_savestates, FOLDER_screenshots])
-
-
-@cache
-def distribution_mister_exceptional_paths():
-    return tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow, FOLDER_linux])

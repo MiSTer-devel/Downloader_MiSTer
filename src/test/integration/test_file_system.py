@@ -129,6 +129,28 @@ class TestFileSystem(unittest.TestCase):
         self.sut().make_dirs('foo')
         self.assertTrue(os.path.isdir(str(Path(self.tempdir.name) / 'foo')))
 
+    def test_remove_folder___on_existing_folder___removes_it(self):
+        self.sut().make_dirs('foo')
+        self.assertTrue(os.path.isdir(str(Path(self.tempdir.name) / 'foo')))
+        self.sut().remove_folder('foo')
+        self.assertFalse(os.path.isdir(str(Path(self.tempdir.name) / 'foo')))
+
+    def test_remove_folder___on_missing_folder___does_nothing(self):
+        self.sut().remove_folder('not_existing/')
+
+    def test_folder_has_items___on_existing_folder_with_files___returns_true(self):
+        self.sut().make_dirs('foo')
+        self.sut().touch('foo/bar')
+        self.assertTrue(self.sut().folder_has_items('foo'))
+
+    def test_folder_has_items___on_existing_folder_with_no_files___returns_false(self):
+        self.sut().make_dirs('foo')
+        self.assertTrue(os.path.isdir(str(Path(self.tempdir.name) / 'foo')))
+        self.assertFalse(self.sut().folder_has_items('foo'))
+
+    def test_folder_has_items___on_non_existing_folder___returns_false(self):
+        self.assertFalse(self.sut().folder_has_items('foo'))
+
     def test_load_dict_from_file___on_plain_json___returns_json_dict(self):
         json_file = 'foo.json'
         self.sut().write_file_contents(json_file, json.dumps(foo_bar_json))

@@ -47,6 +47,7 @@ file_menu_rbf = 'menu.rbf'
 file_s32x_md = '|docs/S32X/S32X.md'
 file_neogeo_md = '|docs/NeoGeo/NeoGeo.md'
 file_foo = 'foo.txt'
+file_save_psx_castlevania = 'saves/PSX/castlevania.sav'
 hash_menu_rbf = 'menu.rbf'
 hash_MiSTer = FILE_MiSTer_new
 hash_PDFViewer = 'pdfviewer'
@@ -62,6 +63,7 @@ folder_docs = '|docs'
 folder_docs_nes = '|docs/NES'
 folder_docs_neogeo = '|docs/NeoGeo'
 folder_docs_s32x = '|docs/S32X'
+folder_save_psx = 'saves/PSX'
 db_test = 'test'
 db_palettes = 'db_palettes'
 db_demo = 'demo'
@@ -471,6 +473,17 @@ def file_foo_descr():
     }
 
 
+def file_save_psx_castlevania_descr(overwrite=None):
+    o = {
+        "hash": file_save_psx_castlevania,
+        "size": 23053019,
+        "url": "https://psx_castlevania.sav"
+    }
+    if overwrite is not None:
+        o['overwrite'] = overwrite
+    return o
+
+
 def tweak_descr(o, zip_id=True, tags=True, url=True):
     if not url:
         o.pop('url')
@@ -551,6 +564,10 @@ def db_with_folders(db_id, folders):
     if isinstance(folders, list):
         folders = {f: {} for f in folders}
     return db_entity(db_id=db_id, db_files=[db_id + '.json.zip'], folders=folders)
+
+
+def db_with_files(db_id, files):
+    return db_entity(db_id=db_id, db_files=[db_id + '.json.zip'], files=files)
 
 
 def empty_store(base_path):

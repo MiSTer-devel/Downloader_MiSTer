@@ -17,8 +17,8 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from downloader.constants import FILE_MiSTer_old, FILE_MiSTer, FILE_PDFViewer, FILE_MiSTer_new, FOLDER_linux
-from downloader.online_importer import InvalidDownloaderPath, invalid_folders, invalid_paths, no_distribution_mister_invalid_paths
+from downloader.constants import FILE_MiSTer_old, FILE_MiSTer, FILE_PDFViewer, FILE_MiSTer_new, FOLDER_linux, \
+    DISTRIBUTION_MISTER_DB_ID
 from test.fake_logger import SpyLoggerDecorator, NoLogger
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_waiter import NoWaiter
@@ -180,7 +180,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.add_db(db_distribution_mister(files={FILE_MiSTer: file_mister_descr()}), store)
         sut.download(False)
 
-        self.assertEqual(store_descr(files={FILE_MiSTer: file_mister_descr()}), store)
+        self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files={FILE_MiSTer: file_mister_descr()}), store)
         self.assertEqual(fs_data(
             files={
                 media_usb0(FILE_MiSTer): file_mister_descr(),
@@ -193,16 +193,6 @@ class TestOnlineImporter(unittest.TestCase):
         ]), sut.fs_records)
         self.assertReports(sut, [FILE_MiSTer], needs_reboot=True)
 
-    def test_download_test_db___with_mister___raises_invalid_downloader_path_exception(self):
-        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={FILE_MiSTer: {'hash': hash_MiSTer_old}}))
-        store = empty_test_store()
-
-        sut.add_db(db_test_with_file(FILE_MiSTer, file_mister_descr()), store)
-        self.assertRaises(InvalidDownloaderPath, lambda: sut.download(False))
-
-        self.assertEqual(fs_data(files={FILE_MiSTer: {'hash': hash_MiSTer_old}}), sut.fs_data)
-        self.assertReportsNothing(sut)
-
     def test_download_distribution_mister_with_pdfviewer___on_empty_store_and_fs___needs_reboot(self):
         sut = OnlineImporter()
         store = empty_test_store()
@@ -210,7 +200,7 @@ class TestOnlineImporter(unittest.TestCase):
         sut.add_db(db_distribution_mister(files={FILE_PDFViewer: file_pdfviewer_descr()}, folders={FOLDER_linux: {'path': 'system'}}), store)
         sut.download(False)
 
-        self.assertEqual(store_descr(files={
+        self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files={
             FILE_PDFViewer: file_pdfviewer_descr()
         }, folders={
             FOLDER_linux: {'path': 'system'}
@@ -364,22 +354,6 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertEqual(store_with_folders('db3', []), store3)
         self.assertEqual(fs_data(folders=['a', 'b', 'x']), sut.fs_data)
         self.assertReportsNothing(sut, save=True)
-
-    def test_downloaded_single_db___with_invalid_files___raises_error(self):
-        invalids = [0, 'linux/file.txt', 'linux/something/something/file.txt', '../omg.txt', 'this/is/ok/../or/nope.txt', '/tmp/no', '.hidden'] + \
-                        ['%s/file.txt' % k for k in invalid_folders()] + \
-                        list(invalid_paths()) + \
-                        list(no_distribution_mister_invalid_paths())
-
-        for wrong_path in invalids:
-            with self.subTest(wrong_path):
-                self.assertRaises(InvalidDownloaderPath, lambda: downloaded_single_db(db_test_with_file(wrong_path, file_a_descr())))
-
-    def test_downloaded_single_db___with_invalid_folders___raises_error(self):
-        invalids = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + invalid_folders()
-        for wrong_path in invalids:
-            with self.subTest(wrong_path):
-                self.assertRaises(InvalidDownloaderPath, lambda: downloaded_single_db(db_with_folders('wrong_db', {wrong_path: {}})))
 
     def test_db_header___when_existing___send_the_lines_to_logger_and_waiter_accordingly(self):
         expected_log = 'this_is_the_logger_expected_log'
