@@ -222,8 +222,9 @@ class _FileSystem(FileSystem):
                 return True
 
         except FileNotFoundError as e:
-            self._logger.debug(e)
-            self._logger.debug('Ignoring error.')
+            self._ignore_error(e)
+        except NotADirectoryError as e:
+            self._ignore_error(e)
 
         return False
 
@@ -238,8 +239,13 @@ class _FileSystem(FileSystem):
         try:
             os.rmdir(self._path(path))
         except FileNotFoundError as e:
-            self._logger.debug(e)
-            self._logger.debug('Ignoring error.')
+            self._ignore_error(e)
+        except NotADirectoryError as e:
+            self._ignore_error(e)
+
+    def _ignore_error(self, e):
+        self._logger.debug(e)
+        self._logger.debug('Ignoring error.')
 
     def remove_non_empty_folder(self, path):
         if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
