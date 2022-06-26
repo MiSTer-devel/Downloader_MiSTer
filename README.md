@@ -105,7 +105,7 @@ NOTE: If you manually add custom databases, you might want to make sure that you
 
 ### Supporters+ shout-out!
 
-Antonio Villena, atrac17, Hard Rich, and MiSTerFPGA.co.uk
+Antonio Villena, atrac17, birdybro, Hard Rich and MiSTerFPGA.co.uk
 
 Thank you so much for supporting this project! If you would like to show up here, join us as **Supporter+** on Patreon:
 
