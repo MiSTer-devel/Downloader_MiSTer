@@ -57,17 +57,12 @@ download_file() {
                     [ "${RO_ROOT}" == "true" ] && mount / -o remount,rw
                     rm /etc/ssl/certs/* 2> /dev/null || true
                     echo
-                    echo "https://curl.se/ca/cacert.pem"
-                    curl -kL "https://curl.se/ca/cacert.pem"|awk 'split_after==1{n++;split_after=0} /-----END CERTIFICATE-----/ {split_after=1} {if(length($0) > 0) print > "/etc/ssl/certs/cert" n ".pem"}'
-                    echo
-                    echo "Installing cacert.pem into /etc/ssl/certs ..."
-                    for PEM in /etc/ssl/certs/*.pem; do mv "$PEM" "$(dirname "$PEM")/$(cat "$PEM" | grep -m 1 '^[^#]').pem"; done
-                    for PEM in /etc/ssl/certs/*.pem; do for HASH in $(openssl x509 -subject_hash_old -hash -noout -in "$PEM" 2>/dev/null); do ln -s "$(basename "$PEM")" "$(dirname "$PEM")/$HASH.0"; done; done
+                    echo "Installing cacert.pem from https://curl.se"
+                    curl --insecure --location -o /etc/ssl/certs/cacert.pem "https://curl.se/ca/cacert.pem"
                     sync
                     [ "${RO_ROOT}" == "true" ] && mount / -o remount,ro
                     echo
-                    echo "CA certificates have been successfully fixed."
-                    export CURL_SSL=""
+                    export CURL_SSL="--cacert /etc/ssl/certs/cacert.pem"
                     continue
                 fi
 
