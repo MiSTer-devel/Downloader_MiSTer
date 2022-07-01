@@ -18,8 +18,8 @@
 import tempfile
 
 from downloader.constants import FILE_MiSTer, DISTRIBUTION_MISTER_DB_ID
-from fake_file_system_factory import make_production_filesystem_factory
-from fake_path_resolver import PathResolverFactory
+from test.fake_file_system_factory import make_production_filesystem_factory
+from test.fake_path_resolver import PathResolverFactory
 from test.fake_online_importer import OnlineImporter
 from test.objects import config_with, file_mister_descr, db_entity, store_descr
 from test.unit.online_importer_with_priority_storage_test_base import OnlineImporterWithPriorityStorageTestBase
