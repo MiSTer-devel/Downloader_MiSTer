@@ -108,6 +108,7 @@ K_ZIP_ACCUMULATED_MB_THRESHOLD = 'zip_accumulated_mb_threshold'
 K_FILTER = 'filter'
 K_VERBOSE = 'verbose'
 K_CONFIG_PATH = 'config_path'
+K_LOGFILE = 'logfile'
 K_USER_DEFINED_OPTIONS = 'user_defined_options'
 K_CURL_SSL = 'curl_ssl'
 K_DB_URL = 'db_url'
@@ -132,6 +133,7 @@ KENV_DEFAULT_DB_ID = 'DEFAULT_DB_ID'
 KENV_DEFAULT_BASE_PATH = 'DEFAULT_BASE_PATH'
 KENV_DEBUG = 'DEBUG'
 KENV_FAIL_ON_FILE_ERROR = 'FAIL_ON_FILE_ERROR'
+KENV_LOGFILE = 'LOGFILE'
 
 
 @unique
