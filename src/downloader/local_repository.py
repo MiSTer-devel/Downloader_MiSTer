@@ -50,7 +50,7 @@ class LocalRepository:
     def logfile_path(self):
         if self._logfile_path_value is None:
             if self._config[K_LOGFILE] is not None:
-                self._storage_path_value = self._config[K_LOGFILE]
+                self._logfile_path_value = self._config[K_LOGFILE]
             else:
                 self._logfile_path_value = '%s/%s' % (self._config[K_BASE_SYSTEM_PATH], FILE_downloader_log % self._config[K_CONFIG_PATH].stem)
         return self._logfile_path_value
