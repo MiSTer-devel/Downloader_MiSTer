@@ -77,10 +77,10 @@ class OnlineImporterWithPriorityStorageTestBase(unittest.TestCase):
             .add_db(db, store)\
             .download(False)
 
-    def assertReports(self, sut, installed, save=True):
+    def assertReports(self, sut, installed, save=True, reboot=False):
         self.assertEqual(sorted(remove_all_priority_paths(installed)), sorted(sut.correctly_installed_files()))
         self.assertEqual([], sut.files_that_failed())
-        self.assertEqual(False, sut.needs_reboot())
+        self.assertEqual(reboot, sut.needs_reboot())
         self.assertEqual(save, sut.needs_save)
 
 

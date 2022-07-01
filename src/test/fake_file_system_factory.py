@@ -31,8 +31,8 @@ fake_temp_file = '/tmp/temp_file'
 first_fake_temp_file = '/tmp/temp_file0'
 
 
-def make_production_filesystem_factory(config) -> ProductionFileSystemFactory:
-    return ProductionFileSystemFactory(config, {}, NoLogger())
+def make_production_filesystem_factory(config, path_dictionary=None) -> ProductionFileSystemFactory:
+    return ProductionFileSystemFactory(config, path_dictionary or {}, NoLogger())
 
 
 def fs_data(files=None, folders=None, base_path=None):

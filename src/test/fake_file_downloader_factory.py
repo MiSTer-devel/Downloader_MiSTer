@@ -78,6 +78,7 @@ class _FileDownloaderWithRealFileSystem(CurlDownloaderAbstract):
 
     def _run(self, description, target_path: str, file: str) -> None:
         self._file_system.write_file_contents(target_path, 'This is a test file.')  # Generates a file with hash: test.objects.hash_real_test_file
+        self._http_oks.add(file)
 
     def _command(self, target_path: str, url: str) -> str:
         return target_path

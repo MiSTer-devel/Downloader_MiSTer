@@ -218,7 +218,9 @@ class _FileSystem(FileSystem):
 
     def folder_has_items(self, path):
         try:
-            for _ in os.scandir(self._path(path)):
+            iterator = os.scandir(self._path(path))
+            for _ in iterator:
+                iterator.close()
                 return True
 
         except FileNotFoundError as e:

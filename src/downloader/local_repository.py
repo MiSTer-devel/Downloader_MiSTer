@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import FILE_MiSTer_old, FILE_downloader_storage, FILE_downloader_log, \
     FILE_downloader_last_successful_run, K_CONFIG_PATH, K_BASE_SYSTEM_PATH, \
-    FILE_downloader_external_storage, K_BASE_PATH
+    FILE_downloader_external_storage, K_BASE_PATH, K_LOGFILE
 from downloader.local_store_wrapper import LocalStoreWrapper
 from downloader.other import UnreachableException, empty_store_without_base_path
 from downloader.store_migrator import make_new_local_store
@@ -37,7 +37,10 @@ class LocalRepository:
     @property
     def _storage_path(self):
         if self._storage_path_value is None:
-            self._storage_path_value = '%s/%s' % (self._config[K_BASE_SYSTEM_PATH], FILE_downloader_storage)
+            if self._config[K_LOGFILE] is not None:
+                self._storage_path_value = self._config[K_LOGFILE]
+            else:
+                self._storage_path_value = '%s/%s' % (self._config[K_BASE_SYSTEM_PATH], FILE_downloader_storage)
         return self._storage_path_value
 
     @property

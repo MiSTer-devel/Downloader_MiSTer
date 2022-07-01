@@ -31,7 +31,8 @@ from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_BASE_SYSTEM
     K_DB_URL, K_SECTION, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, KENV_DOWNLOADER_INI_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, \
     KENV_DEFAULT_BASE_PATH, KENV_ALLOW_REBOOT, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEBUG, K_OPTIONS, \
     MEDIA_FAT, K_DEBUG, K_CURL_SSL, KENV_CURL_SSL, KENV_UPDATE_LINUX, KENV_FAIL_ON_FILE_ERROR, KENV_COMMIT, \
-    K_FAIL_ON_FILE_ERROR, K_COMMIT, K_UPDATE_LINUX_ENVIRONMENT, K_DEFAULT_DB_ID, DISTRIBUTION_MISTER_DB_ID, K_START_TIME
+    K_FAIL_ON_FILE_ERROR, K_COMMIT, K_UPDATE_LINUX_ENVIRONMENT, K_DEFAULT_DB_ID, DISTRIBUTION_MISTER_DB_ID, \
+    K_START_TIME, KENV_LOGFILE, K_LOGFILE
 from downloader.db_options import DbOptionsKind, DbOptions, DbOptionsValidationException
 from downloader.ini_parser import IniParser
 
@@ -84,7 +85,8 @@ def default_config():
         K_VERBOSE: False,
         K_DEBUG: False,
         K_DEFAULT_DB_ID: DISTRIBUTION_MISTER_DB_ID,
-        K_START_TIME: 0
+        K_START_TIME: 0,
+        K_LOGFILE: None
     }
 
 
@@ -159,6 +161,7 @@ class ConfigReader:
         result[K_DEFAULT_DB_ID] = self._valid_db_id(K_DEFAULT_DB_ID, self._env[KENV_DEFAULT_DB_ID])
         result[K_START_TIME] = time.time()
         result[K_CONFIG_PATH] = config_path
+        result[K_LOGFILE] = self._env[KENV_LOGFILE]
 
         self._logger.configure(result)
 

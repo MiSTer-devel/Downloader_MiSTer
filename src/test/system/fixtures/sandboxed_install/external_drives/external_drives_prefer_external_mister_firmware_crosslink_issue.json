@@ -1,0 +1,16 @@
+{
+    "db_id": "distribution_mister",
+    "zips": {},
+    "files": {
+        "MiSTer": {
+            "hash": "f782dd65a0d548f7cda6eba1e2b05f36",
+            "path": "system",
+            "reboot": true,
+            "size": 1024,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Main_MiSTer/master/releases/MiSTer_20210305"
+        }
+    },
+    "folders": {},
+    "latest_zip_url": "https://github.com/MiSTer-devel/Distribution_MiSTer/archive/refs/heads/main.zip",
+    "timestamp": 0
+}

@@ -50,9 +50,6 @@ class PrintLogger(Logger):
         self._verbose_mode = False
         self._start_time = None
 
-    def set_local_repository(self, local_repository):
-        pass
-
     def configure(self, config):
         if config[K_VERBOSE]:
             self._verbose_mode = True
