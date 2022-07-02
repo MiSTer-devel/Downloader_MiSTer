@@ -33,7 +33,7 @@ jobs:
       run: cd src && python3 -m unittest discover -s test/system/slow
 
     - name: Build
-      run: ZIP_FILE="dont_download.zip" ./src/build.sh > dont_download.sh
+      run: ZIP_FILE="$(pwd)/dont_download.zip" ./src/build.sh > dont_download.sh
 
     - name: Release
       id: release
