@@ -41,3 +41,5 @@ jobs:
         git config --global user.email "theypsilon@gmail.com"
         git config --global user.name "The CI/CD Bot"
         ./.github/release.sh
+      env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
