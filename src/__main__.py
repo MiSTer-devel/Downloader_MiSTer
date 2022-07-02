@@ -28,6 +28,7 @@ if __name__ == '__main__':
     exit_code = main({
         KENV_DOWNLOADER_LAUNCHER_PATH: os.getenv(KENV_DOWNLOADER_LAUNCHER_PATH, None),
         KENV_DOWNLOADER_INI_PATH: os.getenv(KENV_DOWNLOADER_INI_PATH, None),
+        KENV_LOGFILE: os.getenv(KENV_LOGFILE, None),
         KENV_CURL_SSL: os.getenv(KENV_CURL_SSL, DEFAULT_CURL_SSL_OPTIONS),
         KENV_COMMIT: os.getenv(KENV_COMMIT, 'unknown'),
         KENV_ALLOW_REBOOT: os.getenv(KENV_ALLOW_REBOOT, None),
@@ -36,8 +37,7 @@ if __name__ == '__main__':
         KENV_DEFAULT_DB_ID: os.getenv(KENV_DEFAULT_DB_ID, DISTRIBUTION_MISTER_DB_ID),
         KENV_DEFAULT_BASE_PATH: os.getenv(KENV_DEFAULT_BASE_PATH, None),
         KENV_DEBUG: os.getenv(KENV_DEBUG, 'false').lower(),
-        KENV_FAIL_ON_FILE_ERROR: os.getenv(KENV_FAIL_ON_FILE_ERROR, 'false'),
-        KENV_LOGFILE: os.getenv(KENV_LOGFILE, None)
+        KENV_FAIL_ON_FILE_ERROR: os.getenv(KENV_FAIL_ON_FILE_ERROR, 'false')
     })
 
     exit(exit_code)
