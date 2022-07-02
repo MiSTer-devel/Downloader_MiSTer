@@ -4,7 +4,7 @@
 set -euo pipefail
 
 TEMP_ZIP1="$(mktemp -u).zip"
-TEMP_ZIP2="$(mktemp -u).zip"
+TEMP_ZIP2="${ZIP_FILE:-$(mktemp -u).zip}"
 BIN="/tmp/dont_download.zip"
 UUDECODE_CMD=$({ [[ "${MISTER:-false}" == "false" ]] && [[ "$(uname -s)" == "Darwin" ]] ; } && echo "uudecode -p" || echo "uudecode -o -")
 EXPORTS="export COMMIT=$(git rev-parse --short HEAD)"
@@ -40,4 +40,6 @@ exit 0
 EOF
 
 uuencode - < <(xzcat -z < "${TEMP_ZIP2}")
-rm "${TEMP_ZIP2}" > /dev/null 2>&1 || true
+if [[ "${TEMP_ZIP2}" != "${ZIP_FILE:-}" ]] ; then
+  rm "${TEMP_ZIP2}" > /dev/null 2>&1 || true
+fi

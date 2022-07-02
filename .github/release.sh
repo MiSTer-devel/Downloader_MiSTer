@@ -15,6 +15,8 @@ if [ ${CHANGES} -ge 1 ] ; then
   echo "There are changes to push."
   echo
   git push origin main
+  gh release create latest_release || true
+  gh release upload latest_release dont_download.zip --clobber
   echo
   echo "New dont_download.sh can be used."
   echo "::set-output name=NEW_RELEASE::yes"
