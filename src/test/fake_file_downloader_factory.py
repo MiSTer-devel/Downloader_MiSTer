@@ -40,12 +40,18 @@ class _FileDownloaderWithFakeFileSystem(CurlDownloaderAbstract):
     def _run(self, description, target_path: str, file: str) -> None:
         self._run_files.append(file)
 
-        if file not in self._network_state.remote_failures:
-            self._network_state.remote_failures[file] = 0
+        failing_path = None
+        for path in self._network_state.remote_failures:
+            if file in path:
+                failing_path = path
 
-        self._network_state.remote_failures[file] -= 1
+        if failing_path is None:
+            failing_path = file
+            self._network_state.remote_failures[failing_path] = 0
 
-        if self._network_state.remote_failures[file] > 0:
+        self._network_state.remote_failures[failing_path] -= 1
+
+        if self._network_state.remote_failures[failing_path] > 0:
             self._errors.add_print_report(file, '')
             return
 

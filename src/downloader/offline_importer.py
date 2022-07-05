@@ -109,11 +109,15 @@ class _OfflineDatabaseImporter:
             db.zips[zip_id].pop('internal_summary')
             write_store.add_zip(zip_id, db.zips[zip_id])
 
+        temp_filename = self._file_system.unique_temp_filename()
+
         for zip_id in zip_ids_to_download:
-            temp_zip = '/tmp/%s.json.zip' % zip_id
+            temp_zip = '%s_%s.json.zip' % (temp_filename.value, zip_id)
             zip_ids_by_temp_zip[temp_zip] = zip_id
 
             summary_downloader.queue_file(db.zips[zip_id]['summary_file'], temp_zip)
+
+        temp_filename.close()
 
         self._logger.print()
         self._logger.print()

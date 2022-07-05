@@ -392,7 +392,7 @@ def db_with_unibios_from_official_url():
                     "url": "http://unibios.free.fr/download/uni-bios-40.zip",
                     "zipped_files": {
                         "files": {
-                            "/tmp/downloader_zip_neogeo_unibios/uni-bios.rom": {
+                            "/tmp/unique_temp_filename_1/neogeo_unibios/uni-bios.rom": {
                                 "hash": "4f0aeda8d2d145f596826b62d563c4ef", "size": 131072}
                         },
                         "folders": {}
