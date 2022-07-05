@@ -40,6 +40,4 @@ exit 0
 EOF
 
 uuencode - < <(xzcat -z < "${TEMP_ZIP2}")
-#if [[ "${TEMP_ZIP2}" != "${ZIP_FILE:-}" ]] ; then
-#  rm "${TEMP_ZIP2}" > /dev/null 2>&1 || true
-#fi
+#rm "${TEMP_ZIP2}" > /dev/null 2>&1 || true

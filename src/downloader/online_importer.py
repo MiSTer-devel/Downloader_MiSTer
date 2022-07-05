@@ -477,11 +477,14 @@ class _OnlineZipSummaries:
         summary_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE], silent=True)
         zip_ids_by_temp_zip = dict()
 
+        temp_filename = self._file_system.unique_temp_filename()
         for zip_id in zip_ids_to_download:
-            temp_zip = '/tmp/%s_summary.json.zip' % zip_id
+            temp_zip = '%s_%s_summary.json.zip' % (temp_filename.value, zip_id)
             zip_ids_by_temp_zip[temp_zip] = zip_id
 
             summary_downloader.queue_file(self._db.zips[zip_id]['summary_file'], temp_zip)
+
+        temp_filename.close()
 
         summary_downloader.download_files(self._is_first_run())
         downloaded_summaries = [(zip_ids_by_temp_zip[temp_zip], temp_zip) for temp_zip in
@@ -610,6 +613,8 @@ class _OnlineDatabaseImporter:
         zip_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE])
         zip_ids_by_temp_zip = dict()
 
+        temp_filename = self._file_system.unique_temp_filename()
+
         for zip_id in needed_zips:
             zipped_files = needed_zips[zip_id]
 
@@ -620,9 +625,11 @@ class _OnlineDatabaseImporter:
             if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
                 continue
 
-            temp_zip = '/tmp/%s_contents.zip' % zip_id
+            temp_zip = '%s_%s_contents.zip' % (temp_filename.value, zip_id)
             zip_ids_by_temp_zip[temp_zip] = zip_id
             zip_downloader.queue_file(self._db.zips[zip_id]['contents_file'], temp_zip)
+
+        temp_filename.close()
 
         if len(zip_ids_by_temp_zip) == 0:
             return
@@ -660,12 +667,14 @@ class _OnlineDatabaseImporter:
 
             elif kind == 'extract_single_files':
                 self._logger.print(zip_description['description'])
-                tmp_path = '/tmp/downloader_zip_%s/' % zip_id
+                temp_filename = self._file_system.unique_temp_filename()
+                tmp_path = '%s/%s/' % (temp_filename.value, zip_id)
                 self._file_system.unzip_contents(temp_zip, tmp_path, list(zipped_files['files']))
                 for file_path, file_description in zipped_files['files'].items():
                     self._file_system.copy('%s%s' % (tmp_path, file_description['zip_path']), file_path)
                 self._file_system.unlink(temp_zip)
                 self._file_system.remove_non_empty_folder(tmp_path)
+                temp_filename.close()
                 file_downloader.mark_unpacked_zip(zip_id, 'whatever')
             else:
                 raise UnreachableException('ERROR: ZIP %s has wrong field kind "%s", contact the db maintainer.' % (zip_id, kind))  # pragma: no cover
