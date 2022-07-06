@@ -668,7 +668,7 @@ class _OnlineDatabaseImporter:
             elif kind == 'extract_single_files':
                 self._logger.print(zip_description['description'])
                 temp_filename = self._file_system.unique_temp_filename()
-                tmp_path = '%s/%s/' % (temp_filename.value, zip_id)
+                tmp_path = '%s_%s/' % (temp_filename.value, zip_id)
                 self._file_system.unzip_contents(temp_zip, tmp_path, list(zipped_files['files']))
                 for file_path, file_description in zipped_files['files'].items():
                     self._file_system.copy('%s%s' % (tmp_path, file_description['zip_path']), file_path)
