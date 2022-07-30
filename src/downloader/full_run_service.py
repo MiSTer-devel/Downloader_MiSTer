@@ -175,11 +175,11 @@ class FullRunService:
             return
 
         self._logger.print()
-        self._logger.print('Not installed due to overwrite protection:')
+        self._logger.print('Following new versions were not installed:')
         for db_id in new_files_not_installed:
             self._logger.print(' •%s: %s' % (db_id, ', '.join(new_files_not_installed[db_id])))
         self._logger.print()
-        self._logger.print(' * Delete any protected file that you wish to install, and run this again.')
+        self._logger.print(' * Delete the file that you wish to upgrade from the previous list, and run this again.')
 
     def _needs_reboot(self):
         return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.needs_reboot())
