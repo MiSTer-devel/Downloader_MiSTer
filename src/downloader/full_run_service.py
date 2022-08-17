@@ -78,10 +78,10 @@ class FullRunService:
     def _check_certificates(self):
         for i in range(3):
             if i != 0:
-                self._logger.print()
-                self._logger.print("Attempting again in 10 seconds...")
+                self._logger.debug()
+                self._logger.debug("Attempting again in 10 seconds...")
                 self._waiter.sleep(10)
-                self._logger.print()
+                self._logger.debug()
 
             if self._certificates_fix.fix_certificates_if_needed():
                 return True
@@ -92,6 +92,7 @@ class FullRunService:
         self._logger.debug('Linux Version: %s' % self._linux_updater.get_current_linux_version())
 
         if not self._check_certificates():
+            self._logger.print("ERROR: Couldn't load certificates.")
             self._logger.print()
             self._logger.print("Please, reboot your system and try again.")
             self._waiter.sleep(50)

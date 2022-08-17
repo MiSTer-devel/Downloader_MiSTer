@@ -76,7 +76,7 @@ class CertificatesFix:
                 raise err
 
             self._logger.debug(err)
-            self._logger.print("ERROR: Your filesystem is mounted incorrectly.")
+            self._logger.debug("ERROR: Could not remove certs file.")
             return False
 
     def _get_new_cacert(self, cacert_path):
