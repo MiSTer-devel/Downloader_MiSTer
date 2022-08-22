@@ -121,7 +121,7 @@ class TestDbEntity(unittest.TestCase):
                 self.assertRaises(DbEntityValidationException, lambda: db_test_with_file(wrong_path, file_a_descr()))
 
     def test_construct_db_entity___with_invalid_root_folders___raises_error(self):
-        invalids = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + invalid_root_folders()
+        invalids = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + tuple('%s/folder' % f for f in invalid_root_folders())
         for wrong_path in invalids:
             with self.subTest(wrong_path):
                 self.assertRaises(DbEntityValidationException, lambda: db_with_folders('wrong_db', {wrong_path: {}}))
