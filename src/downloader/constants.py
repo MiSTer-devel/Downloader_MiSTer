@@ -47,6 +47,8 @@ FOLDER_linux = 'linux'
 FOLDER_saves = 'saves'
 FOLDER_savestates = 'savestates'
 FOLDER_screenshots = 'screenshots'
+FOLDER_gamecontrollerdb = 'linux/gamecontrollerdb'
+FILE_gamecontrollerdb = 'linux/gamecontrollerdb/gamecontrollerdb.txt'
 
 # Downloader files
 FILE_downloader_storage = 'Scripts/.config/downloader/downloader.json.zip'
