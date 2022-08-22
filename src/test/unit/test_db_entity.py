@@ -20,7 +20,7 @@ import unittest
 
 from downloader.config import default_config
 from downloader.constants import K_BASE_PATH, FILE_MiSTer
-from downloader.db_entity import DbEntityValidationException, zip_mandatory_fields, invalid_paths, no_distribution_mister_invalid_paths, invalid_folders
+from downloader.db_entity import DbEntityValidationException, zip_mandatory_fields, invalid_paths, no_distribution_mister_invalid_paths, invalid_root_folders
 from test.fake_db_entity import DbEntity
 from test.objects import raw_db_empty_descr, db_empty, file_mister_descr, db_with_folders, file_a_descr, \
     db_test_with_file, db_entity, file_save_psx_castlevania, file_save_psx_castlevania_descr, folder_save_psx
@@ -112,7 +112,7 @@ class TestDbEntity(unittest.TestCase):
 
     def test_construct_db_entity___with_invalid_files___raises_error(self):
         invalids = [0, 'linux/file.txt', 'linux/something/something/file.txt', '../omg.txt', 'this/is/ok/../or/nope.txt', '/tmp/no', '.hidden'] + \
-                        ['%s/file.txt' % k for k in invalid_folders()] + \
+                        ['%s/file.txt' % k for k in invalid_root_folders()] + \
                         list(invalid_paths()) + \
                         list(no_distribution_mister_invalid_paths())
 
@@ -120,8 +120,8 @@ class TestDbEntity(unittest.TestCase):
             with self.subTest(wrong_path):
                 self.assertRaises(DbEntityValidationException, lambda: db_test_with_file(wrong_path, file_a_descr()))
 
-    def test_construct_db_entity___with_invalid_folders___raises_error(self):
-        invalids = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + invalid_folders()
+    def test_construct_db_entity___with_invalid_root_folders___raises_error(self):
+        invalids = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + invalid_root_folders()
         for wrong_path in invalids:
             with self.subTest(wrong_path):
                 self.assertRaises(DbEntityValidationException, lambda: db_with_folders('wrong_db', {wrong_path: {}}))

@@ -19,7 +19,7 @@
 from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FILE_MiSTer_alt_ini, \
     FILE_downloader_launcher_script, FILE_MiSTer_alt_3_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, \
     FILE_MiSTer_new, FOLDER_linux, FOLDER_saves, FOLDER_savestates, FOLDER_screenshots, FILE_PDFViewer, FILE_lesskey, \
-    FILE_glow, DISTRIBUTION_MISTER_DB_ID
+    FILE_glow, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, DISTRIBUTION_MISTER_DB_ID
 from downloader.db_options import DbOptionsKind, DbOptions, DbOptionsValidationException
 from downloader.other import test_only, cache
 
@@ -194,6 +194,9 @@ def _validate_and_extract_parts_from_path(db_id, path):
     lower_path = path.lower()
     parts = lower_path.split('/')
 
+    if lower_path in exceptional_paths():
+        return parts
+
     if db_id == DISTRIBUTION_MISTER_DB_ID and lower_path in distribution_mister_exceptional_paths():
         return parts
 
@@ -203,7 +206,7 @@ def _validate_and_extract_parts_from_path(db_id, path):
     if db_id != DISTRIBUTION_MISTER_DB_ID and lower_path in no_distribution_mister_invalid_paths():
         raise _InvalidPathException(path)
 
-    if '..' in parts or len(parts) == 0 or parts[0] in invalid_folders():
+    if '..' in parts or len(parts) == 0 or parts[0] in invalid_root_folders():
         raise _InvalidPathException(path)
 
     return parts
@@ -222,7 +225,7 @@ def invalid_paths():
 
 
 @cache
-def invalid_folders():
+def invalid_root_folders():
     return tuple(item.lower() for item in [FOLDER_linux, FOLDER_screenshots, FOLDER_savestates])
 
 
@@ -230,8 +233,11 @@ def invalid_folders():
 def folders_with_non_overridable_files():
     return tuple(item.lower() for item in [FOLDER_saves])
 
+@cache
+def exceptional_paths():
+    return tuple(item.lower() for item in [FOLDER_linux, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb])
 
 @cache
 def distribution_mister_exceptional_paths():
-    return tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow, FOLDER_linux])
+    return tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow])
 
