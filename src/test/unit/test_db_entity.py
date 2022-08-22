@@ -19,8 +19,10 @@
 import unittest
 
 from downloader.config import default_config
-from downloader.constants import K_BASE_PATH, FILE_MiSTer
-from downloader.db_entity import DbEntityValidationException, zip_mandatory_fields, invalid_paths, no_distribution_mister_invalid_paths, invalid_root_folders
+from downloader.constants import K_BASE_PATH, FILE_MiSTer, FOLDER_gamecontrollerdb, FOLDER_linux, FILE_gamecontrollerdb, \
+    FILE_gamecontrollerdb_user, DISTRIBUTION_MISTER_DB_ID
+from downloader.db_entity import DbEntityValidationException, zip_mandatory_fields, invalid_paths, \
+    no_distribution_mister_invalid_paths, invalid_root_folders, distribution_mister_exceptional_paths
 from test.fake_db_entity import DbEntity
 from test.objects import raw_db_empty_descr, db_empty, file_mister_descr, db_with_folders, file_a_descr, \
     db_test_with_file, db_entity, file_save_psx_castlevania, file_save_psx_castlevania_descr, folder_save_psx
@@ -121,10 +123,27 @@ class TestDbEntity(unittest.TestCase):
                 self.assertRaises(DbEntityValidationException, lambda: db_test_with_file(wrong_path, file_a_descr()))
 
     def test_construct_db_entity___with_invalid_root_folders___raises_error(self):
-        invalids = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + tuple('%s/folder' % f for f in invalid_root_folders())
+        invalids = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + tuple('%s/folder' % f for f in invalid_root_folders()) + distribution_mister_exceptional_paths()
         for wrong_path in invalids:
             with self.subTest(wrong_path):
                 self.assertRaises(DbEntityValidationException, lambda: db_with_folders('wrong_db', {wrong_path: {}}))
 
     def test_construct_db_entity___with_mister_file___raises_invalid_downloader_path_exception(self):
         self.assertRaises(DbEntityValidationException, lambda: db_test_with_file(FILE_MiSTer, file_mister_descr()))
+
+    def test_construct_db_entity___valid_folders___does_not_raise_an_error(self):
+        invalids = (FOLDER_linux, FOLDER_gamecontrollerdb)
+        for wrong_path in invalids:
+            with self.subTest(wrong_path):
+                self.assertIsNotNone(db_with_folders('wrong_db', {wrong_path: {}}))
+
+    def test_construct_db_entity___valid_files___does_not_raise_an_error(self):
+        invalids = (FILE_gamecontrollerdb, FILE_gamecontrollerdb_user)
+        for wrong_path in invalids:
+            with self.subTest(wrong_path):
+                self.assertIsNotNone(db_test_with_file('wrong_db', file_a_descr()))
+
+    def test_construct_distribution_mister___valid_exceptional_files___does_not_raise_an_error(self):
+        for wrong_path in distribution_mister_exceptional_paths():
+            with self.subTest(wrong_path):
+                self.assertIsNotNone(db_with_folders(DISTRIBUTION_MISTER_DB_ID, {wrong_path: {}}))
