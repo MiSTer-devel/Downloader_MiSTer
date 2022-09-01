@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
+
+# Checks if a binary is present on the local system
+exit_if_binary_not_installed() {
+  for binary in "$@"; do
+    command -v "$binary" >/dev/null 2>&1 || {
+      echo >&2 "Script requires '$binary' command-line utility to be installed on your local machine. Aborting..."
+      exit 1
+    }
+  done
+}
+
 set -euo pipefail
 export DOWNLOADER_LAUNCHER_PATH="${DOWNLOADER_LAUNCHER_PATH:-${0}}"
 export COMMIT=d11ef18
+
+exit_if_binary_not_installed "uudecode" "xzcat" "python3"
+
 uudecode -o - "${0}" | xzcat -d -c > "/tmp/dont_download.zip"
 chmod a+x "/tmp/dont_download.zip"
 "/tmp/dont_download.zip" "${1:-}"
