@@ -10,7 +10,7 @@ To use it, on your MiSTer main menu, go to the *Scripts* screen, and select `dow
 
 ### Options
 
-You may create a `/media/fat/downloader.ini` file to tweak some parameters.
+You may create a `/media/fat/update.ini` file to tweak some parameters.
 
 Here you can see the default parameters and the options that you may change:
 
