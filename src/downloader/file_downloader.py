@@ -21,6 +21,7 @@ import ssl
 import subprocess
 import sys
 import time
+import socket
 from abc import ABC, abstractmethod
 from shutil import copyfileobj
 from threading import Thread
@@ -30,7 +31,7 @@ from urllib.request import urlopen
 
 from downloader.constants import K_DOWNLOADER_RETRIES, K_DOWNLOADER_SIZE_MB_LIMIT, \
     K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_CURL_SSL, K_DEBUG, FILE_MiSTer_new, FILE_MiSTer, \
-    FILE_MiSTer_old, K_DOWNLOADER_OLD_IMPLEMENTATION, K_DOWNLOADER_THREADS_LIMIT
+    FILE_MiSTer_old, K_DOWNLOADER_OLD_IMPLEMENTATION, K_DOWNLOADER_THREADS_LIMIT, K_IS_PC_LAUNCHER
 from downloader.logger import DebugOnlyLoggerDecorator
 from downloader.other import calculate_url
 from downloader.target_path_repository import TargetPathRepository
@@ -261,6 +262,13 @@ def context_from_curl_ssl(curl_ssl):
     return context
 
 
+original_get_addr_info = socket.getaddrinfo
+
+
+def get_addr_info_ipv4_only(host, port, family=0, socktype=0, proto=0, flags=0):
+    return original_get_addr_info(host, port, socket.AF_INET, socktype, proto, flags)
+
+
 class _LowLevelMultiThreadingFileDownloaderFactory(LowLevelFileDownloaderFactory):
     def __init__(self, threads_limit, config, waiter, logger):
         self._threads_limit = threads_limit
@@ -269,6 +277,11 @@ class _LowLevelMultiThreadingFileDownloaderFactory(LowLevelFileDownloaderFactory
         self._logger = logger
 
     def create_low_level_file_downloader(self, download_validator):
+        if not self._config[K_IS_PC_LAUNCHER] and socket.getaddrinfo != get_addr_info_ipv4_only:
+            # Ugly hack to not try IPv6 which always fail on MiSTer: https://stackoverflow.com/questions/2014534/force-python-mechanize-urllib2-to-only-use-a-requests
+            self._logger.debug('Forcing IPv4!')
+            socket.getaddrinfo = get_addr_info_ipv4_only
+
         return _LowLevelMultiThreadingFileDownloader(self._threads_limit, self._config, context_from_curl_ssl(self._config[K_CURL_SSL]), self._waiter, self._logger, download_validator)
 
 
@@ -371,11 +384,11 @@ class _LowLevelMultiThreadingFileDownloader(LowLevelFileDownloader):
                         notify_queue.put((2, (path, 'Bad http status! %s: %s' % (path, in_stream.status))), False)
 
             except URLError as e:
-                notify_queue.put((2, (path, 'HTTP error! %s: %s' % (path, e.reason))), False)
+                notify_queue.put((2, (path, 'URL Error! %s: %s' % (url, e.reason))), False)
             except ConnectionResetError as e:
-                notify_queue.put((2, (path, 'Connection reset error! %s: %s' % (path, str(e)))), False)
+                notify_queue.put((2, (path, 'Connection reset error! %s: %s' % (url, str(e)))), False)
             except Exception as e:
-                notify_queue.put((2, (path, 'Exception during download! %s: %s' % (path, str(e)))), False)
+                notify_queue.put((2, (path, 'Exception during download! %s: %s' % (url, str(e)))), False)
 
             job_queue.task_done()
 
