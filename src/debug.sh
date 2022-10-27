@@ -11,7 +11,7 @@ fi
 
 TEMP_SCRIPT="$(mktemp)"
 
-DEBUG=true MISTER=true ./src/build.sh > "${TEMP_SCRIPT}"
+DEBUG="${DEBUG:-true}" MISTER=true ./src/build.sh > "${TEMP_SCRIPT}"
 chmod +x "${TEMP_SCRIPT}"
 
 if [ -f dont_download.ini ] ; then

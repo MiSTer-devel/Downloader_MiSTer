@@ -149,8 +149,7 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertReports(sut, [], errors=[file_a])
 
     def test_download_dbs_contents___with_file_with_wrong_hash___just_reports_error(self):
-        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(
-            remote_files={file_a: file_descr(hash_code="wrong_hash")}))
+        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(remote_files={file_a: file_descr(hash_code="wrong_hash")}))
         store = empty_test_store()
 
         sut.add_db(db_test_with_file_a(), store)

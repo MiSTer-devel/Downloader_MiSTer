@@ -43,7 +43,7 @@ class _PathResolver:
         if self._os_name == 'nt' and path.startswith('C:\\'):
             return None
 
-        if path[0] == '/':
+        if path[0] == '/' or path.startswith('C:\\'):
             return None
 
         if path[0] == '|':

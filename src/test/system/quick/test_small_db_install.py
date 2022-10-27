@@ -22,8 +22,10 @@ import os
 import os.path
 from pathlib import Path
 from downloader.config import ConfigReader
-from downloader.constants import FILE_mister_downloader_needs_reboot, K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_CURL_SSL, KENV_DEBUG, \
-    KENV_FAIL_ON_FILE_ERROR, KENV_DEFAULT_BASE_PATH
+from downloader.constants import FILE_mister_downloader_needs_reboot, K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_CURL_SSL, \
+    KENV_DEBUG, \
+    KENV_FAIL_ON_FILE_ERROR, KENV_DEFAULT_BASE_PATH, KENV_DOWNLOADER_INI_PATH
+from downloader.file_system import is_windows
 from test.objects import debug_env, default_base_path
 from test.fake_logger import NoLogger
 import subprocess
@@ -68,16 +70,24 @@ class TestSmallDbInstall(unittest.TestCase):
         mister_path = Path('%s/MiSTer' % config[K_BASE_SYSTEM_PATH])
         os.makedirs(str(mister_path.parent), exist_ok=True)
         mister_path.touch()
-        tool = str(Path(ini_path).with_suffix('.sh'))
-        subprocess.run('cd ..; ./src/build.sh > src/%s' % tool, shell=True, stderr=subprocess.STDOUT)
-        subprocess.run(['chmod', '+x', tool], shell=False, stderr=subprocess.STDOUT)
+
         test_env = os.environ.copy()
         test_env[KENV_CURL_SSL] = ''
         test_env[KENV_DEBUG] = 'true'
         test_env[KENV_FAIL_ON_FILE_ERROR] = 'true'
         test_env[KENV_DEFAULT_BASE_PATH] = default_base_path
-        result = subprocess.run([tool], stderr=subprocess.STDOUT, env=test_env)
-        shutil.rmtree('src/%s' % tool, ignore_errors=True)
+        test_env[KENV_DOWNLOADER_INI_PATH] = ini_path
+
+        if is_windows:
+            result = subprocess.run(['python3', '__main__.py'], stderr=subprocess.STDOUT, env=test_env)
+        else:
+            tool = str(Path(ini_path).with_suffix('.sh'))
+            subprocess.run('cd ..; ./src/build.sh > src/%s' % tool, shell=True, stderr=subprocess.STDOUT)
+            subprocess.run(['chmod', '+x', tool], shell=False, stderr=subprocess.STDOUT)
+
+            result = subprocess.run(tool, stderr=subprocess.STDOUT, env=test_env)
+            shutil.rmtree('src/%s' % tool, ignore_errors=True)
+            os.unlink(tool)
+
         self.assertEqual(result.returncode, 0)
         self.assertEqual(save, os.path.isfile("%s/Scripts/.config/downloader/downloader.json.zip" % config[K_BASE_SYSTEM_PATH]))
-        os.unlink(tool)

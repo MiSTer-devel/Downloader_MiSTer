@@ -55,11 +55,6 @@ allow_reboot = 1
 ;   false -> Doesn't update Linux.
 update_linux = true
 
-; parallel_update options:
-;   true -> Tries to download more than one file simultaneously.
-;   false -> Will only download one file at a time.
-parallel_update = true
-
 ; downloader_timeout: Can be tweaked to increase the timeout time in seconds
 ;   It is useful to increase this value for users with slow connections.
 downloader_timeout = 300
@@ -83,6 +78,12 @@ verbose = false
 - [ ] Integration with *MiSTer* binary
 
 Check the [CHANGELOG](CHANGELOG.md) for more information about past releases.
+
+### PC Launcher (for Windows, Mac, and Linux)
+
+With this different launcher you'll be able to install all MiSTer files without using a MiSTer. This is especially useful if your MiSTer can't access the internet.
+
+Learn how to use the *PC Launcher* [here](docs/pc-launcher.md). 
 
 ### Custom Download Filters
 

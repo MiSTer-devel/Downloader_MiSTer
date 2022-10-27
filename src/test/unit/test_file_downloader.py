@@ -99,7 +99,7 @@ class TestFileDownloader(unittest.TestCase):
         self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
 
     def test_download_files_one___from_scratch_no_matching_hash___return_errors(self):
-        self.network_state.remote_files[file_one] = {'hash': 'wrong'}
+        self.network_state.remote_files[file_one] = {'hash': 'wrong',  'size': 1}
         self.download_one()
         self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
 
@@ -159,7 +159,7 @@ class TestFileDownloader(unittest.TestCase):
         self.assertEqual(need_reboot, self.sut.needs_reboot())
 
     def download_one(self):
-        self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_one}, file_one)
+        self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_one, 'size': 1}, file_one)
         self.sut.download_files(False)
 
     def download_big_file(self, hash_value):

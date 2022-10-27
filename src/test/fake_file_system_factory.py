@@ -22,13 +22,12 @@ from pathlib import Path
 from downloader.config import AllowDelete
 from downloader.constants import K_BASE_PATH, K_ALLOW_DELETE, STORAGE_PATHS_PRIORITY_SEQUENCE
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
-    absolute_parent_folder
+    absolute_parent_folder, is_windows
 from downloader.other import ClosableValue, UnreachableException
 from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_logger import NoLogger
 
-fake_temp_file = '/tmp/temp_file'
-first_fake_temp_file = '/tmp/temp_file0'
+first_fake_temp_file = '/tmp/unique_temp_filename_0'
 
 
 def make_production_filesystem_factory(config, path_dictionary=None) -> ProductionFileSystemFactory:
@@ -94,12 +93,6 @@ class _FileSystem(ProductionFileSystem):
 
     def _fix_paths(self, paths):
         return [p.replace(self._base_path(p) + '/', '') for p in paths]
-
-    def temp_file(self):
-        result = fake_temp_file + str(self._current_temp_file_index)
-        self._current_temp_file_index += 1
-        self._write_records.append(_Record('temp_file', result))
-        return _FakeTempFile(result)
 
     def unique_temp_filename(self):
         name = '/tmp/unique_temp_filename_%d' % self.unique_temp_filename_index
@@ -172,7 +165,7 @@ class _FileSystem(ProductionFileSystem):
         path_object = Path(self._path(path))
         if len(path_object.parents) <= 3:
             return
-        parent = str(path_object.parent)
+        parent = self._path(str(path_object.parent))
         self._state.folders[parent] = {}
         self._write_records.append(_Record('make_dirs_parent', parent))
 
@@ -288,6 +281,11 @@ class _FileSystem(ProductionFileSystem):
         return False
 
     def _path(self, path):
+        if is_windows:
+            path = path.replace('\\', '/')
+            if len(path) > 2 and path[0].lower() == 'c' and path[1] == ':' and path[2] == '/':
+                path = path[2:]
+
         path = path.lower()
 
         if path[0] == '/':

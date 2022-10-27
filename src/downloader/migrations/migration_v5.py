@@ -15,7 +15,7 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import DISTRIBUTION_MISTER_DB_ID, K_DATABASES, K_OPTIONS, PathType
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, K_DATABASES, K_OPTIONS
 from downloader.store_migrator import MigrationBase
 
 

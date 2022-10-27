@@ -16,6 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import tempfile
+from pathlib import Path
 
 from downloader.constants import FILE_MiSTer, DISTRIBUTION_MISTER_DB_ID
 from test.fake_file_system_factory import make_production_filesystem_factory
@@ -39,7 +40,7 @@ class TestMiSTerFirmwareRealInstall(OnlineImporterWithPriorityStorageTestBase):
         base_system_path = self.base_system_path.name.lower()
 
         written_file_hash = '3de8f8b0dc94b8c2230fab9ec0ba0506'
-        path_file_mister = base_system_path + '/' + FILE_MiSTer
+        path_file_mister = str(Path(base_system_path).joinpath(FILE_MiSTer))
 
         config = config_with(storage_priority="prefer_external", base_system_path=base_system_path, base_path=base_path)
 

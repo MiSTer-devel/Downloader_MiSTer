@@ -12,6 +12,6 @@
     "folders": {},
     "timestamp": 0,
     "default_options": {
-        "parallel_update": false
+        "filter": "arcade"
     }
 }

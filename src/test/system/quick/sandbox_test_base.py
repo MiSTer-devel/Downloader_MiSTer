@@ -15,17 +15,14 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-import contextlib
-import subprocess
 import unittest
 import shutil
 import os
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from downloader.config import ConfigReader
 from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, KENV_UPDATE_LINUX, \
-    KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, \
-    KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR, FILE_downloader_storage
+    KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEFAULT_BASE_PATH, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR, FILE_downloader_storage
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from downloader.full_run_service_factory import FullRunServiceFactory
 from downloader.logger import PrintLogger
@@ -34,7 +31,7 @@ from test.fake_file_system_factory import make_production_filesystem_factory
 from test.objects import debug_env, default_base_path, default_env
 from test.fake_logger import NoLogger, SpyLoggerDecorator
 from test.fake_store_migrator import StoreMigrator
-from downloader.file_system import hash_file
+from downloader.file_system import hash_file, is_windows, load_json_from_zip
 from downloader.main import execute_full_run
 from downloader.local_repository import LocalRepositoryProvider
 from downloader.store_migrator import make_new_local_store
@@ -54,13 +51,15 @@ class SandboxTestBase(unittest.TestCase):
         if expected is None:
             return
 
+        transform_windows_paths_from_expected(expected)
+
         config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
         self.file_system = make_production_filesystem_factory(config).create_for_system_scope()
         counter = 0
         if 'local_store' in expected:
             counter += 1
             with self.subTestAdapter('local_store'):
-                actual_store = json.loads(subprocess.run(['unzip', '-p', '%s/%s' % (config[K_BASE_SYSTEM_PATH], FILE_downloader_storage)], stdout=subprocess.PIPE).stdout.decode())
+                actual_store = load_json_from_zip(os.path.join(config[K_BASE_SYSTEM_PATH], FILE_downloader_storage))
                 self.assertEqual(expected['local_store'], actual_store)
 
         if 'files' in expected:
@@ -130,7 +129,7 @@ class SandboxTestBase(unittest.TestCase):
         return execute_full_run(factory, config_reader, argv or [])
 
     def find_all_files(self, directory):
-        return sorted(self._scan_files(directory), key=lambda t: t[0].lower())
+        return [(file.replace('\\', '/'), md5) for file, md5 in sorted(self._scan_files(directory), key=lambda t: t[0].lower())]
 
     def _scan_files(self, directory):
         for entry in os.scandir(directory):
@@ -142,7 +141,7 @@ class SandboxTestBase(unittest.TestCase):
     def find_all_folders(self, directory):
         if not directory.endswith('/'):
             directory = directory + '/'
-        return sorted(self._scan_folders(directory, directory), key=str.casefold)
+        return [folder.replace('\\', '/') for folder in sorted(self._scan_folders(directory, directory), key=str.casefold)]
 
     def _scan_folders(self, directory, base):
         for entry in os.scandir(directory):
@@ -199,3 +198,25 @@ def hashes(base_path, files):
 def load_json(file_path):
     with open(file_path, "r") as f:
         return json.loads(f.read())
+
+
+def transform_windows_paths_from_expected(expected):
+    if not is_windows:
+        return
+
+    transform_windows_paths_from_file_collection(expected, 'files')
+    transform_windows_paths_from_file_collection(expected, 'system_files')
+    transform_windows_paths_from_folder_collection(expected, 'folders')
+    transform_windows_paths_from_folder_collection(expected, 'system_folders')
+
+
+def transform_windows_paths_from_file_collection(expected, field):
+    if field not in expected:
+        return
+    expected[field] = [(str(PurePosixPath(file)).replace('\\', '/'), md5) for file, md5 in expected[field]]
+
+
+def transform_windows_paths_from_folder_collection(expected, field):
+    if field not in expected:
+        return
+    expected[field] = [str(PurePosixPath(folder)).replace('\\', '/') for folder in expected[field]]

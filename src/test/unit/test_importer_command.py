@@ -19,7 +19,7 @@
 import unittest
 
 from downloader.config import default_config
-from downloader.constants import K_BASE_PATH, K_DOWNLOADER_RETRIES, K_PARALLEL_UPDATE, K_OPTIONS, K_STORAGE_PRIORITY
+from downloader.constants import K_BASE_PATH, K_DOWNLOADER_RETRIES, K_OPTIONS, K_STORAGE_PRIORITY, K_FILTER
 from downloader.db_options import DbOptionsKind, DbOptions
 from test.fake_importer_command import ImporterCommand
 from test.objects import db_entity, config_with
@@ -49,11 +49,11 @@ class TestImporterCommand(unittest.TestCase):
     def test_read_dbs___after_adding_different_options___returns_corresponding_original_config_variants(self):
         actual = ImporterCommand(config)\
             .add_db(db, nil, {K_OPTIONS: DbOptions({K_BASE_PATH: 'abc'}, kind=DbOptionsKind.INI_SECTION)})\
-            .add_db(db, nil, {K_OPTIONS: DbOptions({K_PARALLEL_UPDATE: False}, kind=DbOptionsKind.INI_SECTION)})\
+            .add_db(db, nil, {K_OPTIONS: DbOptions({K_FILTER: 'arcade'}, kind=DbOptionsKind.INI_SECTION)})\
             .read_dbs()
 
         self.assert_config({K_BASE_PATH: 'abc', K_STORAGE_PRIORITY: 'prefer_external'}, actual[0])
-        self.assert_config({K_PARALLEL_UPDATE: False, K_STORAGE_PRIORITY: 'prefer_external'}, actual[1])
+        self.assert_config({K_FILTER: 'arcade', K_STORAGE_PRIORITY: 'prefer_external'}, actual[1])
 
     def test_read_dbs___with_config_options___returns_config_with_options(self):
         actual = ImporterCommand(config_with_options)\

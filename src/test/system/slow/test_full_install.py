@@ -35,11 +35,6 @@ class TestFullInstall(unittest.TestCase):
         print('test_full_install_parallel')
         self.assertRunOk("test/system/fixtures/full_install/parallel.ini")
 
-    def test_full_install_serial(self):
-        print('test_full_install_serial')
-        self.assertRunOk("test/system/fixtures/full_install/serial.ini")
-        self.assertTrue(os.path.isfile('/tmp/delme_serial/MiSTer'))
-
     def test_full_install_and_rerun(self):
         print('test_full_install_and_rerun A)')
         self.assertRunOk("test/system/fixtures/full_install/parallel.ini")

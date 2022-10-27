@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import K_BASE_PATH, K_PARALLEL_UPDATE, K_ZIP_FILE_COUNT_THRESHOLD,\
+from downloader.constants import K_BASE_PATH, K_ZIP_FILE_COUNT_THRESHOLD,\
     K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_new, FILE_MiSTer, FILE_MiSTer_old, K_BASE_SYSTEM_PATH
 from downloader.file_filter import BadFileFilterPartException
 from downloader.other import UnreachableException
@@ -474,7 +474,7 @@ class _OnlineZipSummaries:
             self._db.zips[zip_id].pop('internal_summary')
 
     def _import_zip_ids_from_network(self, zip_ids_to_download):
-        summary_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE], silent=True)
+        summary_downloader = self._file_downloader_factory.create(self._config, parallel_update=True, silent=True)
         zip_ids_by_temp_zip = dict()
 
         temp_filename = self._file_system.unique_temp_filename()
@@ -575,7 +575,7 @@ class _OnlineDatabaseImporter:
         return changed_files, needed_zips
 
     def process_changed_files(self, changed_files, needed_zips, filtered_zip_data):
-        file_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE])
+        file_downloader = self._file_downloader_factory.create(self._config, parallel_update=True)
         file_downloader.set_base_files_url(self._db.base_files_url)
 
         for file_path, file_description in changed_files.items():
@@ -610,7 +610,7 @@ class _OnlineDatabaseImporter:
         return self._read_only_store.has_no_files
 
     def _import_zip_contents(self, needed_zips, filtered_zip_data, file_downloader):
-        zip_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE])
+        zip_downloader = self._file_downloader_factory.create(self._config, parallel_update=True)
         zip_ids_by_temp_zip = dict()
 
         temp_filename = self._file_system.unique_temp_filename()

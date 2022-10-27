@@ -19,7 +19,7 @@ from pathlib import Path
 
 from test.fake_external_drives_repository import ExternalDrivesRepositoryFactoryStub
 from test.objects import path_with
-from sandbox_test_base import local_store_files, hashes, \
+from test.system.quick.sandbox_test_base import local_store_files, hashes, \
     create_folder, load_json, SandboxTestBase, tmp_delme_sandbox, delete_folder, cleanup
 
 tmp_delme_external = '/tmp/delme_external'

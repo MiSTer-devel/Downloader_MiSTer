@@ -15,6 +15,8 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+from pathlib import Path
+
 from downloader.constants import K_BASE_PATH, FILE_MiSTer, MEDIA_USB0
 from test.objects import config_with, file_a, file_a_descr, hash_MiSTer_old, file_mister_descr, file_test_json_zip, \
     file_test_json_zip_descr, remove_priority_path
@@ -91,7 +93,7 @@ class FileSystemState:
 
     def fix_description(self, file, description):
         fixed_description = {
-            'hash': description['hash'] if 'hash' in description else file,
+            'hash': description['hash'] if 'hash' in description else Path(file).name,
             'size': description['size'] if 'size' in description else 1
         }
 

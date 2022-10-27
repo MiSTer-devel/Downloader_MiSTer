@@ -18,7 +18,7 @@
 
 import unittest
 from downloader.config import ConfigReader
-from downloader.constants import KENV_DOWNLOADER_LAUNCHER_PATH, KENV_DOWNLOADER_INI_PATH
+from downloader.constants import KENV_DOWNLOADER_LAUNCHER_PATH, KENV_DOWNLOADER_INI_PATH, KENV_PC_LAUNCHER
 from test.fake_logger import NoLogger
 
 
@@ -34,6 +34,9 @@ class TestConfigFilePath(unittest.TestCase):
     def test_calculate_config_path___with_simple_relative_str_and_working_dir_at_fat___returns_media_fat_str_ini(self):
         self.assertEqual('/media/fat/str.ini', calculate_config_path(env(launcher_path='str.sh'), '/media/fat'))
 
+    def test_calculate_config_path___with_just_update_sh_and_working_dir_at_fat___returns_media_fat_downloader_ini(self):
+        self.assertEqual('/media/fat/downloader.ini', calculate_config_path(env(launcher_path='update.sh'), '/media/fat'))
+
     def test_calculate_config_path___with_complex_relative_str___returns_str_ini(self):
         self.assertEqual('./str/complex.ini', calculate_config_path(env(launcher_path='str/complex.sh'), None))
 
@@ -46,18 +49,37 @@ class TestConfigFilePath(unittest.TestCase):
     def test_calculate_config_path___with_relative_scripts_path___returns_relative_downloader_ini_without_scripts(self):
         self.assertEqual('./downloader.ini', calculate_config_path(env(launcher_path='./Scripts/downloader.sh'), None))
 
+    def test_calculate_config_path___with_update_relative_scripts_path___returns_relative_downloader_ini_without_scripts(self):
+        self.assertEqual('./downloader.ini', calculate_config_path(env(launcher_path='./Scripts/update.sh'), None))
+
     def test_calculate_config_path___with_simple_relative_str_and_working_dir_at_scripts___returns_downloader_ini(self):
         self.assertEqual('/media/fat/downloader.ini', calculate_config_path(env(launcher_path='./downloader.sh'), '/media/fat/Scripts'))
+
+    def test_calculate_config_path___with_simple_update_relative_str_and_working_dir_at_scripts___returns_downloader_ini(self):
+        self.assertEqual('/media/fat/downloader.ini', calculate_config_path(env(launcher_path='./update.sh'), '/media/fat/Scripts'))
 
     def test_calculate_config_path___with_relative_media_fat_scripts_path___returns_relative_downloader_ini_without_scripts(self):
         self.assertEqual('./media/fat/downloader.ini', calculate_config_path(env(launcher_path='./media/fat/Scripts/downloader.sh'), None))
 
+    def test_calculate_config_path___with_update_relative_media_fat_scripts_path___returns_relative_downloader_ini_without_scripts(self):
+        self.assertEqual('./media/fat/downloader.ini', calculate_config_path(env(launcher_path='./media/fat/Scripts/update.sh'), None))
+
+    def test_calculate_config_path___with_absolute_media_fat_scripts_path___returns_relative_downloader_ini_without_scripts(self):
+        self.assertEqual('/media/fat/downloader.ini', calculate_config_path(env(launcher_path='/media/fat/Scripts/downloader.sh'), '/root'))
+
+    def test_calculate_config_path___with_update_absolute_media_fat_scripts_path___returns_relative_downloader_ini_without_scripts(self):
+        self.assertEqual('/media/fat/downloader.ini', calculate_config_path(env(launcher_path='/media/fat/Scripts/update.sh'), '/root'))
+
     def test_calculate_config_path___from_ini_path___returns_ini_path(self):
         self.assertEqual('/media/fat/script.ini', calculate_config_path(env(launcher_path='/media/fat/Scripts/whatever.sh', ini_path='/media/fat/script.ini'), None))
 
+    def test_calculate_config_path___from_pc_launcher___returns_downloader_ini_at_pc_launcher_path(self):
+        self.assertEqual('/a/b/c/downloader.ini', calculate_config_path(env(pc_launcher='/a/b/c/whatever.sh'), None))
 
-def env(launcher_path, ini_path=None):
+
+def env(launcher_path=None, ini_path=None, pc_launcher=None):
     return {
         KENV_DOWNLOADER_LAUNCHER_PATH: launcher_path,
         KENV_DOWNLOADER_INI_PATH: ini_path,
+        KENV_PC_LAUNCHER: pc_launcher
     }

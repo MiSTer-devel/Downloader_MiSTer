@@ -19,7 +19,7 @@
 import unittest
 import configparser
 from downloader.config import AllowDelete, AllowReboot, InvalidConfigParameter
-from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, K_UPDATE_LINUX, K_PARALLEL_UPDATE, K_ALLOW_REBOOT, K_ALLOW_DELETE, \
+from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, K_UPDATE_LINUX, K_ALLOW_REBOOT, K_ALLOW_DELETE, \
     K_DOWNLOADER_SIZE_MB_LIMIT, K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_VERBOSE, K_DATABASES, \
     K_DB_URL, K_SECTION, K_OPTIONS, MEDIA_USB2, MEDIA_USB1
 from test.objects import not_found_ini, db_options, default_base_path
@@ -33,7 +33,6 @@ class TestConfigReader(unittest.TestCase):
     def test_config_reader___when_no_ini___returns_default_values(self):
         self.assertConfig(not_found_ini(), {
             K_UPDATE_LINUX: True,
-            K_PARALLEL_UPDATE: True,
             K_ALLOW_REBOOT: AllowReboot.ALWAYS,
             K_ALLOW_DELETE: AllowDelete.ALL,
             K_BASE_PATH: default_base_path,
@@ -86,7 +85,6 @@ class TestConfigReader(unittest.TestCase):
     def test_config_reader___with_custom_mister_ini___returns_custom_fields(self):
         self.assertConfig("test/integration/fixtures/custom_mister.ini", {
             K_UPDATE_LINUX: False,
-            K_PARALLEL_UPDATE: False,
             K_ALLOW_REBOOT: AllowReboot.NEVER,
             K_ALLOW_DELETE: AllowDelete.OLD_RBF,
             K_BASE_PATH: '/media/usb0',
@@ -111,7 +109,6 @@ class TestConfigReader(unittest.TestCase):
     def test_config_reader___with_custom_mister_dbs_ini___returns_custom_fields_and_dbs(self):
         self.assertConfig("test/integration/fixtures/custom_mister_dbs.ini", {
             K_UPDATE_LINUX: False,
-            K_PARALLEL_UPDATE: True,
             K_ALLOW_REBOOT: AllowReboot.ONLY_AFTER_LINUX_UPDATE,
             K_ALLOW_DELETE: AllowDelete.NONE,
             K_BASE_PATH: MEDIA_USB1,
