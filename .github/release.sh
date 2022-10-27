@@ -22,6 +22,7 @@ if [ ${CHANGES} -ge 1 ] ; then
   fi
 
   gh release upload "latest" "dont_download.zip" --clobber
+  gh release upload "latest" "src/downloader.zip" --clobber
   echo
   echo "New dont_download.sh can be used."
   echo "::set-output name=NEW_RELEASE::yes"

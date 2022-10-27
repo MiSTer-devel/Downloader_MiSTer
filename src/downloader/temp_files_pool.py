@@ -15,6 +15,8 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+import os
+
 
 class TempFilesPool:
     def __init__(self, file_system):
@@ -22,9 +24,9 @@ class TempFilesPool:
         self._temp_files = []
 
     def make_temp_file(self):
-        temp_file = self._file_system.temp_file()
+        temp_file = self._file_system.unique_temp_filename()
         self._temp_files.append(temp_file)
-        return temp_file.name
+        return temp_file.value
 
     def __enter__(self):
         return self
@@ -34,5 +36,7 @@ class TempFilesPool:
 
     def cleanup(self):
         for temp_file in self._temp_files:
+            if os.path.exists(temp_file.value):
+                os.unlink(temp_file.value)
             temp_file.close()
         self._temp_files = []

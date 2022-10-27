@@ -18,7 +18,7 @@
 
 from enum import unique, Enum
 
-from downloader.constants import K_BASE_PATH, K_PARALLEL_UPDATE, K_UPDATE_LINUX, K_DOWNLOADER_SIZE_MB_LIMIT, \
+from downloader.constants import K_BASE_PATH, K_UPDATE_LINUX, K_DOWNLOADER_SIZE_MB_LIMIT, \
     K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER
 from downloader.other import test_only
 
@@ -48,10 +48,6 @@ class DbOptions:
         else:
             raise ValueError("Invalid props kind: " + str(kind))
 
-        if K_PARALLEL_UPDATE in props:
-            if not isinstance(props[K_PARALLEL_UPDATE], bool):
-                raise DbOptionsValidationException([K_PARALLEL_UPDATE])
-            present.add(K_PARALLEL_UPDATE)
         if K_UPDATE_LINUX in props:
             if not isinstance(props[K_UPDATE_LINUX], bool):
                 raise DbOptionsValidationException([K_UPDATE_LINUX])
@@ -84,6 +80,9 @@ class DbOptions:
 
     def items(self):
         return self._props.items()
+
+    def unwrap_props(self):
+        return self._props
 
     def apply_to_config(self, config):
         config.update(self._props)

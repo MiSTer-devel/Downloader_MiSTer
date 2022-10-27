@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Version 1.6 - 2022-10-27
+
+### Added
+- PC Launcher was added. It allows users to run Downloader on a PC. [Documentation](docs/pc-launcher.md).
+- Added support for files gamecontrollerdb and gamecontrollerdb_user.
+
+### Changed
+- The minimum python version required is now 3.9 instead of 3.5 (MiSTer OS has python version 3.9 since September 2021).
+- Code that used Linux utilities has been substituted with code using native python libraries. This makes Downloader cross-platform.
+- The file downloader module now uses python threads instead of CURL. This brings a significant speed boost during bulk downloads. General speed improvement is measured to be between 1.47x and 2.52x for standard use cases on MiSTer.
+- File validation now happens in the main thread after each file has been downloaded asynchronously.
+- When called from `update.sh`, the configuration file `downloader.ini` will be read instead of `update.ini`. Reason is: Since Downloader is now distributed through that launcher, this case needs to reflect better the behaviour described in the documentation.
+- Simplified SSL Certificates installation in the launcher file `downloader.sh`.
+- Zip support now also includes a special case for single files that facilitates the distribution of very big files.
+- Improved error reporting when there are certificate and mount errors to be more informative to the end user.
+- Improved messages on files not getting installed because they are marked as overwrite protected in the database.
+- Several lesser fixes and improvements.
+
+### Removed
+- Removed CLI output section that showed file validations with the `+` symbol, as now file validation happens during bulk downloads.
+- Removed documentation about `base_system_path` as is not meant to be used by users.
+
 ## Version 1.5 - 2022-05-06
 
 ### Added

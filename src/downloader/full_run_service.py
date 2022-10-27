@@ -22,7 +22,7 @@ import time
 
 from downloader.config import UpdateLinuxEnvironment
 from downloader.constants import K_DATABASES, K_UPDATE_LINUX, \
-    K_USER_DEFINED_OPTIONS, K_UPDATE_LINUX_ENVIRONMENT, K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME
+    K_USER_DEFINED_OPTIONS, K_UPDATE_LINUX_ENVIRONMENT, K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME, K_IS_PC_LAUNCHER
 from downloader.importer_command import ImporterCommand
 from downloader.other import format_files_message
 
@@ -59,7 +59,7 @@ class FullRunService:
         result = self._full_run_impl()
         self._logger.bench('Full Run done.')
 
-        if self._needs_reboot():
+        if not self._config[K_IS_PC_LAUNCHER] and self._needs_reboot():
             self._logger.print()
             self._logger.print("Rebooting in 10 seconds...")
             sys.stdout.flush()
@@ -156,7 +156,7 @@ class FullRunService:
 
         self._logger.print()
         self._logger.print('===========================')
-        self._logger.print('Downloader 1.5 (%s) by theypsilon. Run time: %ss' % (self._config[K_COMMIT], run_time))
+        self._logger.print('Downloader 1.6 (%s) by theypsilon. Run time: %ss' % (self._config[K_COMMIT], run_time))
         self._logger.print('Log: %s' % self._local_repository.logfile_path)
         if len(unused_filter_tags) > 0:
             self._logger.print()

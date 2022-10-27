@@ -56,9 +56,9 @@ class FullRunServiceFactory:
         self._local_repository_provider.initialize(local_repository)
 
         file_filter_factory = FileFilterFactory()
-        file_downloader_factory = make_file_downloader_factory(file_system_factory, local_repository, self._logger)
-        db_gateway = DbGateway(config, system_file_system, file_downloader_factory, self._logger)
         waiter = Waiter()
+        file_downloader_factory = make_file_downloader_factory(file_system_factory, local_repository, waiter, self._logger)
+        db_gateway = DbGateway(config, system_file_system, file_downloader_factory, self._logger)
         offline_importer = OfflineImporter(file_system_factory, file_downloader_factory, self._logger)
         online_importer = OnlineImporter(file_filter_factory, file_system_factory, file_downloader_factory, path_resolver_factory, local_repository, external_drives_repository, waiter, self._logger)
         linux_updater = LinuxUpdater(config, system_file_system, file_downloader_factory, self._logger)

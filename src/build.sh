@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-TEMP_ZIP1="$(mktemp -u).zip"
+DOWNLOADER_ZIP="downloader.zip"
 TEMP_ZIP2="${ZIP_FILE:-$(mktemp -u).zip}"
 BIN="/tmp/dont_download.zip"
 UUDECODE_CMD=$({ [[ "${MISTER:-false}" == "false" ]] && [[ "$(uname -s)" == "Darwin" ]] ; } && echo "uudecode -p" || echo "uudecode -o -")
@@ -21,11 +21,10 @@ cd src
 
 find downloader -type f -iname "*.py" -print0 | while IFS= read -r -d '' file ; do pin_metadata "${file}" ; done
 pin_metadata __main__.py
-zip -q -0 -D -X -A -r "${TEMP_ZIP1}" __main__.py downloader -x "*/__pycache__/*"
-pin_metadata "${TEMP_ZIP1}"
-echo '#!/usr/bin/env python3' | cat - "${TEMP_ZIP1}" > "${TEMP_ZIP2}"
+zip -q -0 -D -X -A -r "${DOWNLOADER_ZIP}" __main__.py downloader -x "*/__pycache__/*"
+pin_metadata "${DOWNLOADER_ZIP}"
+echo '#!/usr/bin/env python3' | cat - "${DOWNLOADER_ZIP}" > "${TEMP_ZIP2}"
 pin_metadata "${TEMP_ZIP2}"
-rm "${TEMP_ZIP1}"
 cd ..
 
 cat <<-EOF

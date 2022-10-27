@@ -194,14 +194,14 @@ In practice, downloader will install both files at `games/PSX/tomb_raider.chd` a
 
 ### Default Options
 
-Options for a repository can be defined in `/media/fat/downloader.ini` following the `db_url` entry. Here is an example that sets "_parallel_update_" option for the *custom_db_id* repository:
+Options for a repository can be defined in `/media/fat/downloader.ini` following the `db_url` entry. Here is an example that sets "_filter_" option for the *custom_db_id* repository:
 ```ini
 [*custom_db_id*]
 db_url = 'https://url_to_db.json.zip'
-parallel_update = true
+filter = arcade
 ```
 The following options can be defined:
-- parallel_update
+- filter
 - update_linux
 - downloader_size_mb_limit
 - downloader_process_limit
@@ -211,14 +211,14 @@ The following options can be defined:
 
 Using the same list: maintainers can also set new default options [for any users haven't set themselves] that will only apply to their repository; think of these as **database-scoped defaults**.
 
-Here is an example that sets the **database-scoped default** for the "_parallel_update_" option:
+Here is an example that sets the **database-scoped default** for the "_filter_" option:
 ```js
     "default_options": {
         /**
         * [Optional] Parallel Update (boolean). Should files be downloaded in parallel?
          *           If missing, the global default value will be used.
         */
-        "parallel_update": false
+        "filter": "arcade"
     },
 ```
 

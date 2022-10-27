@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import AllowDelete
-from downloader.constants import K_BASE_PATH, K_ALLOW_DELETE, K_PARALLEL_UPDATE
+from downloader.constants import K_BASE_PATH, K_ALLOW_DELETE
 from downloader.db_entity import DbEntity, DbEntityValidationException
 
 
@@ -90,7 +90,7 @@ class _OfflineDatabaseImporter:
             self._logger.print()
 
     def _update_from_zips(self, db, read_store, write_store):
-        summary_downloader = self._file_downloader_factory.create(self._config, self._config[K_PARALLEL_UPDATE])
+        summary_downloader = self._file_downloader_factory.create(self._config, parallel_update=True)
         zip_ids_by_temp_zip = dict()
 
         zip_ids_to_download = []
