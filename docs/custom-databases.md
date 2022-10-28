@@ -203,8 +203,7 @@ filter = arcade
 The following options can be defined:
 - filter
 - update_linux
-- downloader_size_mb_limit
-- downloader_process_limit
+- downloader_threads_limit
 - downloader_timeout
 - downloader_retries
 - base_path

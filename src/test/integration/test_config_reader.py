@@ -20,8 +20,8 @@ import unittest
 import configparser
 from downloader.config import AllowDelete, AllowReboot, InvalidConfigParameter
 from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, K_UPDATE_LINUX, K_ALLOW_REBOOT, K_ALLOW_DELETE, \
-    K_DOWNLOADER_SIZE_MB_LIMIT, K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_VERBOSE, K_DATABASES, \
-    K_DB_URL, K_SECTION, K_OPTIONS, MEDIA_USB2, MEDIA_USB1
+    K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_VERBOSE, K_DATABASES, \
+    K_DB_URL, K_SECTION, K_OPTIONS, MEDIA_USB2, MEDIA_USB1, K_DOWNLOADER_THREADS_LIMIT
 from test.objects import not_found_ini, db_options, default_base_path
 from test.fake_config_reader import ConfigReader
 
@@ -37,8 +37,7 @@ class TestConfigReader(unittest.TestCase):
             K_ALLOW_DELETE: AllowDelete.ALL,
             K_BASE_PATH: default_base_path,
             K_BASE_SYSTEM_PATH: default_base_path,
-            K_DOWNLOADER_SIZE_MB_LIMIT: 100,
-            K_DOWNLOADER_PROCESS_LIMIT: 300,
+            K_DOWNLOADER_THREADS_LIMIT: 20,
             K_DOWNLOADER_TIMEOUT: 300,
             K_DOWNLOADER_RETRIES: 3,
             K_VERBOSE: False,

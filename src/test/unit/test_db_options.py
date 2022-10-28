@@ -18,8 +18,8 @@
 
 import unittest
 
-from downloader.constants import K_BASE_PATH, K_UPDATE_LINUX, K_DOWNLOADER_SIZE_MB_LIMIT, \
-    K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES
+from downloader.constants import K_BASE_PATH, K_UPDATE_LINUX, \
+    K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_DOWNLOADER_THREADS_LIMIT
 from downloader.db_options import DbOptionsValidationException, DbOptions, DbOptionsKind
 from test.objects import db_options
 
@@ -34,8 +34,7 @@ class TestDbOptions(unittest.TestCase):
         (K_BASE_PATH, lambda: db_options(base_path='a')),
         (K_BASE_PATH, lambda: db_options(base_path='/media/fat/')),
         (K_UPDATE_LINUX, lambda: db_options(update_linux='false')),
-        (K_DOWNLOADER_SIZE_MB_LIMIT, lambda: db_options(downloader_size_mb_limit=-10)),
-        (K_DOWNLOADER_PROCESS_LIMIT, lambda: db_options(downloader_process_limit=False)),
+        (K_DOWNLOADER_THREADS_LIMIT, lambda: db_options(downloader_threads_limit=False)),
         (K_DOWNLOADER_TIMEOUT, lambda: db_options(downloader_timeout='1')),
         (K_DOWNLOADER_RETRIES, lambda: db_options(downloader_retries=0)),
     ]

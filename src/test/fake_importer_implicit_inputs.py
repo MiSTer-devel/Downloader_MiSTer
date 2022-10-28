@@ -46,7 +46,7 @@ class FileSystemState:
 
         path = file.lower() if file[0] == '/' else base_path.lower() + '/' + file.lower()
 
-        self.files[path] = self.fix_description(file, description)
+        self.files[path] = fix_description(file, description)
         return self
 
     def set_non_base_path(self, base, file):
@@ -91,20 +91,21 @@ class FileSystemState:
         self.folders[path.lower()] = {}
         return self
 
-    def fix_description(self, file, description):
-        fixed_description = {
-            'hash': description['hash'] if 'hash' in description else Path(file).name,
-            'size': description['size'] if 'size' in description else 1
-        }
 
-        if 'unzipped_json' in description:
-            fixed_description['unzipped_json'] = description['unzipped_json']
-        if 'zipped_files' in description:
-            fixed_description['zipped_files'] = description['zipped_files']
-        if 'content' in description:
-            fixed_description['content'] = description['content']
+def fix_description(file, description):
+    fixed_description = {
+        'hash': description['hash'] if 'hash' in description else Path(file).name,
+        'size': description['size'] if 'size' in description else 1
+    }
 
-        return fixed_description
+    if 'unzipped_json' in description:
+        fixed_description['unzipped_json'] = description['unzipped_json']
+    if 'zipped_files' in description:
+        fixed_description['zipped_files'] = description['zipped_files']
+    if 'content' in description:
+        fixed_description['content'] = description['content']
+
+    return fixed_description
 
 
 def _fs_paths(paths, base_path):
