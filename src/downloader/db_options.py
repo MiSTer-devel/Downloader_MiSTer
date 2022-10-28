@@ -18,8 +18,8 @@
 
 from enum import unique, Enum
 
-from downloader.constants import K_BASE_PATH, K_UPDATE_LINUX, K_DOWNLOADER_SIZE_MB_LIMIT, \
-    K_DOWNLOADER_PROCESS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER
+from downloader.constants import K_BASE_PATH, K_UPDATE_LINUX, \
+    K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER
 from downloader.other import test_only
 
 
@@ -52,14 +52,10 @@ class DbOptions:
             if not isinstance(props[K_UPDATE_LINUX], bool):
                 raise DbOptionsValidationException([K_UPDATE_LINUX])
             present.add(K_UPDATE_LINUX)
-        if K_DOWNLOADER_SIZE_MB_LIMIT in props:
-            if not isinstance(props[K_DOWNLOADER_SIZE_MB_LIMIT], int) or props[K_DOWNLOADER_SIZE_MB_LIMIT] < 1:
-                raise DbOptionsValidationException([K_DOWNLOADER_SIZE_MB_LIMIT])
-            present.add(K_DOWNLOADER_SIZE_MB_LIMIT)
-        if K_DOWNLOADER_PROCESS_LIMIT in props:
-            if not isinstance(props[K_DOWNLOADER_PROCESS_LIMIT], int) or props[K_DOWNLOADER_PROCESS_LIMIT] < 1:
-                raise DbOptionsValidationException([K_DOWNLOADER_PROCESS_LIMIT])
-            present.add(K_DOWNLOADER_PROCESS_LIMIT)
+        if K_DOWNLOADER_THREADS_LIMIT in props:
+            if not isinstance(props[K_DOWNLOADER_THREADS_LIMIT], int) or props[K_DOWNLOADER_THREADS_LIMIT] < 1:
+                raise DbOptionsValidationException([K_DOWNLOADER_THREADS_LIMIT])
+            present.add(K_DOWNLOADER_THREADS_LIMIT)
         if K_DOWNLOADER_TIMEOUT in props:
             if not isinstance(props[K_DOWNLOADER_TIMEOUT], int) or props[K_DOWNLOADER_TIMEOUT] < 1:
                 raise DbOptionsValidationException([K_DOWNLOADER_TIMEOUT])

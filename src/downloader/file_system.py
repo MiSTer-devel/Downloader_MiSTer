@@ -126,10 +126,6 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def delete_previous(self, file):
-        """interface"""
-
-    @abstractmethod
     def load_dict_from_file(self, path, suffix=None):
         """interface"""
 
@@ -270,36 +266,6 @@ class _FileSystem(FileSystem):
             return True
 
         return self._unlink(path, verbose)
-
-    def delete_previous(self, file):
-        if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
-            return True
-
-        path = Path(self._path(file))
-        if not self.is_folder(str(path.parent)):
-            return
-
-        regex = re.compile("^(.+_)[0-9]{8}([.][a-zA-Z0-9]+)$", )
-        m = regex.match(path.name)
-        if m is None:
-            return
-
-        g = m.groups()
-        if g is None:
-            return
-
-        start = g[0].lower()
-        ext = g[1].lower()
-
-        deleted = False
-        for child in path.parent.iterdir():
-            name = child.name.lower()
-            if name.startswith(start) and name.endswith(ext) and regex.match(name):
-                child.unlink()
-                deleted = True
-
-        if deleted:
-            self._logger.print('Deleted previous "%s"* files.' % start)
 
     def load_dict_from_file(self, path, suffix=None):
         path = self._path(path)
