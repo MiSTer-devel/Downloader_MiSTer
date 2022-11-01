@@ -35,6 +35,10 @@ This happens most probably because you have another program assigned to this fil
 
 You didn't install Python through the Microsoft Store, right? When you use alternative ways to install Python, you need to make sure that the installed programs are getting included in the system path.
 
+* **It runs but closes very quick and I can't read anything**
+
+This probably means Python is not properly installed in your system or it's an old version. If you wanna read a more detailed error message, try to run the launcher from the command prompt ("cmd.exe"), by typing `python3 downloader_pc_launcher.py` in the same directory.
+
 * **I have Python installed but I don't know which version I have**
 
 Open the command prompt, and type `python3 --version` to find out.
