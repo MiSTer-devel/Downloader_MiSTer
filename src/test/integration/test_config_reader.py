@@ -21,8 +21,9 @@ import configparser
 from downloader.config import AllowDelete, AllowReboot, InvalidConfigParameter
 from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, K_UPDATE_LINUX, K_ALLOW_REBOOT, K_ALLOW_DELETE, \
     K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_VERBOSE, K_DATABASES, \
-    K_DB_URL, K_SECTION, K_OPTIONS, MEDIA_USB2, MEDIA_USB1, K_DOWNLOADER_THREADS_LIMIT
-from test.objects import not_found_ini, db_options, default_base_path
+    K_DB_URL, K_SECTION, K_OPTIONS, MEDIA_USB2, MEDIA_USB1, K_DOWNLOADER_THREADS_LIMIT, KENV_DEFAULT_DB_ID, \
+    KENV_DEFAULT_DB_URL
+from test.objects import not_found_ini, db_options, default_base_path, default_env
 from test.fake_config_reader import ConfigReader
 
 
@@ -144,8 +145,28 @@ class TestConfigReader(unittest.TestCase):
         self.assertRaises(Exception,
                           lambda: databases("test/integration/fixtures/db_plus_random_empty_section.ini"))
 
-    def assertConfig(self, path, config_vars):
-        actual = ConfigReader().read_config(path)
+    def test_config_reader___with_uppercase_default_db_and_empty_ini___returns_lowercase_default_db_section(self):
+        env = default_env()
+        env[KENV_DEFAULT_DB_ID] = 'SomethingUPPERCASE'
+        env[KENV_DEFAULT_DB_URL] = 'http://path/to/nowhere.json.zip'
+        self.assertConfig(not_found_ini(), {
+            K_UPDATE_LINUX: True,
+            K_ALLOW_REBOOT: AllowReboot.ALWAYS,
+            K_ALLOW_DELETE: AllowDelete.ALL,
+            K_BASE_PATH: default_base_path,
+            K_BASE_SYSTEM_PATH: default_base_path,
+            K_DOWNLOADER_THREADS_LIMIT: 20,
+            K_DOWNLOADER_TIMEOUT: 300,
+            K_DOWNLOADER_RETRIES: 3,
+            K_VERBOSE: False,
+            K_DATABASES: {'somethinguppercase': {
+                K_DB_URL: 'http://path/to/nowhere.json.zip',
+                K_SECTION: 'somethinguppercase',
+            }}
+        }, env=env)
+
+    def assertConfig(self, path, config_vars, env=None):
+        actual = ConfigReader(env=env).read_config(path)
 
         expected = {}
 
@@ -163,8 +184,8 @@ class TestConfigReader(unittest.TestCase):
         self.assertEqual(expected, actual)
 
 
-def databases(path):
-    return {k: testable(v) for k, v in (ConfigReader().read_config(path)[K_DATABASES].items())}
+def databases(path, env=None):
+    return {k: testable(v) for k, v in (ConfigReader(env=env).read_config(path)[K_DATABASES].items())}
 
 
 def testable(db):

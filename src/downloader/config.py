@@ -296,7 +296,7 @@ class ConfigReader:
     def _default_db_config(self):
         return {
             K_DB_URL: self._env[KENV_DEFAULT_DB_URL],
-            K_SECTION: self._env[KENV_DEFAULT_DB_ID]
+            K_SECTION: self._env[KENV_DEFAULT_DB_ID].lower()
         }
 
     def _valid_base_path(self, path, key):
@@ -324,7 +324,7 @@ class ConfigReader:
 
         regex = re.compile("^[a-zA-Z][-._a-zA-Z0-9]*[/]?[-._a-zA-Z0-9]+$")
         if regex.match(value):
-            return value
+            return value.lower()
 
         raise InvalidConfigParameter("Invalid %s with value '%s'. Not matching ID regex." % (key, value))
 

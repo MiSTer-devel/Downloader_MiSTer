@@ -22,5 +22,5 @@ from test.objects import default_env
 
 
 class ConfigReader(ProductionConfigReader):
-    def __init__(self):
-        super().__init__(NoLogger(), default_env())
+    def __init__(self, env=None):
+        super().__init__(NoLogger(), env or default_env())
