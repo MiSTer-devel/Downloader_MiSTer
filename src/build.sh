@@ -7,11 +7,7 @@ DOWNLOADER_ZIP="downloader.zip"
 TEMP_ZIP2="${ZIP_FILE:-$(mktemp -u).zip}"
 BIN="/tmp/dont_download.zip"
 UUDECODE_CMD=$({ [[ "${MISTER:-false}" == "false" ]] && [[ "$(uname -s)" == "Darwin" ]] ; } && echo "uudecode -p" || echo "uudecode -o -")
-EXPORTS="export COMMIT=$(git rev-parse --short HEAD)"
-
-if [[ "${DEBUG:-false}" == "true" ]] ; then
-  EXPORTS="${EXPORTS}"$'\n'"export DEBUG=true"
-fi
+EXPORTS=$([[ "${DEBUG:-false}" == "true" ]] && echo "export DEBUG=true" || echo "")
 
 pin_metadata() {
   touch -a -m -t 202108231405 "${1}"
