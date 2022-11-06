@@ -320,7 +320,7 @@ class ConfigReader:
         raise InvalidConfigParameter("Invalid %s with value '%s'. Too long string (max is %s)." % (key, value, max_limit))
 
     def _valid_db_id(self, key, value):
-        value = self._valid_max_length(key, value, 255).lower()
+        value = self._valid_max_length(key, value, 255)
 
         regex = re.compile("^[a-zA-Z][-._a-zA-Z0-9]*[/]?[-._a-zA-Z0-9]+$")
         if regex.match(value):
