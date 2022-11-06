@@ -322,7 +322,7 @@ class ConfigReader:
     def _valid_db_id(self, key, value):
         value = self._valid_max_length(key, value, 255).lower()
 
-        regex = re.compile("[a-z][_a-z0-9]*$")
+        regex = re.compile(^[a-zA-Z][-._a-zA-Z0-9]*[/]?[-._a-zA-Z0-9]+$)
         if regex.match(value):
             return value
 
