@@ -19,9 +19,11 @@ pin_metadata() {
 
 cd src
 
+echo "default_commit = '$(git rev-parse --short HEAD)'" > commit.py
 find downloader -type f -iname "*.py" -print0 | while IFS= read -r -d '' file ; do pin_metadata "${file}" ; done
 pin_metadata __main__.py
-zip -q -0 -D -X -A -r "${DOWNLOADER_ZIP}" __main__.py downloader -x "*/__pycache__/*"
+pin_metadata commit.py
+zip -q -0 -D -X -A -r "${DOWNLOADER_ZIP}" __main__.py commit.py downloader -x "*/__pycache__/*"
 pin_metadata "${DOWNLOADER_ZIP}"
 echo '#!/usr/bin/env python3' | cat - "${DOWNLOADER_ZIP}" > "${TEMP_ZIP2}"
 pin_metadata "${TEMP_ZIP2}"

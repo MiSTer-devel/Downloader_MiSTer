@@ -24,13 +24,18 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     KENV_UPDATE_LINUX, KENV_DEFAULT_DB_URL, \
     KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR, KENV_LOGFILE, KENV_PC_LAUNCHER
 
+try:
+    from commit import default_commit
+except ImportError as e:
+    default_commit = 'unknown'
+
 if __name__ == '__main__':
     exit_code = main({
         KENV_DOWNLOADER_LAUNCHER_PATH: os.getenv(KENV_DOWNLOADER_LAUNCHER_PATH, None),
         KENV_DOWNLOADER_INI_PATH: os.getenv(KENV_DOWNLOADER_INI_PATH, None),
         KENV_LOGFILE: os.getenv(KENV_LOGFILE, None),
         KENV_CURL_SSL: os.getenv(KENV_CURL_SSL, DEFAULT_CURL_SSL_OPTIONS),
-        KENV_COMMIT: os.getenv(KENV_COMMIT, 'unknown'),
+        KENV_COMMIT: os.getenv(KENV_COMMIT, default_commit),
         KENV_ALLOW_REBOOT: os.getenv(KENV_ALLOW_REBOOT, None),
         KENV_UPDATE_LINUX: os.getenv(KENV_UPDATE_LINUX, 'true').lower(),
         KENV_DEFAULT_DB_URL: os.getenv(KENV_DEFAULT_DB_URL, DISTRIBUTION_MISTER_DB_URL),
