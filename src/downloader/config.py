@@ -24,14 +24,14 @@ from enum import IntEnum, unique
 from pathlib import Path
 
 from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_BASE_SYSTEM_PATH, K_STORAGE_PRIORITY, K_DATABASES, \
-    K_ALLOW_DELETE, K_ALLOW_REBOOT, K_UPDATE_LINUX, K_VERBOSE, \
-    K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, K_FILTER, \
-    K_DB_URL, K_SECTION, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, KENV_DOWNLOADER_INI_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, \
+    K_ALLOW_DELETE, K_ALLOW_REBOOT, K_UPDATE_LINUX, K_VERBOSE, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, \
+    K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, K_FILTER, K_DB_URL, K_SECTION, K_CONFIG_PATH, \
+    K_USER_DEFINED_OPTIONS, KENV_DOWNLOADER_INI_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, \
     KENV_DEFAULT_BASE_PATH, KENV_ALLOW_REBOOT, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEBUG, K_OPTIONS, \
     MEDIA_FAT, K_DEBUG, K_CURL_SSL, KENV_CURL_SSL, KENV_UPDATE_LINUX, KENV_FAIL_ON_FILE_ERROR, KENV_COMMIT, \
-    K_FAIL_ON_FILE_ERROR, K_COMMIT, K_UPDATE_LINUX_ENVIRONMENT, K_DEFAULT_DB_ID, DISTRIBUTION_MISTER_DB_ID, \
+    K_FAIL_ON_FILE_ERROR, K_COMMIT, K_DEFAULT_DB_ID, DISTRIBUTION_MISTER_DB_ID, \
     K_START_TIME, KENV_LOGFILE, K_LOGFILE, K_DOWNLOADER_THREADS_LIMIT, \
-    KENV_PC_LAUNCHER, K_IS_PC_LAUNCHER
+    KENV_PC_LAUNCHER, K_IS_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV
 from downloader.db_options import DbOptionsKind, DbOptions, DbOptionsValidationException
 from downloader.ini_parser import IniParser
 
@@ -54,13 +54,6 @@ class AllowReboot(IntEnum):
     NEVER = 0
     ALWAYS = 1
     ONLY_AFTER_LINUX_UPDATE = 2
-
-
-@unique
-class UpdateLinuxEnvironment(IntEnum):
-    TRUE = 0
-    FALSE = 1
-    ONLY = 2
 
 
 def default_config():
@@ -160,7 +153,9 @@ class ConfigReader:
             result[K_USER_DEFINED_OPTIONS] = []
 
         result[K_CURL_SSL] = self._valid_max_length(KENV_CURL_SSL, self._env[KENV_CURL_SSL], 50)
-        result[K_UPDATE_LINUX_ENVIRONMENT] = self._valid_update_linux_environment(KENV_UPDATE_LINUX, self._env[KENV_UPDATE_LINUX])
+        if self._env[KENV_UPDATE_LINUX] != DEFAULT_UPDATE_LINUX_ENV:
+            result[K_UPDATE_LINUX] = self._env[KENV_UPDATE_LINUX] == 'true'
+
         result[K_FAIL_ON_FILE_ERROR] = self._env[KENV_FAIL_ON_FILE_ERROR] == 'true'
         result[K_COMMIT] = self._valid_max_length(KENV_COMMIT, self._env[KENV_COMMIT], 50)
         result[K_DEFAULT_DB_ID] = self._valid_db_id(K_DEFAULT_DB_ID, self._env[KENV_DEFAULT_DB_ID])
@@ -254,8 +249,6 @@ class ConfigReader:
         options = dict()
         if parser.has(K_BASE_PATH):
             options[K_BASE_PATH] = self._valid_base_path(parser.get_string(K_BASE_PATH, None), K_BASE_PATH)
-        if parser.has(K_UPDATE_LINUX):
-            options[K_UPDATE_LINUX] = parser.get_bool(K_UPDATE_LINUX, None)
         if parser.has(K_DOWNLOADER_THREADS_LIMIT):
             options[K_DOWNLOADER_THREADS_LIMIT] = parser.get_int(K_DOWNLOADER_THREADS_LIMIT, None)
         if parser.has(K_DOWNLOADER_TIMEOUT):
@@ -327,17 +320,6 @@ class ConfigReader:
             return value.lower()
 
         raise InvalidConfigParameter("Invalid %s with value '%s'. Not matching ID regex." % (key, value))
-
-    def _valid_update_linux_environment(self, key, value):
-        value = value.lower()
-        if value == 'true':
-            return UpdateLinuxEnvironment.TRUE
-        elif value == 'false':
-            return UpdateLinuxEnvironment.FALSE
-        elif value == 'only':
-            return UpdateLinuxEnvironment.ONLY
-
-        raise InvalidConfigParameter("Wrong %s variable with value '%s'" % (key, value))
 
     def _valid_storage_priority(self, parameter):
         lower_parameter = parameter.lower()

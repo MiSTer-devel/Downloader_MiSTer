@@ -21,6 +21,7 @@ from enum import unique, Enum
 
 DEFAULT_CACERT_FILE = '/etc/ssl/certs/cacert.pem'
 DEFAULT_CURL_SSL_OPTIONS = '--cacert %s' % DEFAULT_CACERT_FILE
+DEFAULT_UPDATE_LINUX_ENV = 'undefined'
 
 # Pre-selected database
 DISTRIBUTION_MISTER_DB_URL = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'
@@ -118,7 +119,6 @@ K_OPTIONS = 'options'
 K_DEBUG = 'debug'
 K_FAIL_ON_FILE_ERROR = 'fail_on_file_error'
 K_COMMIT = 'commit'
-K_UPDATE_LINUX_ENVIRONMENT = 'update_linux_environment'
 K_DEFAULT_DB_ID = 'default_db_id'
 K_START_TIME = 'start_time'
 K_IS_PC_LAUNCHER = 'is_pc_launcher'

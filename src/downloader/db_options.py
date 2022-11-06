@@ -18,8 +18,7 @@
 
 from enum import unique, Enum
 
-from downloader.constants import K_BASE_PATH, K_UPDATE_LINUX, \
-    K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER
+from downloader.constants import K_BASE_PATH, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER
 from downloader.other import test_only
 
 
@@ -48,10 +47,6 @@ class DbOptions:
         else:
             raise ValueError("Invalid props kind: " + str(kind))
 
-        if K_UPDATE_LINUX in props:
-            if not isinstance(props[K_UPDATE_LINUX], bool):
-                raise DbOptionsValidationException([K_UPDATE_LINUX])
-            present.add(K_UPDATE_LINUX)
         if K_DOWNLOADER_THREADS_LIMIT in props:
             if not isinstance(props[K_DOWNLOADER_THREADS_LIMIT], int) or props[K_DOWNLOADER_THREADS_LIMIT] < 1:
                 raise DbOptionsValidationException([K_DOWNLOADER_THREADS_LIMIT])
