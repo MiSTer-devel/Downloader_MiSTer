@@ -26,7 +26,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     MEDIA_FAT, K_BASE_SYSTEM_PATH, K_CONFIG_PATH, K_ZIP_FILE_COUNT_THRESHOLD, K_STORAGE_PRIORITY, MEDIA_USB0, \
     MEDIA_USB1, \
     MEDIA_USB2, KENV_FAIL_ON_FILE_ERROR, KENV_UPDATE_LINUX, KENV_CURL_SSL, KENV_COMMIT, DEFAULT_CURL_SSL_OPTIONS, \
-    K_DEFAULT_DB_ID, MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER
+    K_DEFAULT_DB_ID, MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV
 from downloader.db_options import DbOptions, DbOptionsKind
 from downloader.other import empty_store_without_base_path
 from test.fake_db_entity import DbEntity
@@ -344,9 +344,8 @@ def raw_db_wrong_descr():
     }
 
 
-def db_options(kind=None, base_path=None, update_linux=None, downloader_threads_limit=None, downloader_timeout=None, downloader_retries=None, download_filter=None):
+def db_options(kind=None, base_path=None, downloader_threads_limit=None, downloader_timeout=None, downloader_retries=None, download_filter=None):
     raw_db_options = {
-        K_UPDATE_LINUX: False if update_linux is None else update_linux,
         K_DOWNLOADER_THREADS_LIMIT: 3 if downloader_threads_limit is None else downloader_threads_limit,
         K_DOWNLOADER_TIMEOUT: 1 if downloader_timeout is None else downloader_timeout,
         K_DOWNLOADER_RETRIES: 100 if downloader_retries is None else downloader_retries,
@@ -612,7 +611,7 @@ def default_env():
         KENV_ALLOW_REBOOT: None,
         KENV_DEBUG: 'false',
         KENV_CURL_SSL: DEFAULT_CURL_SSL_OPTIONS,
-        KENV_UPDATE_LINUX: 'true',
+        KENV_UPDATE_LINUX: DEFAULT_UPDATE_LINUX_ENV,
         KENV_FAIL_ON_FILE_ERROR: 'false',
         KENV_COMMIT: 'unknown',
         KENV_LOGFILE: None,

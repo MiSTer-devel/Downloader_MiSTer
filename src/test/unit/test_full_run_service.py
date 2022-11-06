@@ -19,7 +19,6 @@
 import unittest
 from unittest.mock import Mock
 
-from downloader.config import UpdateLinuxEnvironment
 from test.fake_external_drives_repository import ExternalDrivesRepositoryStub
 from test.fake_os_utils import SpyOsUtils
 from test.fake_full_run_service import FullRunService
@@ -70,27 +69,6 @@ class TestFullRunService(unittest.TestCase):
             .full_run()
 
         self.assertEqual(1, exit_code)
-
-    def test_full_run___database_with_old_linux_and_linux_update_environment_only___calls_update_linux_and_returns_0(self):
-        linux_updater = old_linux()
-
-        exit_code = FullRunService.with_single_db(db_empty, raw_db_empty_with_linux_descr(), linux_updater=linux_updater, linux_update_environment=UpdateLinuxEnvironment.ONLY).full_run()
-
-        self.assertEqual(exit_code, 0)
-        linux_updater.update_linux.assert_called()
-
-    def test_full_run___database_with_old_linux_and_linux_update_disabled_but_environment_only___doesnt_call_update_linux_and_returns_0(self):
-        linux_updater = old_linux()
-
-        exit_code = FullRunService.with_single_db(db_empty,
-                                                  raw_db_empty_with_linux_descr(),
-                                                  linux_updater=linux_updater,
-                                                  linux_update_environment=UpdateLinuxEnvironment.ONLY,
-                                                  update_linux=False
-                                                  ).full_run()
-        
-        self.assertEqual(exit_code, 0)
-        linux_updater.update_linux.assert_not_called()
 
     def test_print_drives___when_there_are_external_drives___returns_0(self):
         self.assertEqual(0, FullRunService(external_drives_repository=ExternalDrivesRepositoryStub(['/wtf'])).print_drives())

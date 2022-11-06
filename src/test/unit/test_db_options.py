@@ -33,7 +33,6 @@ class TestDbOptions(unittest.TestCase):
         (K_BASE_PATH, lambda: db_options(base_path=False)),
         (K_BASE_PATH, lambda: db_options(base_path='a')),
         (K_BASE_PATH, lambda: db_options(base_path='/media/fat/')),
-        (K_UPDATE_LINUX, lambda: db_options(update_linux='false')),
         (K_DOWNLOADER_THREADS_LIMIT, lambda: db_options(downloader_threads_limit=False)),
         (K_DOWNLOADER_TIMEOUT, lambda: db_options(downloader_timeout='1')),
         (K_DOWNLOADER_RETRIES, lambda: db_options(downloader_retries=0)),

@@ -20,9 +20,8 @@ import datetime
 import sys
 import time
 
-from downloader.config import UpdateLinuxEnvironment
 from downloader.constants import K_DATABASES, K_UPDATE_LINUX, \
-    K_USER_DEFINED_OPTIONS, K_UPDATE_LINUX_ENVIRONMENT, K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME, K_IS_PC_LAUNCHER
+    K_USER_DEFINED_OPTIONS, K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME, K_IS_PC_LAUNCHER
 from downloader.importer_command import ImporterCommand
 from downloader.other import format_files_message
 
@@ -108,37 +107,27 @@ class FullRunService:
 
             importer_command.add_db(db, local_store.store_by_id(db.db_id), description)
 
-        update_only_linux = self._config[K_UPDATE_LINUX_ENVIRONMENT] == UpdateLinuxEnvironment.ONLY
-        update_linux = self._config[K_UPDATE_LINUX_ENVIRONMENT] != UpdateLinuxEnvironment.FALSE and self._config[K_UPDATE_LINUX]
+        for relocation_package in self._base_path_relocator.relocating_base_paths(importer_command):
+            self._base_path_relocator.relocate_non_system_files(relocation_package)
+            self._local_repository.save_store(local_store)
 
-        if not update_only_linux:
-            for relocation_package in self._base_path_relocator.relocating_base_paths(importer_command):
-                self._base_path_relocator.relocate_non_system_files(relocation_package)
-                self._local_repository.save_store(local_store)
+        full_resync = not self._local_repository.has_last_successful_run()
 
-            full_resync = not self._local_repository.has_last_successful_run()
-
-            self._offline_importer.apply_offline_databases(importer_command)
-            self._online_importer.download_dbs_contents(importer_command, full_resync)
+        self._offline_importer.apply_offline_databases(importer_command)
+        self._online_importer.download_dbs_contents(importer_command, full_resync)
 
         self._local_repository.save_store(local_store)
 
-        if not update_only_linux:
-            self._display_summary(self._online_importer.correctly_installed_files(),
-                                  self._online_importer.files_that_failed() + failed_dbs,
-                                  self._online_importer.unused_filter_tags(),
-                                  self._online_importer.new_files_not_overwritten(),
-                                  self._config[K_START_TIME])
+        self._display_summary(self._online_importer.correctly_installed_files(),
+                              self._online_importer.files_that_failed() + failed_dbs,
+                              self._online_importer.unused_filter_tags(),
+                              self._online_importer.new_files_not_overwritten(),
+                              self._config[K_START_TIME])
 
         self._logger.print()
 
-        if update_linux:
+        if self._config[K_UPDATE_LINUX]:
             self._linux_updater.update_linux(importer_command)
-
-            if update_only_linux and not self._linux_updater.needs_reboot():
-                self._logger.print('Linux is already on the latest version.\n')
-        elif update_only_linux:
-            self._logger.print('update_linux is set to false, skipping...\n')
 
         if self._config[K_FAIL_ON_FILE_ERROR] and len(self._online_importer.files_that_failed()) > 0:
             self._logger.debug('Length of files_that_failed: %d' % len(self._online_importer.files_that_failed()))

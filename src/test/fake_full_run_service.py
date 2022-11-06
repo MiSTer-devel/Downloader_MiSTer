@@ -18,9 +18,9 @@
 
 from pathlib import Path
 
-from downloader.config import default_config, UpdateLinuxEnvironment
+from downloader.config import default_config
 from downloader.constants import K_DATABASES, K_DB_URL, K_SECTION, K_VERBOSE, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, \
-    K_COMMIT, K_UPDATE_LINUX_ENVIRONMENT, K_FAIL_ON_FILE_ERROR, K_UPDATE_LINUX
+    K_COMMIT, K_FAIL_ON_FILE_ERROR, K_UPDATE_LINUX
 from downloader.full_run_service import FullRunService as ProductionFullRunService
 from test.fake_os_utils import SpyOsUtils
 from test.fake_waiter import NoWaiter
@@ -76,7 +76,8 @@ class FullRunService(ProductionFullRunService):
             K_VERBOSE: False,
             K_CONFIG_PATH: Path(''),
             K_USER_DEFINED_OPTIONS: [],
-            K_COMMIT: 'test', K_UPDATE_LINUX_ENVIRONMENT: UpdateLinuxEnvironment.TRUE, K_FAIL_ON_FILE_ERROR: True
+            K_COMMIT: 'test',
+            K_FAIL_ON_FILE_ERROR: True
         })
 
         file_system_state = FileSystemState(files={db_empty: {'unzipped_json': {}}})
@@ -89,7 +90,7 @@ class FullRunService(ProductionFullRunService):
         )
 
     @staticmethod
-    def with_single_db(db_id, db_descr, linux_updater=None, linux_update_environment=None, update_linux=None, os_utils=None, certificates_fix=None) -> ProductionFullRunService:
+    def with_single_db(db_id, db_descr, linux_updater=None, update_linux=None, os_utils=None, certificates_fix=None) -> ProductionFullRunService:
         update_linux = update_linux if update_linux is not None else True
         config = default_config()
         config.update({
@@ -106,7 +107,6 @@ class FullRunService(ProductionFullRunService):
                 K_CONFIG_PATH: Path(''),
                 K_COMMIT: 'test',
                 K_UPDATE_LINUX: update_linux,
-                K_UPDATE_LINUX_ENVIRONMENT: linux_update_environment or UpdateLinuxEnvironment.TRUE,
                 K_FAIL_ON_FILE_ERROR: True
             })
         return FullRunService(
@@ -122,7 +122,7 @@ class FullRunService(ProductionFullRunService):
         config = default_config()
         config.update({
             K_DATABASES: {}, K_VERBOSE: False, K_CONFIG_PATH: Path(''), K_USER_DEFINED_OPTIONS: [],
-            K_COMMIT: 'test', K_UPDATE_LINUX_ENVIRONMENT: UpdateLinuxEnvironment.TRUE, K_FAIL_ON_FILE_ERROR: True
+            K_COMMIT: 'test', K_FAIL_ON_FILE_ERROR: True
         })
         return FullRunService(
             config,
