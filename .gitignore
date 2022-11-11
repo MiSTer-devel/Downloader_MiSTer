@@ -1,6 +1,7 @@
 .idea
 venv
 __pycache__
+delme
 mister.ip
 dont_download.ini
 src/downloader.zip

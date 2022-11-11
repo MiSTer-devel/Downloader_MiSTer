@@ -46,6 +46,12 @@ class Logger(ABC):
 
 
 class PrintLogger(Logger):
+    @staticmethod
+    def make_configured(config):
+        logger = PrintLogger()
+        logger.configure(config)
+        return logger
+
     def __init__(self):
         self._verbose_mode = False
         self._start_time = None
