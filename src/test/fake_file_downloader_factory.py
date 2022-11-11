@@ -1,10 +1,8 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -28,7 +26,7 @@ class _FakeLowLevelFileDownloaderFactory(LowLevelFileDownloaderFactory):
         self._target_path_repository = target_path_repository
         self._network_state = network_state
 
-    def create_low_level_file_downloader(self, high_level):
+    def create_low_level_file_downloader(self, high_level) -> LowLevelFileDownloader:
         if isinstance(self._file_system, FakeFileSystem):
             return _FakeLowLevelFileDownloader(self._file_system, self._network_state, self._file_system.state, self._target_path_repository, high_level)
         else:

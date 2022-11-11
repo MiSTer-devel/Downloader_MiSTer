@@ -16,18 +16,19 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import queue
-import ssl
 import sys
 import socket
+import ssl
 from abc import ABC, abstractmethod
 from shutil import copyfileobj
 from threading import Thread
 from typing import Tuple, Union
-from urllib.error import URLError, HTTPError
-from urllib.request import urlopen
+from urllib.error import URLError
+from http.client import HTTPException
 
 from downloader.constants import K_DOWNLOADER_RETRIES, K_DOWNLOADER_TIMEOUT, K_CURL_SSL, FILE_MiSTer_new, FILE_MiSTer, \
-    FILE_MiSTer_old, K_DOWNLOADER_THREADS_LIMIT, K_IS_PC_LAUNCHER
+    FILE_MiSTer_old, K_DOWNLOADER_THREADS_LIMIT, K_IS_PC_LAUNCHER, K_DEBUG
+from downloader.http_gateway import HttpGateway
 from downloader.logger import DebugOnlyLoggerDecorator
 from downloader.other import calculate_url
 from downloader.target_path_repository import TargetPathRepository
@@ -101,7 +102,7 @@ class LowLevelFileDownloader(ABC):
 
 
 class LowLevelFileDownloaderFactory(ABC):
-    def create_low_level_file_downloader(self, high_level):
+    def create_low_level_file_downloader(self, high_level) -> LowLevelFileDownloader:
         """"returns instance of LowLevelFileDownloader"""
 
 
@@ -168,7 +169,11 @@ class HighLevelFileDownloader(FileDownloader, DownloadValidator):
         self._logger.print("Downloading %d files:" % len(self._queued_files))
 
         low_level = self._low_level_file_downloader_factory.create_low_level_file_downloader(self)
+        self._fetch_whole_queue(low_level)
+        self._check_downloaded_files(low_level.downloaded_files())
+        return low_level.network_errors()
 
+    def _fetch_whole_queue(self, low_level: LowLevelFileDownloader) -> None:
         files_to_download = []
         skip_files = []
         for file_path, file_description in self._queued_files.items():
@@ -197,10 +202,6 @@ class HighLevelFileDownloader(FileDownloader, DownloadValidator):
             self._queued_files.pop(file_path)
 
         low_level.fetch(files_to_download, self._queued_files)
-
-        self._check_downloaded_files(low_level.downloaded_files())
-
-        return low_level.network_errors()
 
     def validate_download(self, file_path: str, file_hash: str) -> Tuple[int, Union[str, Tuple[str, str]]]:
         target_path = self._target_path_repository.access_target(file_path)
@@ -265,13 +266,14 @@ class _LowLevelMultiThreadingFileDownloaderFactory(LowLevelFileDownloaderFactory
         self._waiter = waiter
         self._logger = logger
 
-    def create_low_level_file_downloader(self, download_validator):
+    def create_low_level_file_downloader(self, download_validator) -> LowLevelFileDownloader:
         if not self._config[K_IS_PC_LAUNCHER] and socket.getaddrinfo != get_addr_info_ipv4_only:
             # Ugly hack to not try IPv6 which always fail on MiSTer: https://stackoverflow.com/questions/2014534/force-python-mechanize-urllib2-to-only-use-a-requests
             self._logger.debug('Forcing IPv4!')
             socket.getaddrinfo = get_addr_info_ipv4_only
 
         return _LowLevelMultiThreadingFileDownloader(self._threads_limit, self._config, context_from_curl_ssl(self._config[K_CURL_SSL]), self._waiter, self._logger, download_validator)
+
 
 
 class _LowLevelMultiThreadingFileDownloader(LowLevelFileDownloader):
@@ -360,30 +362,35 @@ class _LowLevelMultiThreadingFileDownloader(LowLevelFileDownloader):
         return self._downloaded_files
 
     def _thread_worker(self, job_queue, notify_queue):
-        while not job_queue.empty():
-            url, path, target = job_queue.get(False)
+        http_logger = self._logger if self._config[K_DEBUG] else None
+        with HttpGateway(self._context, self._config[K_DOWNLOADER_TIMEOUT], logger=http_logger) as http_gateway:
+            while not job_queue.empty():
+                url, path, target = job_queue.get(False)
 
-            notify_queue.put((0, path), False)
-            try:
-                with urlopen(url, timeout=self._config[K_DOWNLOADER_TIMEOUT], context=self._context) as in_stream, open(target, 'wb') as out_file:
-                    if in_stream.status == 200:
-                        copyfileobj(in_stream, out_file)
-                        notify_queue.put((1, path), False)
-                    else:
-                        notify_queue.put((2, (path, 'Bad http status! %s: %s' % (path, in_stream.status))), False)
+                notify_queue.put((0, path), False)
+                try:
+                    with http_gateway.open(url) as (final_url, in_stream), open(target, 'wb') as out_file:
+                        url = final_url
+                        if in_stream.status == 200:
+                            copyfileobj(in_stream, out_file)
+                            notify_queue.put((1, path), False)
+                        else:
+                            notify_queue.put((2, (path, 'Bad http status! %s: %s' % (path, in_stream.status))), False)
 
-            except socket.gaierror as e:
-                notify_queue.put((2, (path, 'Socket Address Error! %s: %s' % (url, str(e)))), False)
-            except URLError as e:
-                notify_queue.put((2, (path, 'URL Error! %s: %s' % (url, e.reason))), False)
-            except HTTPError as e:
-                notify_queue.put((2, (path, 'HTTP Error! %s: %s' % (url, e.reason))), False)
-            except ConnectionResetError as e:
-                notify_queue.put((2, (path, 'Connection reset error! %s: %s' % (url, str(e)))), False)
-            except Exception as e:
-                notify_queue.put((2, (path, 'Exception during download! %s: %s' % (url, str(e)))), False)
+                except socket.gaierror as e:
+                    notify_queue.put((2, (path, 'Socket Address Error! %s: %s' % (url, str(e)))), False)
+                except URLError as e:
+                    notify_queue.put((2, (path, 'URL Error! %s: %s' % (url, e.reason))), False)
+                except HTTPException as e:
+                    notify_queue.put((2, (path, 'HTTP Error %s! %s: %s' % (type(e).__name__, url, str(e)))), False)
+                except ConnectionResetError as e:
+                    notify_queue.put((2, (path, 'Connection reset error! %s: %s' % (url, str(e)))), False)
+                except OSError as e:
+                    notify_queue.put((2, (path, 'OS Error! %s: %s %s' % (url, e.errno, str(e)))), False)
+                except Exception as e:
+                    notify_queue.put((2, (path, 'Exception during download! %s: %s' % (url, str(e)))), False)
 
-            job_queue.task_done()
+                job_queue.task_done()
 
 
 class _DownloadErrors:
