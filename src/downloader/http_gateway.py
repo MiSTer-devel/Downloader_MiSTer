@@ -17,10 +17,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import ssl
 import time
-from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Tuple, Any, Optional
+from typing import Tuple, Any, Optional, Generator
 from urllib.parse import urlparse, ParseResult
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
 
