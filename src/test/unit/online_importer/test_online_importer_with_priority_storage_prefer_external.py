@@ -15,7 +15,7 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import MEDIA_FAT, MEDIA_USB0, MEDIA_USB1
+from downloader.constants import MEDIA_FAT, MEDIA_USB0, MEDIA_USB1, STORAGE_PRIORITY_PREFER_EXTERNAL
 from test.fake_file_system_factory import fs_data
 from test.fake_importer_command import ImporterCommand
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
@@ -196,7 +196,7 @@ class TestOnlineImporterWithPriorityStoragePreferExternal(OnlineImporterWithPrio
 
 def fs(files=None, folders=None, base_path=None):
     return ImporterImplicitInputs(
-        config=config_with(storage_priority="prefer_external", base_system_path=MEDIA_FAT, zip_file_count_threshold=0),
+        config=config_with(storage_priority=STORAGE_PRIORITY_PREFER_EXTERNAL, base_system_path=MEDIA_FAT, zip_file_count_threshold=0),
         files=files,
         folders=folders,
         base_path=base_path

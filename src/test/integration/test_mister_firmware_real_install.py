@@ -18,7 +18,8 @@
 import tempfile
 from pathlib import Path
 
-from downloader.constants import FILE_MiSTer, DISTRIBUTION_MISTER_DB_ID
+from downloader.constants import FILE_MiSTer, DISTRIBUTION_MISTER_DB_ID, STORAGE_PRIORITY_PREFER_EXTERNAL, \
+    FILE_MiSTer_old
 from test.fake_file_system_factory import make_production_filesystem_factory
 from test.fake_path_resolver import PathResolverFactory
 from test.fake_online_importer import OnlineImporter
@@ -39,25 +40,34 @@ class TestMiSTerFirmwareRealInstall(OnlineImporterWithPriorityStorageTestBase):
         base_path = self.base_path.name.lower()
         base_system_path = self.base_system_path.name.lower()
 
-        written_file_hash = '3de8f8b0dc94b8c2230fab9ec0ba0506'
+        old_mister_hash = '149603e6c03516362a8da23f624db945'
+        new_mister_hash = '3de8f8b0dc94b8c2230fab9ec0ba0506'
         path_file_mister = str(Path(base_system_path).joinpath(FILE_MiSTer))
+        path_file_mister_old = str(Path(base_system_path).joinpath(FILE_MiSTer_old))
 
-        config = config_with(storage_priority="prefer_external", base_system_path=base_system_path, base_path=base_path)
+        config = config_with(storage_priority=STORAGE_PRIORITY_PREFER_EXTERNAL, base_system_path=base_system_path, base_path=base_path)
 
-        db = db_entity(db_id=DISTRIBUTION_MISTER_DB_ID, files={FILE_MiSTer: file_mister_descr(hash_code=written_file_hash)})
+        db = db_entity(db_id=DISTRIBUTION_MISTER_DB_ID, files={FILE_MiSTer: file_mister_descr(hash_code=new_mister_hash)})
 
         sut, file_system = online_importer(config)
         file_system.write_file_contents(path_file_mister, 'old')
-        actual_store = store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, base_path=base_path, files={FILE_MiSTer: file_mister_descr(hash_code=file_system.hash(path_file_mister))})
+        file_system.write_file_contents(path_file_mister_old, 'very very old')
+        self.assertEqual(old_mister_hash, file_system.hash(path_file_mister))
+        self.assertEqual('c70c3e2ebd6dbde780ecd2d1df7d8440', file_system.hash(path_file_mister_old))
+
+        actual_store = store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, base_path=base_path, files={FILE_MiSTer: file_mister_descr(hash_code=old_mister_hash)})
 
         sut.add_db(db, actual_store).download(False)
 
-        self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, base_path=base_path, files={FILE_MiSTer: file_mister_descr(hash_code=written_file_hash)}), actual_store)
+        self.assertNotEqual(new_mister_hash, old_mister_hash)
+        self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, base_path=base_path, files={FILE_MiSTer: file_mister_descr(hash_code=new_mister_hash)}), actual_store)
         self.assertReports(sut, [FILE_MiSTer], reboot=True)
 
+        self.assertEqual(new_mister_hash, file_system.hash(path_file_mister))
+        self.assertEqual(old_mister_hash, file_system.hash(path_file_mister_old))
 
 def online_importer(config):
-    path_dictionary = {}
+    path_dictionary = {'asdf': 3}
     file_system_factory = make_production_filesystem_factory(config, path_dictionary=path_dictionary)
     path_resolver_factory = PathResolverFactory(file_system_factory=file_system_factory, path_dictionary=path_dictionary)
-    return OnlineImporter(config=config, file_system_factory=file_system_factory, path_resolver_factory=path_resolver_factory), file_system_factory.create_for_config(config)
+    return OnlineImporter(config=config, file_system_factory=file_system_factory, path_resolver_factory=path_resolver_factory, path_dictionary=path_dictionary), file_system_factory.create_for_config(config)

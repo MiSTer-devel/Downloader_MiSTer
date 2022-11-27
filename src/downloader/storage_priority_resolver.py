@@ -17,7 +17,8 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from pathlib import Path
 
-from downloader.constants import K_STORAGE_PRIORITY, K_BASE_PATH, PathType
+from downloader.constants import K_STORAGE_PRIORITY, K_BASE_PATH, PathType, STORAGE_PRIORITY_PREFER_SD, \
+    STORAGE_PRIORITY_PREFER_EXTERNAL, STORAGE_PRIORITY_OFF
 from downloader.other import UnreachableException
 
 
@@ -73,15 +74,15 @@ class _StoragePriorityResolver:
         return self._priority_top_folders[first].folders[second]
 
     def _search_drive_for_directory(self, directory):
-        if self._config[K_STORAGE_PRIORITY] == 'off':
+        if self._config[K_STORAGE_PRIORITY] == STORAGE_PRIORITY_OFF:
             return self._config[K_BASE_PATH]
-        elif self._config[K_STORAGE_PRIORITY] == 'prefer_sd':
+        elif self._config[K_STORAGE_PRIORITY] == STORAGE_PRIORITY_PREFER_SD:
             result = self._first_drive_with_existing_directory(directory)
             if result is not None:
                 return result
 
             return self._config[K_BASE_PATH]
-        elif self._config[K_STORAGE_PRIORITY] == 'prefer_external':
+        elif self._config[K_STORAGE_PRIORITY] == STORAGE_PRIORITY_PREFER_EXTERNAL:
             result = self._first_drive_with_existing_directory(directory)
             if result is not None:
                 return result

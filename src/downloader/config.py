@@ -31,7 +31,8 @@ from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_BASE_SYSTEM
     MEDIA_FAT, K_DEBUG, K_CURL_SSL, KENV_CURL_SSL, KENV_UPDATE_LINUX, KENV_FAIL_ON_FILE_ERROR, KENV_COMMIT, \
     K_FAIL_ON_FILE_ERROR, K_COMMIT, K_DEFAULT_DB_ID, DISTRIBUTION_MISTER_DB_ID, \
     K_START_TIME, KENV_LOGFILE, K_LOGFILE, K_DOWNLOADER_THREADS_LIMIT, \
-    KENV_PC_LAUNCHER, K_IS_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV
+    KENV_PC_LAUNCHER, K_IS_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, STORAGE_PRIORITY_PREFER_SD, \
+    STORAGE_PRIORITY_PREFER_EXTERNAL, STORAGE_PRIORITY_OFF
 from downloader.db_options import DbOptionsKind, DbOptions, DbOptionsValidationException
 from downloader.ini_parser import IniParser
 
@@ -62,7 +63,7 @@ def default_config():
         K_CONFIG_PATH: Path(FILE_downloader_ini),
         K_BASE_PATH: MEDIA_FAT,
         K_BASE_SYSTEM_PATH: MEDIA_FAT,
-        K_STORAGE_PRIORITY: 'prefer_sd',
+        K_STORAGE_PRIORITY: STORAGE_PRIORITY_PREFER_SD,
         K_ALLOW_DELETE: AllowDelete.ALL,
         K_ALLOW_REBOOT: AllowReboot.ALWAYS,
         K_UPDATE_LINUX: True,
@@ -323,9 +324,9 @@ class ConfigReader:
 
     def _valid_storage_priority(self, parameter):
         lower_parameter = parameter.lower()
-        if lower_parameter in ['off', 'false', 'no', 'base_path', '0', 'f', 'n']:
-            return 'off'
-        elif lower_parameter in ['prefer_sd', 'prefer_external']:
+        if lower_parameter in [STORAGE_PRIORITY_OFF, 'false', 'no', 'base_path', '0', 'f', 'n']:
+            return STORAGE_PRIORITY_OFF
+        elif lower_parameter in [STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL]:
             return lower_parameter
         else:
             return self._valid_base_path(parameter, K_STORAGE_PRIORITY)

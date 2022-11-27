@@ -375,18 +375,16 @@ def with_base_path(description, base_path):
 
 def file_mister_descr(hash_code=None):
     return {
-        "delete": [],
         "hash": hash_code or hash_MiSTer,
+        "path": "system",
+        "reboot": True,
         "size": 2915040,
         "url": "https://MiSTer",
-        "reboot": True,
-        "path": "system"
     }
 
 
 def file_mister_old_descr():
     return {
-        "delete": [],
         "hash": hash_MiSTer_old,
         "size": 2915040,
         "url": "https://MiSTer",

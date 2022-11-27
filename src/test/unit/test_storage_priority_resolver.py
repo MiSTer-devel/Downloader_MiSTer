@@ -20,7 +20,8 @@ from pathlib import Path
 
 from downloader.config import default_config
 from downloader.constants import K_BASE_PATH, K_STORAGE_PRIORITY, PathType, MEDIA_FAT_CIFS, MEDIA_FAT, MEDIA_USB2, \
-    MEDIA_USB5, MEDIA_USB0, MEDIA_USB4, MEDIA_USB1, MEDIA_USB3
+    MEDIA_USB5, MEDIA_USB0, MEDIA_USB4, MEDIA_USB1, MEDIA_USB3, STORAGE_PRIORITY_PREFER_SD, \
+    STORAGE_PRIORITY_PREFER_EXTERNAL
 from downloader.storage_priority_resolver import StoragePriorityError
 from test.objects import path_with
 from test.fake_importer_implicit_inputs import FileSystemState
@@ -40,15 +41,15 @@ media_fat_cifs_games = path_with(MEDIA_FAT_CIFS, games)
 
 
 def config_storage_priority_prefer_media_usb0():
-    return {K_STORAGE_PRIORITY: 'prefer_sd', K_BASE_PATH: MEDIA_USB0}
+    return {K_STORAGE_PRIORITY: STORAGE_PRIORITY_PREFER_SD, K_BASE_PATH: MEDIA_USB0}
 
 
 def config_storage_priority_prefer_media_fat():
-    return {K_STORAGE_PRIORITY: 'prefer_sd', K_BASE_PATH: MEDIA_FAT}
+    return {K_STORAGE_PRIORITY: STORAGE_PRIORITY_PREFER_SD, K_BASE_PATH: MEDIA_FAT}
 
 
 def config_storage_priority_prefer_external_with_base_path_media_fat():
-    return {K_STORAGE_PRIORITY: 'prefer_external', K_BASE_PATH: MEDIA_FAT}
+    return {K_STORAGE_PRIORITY: STORAGE_PRIORITY_PREFER_EXTERNAL, K_BASE_PATH: MEDIA_FAT}
 
 
 def fs_external_drives():
