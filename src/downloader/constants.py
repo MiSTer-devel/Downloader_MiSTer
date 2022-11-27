@@ -68,6 +68,10 @@ FILE_Linux_7z = '/media/fat/linux/7za'
 FILE_downloader_needs_reboot_after_linux_update = '/tmp/downloader_needs_reboot_after_linux_update'
 FILE_mister_downloader_needs_reboot = '/tmp/MiSTer_downloader_needs_reboot'
 
+# Storage Priority
+STORAGE_PRIORITY_PREFER_SD = 'prefer_sd'
+STORAGE_PRIORITY_PREFER_EXTERNAL = 'prefer_external'
+STORAGE_PRIORITY_OFF = 'off'
 
 # Standard Drives
 MEDIA_USB0 = '/media/usb0'

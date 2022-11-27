@@ -355,7 +355,7 @@ class _Resolver:
             if is_system_path:
                 self._path_resolver.add_system_path(file_path)
 
-            if file_path is FILE_MiSTer:
+            if file_path == FILE_MiSTer and is_system_path:
                 self._path_resolver.add_system_path(FILE_MiSTer_new)
                 self._path_resolver.add_system_path(FILE_MiSTer_old)
 

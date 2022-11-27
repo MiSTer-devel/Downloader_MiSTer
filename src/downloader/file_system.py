@@ -178,6 +178,8 @@ class _FileSystem(FileSystem):
 
     def move(self, source, target):
         self._makedirs(self._parent_folder(target))
+        self._logger.debug(f'Moving "{source}" to "{target}".')
+        self._logger.debug(self._path_dictionary)
         os.replace(self._path(source), self._path(target))
 
     def copy(self, source, target):
