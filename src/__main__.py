@@ -18,6 +18,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import os
+from sys import exit
 from downloader.main import main
 from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, DEFAULT_CURL_SSL_OPTIONS, \
     KENV_DOWNLOADER_INI_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, KENV_CURL_SSL, KENV_COMMIT, KENV_ALLOW_REBOOT, \
