@@ -145,8 +145,9 @@ class FullRunService:
 
         self._logger.print()
         self._logger.print('===========================')
-        self._logger.print('Downloader 1.6 (%s) by theypsilon. Run time: %ss' % (self._config[K_COMMIT], run_time))
-        self._logger.print('Log: %s' % self._local_repository.logfile_path)
+        self._logger.print(f'Downloader 1.6 ({self._config[K_COMMIT][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        self._logger.debug(f'Commit: {self._config[K_COMMIT]}')
+        self._logger.print(f'Log: {self._local_repository.logfile_path}')
         if len(unused_filter_tags) > 0:
             self._logger.print()
             self._logger.print("Unused filter terms:")
