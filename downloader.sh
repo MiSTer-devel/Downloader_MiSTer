@@ -28,7 +28,7 @@ if (( $(date +%Y) < 2000 )) ; then
         echo "$(date)"
         echo
     elif [[ "${CURL_SSL:-}" != "--insecure" ]] ; then
-	    echo "Unable to sync."
+        echo "Unable to sync."
         echo "Please, try again later."
         exit 1
     fi
