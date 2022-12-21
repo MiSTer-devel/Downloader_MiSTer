@@ -10,7 +10,7 @@ In a nutshell:
 </p>
 <p align="center"><i>This filter will only install four systems: NES, SNES, GB and GBA.</i></p>
 
-As a filter term, you may put a list of space-separated names such as: core names, core categories, file types, etc. Specifically, [these are all the available terms](https://github.com/MiSTer-devel/Distribution_MiSTer#list-of-tags-that-you-may-use-with-the-downloader-and-the-custom-download-filters-feature) that you may use right now.
+As a filter term, you may put a list of space-separated names such as: core names, core categories, file types, etc. Specifically, [these are all the available terms](https://github.com/MiSTer-devel/Distribution_MiSTer#tags-that-you-may-use-with-download-filters-feature) that you may use right now.
 
 Is also worth mentioning that symbols `-` and `_` within the term are ignored by the system. So in the eyes of Downloader, the terms `pc_engine-cd` and `pcenginecd` would be equivalent.
 
