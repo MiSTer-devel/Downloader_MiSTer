@@ -30,6 +30,6 @@ If you add a **filter** property under `[mister]` it will be global, so the filt
 
 ### Porting filters from the old Updater
 
-Most of the terms from [this list](https://github.com/MiSTer-devel/Distribution_MiSTer#list-of-tags-that-you-may-use-with-the-downloader-and-the-custom-download-filters-feature), are the same terms that you could use in the filters from the old updater. That means, for the most part, filters are compatible with the old updater format. Thus, the transition is very straightforward, as you can see in this video:
+Most of the terms from [this list](https://github.com/MiSTer-devel/Distribution_MiSTer#tags-that-you-may-use-with-download-filters-feature), are the same terms that you could use in the filters from the old updater. That means, for the most part, filters are compatible with the old updater format. Thus, the transition is very straightforward, as you can see in this video:
 
 https://www.youtube.com/watch?v=0gdr5Vv3obc
