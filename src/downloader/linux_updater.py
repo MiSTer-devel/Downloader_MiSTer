@@ -132,7 +132,6 @@ class LinuxUpdater:
                     else
                         rm -R "/media/fat/linux.update" > /dev/null 2>&1
                         sync
-                        touch /tmp/downloader_needs_reboot_after_linux_update
                         RET_CODE=101
                     fi
                 else
