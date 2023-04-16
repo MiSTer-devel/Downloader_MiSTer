@@ -22,7 +22,7 @@ import json
 from pathlib import Path, PurePosixPath
 from downloader.config import ConfigReader
 from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, KENV_UPDATE_LINUX, \
-    KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR, FILE_downloader_storage
+    KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR, FILE_downloader_storage, KENV_DEFAULT_BASE_PATH
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from downloader.full_run_service_factory import FullRunServiceFactory
 from downloader.logger import PrintLogger
@@ -38,6 +38,7 @@ from downloader.store_migrator import make_new_local_store
 
 
 tmp_delme_sandbox = '/tmp/delme_sandbox/'
+tmp_default_base_path = '/tmp/default_base_path'
 
 
 class SandboxTestBase(unittest.TestCase):
@@ -122,6 +123,7 @@ class SandboxTestBase(unittest.TestCase):
         env[KENV_DEBUG] = 'true'
         env[KENV_FAIL_ON_FILE_ERROR] = 'true'
         env[KENV_CURL_SSL] = ''
+        env[KENV_DEFAULT_BASE_PATH] = tmp_default_base_path
 
         config_reader = ConfigReader(logger, env)
         factory = FullRunServiceFactory(logger, LocalRepositoryProvider(), external_drives_repository_factory=external_drives_repository_factory)
@@ -174,7 +176,7 @@ def fix_relative_files(files):
 
 
 def cleanup(ini_path):
-    config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
+    config = ConfigReader(NoLogger(), {**debug_env(), KENV_DEFAULT_BASE_PATH: tmp_default_base_path}).read_config(ini_path)
     delete_folder(config[K_BASE_PATH])
     delete_folder(config[K_BASE_SYSTEM_PATH])
     create_folder(config[K_BASE_PATH])

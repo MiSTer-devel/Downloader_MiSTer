@@ -26,9 +26,11 @@ from downloader.constants import FILE_mister_downloader_needs_reboot, K_BASE_PAT
     KENV_DEBUG, \
     KENV_FAIL_ON_FILE_ERROR, KENV_DEFAULT_BASE_PATH, KENV_DOWNLOADER_INI_PATH
 from downloader.file_system import is_windows
-from test.objects import debug_env, default_base_path
+from test.objects import debug_env
 from test.fake_logger import NoLogger
 import subprocess
+
+from test.system.quick.sandbox_test_base import tmp_default_base_path
 
 
 class TestSmallDbInstall(unittest.TestCase):
@@ -57,14 +59,14 @@ class TestSmallDbInstall(unittest.TestCase):
     def test_small_db_4(self):
         print('test_small_db_4')
         self.assertRunOk("test/system/fixtures/small_db_install/small_db_4_first_run.ini")
-        self.assertTrue(os.path.isfile(f'{default_base_path()}/_Cores/core.rbf'))
+        self.assertTrue(os.path.isfile(f'{tmp_default_base_path}/_Cores/core.rbf'))
 
         self.assertRunOk("test/system/fixtures/small_db_install/small_db_4_second_run.ini")
-        self.assertFalse(os.path.isfile(f'{default_base_path()}/_Cores/core.rbf'))
+        self.assertFalse(os.path.isfile(f'{tmp_default_base_path}/_Cores/core.rbf'))
         self.assertTrue(os.path.isfile('/tmp/special_base_path/_Cores/core.rbf'))
 
     def assertRunOk(self, ini_path, save=True):
-        config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
+        config = ConfigReader(NoLogger(), {**debug_env(), KENV_DEFAULT_BASE_PATH: tmp_default_base_path}).read_config(ini_path)
         shutil.rmtree(config[K_BASE_PATH], ignore_errors=True)
         shutil.rmtree(config[K_BASE_SYSTEM_PATH], ignore_errors=True)
         mister_path = Path('%s/MiSTer' % config[K_BASE_SYSTEM_PATH])
@@ -76,7 +78,7 @@ class TestSmallDbInstall(unittest.TestCase):
         test_env[KENV_DEBUG] = 'true'
         test_env[KENV_FAIL_ON_FILE_ERROR] = 'true'
         test_env[KENV_DOWNLOADER_INI_PATH] = ini_path
-        test_env[KENV_DEFAULT_BASE_PATH] = default_base_path()
+        test_env[KENV_DEFAULT_BASE_PATH] = tmp_default_base_path
 
         if is_windows:
             result = subprocess.run(['python3', '__main__.py'], stderr=subprocess.STDOUT, env=test_env)
