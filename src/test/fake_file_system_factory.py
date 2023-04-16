@@ -16,11 +16,9 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import json
-import re
 from pathlib import Path
 
-from downloader.config import AllowDelete
-from downloader.constants import K_BASE_PATH, K_ALLOW_DELETE, STORAGE_PATHS_PRIORITY_SEQUENCE
+from downloader.constants import K_BASE_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
     absolute_parent_folder, is_windows
 from downloader.other import ClosableValue, UnreachableException
@@ -43,8 +41,8 @@ def fs_records(records):
 
 
 class FileSystemFactory:
-    def __init__(self, state=None, write_records=None):
-        self._state = state if state is not None else FileSystemState()
+    def __init__(self, state=None, write_records=None, config=None):
+        self._state = state if state is not None else FileSystemState(config=config)
         self._fake_failures = {}
         self._write_records = write_records if write_records is not None else []
 

@@ -243,7 +243,14 @@ class TestSandboxedInstall(SandboxTestBase):
         self.assertExecutesCorrectly("test/system/fixtures/small_db_install/small_db_3.ini")
         self.assertFalse(os.path.isfile(FILE_mister_downloader_needs_reboot))
 
-
     def test_print_drives(self):
         exit_code = self.run_execute_full_run(self.sandbox_ini, ExternalDrivesRepositoryFactory(), PrintLogger(), ['', '--print-drives'])
         self.assertEqual(0, exit_code)
+
+    def test_sandbox_db___installs_file_after_applying_expanded_filter(self):
+        self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/filter_inheritance/expanded_mister_filter.ini', {
+            'files': hashes(self.tmp_delme, {
+                'GB.rbf': {'hash': '942b89ab661f86228ea9ad3e980763a7'},
+                'SNES.rbf': {'hash': '133af32b4894d9c5527cc5c91269ee28'},
+            }),
+        })

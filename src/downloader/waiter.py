@@ -19,5 +19,5 @@ import time
 
 
 class Waiter:
-    def sleep(self, value):
+    def sleep(self, value: int) -> None:
         time.sleep(value)

@@ -57,10 +57,10 @@ class TestSmallDbInstall(unittest.TestCase):
     def test_small_db_4(self):
         print('test_small_db_4')
         self.assertRunOk("test/system/fixtures/small_db_install/small_db_4_first_run.ini")
-        self.assertTrue(os.path.isfile('/tmp/default_base_path/_Cores/core.rbf'))
+        self.assertTrue(os.path.isfile(f'{default_base_path()}/_Cores/core.rbf'))
 
         self.assertRunOk("test/system/fixtures/small_db_install/small_db_4_second_run.ini")
-        self.assertFalse(os.path.isfile('/tmp/default_base_path/_Cores/core.rbf'))
+        self.assertFalse(os.path.isfile(f'{default_base_path()}/_Cores/core.rbf'))
         self.assertTrue(os.path.isfile('/tmp/special_base_path/_Cores/core.rbf'))
 
     def assertRunOk(self, ini_path, save=True):
@@ -75,8 +75,8 @@ class TestSmallDbInstall(unittest.TestCase):
         test_env[KENV_CURL_SSL] = ''
         test_env[KENV_DEBUG] = 'true'
         test_env[KENV_FAIL_ON_FILE_ERROR] = 'true'
-        test_env[KENV_DEFAULT_BASE_PATH] = default_base_path
         test_env[KENV_DOWNLOADER_INI_PATH] = ini_path
+        test_env[KENV_DEFAULT_BASE_PATH] = default_base_path()
 
         if is_windows:
             result = subprocess.run(['python3', '__main__.py'], stderr=subprocess.STDOUT, env=test_env)

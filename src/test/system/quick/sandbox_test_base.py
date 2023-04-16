@@ -22,13 +22,13 @@ import json
 from pathlib import Path, PurePosixPath
 from downloader.config import ConfigReader
 from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, KENV_UPDATE_LINUX, \
-    KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEFAULT_BASE_PATH, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR, FILE_downloader_storage
+    KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR, FILE_downloader_storage
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from downloader.full_run_service_factory import FullRunServiceFactory
 from downloader.logger import PrintLogger
 from downloader.other import UnreachableException
 from test.fake_file_system_factory import make_production_filesystem_factory
-from test.objects import debug_env, default_base_path, default_env
+from test.objects import debug_env, default_env
 from test.fake_logger import NoLogger, SpyLoggerDecorator
 from test.fake_store_migrator import StoreMigrator
 from downloader.file_system import hash_file, is_windows, load_json_from_zip
@@ -117,9 +117,8 @@ class SandboxTestBase(unittest.TestCase):
         env = default_env()
         env[KENV_DOWNLOADER_LAUNCHER_PATH] = str(Path(ini_path).with_suffix('.sh'))
         env[KENV_UPDATE_LINUX] = 'false'
-        env[KENV_ALLOW_REBOOT] = None
+        env[KENV_ALLOW_REBOOT] = '0'
         env[KENV_COMMIT] = 'quick system test'
-        env[KENV_DEFAULT_BASE_PATH] = default_base_path
         env[KENV_DEBUG] = 'true'
         env[KENV_FAIL_ON_FILE_ERROR] = 'true'
         env[KENV_CURL_SSL] = ''

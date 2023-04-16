@@ -78,7 +78,10 @@ def default_config():
         K_DEFAULT_DB_ID: DISTRIBUTION_MISTER_DB_ID,
         K_START_TIME: 0,
         K_LOGFILE: None,
-        K_IS_PC_LAUNCHER: False
+        K_IS_PC_LAUNCHER: False,
+        K_USER_DEFINED_OPTIONS: [],
+        K_COMMIT: 'unknown',
+        K_FAIL_ON_FILE_ERROR: False,
     }
 
 

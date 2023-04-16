@@ -114,4 +114,5 @@ class TestImporterCommand(unittest.TestCase):
         config = default_config()
         for key in expected_config:
             config[key] = expected_config[key]
+
         self.assertEqual(config, actual[2], "config")

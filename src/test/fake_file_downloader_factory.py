@@ -13,6 +13,8 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+from typing import Dict, Any, List, Tuple
+
 from downloader.file_downloader import FileDownloaderFactory as ProductionFileDownloaderFactory, LowLevelFileDownloaderFactory, LowLevelFileDownloader, HighLevelFileDownloader
 from test.fake_target_path_repository import TargetPathRepository
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs, NetworkState, fix_description
@@ -102,3 +104,8 @@ class FileDownloaderFactory(ProductionFileDownloaderFactory):
         )
         return file_downloader_factory, file_system_factory, implicit_inputs.config
 
+    @staticmethod
+    def with_remote_files(fsf: FileSystemFactory, config: Dict[str, Any], remote_files: List[Tuple[str, Dict[str, Any]]]):
+        return FileDownloaderFactory(file_system_factory=fsf, config=config, network_state=NetworkState(remote_files={
+            file_name: {'hash': 'ignore', 'unzipped_json': file_content} for file_name, file_content in remote_files
+        }))

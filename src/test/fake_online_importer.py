@@ -17,9 +17,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import MEDIA_USB0
 from downloader.file_filter import FileFilterFactory
-from downloader.importer_command import ImporterCommand
+from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
-from test.fake_local_store_wrapper import StoreWrapper, LocalStoreWrapper
+from test.fake_local_store_wrapper import StoreWrapper
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_local_repository import LocalRepository
 from test.fake_path_resolver import PathResolverFactory
@@ -94,3 +94,17 @@ class OnlineImporter(ProductionOnlineImporter):
                 zip_description['contents_file'].pop('zipped_files')
             if 'summary_file' in zip_description and 'unzipped_json' in zip_description['summary_file']:
                 zip_description['summary_file'].pop('unzipped_json')
+
+
+class ImporterCommandFactorySpy(ImporterCommandFactory):
+    def __init__(self, config):
+        super().__init__(config)
+        self._commands = []
+
+    def create(self):
+        command = super().create()
+        self._commands.append(command)
+        return command
+
+    def commands(self):
+        return [[(x.testable, y.unwrap_store(), z) for x, y, z in c.read_dbs()] for c in self._commands]

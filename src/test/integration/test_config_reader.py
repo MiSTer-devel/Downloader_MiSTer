@@ -36,8 +36,8 @@ class TestConfigReader(unittest.TestCase):
             K_UPDATE_LINUX: True,
             K_ALLOW_REBOOT: AllowReboot.ALWAYS,
             K_ALLOW_DELETE: AllowDelete.ALL,
-            K_BASE_PATH: default_base_path,
-            K_BASE_SYSTEM_PATH: default_base_path,
+            K_BASE_PATH: default_base_path(),
+            K_BASE_SYSTEM_PATH: default_base_path(),
             K_DOWNLOADER_THREADS_LIMIT: 20,
             K_DOWNLOADER_TIMEOUT: 300,
             K_DOWNLOADER_RETRIES: 3,
@@ -153,8 +153,8 @@ class TestConfigReader(unittest.TestCase):
             K_UPDATE_LINUX: True,
             K_ALLOW_REBOOT: AllowReboot.ALWAYS,
             K_ALLOW_DELETE: AllowDelete.ALL,
-            K_BASE_PATH: default_base_path,
-            K_BASE_SYSTEM_PATH: default_base_path,
+            K_BASE_PATH: default_base_path(),
+            K_BASE_SYSTEM_PATH: default_base_path(),
             K_DOWNLOADER_THREADS_LIMIT: 20,
             K_DOWNLOADER_TIMEOUT: 300,
             K_DOWNLOADER_RETRIES: 3,
@@ -164,6 +164,23 @@ class TestConfigReader(unittest.TestCase):
                 K_SECTION: 'somethinguppercase',
             }}
         }, env=env)
+
+    def test_config_reader___with_filter_inheritance___returns_expected_filter_value(self):
+        self.assertEqual(databases("test/integration/fixtures/mister_filter_inheritance.ini"), {
+            'one': {
+                K_DB_URL: 'https://one.com',
+                K_OPTIONS: {'filter': '[mister] console'},
+                K_SECTION: 'one',
+            },
+            'three': {
+                K_DB_URL: 'https://three.org',
+                K_SECTION: 'three',
+            },
+            'two': {
+                K_DB_URL: 'test/integration/fixtures/mister_filter_inheritance_two.json',
+                K_SECTION: 'two',
+            },
+        })
 
     def assertConfig(self, path, config_vars, env=None):
         actual = ConfigReader(env=env).read_config(path)

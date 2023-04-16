@@ -16,17 +16,19 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import unittest
+import platform
 from pathlib import Path
+from typing import Dict, Any
 
 from downloader.config import default_config
 from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, FILE_MiSTer_new, K_BASE_PATH, \
-    K_UPDATE_LINUX, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, \
+    K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, \
     K_DOWNLOADER_RETRIES, K_FILTER, K_DATABASES, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, \
     KENV_ALLOW_REBOOT, KENV_DEBUG, \
     MEDIA_FAT, K_BASE_SYSTEM_PATH, K_CONFIG_PATH, K_ZIP_FILE_COUNT_THRESHOLD, K_STORAGE_PRIORITY, MEDIA_USB0, \
     MEDIA_USB1, \
     MEDIA_USB2, KENV_FAIL_ON_FILE_ERROR, KENV_UPDATE_LINUX, KENV_CURL_SSL, KENV_COMMIT, DEFAULT_CURL_SSL_OPTIONS, \
-    K_DEFAULT_DB_ID, MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV
+    K_DEFAULT_DB_ID, MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, K_DB_URL, K_SECTION, K_OPTIONS, K_USER_DEFINED_OPTIONS
 from downloader.db_options import DbOptions, DbOptionsKind
 from downloader.other import empty_store_without_base_path
 from test.fake_db_entity import DbEntity
@@ -108,12 +110,35 @@ def empty_config():
 
 
 def config_test(base_path=MEDIA_FAT):
-    config = config_with(base_path=base_path)
-    config[K_DATABASES] = {db_test: {}}
-    return config
+    return config_with(base_path=base_path, databases={db_test: {}})
 
 
-def config_with(filter_value=None, base_path=None, base_system_path=None, storage_priority=None, config_path=None, zip_file_count_threshold=None, downloader_retries=None, default_db_id=None):
+def config_test_with_filters(config_filter=None, ini_filter=None):
+    return config_with(
+        base_path=MEDIA_FAT,
+        filter_value=None if config_filter is None else config_filter,
+        default_db_id=db_test,
+        databases={db_test: db_description(
+            db_url='https://db.zip',
+            section=db_test,
+            options=None if ini_filter is None else DbOptions({K_FILTER: ini_filter}, DbOptionsKind.INI_SECTION)
+        )},
+        user_defined_options=[] if config_filter is None else [K_FILTER]
+    )
+
+
+def config_with(
+        filter_value=None,
+        base_path=None,
+        base_system_path=None,
+        storage_priority=None,
+        config_path=None,
+        zip_file_count_threshold=None,
+        downloader_retries=None,
+        default_db_id=None,
+        user_defined_options=None,
+        databases: Dict[str, Any] = None):
+
     config = default_config()
     if filter_value is not None:
         config[K_FILTER] = filter_value
@@ -131,6 +156,10 @@ def config_with(filter_value=None, base_path=None, base_system_path=None, storag
         config[K_DOWNLOADER_RETRIES] = downloader_retries
     if default_db_id is not None:
         config[K_DEFAULT_DB_ID] = default_db_id
+    if databases is not None:
+        config[K_DATABASES] = databases
+    if user_defined_options is not None:
+        config[K_USER_DEFINED_OPTIONS] = user_defined_options
     return config
 
 
@@ -198,6 +227,13 @@ def empty_zip_summary():
         'folders': {},
         "folders_count": 0,
     }
+
+
+def db_test_with_default_filter_descr(db_default_option_filter=None):
+    return db_entity(
+        db_id=db_test,
+        default_options=None if db_default_option_filter is None else {K_FILTER: db_default_option_filter}
+    )
 
 
 def db_test_descr(zips=None, folders=None, files=None, db_files=None, tag_dictionary=None):
@@ -270,6 +306,16 @@ def db_to_store(db, base_path=None):
         "files": raw_db["files"],
         "offline_databases_imported": []
     }
+
+
+def db_description(db_url: str = None, section: str = None, options: DbOptions = None):
+    description = {
+        K_DB_URL: db_url if db_url is not None else DISTRIBUTION_MISTER_DB_URL,
+        K_SECTION: section if section is not None else DISTRIBUTION_MISTER_DB_ID
+    }
+    if options is not None:
+        description[K_OPTIONS] = options
+    return description
 
 
 def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, default_options=None, timestamp=None, linux=None, header=None, section=None, tag_dictionary=None):
@@ -598,14 +644,15 @@ def _not_file(file):
     return file
 
 
-default_base_path = '/tmp/default_base_path'
+def default_base_path():
+    return '/media/fat'
 
 
 def default_env():
     return {
         KENV_DEFAULT_DB_URL: DISTRIBUTION_MISTER_DB_URL,
         KENV_DEFAULT_DB_ID: DISTRIBUTION_MISTER_DB_ID,
-        KENV_DEFAULT_BASE_PATH: default_base_path,
+        KENV_DEFAULT_BASE_PATH: default_base_path(),
         KENV_ALLOW_REBOOT: None,
         KENV_DEBUG: 'false',
         KENV_CURL_SSL: DEFAULT_CURL_SSL_OPTIONS,
