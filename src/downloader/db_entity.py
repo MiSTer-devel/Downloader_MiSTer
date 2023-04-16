@@ -16,6 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from typing import Dict, Any, List
+
 from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FILE_MiSTer_alt_ini, \
     FILE_downloader_launcher_script, FILE_MiSTer_alt_3_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, \
     FILE_MiSTer_new, FOLDER_linux, FOLDER_saves, FOLDER_savestates, FOLDER_screenshots, FILE_PDFViewer, FILE_lesskey, \
@@ -35,23 +37,23 @@ class DbEntity:
 
     def _initialize(self, db_raw, section):
         if db_raw is None:
-            raise _InternalDbValidationException(lambda section: 'db "%s" is empty' % section)
+            raise _InternalDbValidationException(lambda sec: 'db "%s" is empty' % sec)
 
         if not isinstance(db_raw, dict):
-            raise _InternalDbValidationException(lambda section: 'db "%s" has incorrect format' % section)
+            raise _InternalDbValidationException(lambda sec: 'db "%s" has incorrect format' % sec)
 
-        self.db_id = _mandatory(db_raw, 'db_id', lambda db_id, _: _create_db_id(db_id, section))
-        self.timestamp = _mandatory(db_raw, 'timestamp', _guard(lambda v: isinstance(v, int)))
-        self.files = _mandatory(db_raw, 'files', _guard(_make_files_validator(section)))
-        self.folders = _mandatory(db_raw, 'folders', _guard(_make_folders_validator(section)))
+        self.db_id: str = _mandatory(db_raw, 'db_id', lambda db_id, _: _create_db_id(db_id, section))
+        self.timestamp: int = _mandatory(db_raw, 'timestamp', _guard(lambda v: isinstance(v, int)))
+        self.files: Dict[str, Any] = _mandatory(db_raw, 'files', _guard(_make_files_validator(section)))
+        self.folders: Dict[str, Any] = _mandatory(db_raw, 'folders', _guard(_make_folders_validator(section)))
 
-        self.zips = _optional(db_raw, 'zips', _guard(_zips_validator), {})
-        self.db_files = _optional(db_raw, 'db_files', _guard(lambda v: isinstance(v, list)), [])
-        self.default_options = _optional(db_raw, 'default_options', lambda v, _: DbOptions(v, kind=DbOptionsKind.DEFAULT_OPTIONS), DbOptions({}, DbOptionsKind.DEFAULT_OPTIONS))
-        self.base_files_url = _optional(db_raw, 'base_files_url', _guard(lambda v: isinstance(v, str)), '')
-        self.tag_dictionary = _optional(db_raw, 'tag_dictionary', _guard(lambda v: isinstance(v, dict)), {})
-        self.linux = _optional(db_raw, 'linux', _guard(lambda v: isinstance(v, dict)), None)
-        self.header = _optional(db_raw, 'header', _guard(lambda v: isinstance(v, list)), [])
+        self.zips: Dict[str, Any] = _optional(db_raw, 'zips', _guard(_zips_validator), {})
+        self.db_files: List[str] = _optional(db_raw, 'db_files', _guard(lambda v: isinstance(v, list)), [])
+        self.default_options: DbOptions = _optional(db_raw, 'default_options', lambda v, _: DbOptions(v, kind=DbOptionsKind.DEFAULT_OPTIONS), DbOptions({}, DbOptionsKind.DEFAULT_OPTIONS))
+        self.base_files_url: str = _optional(db_raw, 'base_files_url', _guard(lambda v: isinstance(v, str)), '')
+        self.tag_dictionary: Dict[str, int] = _optional(db_raw, 'tag_dictionary', _guard(lambda v: isinstance(v, dict)), {})
+        self.linux: Dict[str, Any] = _optional(db_raw, 'linux', _guard(lambda v: isinstance(v, dict)), None)
+        self.header: List[str] = _optional(db_raw, 'header', _guard(lambda v: isinstance(v, list)), [])
 
     @property
     @test_only

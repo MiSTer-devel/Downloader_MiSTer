@@ -21,13 +21,14 @@ import sys
 import time
 
 from downloader.constants import K_DATABASES, K_UPDATE_LINUX, \
-    K_USER_DEFINED_OPTIONS, K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME, K_IS_PC_LAUNCHER
-from downloader.importer_command import ImporterCommand
+    K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME, K_IS_PC_LAUNCHER
+from downloader.importer_command import ImporterCommandFactory
 from downloader.other import format_files_message
 
 
 class FullRunService:
-    def __init__(self, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter):
+    def __init__(self, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter, importer_command_factory: ImporterCommandFactory):
+        self._importer_command_factory = importer_command_factory
         self._waiter = waiter
         self._os_utils = os_utils
         self._external_drives_repository = external_drives_repository
@@ -101,7 +102,7 @@ class FullRunService:
 
         databases, failed_dbs = self._db_gateway.fetch_all(self._config[K_DATABASES])
 
-        importer_command = ImporterCommand(self._config, self._config[K_USER_DEFINED_OPTIONS])
+        importer_command = self._importer_command_factory.create()
         for db in databases:
             description = self._config[K_DATABASES][db.db_id]
 

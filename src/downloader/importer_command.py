@@ -15,11 +15,12 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import K_OPTIONS, K_DEFAULT_DB_ID, K_BASE_PATH
+from typing import Dict, Any
+from downloader.constants import K_OPTIONS, K_DEFAULT_DB_ID, K_BASE_PATH, K_USER_DEFINED_OPTIONS, K_FILTER
 
 
 class ImporterCommand:
-    def __init__(self, config, user_defined_options):
+    def __init__(self, config: Dict[str, Any], user_defined_options):
         self._config = config
         self._user_defined_options = user_defined_options
         self._parameters = []
@@ -28,7 +29,7 @@ class ImporterCommand:
         config = self._config.copy()
 
         for key, option in db.default_options.items():
-            if key not in self._user_defined_options:
+            if key not in self._user_defined_options or (key == K_FILTER and '[mister]' in option.lower()):
                 config[key] = option
 
         if K_OPTIONS in ini_description:
@@ -36,6 +37,9 @@ class ImporterCommand:
 
         if not store.read_only().has_base_path():
             store.write_only().set_base_path(config[K_BASE_PATH])
+
+        if config[K_FILTER] is not None and '[mister]' in config[K_FILTER].lower():
+            config[K_FILTER] = config[K_FILTER].lower().replace('[mister]', '' if K_FILTER not in self._config else self._config[K_FILTER].lower())
 
         entry = (db, store, config)
 
@@ -48,3 +52,11 @@ class ImporterCommand:
 
     def read_dbs(self):
         return self._parameters
+
+
+class ImporterCommandFactory:
+    def __init__(self, config):
+        self._config = config
+
+    def create(self) -> ImporterCommand:
+        return ImporterCommand(self._config, self._config[K_USER_DEFINED_OPTIONS])
