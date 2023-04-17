@@ -142,7 +142,10 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
         self.assertAllFilesAreInstalled()
 
     def test_download_cheat_files_without_zip___with_filtered_nes_zip_data_in_store_but_filter_empty_string___install_files_and_removes_filtered_zip_data(self):
-        self.assertRaises(WrongDatabaseOptions, lambda: self.download_cheat_files_without_zip(store_with_filtered_nes_zip_data(), ''))
+        actual_store = self.download_cheat_files_without_zip(store_with_filtered_nes_zip_data(), '')
+
+        self.assertEqual(store_with_installed_files_without_zips_and_no_filtered_data(), actual_store)
+        self.assertAllFilesAreInstalled()
 
     """NeoGeo UniBios Test cases"""
     def test_download_unibios_from_official_url___on_empty_store___extracts_single_file_to_the_specified_zip_path(self):
