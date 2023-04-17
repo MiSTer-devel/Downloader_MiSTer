@@ -39,7 +39,8 @@ class ImporterCommand:
             store.write_only().set_base_path(config[K_BASE_PATH])
 
         if config[K_FILTER] is not None and '[mister]' in config[K_FILTER].lower():
-            config[K_FILTER] = config[K_FILTER].lower().replace('[mister]', '' if K_FILTER not in self._config else self._config[K_FILTER].lower())
+            mister_filter = '' if K_FILTER not in self._config or self._config[K_FILTER] is None else self._config[K_FILTER].lower()
+            config[K_FILTER] = config[K_FILTER].lower().replace('[mister]', mister_filter)
 
         entry = (db, store, config)
 

@@ -58,6 +58,9 @@ class TestFullProducedImporterCommands(unittest.TestCase):
     def test_no_config_filter___with_db_default_options_override_GB___forwards_GB_to_output_filter(self):
         self.assertForwardsToOutputFilter('GB', config_filter=None, db_default_option_filter='GB')
 
+    def test_no_config_filter___with_db_default_options_override_GB___forwards_GB_to_output_filter(self):
+        self.assertForwardsToOutputFilter('GB', config_filter=None, db_default_option_filter='[MiSTer] GB')
+
     def assertForwardsToOutputFilter(self, output_filter, config_filter, ini_filter=None, db_default_option_filter=None):
         self.maxDiff = None
         config = config_test_with_filters(config_filter, ini_filter)
@@ -69,7 +72,7 @@ class TestFullProducedImporterCommands(unittest.TestCase):
         service = FullRunService(file_system_factory=fsf, config=config, importer_command_factory=importer_factory, file_downloader_factory=file_downloader_factory)
         service.full_run()
         actual = first_filter(importer_factory)
-        self.assertEquals(None if actual is None else actual.lower(), None if output_filter is None else output_filter.lower())
+        self.assertEquals(None if actual is None else actual.lower().strip(), None if output_filter is None else output_filter.lower().strip())
 
 
 def first_filter(spy: ImporterCommandFactorySpy):
