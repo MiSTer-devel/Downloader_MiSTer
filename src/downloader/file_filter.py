@@ -131,7 +131,7 @@ class FileFilterFactory:
         return list(self._unused - self._used)
 
     def _create_filter_calculator(self, db: DbEntity, config: Config) -> Optional[FilterCalculator]:
-        if config[K_FILTER] is None:
+        if config[K_FILTER] is None or config[K_FILTER] == '':
             return None
         this_filter = config[K_FILTER].strip().lower()  # @TODO Remove strip after field is validated in other place
         if this_filter == '':
