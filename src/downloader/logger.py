@@ -87,6 +87,23 @@ class PrintLogger(Logger):
             print('An unknown exception occurred during logging: %s' % str(error))
 
 
+class NoLogger(Logger):
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
+        pass
+
+    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
+        pass
+
+    def bench(self, _label):
+        pass
+
+    def configure(self, _config):
+        pass
+
+    def finalize(self):
+        pass
+
+
 class FileLoggerDecorator(Logger):
     def __init__(self, decorated_logger, local_repository_provider):
         self._decorated_logger = decorated_logger
