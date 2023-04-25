@@ -28,8 +28,9 @@ from downloader.full_run_service_factory import FullRunServiceFactory
 from downloader.logger import PrintLogger
 from downloader.other import UnreachableException
 from test.fake_file_system_factory import make_production_filesystem_factory
+from test.fake_logger import SpyLoggerDecorator
 from test.objects import debug_env, default_env
-from test.fake_logger import NoLogger, SpyLoggerDecorator
+from downloader.logger import NoLogger
 from test.fake_store_migrator import StoreMigrator
 from downloader.file_system import hash_file, is_windows, load_json_from_zip
 from downloader.main import execute_full_run

@@ -19,7 +19,7 @@
 from downloader.config import default_config
 from downloader.reboot_calculator import RebootCalculator as ProductionRebootCalculator
 from test.fake_file_system_factory import FileSystemFactory
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 
 
 class RebootCalculator(ProductionRebootCalculator):

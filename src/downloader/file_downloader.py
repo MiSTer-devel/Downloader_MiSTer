@@ -20,8 +20,8 @@ import sys
 import socket
 import ssl
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, wait
 from shutil import copyfileobj
-from threading import Thread
 from typing import Tuple, Union
 from urllib.error import URLError
 from http.client import HTTPException
@@ -274,7 +274,7 @@ class _LowLevelMultiThreadingFileDownloader(LowLevelFileDownloader):
         self._network_errors = _DownloadErrors(self._logger)
         self._downloaded_files = []
         self._pending_notifications = []
-        self._endl_pending = False
+        self._newline_pending = False
 
     def fetch(self, files_to_download, descriptions):
         job_queue = queue.Queue()
@@ -282,20 +282,19 @@ class _LowLevelMultiThreadingFileDownloader(LowLevelFileDownloader):
         for path, target in files_to_download:
             job_queue.put((descriptions[path]['url'], path, target), False)
 
-        threads = [Thread(target=self._thread_worker, args=(job_queue, notify_queue)) for _ in range(min(self._threads_limit, len(files_to_download)))]
-        for thread in threads:
-            thread.start()
+        http_logger = self._logger if self._config[K_DEBUG] else None
+        with HttpGateway(self._context, self._config[K_DOWNLOADER_TIMEOUT], logger=http_logger) as http_gateway:
+            with ThreadPoolExecutor(max_workers=self._threads_limit) as executor:
+                futures = [executor.submit(_thread_worker, http_gateway, job_queue, notify_queue) for _ in files_to_download]
 
-        remaining_notifications = len(files_to_download) * 2
+                remaining_notifications = len(files_to_download) * 2
 
-        while remaining_notifications > 0:
-            remaining_notifications -= self._read_notifications(descriptions, notify_queue, True)
-            self._waiter.sleep(1)
+                while remaining_notifications > 0:
+                    remaining_notifications -= self._read_notifications(descriptions, notify_queue, True)
+                    self._waiter.sleep(1)
 
-        job_queue.join()
-
-        for thread in threads:
-            thread.join()
+                job_queue.join()
+                wait(futures)
 
         self._read_notifications(descriptions, notify_queue, False)
         self._logger.print()
@@ -308,8 +307,8 @@ class _LowLevelMultiThreadingFileDownloader(LowLevelFileDownloader):
             notify_queue.task_done()
 
             if state == 0:
-                if self._endl_pending:
-                    self._endl_pending = False
+                if self._newline_pending:
+                    self._newline_pending = False
                     self._logger.print()
                 self._logger.print(path, flush=True)
 
@@ -338,7 +337,7 @@ class _LowLevelMultiThreadingFileDownloader(LowLevelFileDownloader):
         elif in_progress:
             self._logger.print('*', end='', flush=True)
 
-        self._endl_pending = in_progress
+        self._newline_pending = in_progress
         self._pending_notifications.clear()
         return read_notifications
 
@@ -348,36 +347,35 @@ class _LowLevelMultiThreadingFileDownloader(LowLevelFileDownloader):
     def downloaded_files(self):
         return self._downloaded_files
 
-    def _thread_worker(self, job_queue, notify_queue):
-        http_logger = self._logger if self._config[K_DEBUG] else None
-        with HttpGateway(self._context, self._config[K_DOWNLOADER_TIMEOUT], logger=http_logger) as http_gateway:
-            while not job_queue.empty():
-                url, path, target = job_queue.get(False)
 
-                notify_queue.put((0, path), False)
-                try:
-                    with http_gateway.open(url) as (final_url, in_stream), open(target, 'wb') as out_file:
-                        url = final_url
-                        if in_stream.status == 200:
-                            copyfileobj(in_stream, out_file)
-                            notify_queue.put((1, path), False)
-                        else:
-                            notify_queue.put((2, (path, 'Bad http status! %s: %s' % (path, in_stream.status))), False)
+def _thread_worker(http_gateway: HttpGateway, job_queue: queue.Queue, notify_queue: queue.Queue) -> None:
+    while not job_queue.empty():
+        url, path, target = job_queue.get(False)
 
-                except socket.gaierror as e:
-                    notify_queue.put((2, (path, 'Socket Address Error! %s: %s' % (url, str(e)))), False)
-                except URLError as e:
-                    notify_queue.put((2, (path, 'URL Error! %s: %s' % (url, e.reason))), False)
-                except HTTPException as e:
-                    notify_queue.put((2, (path, 'HTTP Error %s! %s: %s' % (type(e).__name__, url, str(e)))), False)
-                except ConnectionResetError as e:
-                    notify_queue.put((2, (path, 'Connection reset error! %s: %s' % (url, str(e)))), False)
-                except OSError as e:
-                    notify_queue.put((2, (path, 'OS Error! %s: %s %s' % (url, e.errno, str(e)))), False)
-                except Exception as e:
-                    notify_queue.put((2, (path, 'Exception during download! %s: %s' % (url, str(e)))), False)
+        notify_queue.put((0, path), False)
+        try:
+            with http_gateway.open(url) as (final_url, in_stream), open(target, 'wb') as out_file:
+                url = final_url
+                if in_stream.status == 200:
+                    copyfileobj(in_stream, out_file)
+                    notify_queue.put((1, path), False)
+                else:
+                    notify_queue.put((2, (path, 'Bad http status! %s: %s' % (path, in_stream.status))), False)
 
-                job_queue.task_done()
+        except socket.gaierror as e:
+            notify_queue.put((2, (path, 'Socket Address Error! %s: %s' % (url, str(e)))), False)
+        except URLError as e:
+            notify_queue.put((2, (path, 'URL Error! %s: %s' % (url, e.reason))), False)
+        except HTTPException as e:
+            notify_queue.put((2, (path, 'HTTP Error %s! %s: %s' % (type(e).__name__, url, str(e)))), False)
+        except ConnectionResetError as e:
+            notify_queue.put((2, (path, 'Connection reset error! %s: %s' % (url, str(e)))), False)
+        except OSError as e:
+            notify_queue.put((2, (path, 'OS Error! %s: %s %s' % (url, e.errno, str(e)))), False)
+        except Exception as e:
+            notify_queue.put((2, (path, 'Exception during download! %s: %s' % (url, str(e)))), False)
+
+        job_queue.task_done()
 
 
 class _DownloadErrors:

@@ -24,7 +24,7 @@ from downloader.target_path_repository import downloader_in_progress_postfix
 from test.fake_store_migrator import StoreMigrator
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_importer_implicit_inputs import NetworkState, FileSystemState
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 from test.fake_file_system_factory import fs_data, FileSystemFactory, fs_records
 from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.objects import file_menu_rbf, hash_menu_rbf, file_one, hash_one, hash_big, file_big, \

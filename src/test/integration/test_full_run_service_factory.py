@@ -23,7 +23,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     KENV_ALLOW_REBOOT, KENV_CURL_SSL, KENV_DEFAULT_BASE_PATH, KENV_DEBUG
 from downloader.full_run_service_factory import FullRunServiceFactory
 from downloader.local_repository import LocalRepositoryProvider
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 
 
 class TestFullRunServiceFactory(unittest.TestCase):

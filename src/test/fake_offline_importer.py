@@ -22,7 +22,7 @@ from test.fake_local_store_wrapper import StoreWrapper
 from downloader.offline_importer import OfflineImporter as ProductionOfflineImporter
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 
 
 class OfflineImporter(ProductionOfflineImporter):

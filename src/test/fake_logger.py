@@ -20,23 +20,6 @@ import sys
 from downloader.logger import Logger
 
 
-class NoLogger(Logger):
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
-        pass
-
-    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
-        pass
-
-    def bench(self, _label):
-        pass
-
-    def configure(self, _config):
-        pass
-
-    def finalize(self):
-        pass
-
-
 class SpyLoggerDecorator(Logger):
     def __init__(self, decorated_logger):
         self._decorated_logger = decorated_logger

@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.base_path_relocator import BasePathRelocator as ProductionBasePathRelocator
 from test.fake_file_system_factory import FileSystemFactory
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 from test.fake_waiter import NoWaiter
 
 

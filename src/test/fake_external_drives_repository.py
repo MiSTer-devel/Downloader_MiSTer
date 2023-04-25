@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.external_drives_repository import ExternalDrivesRepository as ProductionExternalDrivesRepository
 from test.fake_file_system_factory import FileSystemFactory
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 
 
 class ExternalDrivesRepository(ProductionExternalDrivesRepository):

@@ -24,7 +24,7 @@ from pathlib import Path
 
 from downloader.constants import FILE_MiSTer, K_BASE_PATH, K_BASE_SYSTEM_PATH, K_ALLOW_DELETE
 from downloader.file_system import FileSystemFactory
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 from test.objects import temp_name
 from test.fake_file_system_factory import make_production_filesystem_factory
 from downloader.config import AllowDelete, default_config

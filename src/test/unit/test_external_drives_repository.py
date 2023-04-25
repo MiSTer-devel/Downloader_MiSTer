@@ -21,7 +21,7 @@ from pathlib import Path
 from downloader.constants import MEDIA_FAT_CIFS, MEDIA_USB0
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from test.fake_importer_implicit_inputs import FileSystemState
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 from test.fake_file_system_factory import FileSystemFactory
 
 

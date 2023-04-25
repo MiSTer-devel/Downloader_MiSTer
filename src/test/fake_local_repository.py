@@ -20,7 +20,7 @@ from test.fake_store_migrator import StoreMigrator
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.objects import config_with
 from test.fake_file_system_factory import FileSystemFactory
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 
 
 class LocalRepository(ProductionLocalRepository):

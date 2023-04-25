@@ -22,7 +22,7 @@ from test.fake_importer_command import ImporterCommand
 from downloader.linux_updater import LinuxUpdater as ProductionLinuxUpdater
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 
 
 class LinuxUpdater(ProductionLinuxUpdater):

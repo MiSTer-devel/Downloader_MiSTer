@@ -22,7 +22,7 @@ from pathlib import Path
 
 from downloader.local_repository import LocalRepositoryProvider
 from downloader.logger import FileLoggerDecorator
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 from test.fake_external_drives_repository import ExternalDrivesRepositoryStub
 from test.fake_file_system_factory import make_production_filesystem_factory
 from test.fake_local_repository import LocalRepository

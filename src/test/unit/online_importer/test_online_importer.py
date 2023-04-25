@@ -19,7 +19,8 @@
 import unittest
 from downloader.constants import FILE_MiSTer_old, FILE_MiSTer, FILE_PDFViewer, FILE_MiSTer_new, FOLDER_linux, \
     DISTRIBUTION_MISTER_DB_ID
-from test.fake_logger import SpyLoggerDecorator, NoLogger
+from downloader.logger import NoLogger
+from test.fake_logger import SpyLoggerDecorator
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_waiter import NoWaiter
 from test.fake_file_system_factory import fs_data, fs_records

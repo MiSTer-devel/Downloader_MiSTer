@@ -23,7 +23,7 @@ from downloader.file_system import FileSystemFactory as ProductionFileSystemFact
     absolute_parent_folder, is_windows
 from downloader.other import ClosableValue, UnreachableException
 from test.fake_importer_implicit_inputs import FileSystemState
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 
 first_fake_temp_file = '/tmp/unique_temp_filename_0'
 

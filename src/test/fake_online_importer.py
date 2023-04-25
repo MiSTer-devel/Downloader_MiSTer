@@ -28,7 +28,7 @@ from test.fake_waiter import NoWaiter
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs, FileSystemState
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 
 
 class OnlineImporter(ProductionOnlineImporter):

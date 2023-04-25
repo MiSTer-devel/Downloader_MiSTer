@@ -19,7 +19,7 @@ from downloader.file_downloader import FileDownloaderFactory as ProductionFileDo
 from test.fake_target_path_repository import TargetPathRepository
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs, NetworkState, fix_description
 from test.fake_file_system_factory import FileSystemFactory, FakeFileSystem
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 
 
 class _FakeLowLevelFileDownloaderFactory(LowLevelFileDownloaderFactory):

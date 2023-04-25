@@ -27,7 +27,7 @@ from downloader.constants import FILE_mister_downloader_needs_reboot, K_BASE_PAT
     KENV_FAIL_ON_FILE_ERROR, KENV_DEFAULT_BASE_PATH, KENV_DOWNLOADER_INI_PATH
 from downloader.file_system import is_windows
 from test.objects import debug_env
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 import subprocess
 
 from test.system.quick.sandbox_test_base import tmp_default_base_path

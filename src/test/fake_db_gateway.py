@@ -20,7 +20,7 @@ from downloader.db_gateway import DbGateway as ProductionDbGateway
 from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 
 
 class DbGateway(ProductionDbGateway):

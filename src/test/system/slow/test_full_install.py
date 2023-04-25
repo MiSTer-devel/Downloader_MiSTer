@@ -24,7 +24,7 @@ from pathlib import Path
 from downloader.config import ConfigReader
 from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_CURL_SSL, KENV_DEBUG
 from test.objects import debug_env
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 from downloader.file_system import hash_file
 import subprocess
 

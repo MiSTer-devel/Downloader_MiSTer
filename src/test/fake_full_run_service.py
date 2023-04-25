@@ -33,7 +33,7 @@ from test.fake_db_gateway import DbGateway
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_linux_updater import LinuxUpdater
 from test.fake_local_repository import LocalRepository
-from test.fake_logger import NoLogger
+from downloader.logger import NoLogger
 from test.fake_online_importer import OnlineImporter
 from test.fake_offline_importer import OfflineImporter
 from test.fake_reboot_calculator import RebootCalculator
