@@ -222,3 +222,5 @@ Here is an example that sets the **database-scoped default** for the "_filter_" 
 ```
 
 Any option not set by a user or a maintainer will continue to use it's [global value](https://github.com/MiSTer-devel/Downloader_MiSTer#options).
+
+Additionally, database default filters may inherit all the global filter terms by adding the special term `[mister]` in it. Filter inheritance is explained in the [Download Filters page](download-filters.md).

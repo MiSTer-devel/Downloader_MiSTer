@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Version 1.7 - 2023-04-28
+
+### Added
+- Database-scoped filters can now inherit the terms from the global filter (the filter under the `[MiSTer]` section). In a database-scoped filter, you may add the term `[mister]` to bring all the global filter terms into the scope. This is useful to apply different filters to different DBs while sharing some common terms. More info [in the database-scoped filters section](docs/download-filters.md#database-scoped-filters-using-the-filter-property-in-another-section-other-than-mister).
+- Filters on database-scoped default options may also use global filter inheritance. This is useful as users expect to apply the global filter to all DBs by default, and DBs with database-scoped default filters were taking precedence over global filters when inheritance was not available. So DB maintainers can now easily solve this UX issue by adding the term `[mister]` to the database-scoped default filter.
+- Added support for the yc.txt file.
+- Added ntpdate mitigation code to the launcher to deal with installations where the system clock is not configured.
+- Added message with instructions for users that have an old MiSTer installation.
+
+### Changed
+- Optimisations on the HTTP Client to allow more requests going on at the same time.
+- Added types to several files to improve the codebase maintainability.
+- Several lesser fixes and improvements.
+
 ## Version 1.6 - 2022-10-27
 
 ### Added

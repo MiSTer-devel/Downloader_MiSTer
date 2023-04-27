@@ -28,6 +28,8 @@ https://www.youtube.com/watch?v=jBxls-yGtvI
 ### Database-scoped filters: Using the filter property in another section, other than [mister]
 If you add a **filter** property under `[mister]` it will be global, so the filter will affect all databases. But you can constraint the filter so it only applies to a single database. For example, if you add the filter under the section `[distribution_mister]`, it will affect only to the **distribution_mister** database. And if both are defined at the same time, the database-scoped filters will always override whatever it is in the global filter (again, the one under `[mister]`).
 
+If you want to use the global filter terms and add database-specific terms, include the special term `[mister]` in the database-specific filter. For example, if the global filter under `[mister]` is `filter = console computer` and the `[distribution_mister]` filter is `filter = [mister] arcade`, the database-specific filter will inherit terms from the global filter and add the arcade term. The resulting filter will be `filter = console computer arcade`.
+
 ### Porting filters from the old Updater
 
 Most of the terms from [this list](https://github.com/MiSTer-devel/Distribution_MiSTer#tags-that-you-may-use-with-download-filters-feature), are the same terms that you could use in the filters from the old updater. That means, for the most part, filters are compatible with the old updater format. Thus, the transition is very straightforward, as you can see in this video:
