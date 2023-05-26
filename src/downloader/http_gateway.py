@@ -18,11 +18,15 @@ import ssl
 import time
 import abc
 from contextlib import contextmanager
-from typing import Tuple, Any, Optional, Generator, List, Dict, Callable
+from typing import Tuple, Any, Optional, Generator, List, Dict, Callable, Union
 from urllib.parse import urlparse, ParseResult
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
 
 from downloader.logger import Logger
+
+
+class HTTPGatewayException(Exception):
+    pass
 
 
 class _Connection(abc.ABC):
@@ -144,9 +148,6 @@ class HttpGateway:
 
         if self._is_a_keep_alive_connection(conn):
             self._handle_keep_alive(conn)
-        else:
-            if self._logger is not None: self._logger.debug(f'Closing "{parsed_url.netloc}".')
-            conn.kill()
 
         return retry, conn
 
@@ -199,11 +200,15 @@ def _create_http_connection(parsed_url: ParseResult, timeout: int, context: ssl.
 _default_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=120'}
 
 
+class _FinishedResponse:
+    pass
+
+
 class _HttpConnectionAdapter(_Connection):
     _http: HTTPConnection
     _last_use_time: float = 0.0
     _timeout: float = 120.0
-    _response: Optional[HTTPResponse] = None
+    _response: Optional[Union[HTTPResponse, _FinishedResponse]] = None
     _connection_header: Optional[str] = None
 
     def __init__(self, http: HTTPConnection):
@@ -221,7 +226,7 @@ class _HttpConnectionAdapter(_Connection):
         except BrokenPipeError:
             pass
         self._response = self._http.getresponse()
-        self._connection_header = self._response.headers.get('Connection', '').lower()
+        self._connection_header = self.response.headers.get('Connection', '').lower()
 
     def kill(self) -> None:
         self.finish_response()
@@ -231,30 +236,31 @@ class _HttpConnectionAdapter(_Connection):
         self._last_use_time = t
 
     def response_connection_header(self):
-        if self._connection_header is None: raise HTTPException('No response available')
         return self._connection_header
 
     def response_keep_alive(self) -> str:
-        return self._response.headers.get('Keep-Alive', '')
+        return self.response.headers.get('Keep-Alive', '')
 
     @property
     def response(self) -> HTTPResponse:
-        if self._response is None: raise HTTPException('No response available')
+        if self._response is None: raise HTTPGatewayException('No response available.')
+        elif isinstance(self._response, _FinishedResponse): raise HTTPGatewayException('Response is already finished.')
         return self._response
 
     def response_location_header(self) -> Optional[str]:
-        return self._response.headers.get('location', None)
+        return self.response.headers.get('location', None)
 
     def finish_response(self):
+        if isinstance(self._response, _FinishedResponse): return
         if self._response is not None:
             self._response.close()
-        self._response = None
+        self._response = _FinishedResponse()
 
     def set_timeout(self, timeout: float) -> None:
         self._timeout = timeout
 
     def response_version_text(self) -> str:
-        return f'Version: {self._response.version}\n{self._response.headers}'
+        return f'Version: {self.response.version}\n{self.response.headers}'
 
 
 class _ConnectionQueue:
