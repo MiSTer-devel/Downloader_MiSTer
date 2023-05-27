@@ -28,7 +28,7 @@ from http.client import HTTPException
 
 from downloader.constants import K_DOWNLOADER_RETRIES, K_DOWNLOADER_TIMEOUT, K_CURL_SSL, FILE_MiSTer_new, FILE_MiSTer, \
     FILE_MiSTer_old, K_DOWNLOADER_THREADS_LIMIT, K_DEBUG
-from downloader.http_gateway import HttpGateway, HTTPGatewayException
+from downloader.http_gateway import HttpGateway, HttpGatewayException
 from downloader.logger import DebugOnlyLoggerDecorator
 from downloader.other import calculate_url
 from downloader.target_path_repository import TargetPathRepository
@@ -366,10 +366,10 @@ def _thread_worker(http_gateway: HttpGateway, job_queue: queue.Queue, notify_que
             notify_queue.put((2, (path, 'Socket Address Error! %s: %s' % (url, str(e)))), False)
         except URLError as e:
             notify_queue.put((2, (path, 'URL Error! %s: %s' % (url, e.reason))), False)
+        except HttpGatewayException as e:
+            notify_queue.put((2, (path, 'Http Gateway Error %s! %s: %s' % (type(e).__name__, url, str(e)))), False)
         except HTTPException as e:
             notify_queue.put((2, (path, 'HTTP Error %s! %s: %s' % (type(e).__name__, url, str(e)))), False)
-        except HTTPGatewayException as e:
-            notify_queue.put((2, (path, 'HTTP Gateway Error %s! %s: %s' % (type(e).__name__, url, str(e)))), False)
         except ConnectionResetError as e:
             notify_queue.put((2, (path, 'Connection reset error! %s: %s' % (url, str(e)))), False)
         except OSError as e:
