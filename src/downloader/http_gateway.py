@@ -25,7 +25,7 @@ from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPExcep
 from downloader.logger import Logger
 
 
-class HTTPGatewayException(Exception):
+class HttpGatewayException(Exception):
     pass
 
 
@@ -231,6 +231,8 @@ class _HttpConnectionAdapter(_Connection):
     def kill(self) -> None:
         self.finish_response()
         self._http.close()
+        self._last_use_time = 0
+        self._timeout = 0
 
     def set_last_use_time(self, t: float) -> None:
         self._last_use_time = t
@@ -243,8 +245,8 @@ class _HttpConnectionAdapter(_Connection):
 
     @property
     def response(self) -> HTTPResponse:
-        if self._response is None: raise HTTPGatewayException('No response available.')
-        elif isinstance(self._response, _FinishedResponse): raise HTTPGatewayException('Response is already finished.')
+        if self._response is None: raise HttpGatewayException('No response available.')
+        elif isinstance(self._response, _FinishedResponse): raise HttpGatewayException('Response is already finished.')
         return self._response
 
     def response_location_header(self) -> Optional[str]:
