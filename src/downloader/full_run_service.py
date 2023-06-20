@@ -23,7 +23,7 @@ import time
 from downloader.constants import K_DATABASES, K_UPDATE_LINUX, \
     K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME, K_IS_PC_LAUNCHER
 from downloader.importer_command import ImporterCommandFactory
-from downloader.other import format_files_message
+from downloader.other import format_files_message, format_folders_message
 
 
 class FullRunService:
@@ -121,6 +121,7 @@ class FullRunService:
 
         self._display_summary(self._online_importer.correctly_installed_files(),
                               self._online_importer.files_that_failed() + failed_dbs,
+                              self._online_importer.folders_that_failed(),
                               self._online_importer.unused_filter_tags(),
                               self._online_importer.new_files_not_overwritten(),
                               self._config[K_START_TIME])
@@ -141,7 +142,7 @@ class FullRunService:
 
         return 0
 
-    def _display_summary(self, installed_files, failed_files, unused_filter_tags, new_files_not_installed, start_time):
+    def _display_summary(self, installed_files, failed_files, failed_folders, unused_filter_tags, new_files_not_installed, start_time):
         run_time = str(datetime.timedelta(seconds=time.time() - start_time))[0:-4]
 
         self._logger.print()
@@ -163,6 +164,8 @@ class FullRunService:
         self._logger.print()
         self._logger.print('Errors:')
         self._logger.print(format_files_message(failed_files))
+        if len(failed_folders) > 0:
+            self._logger.print(format_folders_message(failed_folders))
         if len(new_files_not_installed) == 0:
             return
 

@@ -84,6 +84,11 @@ def format_files_message(file_list):
     return 'none.' if message == '' else message
 
 
+def format_folders_message(folder_list):
+    printable = [f'Folder {folder}' for folder in set(folder_list)]
+    return ', '.join(printable)
+
+
 _calling_test_only = False
 
 
