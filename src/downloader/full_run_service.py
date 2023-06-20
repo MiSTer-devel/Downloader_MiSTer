@@ -131,8 +131,9 @@ class FullRunService:
         if self._config[K_UPDATE_LINUX]:
             self._linux_updater.update_linux(importer_command)
 
-        if self._config[K_FAIL_ON_FILE_ERROR] and len(self._online_importer.files_that_failed()) > 0:
+        if self._config[K_FAIL_ON_FILE_ERROR] and (len(self._online_importer.files_that_failed()) + len(self._online_importer.folders_that_failed())) > 0:
             self._logger.debug('Length of files_that_failed: %d' % len(self._online_importer.files_that_failed()))
+            self._logger.debug('Length of folders_that_failed: %d' % len(self._online_importer.folders_that_failed()))
             self._logger.debug('Length of failed_dbs: %d' % len(failed_dbs))
             return 1
 
