@@ -377,6 +377,19 @@ def raw_db_empty_descr():
     }
 
 
+def raw_db_descr(db_id, files=None, folders=None):
+    return {
+        'db_id': db_id,
+        'db_files': [],
+        'files': files or {},
+        'folders': folders or {},
+        'base_files_url': '',
+        'zips': {},
+        'default_options': {},
+        'timestamp': 0
+    }
+
+
 def raw_db_wrong_descr():
     return {
         'db_id': 'wrong',

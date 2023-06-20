@@ -35,7 +35,7 @@ class DbGateway(ProductionDbGateway):
             NoLogger())
 
     @staticmethod
-    def with_single_db(db_id, descr, config=None) -> ProductionDbGateway:
+    def with_single_db(db_id, descr, config=None, file_system_factory=None) -> ProductionDbGateway:
         state = FileSystemState(config=config, files={db_id: {'unzipped_json': descr}})
-        db_gateway = DbGateway(config=config, file_system_factory=FileSystemFactory(state=state))
+        db_gateway = DbGateway(config=config, file_system_factory=file_system_factory or FileSystemFactory(state=state))
         return db_gateway

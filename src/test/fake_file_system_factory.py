@@ -20,7 +20,7 @@ from pathlib import Path
 
 from downloader.constants import K_BASE_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
-    absolute_parent_folder, is_windows
+    absolute_parent_folder, is_windows, FolderCreationError
 from downloader.other import ClosableValue, UnreachableException
 from test.fake_importer_implicit_inputs import FileSystemState
 from downloader.logger import NoLogger
@@ -45,6 +45,9 @@ class FileSystemFactory:
         self._state = state if state is not None else FileSystemState(config=config)
         self._fake_failures = {}
         self._write_records = write_records if write_records is not None else []
+
+    def set_create_folders_buggy(self):
+        self._fake_failures['create_folders'] = True
 
     def create_for_config(self, config):
         return FakeFileSystem(self._state, config, self._fake_failures, self._write_records)
@@ -158,6 +161,8 @@ class FakeFileSystem(ProductionFileSystem):
         folder = self._path(path)
         self.state.folders[folder] = {}
         self._write_records.append(_Record('make_dirs', folder))
+        if 'create_folders' in self._fake_failures:
+            raise FolderCreationError(folder)
 
     def make_dirs_parent(self, path):
         path_object = Path(self._path(path))
@@ -166,6 +171,8 @@ class FakeFileSystem(ProductionFileSystem):
         parent = self._path(str(path_object.parent))
         self.state.folders[parent] = {}
         self._write_records.append(_Record('make_dirs_parent', parent))
+        if 'create_folders' in self._fake_failures:
+            raise FolderCreationError(parent)
 
     def _parent_folder(self, path):
         return absolute_parent_folder(self._path(path))

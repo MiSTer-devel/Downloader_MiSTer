@@ -103,7 +103,20 @@ class FullRunService(ProductionFullRunService):
         )
 
     @staticmethod
-    def with_single_db(db_id, db_descr, linux_updater=None, update_linux=None, os_utils=None, certificates_fix=None) -> ProductionFullRunService:
+    def with_single_db(db_id, db_descr, linux_updater=None, update_linux=None, os_utils=None, certificates_fix=None, file_system_factory=None) -> ProductionFullRunService:
+        config = FullRunService.single_db_config(db_id, update_linux)
+        file_system_factory = file_system_factory or FileSystemFactory(config=config, state=FileSystemState(config=config, files={db_id: {'unzipped_json': db_descr}}))
+        return FullRunService(
+            config=config,
+            db_gateway=DbGateway(config=config, file_system_factory=file_system_factory),
+            linux_updater=linux_updater,
+            os_utils=os_utils,
+            certificates_fix=certificates_fix,
+            file_system_factory=file_system_factory
+        )
+
+    @staticmethod
+    def single_db_config(db_id, update_linux=None):
         update_linux = update_linux if update_linux is not None else True
         config = default_config()
         config.update({
@@ -122,13 +135,7 @@ class FullRunService(ProductionFullRunService):
                 K_UPDATE_LINUX: update_linux,
                 K_FAIL_ON_FILE_ERROR: True
             })
-        return FullRunService(
-            config,
-            DbGateway.with_single_db(db_id, db_descr, config=config),
-            linux_updater=linux_updater,
-            os_utils=os_utils,
-            certificates_fix=certificates_fix
-        )
+        return config
 
     @staticmethod
     def with_no_dbs() -> ProductionFullRunService:

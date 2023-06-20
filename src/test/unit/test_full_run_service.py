@@ -20,9 +20,11 @@ import unittest
 from unittest.mock import Mock
 
 from test.fake_external_drives_repository import ExternalDrivesRepositoryStub
+from test.fake_file_system_factory import FileSystemFactory
+from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_os_utils import SpyOsUtils
 from test.fake_full_run_service import FullRunService
-from test.objects import raw_db_empty_descr, raw_db_empty_with_linux_descr, raw_db_wrong_descr, db_empty
+from test.objects import raw_db_empty_descr, raw_db_empty_with_linux_descr, raw_db_wrong_descr, db_empty, db_test_with_file_a, db_test, db_with_folders, raw_db_descr
 
 
 class TestFullRunService(unittest.TestCase):
@@ -70,8 +72,26 @@ class TestFullRunService(unittest.TestCase):
 
         self.assertEqual(1, exit_code)
 
+    def test_full_run___test_database_but_failing_folders_on_fs___returns_exit_code_1(self):
+        db_id, db_descr, file_system_factory = test_database_setup()
+        file_system_factory.set_create_folders_buggy()
+        exit_code = FullRunService.with_single_db(db_id, db_descr, file_system_factory=file_system_factory).full_run()
+        self.assertEqual(1, exit_code)
+
+    def test_full_run___test_database_with_no_fs_problems___returns_exit_code_0(self):
+        db_id, db_descr, file_system_factory = test_database_setup()
+        exit_code = FullRunService.with_single_db(db_id, db_descr, file_system_factory=file_system_factory).full_run()
+        self.assertEqual(0, exit_code)
+
     def test_print_drives___when_there_are_external_drives___returns_0(self):
         self.assertEqual(0, FullRunService(external_drives_repository=ExternalDrivesRepositoryStub(['/wtf'])).print_drives())
+
+
+def test_database_setup():
+    db_id = db_test
+    db_descr = raw_db_descr(db_id, folders={'test_folder': {}})
+    config = FullRunService.single_db_config(db_id)
+    return db_id, db_descr, FileSystemFactory(config=config, state=FileSystemState(config=config, files={db_id: {'unzipped_json': db_descr}}))
 
 
 def new_linux():
