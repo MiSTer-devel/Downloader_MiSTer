@@ -142,6 +142,10 @@ class FileSystem(ABC):
         """interface"""
 
 
+class FolderCreationError(Exception):
+    pass
+
+
 class _FileSystem(FileSystem):
     def __init__(self, config, path_dictionary, logger, unique_temp_filenames):
         self._config = config
@@ -212,6 +216,9 @@ class _FileSystem(FileSystem):
             if e.errno == 17:
                 return
             raise e
+        except FileNotFoundError as e:
+            self._logger.debug(e)
+            raise FolderCreationError(target)
 
     def folder_has_items(self, path):
         try:

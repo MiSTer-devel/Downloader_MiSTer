@@ -19,12 +19,14 @@
 from downloader.constants import K_BASE_PATH, K_ZIP_FILE_COUNT_THRESHOLD,\
     K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_new, FILE_MiSTer, FILE_MiSTer_old, K_BASE_SYSTEM_PATH
 from downloader.file_filter import BadFileFilterPartException
+from downloader.file_system import FolderCreationError
 from downloader.other import UnreachableException
 
 
 class _Session:
     def __init__(self):
         self.files_that_failed = []
+        self.folders_that_failed = []
         self.correctly_installed_files = []
         self.new_files_not_overwritten = {}
         self.processed_files = {}
@@ -286,6 +288,9 @@ class OnlineImporter:
     def files_that_failed(self):
         return self._base_session.files_that_failed
 
+    def folders_that_failed(self):
+        return self._base_session.folders_that_failed
+
     def unused_filter_tags(self):
         return self._unused_filter_tags
 
@@ -503,6 +508,7 @@ class _OnlineZipSummaries:
             self._import_zip_ids_from_store(zip_ids_falling_back_to_store)
 
         self._session.files_that_failed.extend(summary_downloader.errors())
+        self._session.folders_that_failed.extend(summary_downloader.failed_folders())
 
     def _populate_with_summary(self, zip_id, summary):
         self._db.files.update(summary['files'])
@@ -588,6 +594,7 @@ class _OnlineDatabaseImporter:
         file_downloader.download_files(self._is_first_run())
 
         self._session.files_that_failed.extend(file_downloader.errors())
+        self._session.folders_that_failed.extend(file_downloader.failed_folders())
         self._session.correctly_installed_files.extend(file_downloader.correctly_downloaded_files())
         self._session.needs_reboot = self._session.needs_reboot or file_downloader.needs_reboot()
 
@@ -641,66 +648,76 @@ class _OnlineDatabaseImporter:
             zipped_files = needed_zips[zip_id]
             zip_description = self._db.zips[zip_id]
 
-            kind = zip_description['kind']
-            if kind == 'extract_all_contents':
-                target_folder_path = zip_description['target_folder_path']
-                if target_folder_path[0] == '|':
-                    target_folder_path = target_folder_path[1:]
-
-                self._logger.print(zip_description['description'])
-                self._file_system.unzip_contents(temp_zip, target_folder_path, list(zipped_files['files']))
-                self._file_system.unlink(temp_zip)
-                file_downloader.mark_unpacked_zip(zip_id, zip_description['base_files_url'])
-
-                filtered_files = filtered_zip_data[zip_id]['files'] if zip_id in filtered_zip_data else []
-                for file_path in filtered_files:
-                    self._file_system.unlink(file_path)
-
-                # TODO: Add this back when adding official support fort zips
-                # for folder_path in sorted(filtered_zip_data[zip_id]['folders'].keys(), key=len, reverse=True):
-                #     if not self._file_system.is_folder(folder_path):
-                #         continue
-                #     if self._file_system.folder_has_items(folder_path):
-                #         continue
-                #
-                #     self._file_system.remove_folder(folder_path)
-
-            elif kind == 'extract_single_files':
-                self._logger.print(zip_description['description'])
-                temp_filename = self._file_system.unique_temp_filename()
-                tmp_path = '%s_%s/' % (temp_filename.value, zip_id)
-                self._file_system.unzip_contents(temp_zip, tmp_path, list(zipped_files['files']))
-                for file_path, file_description in zipped_files['files'].items():
-                    self._file_system.copy('%s%s' % (tmp_path, file_description['zip_path']), file_path)
-                self._file_system.unlink(temp_zip)
-                self._file_system.remove_non_empty_folder(tmp_path)
-                temp_filename.close()
-                file_downloader.mark_unpacked_zip(zip_id, 'whatever')
-            else:
-                raise UnreachableException('ERROR: ZIP %s has wrong field kind "%s", contact the db maintainer.' % (zip_id, kind))  # pragma: no cover
+            self._import_zip_contents_from_temp_zip(temp_zip, zip_id, zipped_files, zip_description, filtered_zip_data, file_downloader)
 
         self._logger.print()
         self._session.files_that_failed.extend(zip_downloader.errors())
 
-    def create_folders(self):
-        priority_top_folders = self._externals['priority_top_folders']
-        priority_sub_folders = self._externals['priority_sub_folders']
+    def _import_zip_contents_from_temp_zip(self, temp_zip, zip_id, zipped_files, zip_description, filtered_zip_data, file_downloader):
+        kind = zip_description['kind']
+        if kind == 'extract_all_contents':
+            target_folder_path = zip_description['target_folder_path']
+            if target_folder_path[0] == '|':
+                target_folder_path = target_folder_path[1:]
 
+            self._logger.print(zip_description['description'])
+            self._file_system.unzip_contents(temp_zip, target_folder_path, list(zipped_files['files']))
+            self._file_system.unlink(temp_zip)
+            file_downloader.mark_unpacked_zip(zip_id, zip_description['base_files_url'])
+
+            filtered_files = filtered_zip_data[zip_id]['files'] if zip_id in filtered_zip_data else []
+            for file_path in filtered_files:
+                self._file_system.unlink(file_path)
+
+            # TODO: Add this back when adding official support fort zips
+            # for folder_path in sorted(filtered_zip_data[zip_id]['folders'].keys(), key=len, reverse=True):
+            #     if not self._file_system.is_folder(folder_path):
+            #         continue
+            #     if self._file_system.folder_has_items(folder_path):
+            #         continue
+            #
+            #     self._file_system.remove_folder(folder_path)
+
+        elif kind == 'extract_single_files':
+            self._logger.print(zip_description['description'])
+            temp_filename = self._file_system.unique_temp_filename()
+            tmp_path = '%s_%s/' % (temp_filename.value, zip_id)
+            self._file_system.unzip_contents(temp_zip, tmp_path, list(zipped_files['files']))
+            for file_path, file_description in zipped_files['files'].items():
+                self._file_system.copy('%s%s' % (tmp_path, file_description['zip_path']), file_path)
+            self._file_system.unlink(temp_zip)
+            self._file_system.remove_non_empty_folder(tmp_path)
+            temp_filename.close()
+            file_downloader.mark_unpacked_zip(zip_id, 'whatever')
+        else:
+            raise UnreachableException('ERROR: ZIP %s has wrong field kind "%s", contact the db maintainer.' % (zip_id, kind))  # pragma: no cover
+
+    def create_folders(self):
         for folder_path in sorted(self._db.folders):
             folder_description = self._db.folders[folder_path]
 
-            if 'tags' in folder_description and 'zip_id' not in folder_description:
-                folder_description.pop('tags')
+            try:
+                self._create_folder_in_folders(folder_path, folder_description)
+            except FolderCreationError as _e:
+                self._logger.print('ERROR: Folder "%s" could not be created, skipping.' % folder_path)
+                self._session.folders_that_failed.append(folder_path)
 
-            if folder_path in priority_top_folders:
-                for drive in priority_top_folders[folder_path].drives:
-                    self._write_folder(drive, folder_path, folder_description)
-            elif folder_path in priority_sub_folders:
-                drive = priority_sub_folders[folder_path]
+    def _create_folder_in_folders(self, folder_path, folder_description):
+        priority_top_folders = self._externals['priority_top_folders']
+        priority_sub_folders = self._externals['priority_sub_folders']
+
+        if 'tags' in folder_description and 'zip_id' not in folder_description:
+            folder_description.pop('tags')
+
+        if folder_path in priority_top_folders:
+            for drive in priority_top_folders[folder_path].drives:
                 self._write_folder(drive, folder_path, folder_description)
-            else:
-                self._file_system.make_dirs(folder_path)
-                self._write_only_store.add_folder(folder_path, folder_description)
+        elif folder_path in priority_sub_folders:
+            drive = priority_sub_folders[folder_path]
+            self._write_folder(drive, folder_path, folder_description)
+        else:
+            self._file_system.make_dirs(folder_path)
+            self._write_only_store.add_folder(folder_path, folder_description)
 
     def _write_folder(self, drive, folder_path, folder_description):
         full_folder_path = '%s/%s' % (drive, folder_path)

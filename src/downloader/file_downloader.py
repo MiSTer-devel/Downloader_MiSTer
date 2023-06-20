@@ -22,12 +22,13 @@ import ssl
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, wait
 from shutil import copyfileobj
-from typing import Tuple, Union
+from typing import Tuple, Union, Dict, Any, Optional
 from urllib.error import URLError
 from http.client import HTTPException
 
 from downloader.constants import K_DOWNLOADER_RETRIES, K_DOWNLOADER_TIMEOUT, K_CURL_SSL, FILE_MiSTer_new, FILE_MiSTer, \
     FILE_MiSTer_old, K_DOWNLOADER_THREADS_LIMIT, K_DEBUG
+from downloader.file_system import FolderCreationError
 from downloader.http_gateway import HttpGateway, HttpGatewayException
 from downloader.logger import DebugOnlyLoggerDecorator
 from downloader.other import calculate_url
@@ -82,6 +83,10 @@ class FileDownloader(ABC):
         """all files with errors"""
 
     @abstractmethod
+    def failed_folders(self):
+        """all folders that could not be created"""
+
+    @abstractmethod
     def correctly_downloaded_files(self):
         """all correctly downloaded files"""
 
@@ -112,6 +117,7 @@ class DownloadValidator(ABC):
 
 
 class HighLevelFileDownloader(FileDownloader, DownloadValidator):
+
     def __init__(self, hash_check, config, file_system, target_path_repository, low_level_file_downloader_factory, logger):
         self._hash_check = hash_check
         self._file_system = file_system
@@ -126,6 +132,10 @@ class HighLevelFileDownloader(FileDownloader, DownloadValidator):
         self._needs_reboot = False
         self._errors = []
         self._correct_files = []
+        self._failed_folders = []
+
+    def failed_folders(self):
+        return self._failed_folders
 
     def queue_file(self, file_description, file_path):
         self._queued_files[file_path] = file_description
@@ -177,31 +187,42 @@ class HighLevelFileDownloader(FileDownloader, DownloadValidator):
         files_to_download = []
         skip_files = []
         for file_path, file_description in self._queued_files.items():
-            if self._hash_check and self._file_system.is_file(file_path):
-                path_hash = self._file_system.hash(file_path)
-                if path_hash == file_description['hash']:
-                    if 'zip_id' in file_description and file_description['zip_id'] in self._unpacked_zips:
-                        self._logger.print('Unpacked: %s' % file_path)
-                    else:
-                        self._logger.print('No changes: %s' % file_path)  # @TODO This scenario might be redundant now, since it's also checked in the Online Importer
-                    skip_files.append(file_path)
-                    continue
-                else:
-                    self._logger.debug('%s: %s != %s' % (file_path, file_description['hash'], path_hash))
+            try:
+                target_path = self._prepare_target_path_in_whole_queue(file_path, file_description)
+            except FolderCreationError as folder_path:
+                self._failed_folders.append(folder_path)
+                continue
 
-            if 'url' not in file_description:
-                file_description['url'] = calculate_url(self._base_files_url, file_path)
-
-            self._file_system.make_dirs_parent(file_path)
-            target_path = self._target_path_repository.create_target(file_path, file_description)
-            files_to_download.append((file_path, self._file_system.download_target_path(target_path)))
-            self._run_files.append(file_path)
+            if target_path is None:
+                skip_files.append(file_path)
+            else:
+                files_to_download.append((file_path, target_path))
+                self._run_files.append(file_path)
 
         for file_path in skip_files:
             self._correct_files.append(file_path)
             self._queued_files.pop(file_path)
 
         low_level.fetch(files_to_download, self._queued_files)
+
+    def _prepare_target_path_in_whole_queue(self, file_path: str, file_description: Dict[str, Any]) -> Optional[str]:
+        if self._hash_check and self._file_system.is_file(file_path):
+            path_hash = self._file_system.hash(file_path)
+            if path_hash == file_description['hash']:
+                if 'zip_id' in file_description and file_description['zip_id'] in self._unpacked_zips:
+                    self._logger.print('Unpacked: %s' % file_path)
+                else:
+                    self._logger.print('No changes: %s' % file_path)  # @TODO This scenario might be redundant now, since it's also checked in the Online Importer
+                return None
+            else:
+                self._logger.debug('%s: %s != %s' % (file_path, file_description['hash'], path_hash))
+
+        if 'url' not in file_description:
+            file_description['url'] = calculate_url(self._base_files_url, file_path)
+
+        self._file_system.make_dirs_parent(file_path)
+        target_path = self._target_path_repository.create_target(file_path, file_description)
+        return self._file_system.download_target_path(target_path)
 
     def validate_download(self, file_path: str, file_hash: str) -> Tuple[int, Union[str, Tuple[str, str]]]:
         target_path = self._target_path_repository.access_target(file_path)
