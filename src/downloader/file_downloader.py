@@ -190,6 +190,8 @@ class HighLevelFileDownloader(FileDownloader, DownloadValidator):
             try:
                 target_path = self._prepare_target_path_in_whole_queue(file_path, file_description)
             except FolderCreationError as folder_path:
+                self._logger.print('ERROR: Folder for file "%s" could not be created, skipping.' % file_path)
+                self._logger.debug(file_path)
                 self._failed_folders.append(folder_path)
                 continue
 
