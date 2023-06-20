@@ -85,8 +85,9 @@ def format_files_message(file_list):
 
 
 def format_folders_message(folder_list):
-    printable = [f'Folder {folder}' for folder in set(folder_list)]
-    return ', '.join(printable)
+    printable = [f'Folder {folder}' for folder in set(folder_list[0:10])]
+    message = ', '.join(printable)
+    return f'{message} + other folders.' if len(folder_list) > len(printable) else message
 
 
 _calling_test_only = False
