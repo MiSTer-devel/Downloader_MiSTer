@@ -192,6 +192,9 @@ class _WriteOnlyStoreAdapter:
             del self._store['external']
             self._top_wrapper.mark_force_save()
 
+    def commit(self):
+        pass
+
     @staticmethod
     def _remove_non_zip_fields(descriptions, removed_zip_ids):
         for description in descriptions:

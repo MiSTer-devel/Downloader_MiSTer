@@ -1,5 +1,6 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-
+import distutils
+from distutils.util import strtobool
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -17,6 +18,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from typing import Dict, Any, List
+from urllib.parse import urlparse
 
 from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FILE_MiSTer_alt_ini, \
     FILE_downloader_launcher_script, FILE_MiSTer_alt_3_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, \
@@ -31,16 +33,16 @@ class DbEntity:
         try:
             self._initialize(db_raw, section)
         except _InternalDbValidationException as e:
-            raise DbEntityValidationException('ERROR: %s, contact the db maintainer if this error persists.' % e.message_for_section(section))
+            raise DbEntityValidationException(message_from_internal_exception(e, section))
         except DbOptionsValidationException as e:
-            raise DbEntityValidationException('ERROR: db "%s" has invalid default options [%s], contact the db maintainer if this error persists.' % (section, e.fields_to_string()))
+            raise DbEntityValidationException(f'ERROR: db "{section}" has invalid default options [{e.fields_to_string()}], contact the db maintainer if this error persists.')
 
     def _initialize(self, db_raw, section):
         if db_raw is None:
-            raise _InternalDbValidationException(lambda sec: 'db "%s" is empty' % sec)
+            raise _EmptyDbException()
 
         if not isinstance(db_raw, dict):
-            raise _InternalDbValidationException(lambda sec: 'db "%s" has incorrect format' % sec)
+            raise _IncorrectFormatDbException()
 
         self.db_id: str = _mandatory(db_raw, 'db_id', lambda db_id, _: _create_db_id(db_id, section))
         self.timestamp: int = _mandatory(db_raw, 'timestamp', _guard(lambda v: isinstance(v, int)))
@@ -67,33 +69,13 @@ class DbEntity:
         return result
 
 
-class DbEntityValidationException(Exception):
-    pass
-
-
-class _InternalDbValidationException(Exception):
-    def __init__(self, message_factory):
-        self._message_factory = message_factory
-
-    def message_for_section(self, section):
-        return self._message_factory(section)
-
-
-class _InvalidPathException(_InternalDbValidationException):
-    def __init__(self, path):
-        self._path = path
-
-    def message_for_section(self, section):
-        return 'db "%s" contains invalid path "%s"' % (section, self._path)
-
-
 def _mandatory(raw, key, factory):
     class _MissingKeyError:
         pass
 
     result = _optional(raw, key, factory, _MissingKeyError())
     if isinstance(result, _MissingKeyError):
-        raise _InternalDbValidationException(lambda section: 'db "%s" does not have "%s"' % (section, key))
+        raise _MissingKeyException(key)
 
     return result
 
@@ -119,7 +101,7 @@ def _guard(validator):
         if validator(v):
             return v
         else:
-            raise _InternalDbValidationException(lambda section: 'db "%s" has invalid "%s"' % (section, k))
+            raise _InvalidKeyException(k)
 
     return func
 
@@ -129,9 +111,6 @@ def zip_mandatory_fields():
         'kind',
         'description',
         'contents_file',
-#        'files_count',
-#        'folders_count',
-#        'raw_files_size'
     ]
 
 
@@ -139,23 +118,70 @@ def _zips_validator(zips):
     if not isinstance(zips, dict):
         return False
 
-    mandatory_fields = zip_mandatory_fields()
-
     for zip_id, zip_desc in zips.items():
-        for field in mandatory_fields:
-            if field not in zip_desc:
-                raise _InternalDbValidationException(lambda section: 'db "%s" has invalid ZIP "%s" with missing field "%s"' % (section, zip_id, field))
-
-        if 'internal_summary' not in zip_desc and 'summary_file' not in zip_desc:
-            raise _InternalDbValidationException(lambda section: 'db "%s" has invalid ZIP "%s" with missing summary field' % (section, zip_id))
-
-        if zip_desc['kind'] not in {'extract_all_contents', 'extract_single_files'}:
-            raise _InternalDbValidationException(lambda section: 'db "%s" has invalid ZIP "%s" with wrong kind "%s".' % (section, zip_id, zip_desc['kind']))
-
-        if zip_desc['kind'] == 'extract_all_contents' and 'target_folder_path' not in zip_desc:
-            raise _InternalDbValidationException(lambda section: 'db "%s" has invalid ZIP "%s" with missing target_folder_path field' % (section, zip_id))
+        if not isinstance(zip_id, str) or len(zip_id) == 0:
+            raise _InvalidZipId(str(zip_id))
+        try:
+            _validate_zip_description(zip_desc)
+        except _InternalDbValidationException as e:
+            raise _ZipException(zip_id, e)
 
     return True
+
+
+def _validate_zip_description(zip_desc):
+    for field in zip_mandatory_fields():
+        if field not in zip_desc:
+            raise _MissingKeyException(field)
+
+    _validate_zip_contents_file(zip_desc['contents_file'])
+
+    if 'internal_summary' not in zip_desc and 'summary_file' not in zip_desc:
+        raise _MissingSummaryException()
+
+    if 'internal_summary' in zip_desc and 'summary_file' in zip_desc:
+        raise _AmbiguousSummaryException()
+
+    if 'internal_summary' in zip_desc:
+        _validate_zip_internal_summary(zip_desc['internal_summary'])
+    elif 'summary_file' in zip_desc:
+        _validate_zip_summary_file(zip_desc['summary_file'])
+
+    kind = zip_desc['kind']
+    if kind not in {'extract_all_contents', 'extract_single_files'}:
+        raise _WrongKindException(kind)
+
+    if kind == 'extract_all_contents':
+        _validate_zip_kind_extract_all_contents(zip_desc)
+    elif kind == 'extract_single_files':
+        _validate_zip_kind_extract_single_files(zip_desc)
+
+
+def _validate_zip_internal_summary(summary):
+    _mandatory(summary, 'files', _guard(_make_files_validator(None)))
+    _mandatory(summary, 'folders', _guard(_make_folders_validator(None)))
+
+
+def _validate_zip_contents_file(description):
+    _mandatory(description, 'hash', _guard(lambda v: isinstance(v, str)))
+    _mandatory(description, 'size', _guard(lambda v: isinstance(v, int)))
+    _mandatory(description, 'url', _guard(_is_url))
+
+
+def _validate_zip_summary_file(description):
+    _validate_zip_contents_file(description)  # Requires same fields as contents file for now, but is still semantically different
+
+
+def _validate_zip_kind_extract_all_contents(zip_desc):
+    if 'target_folder_path' not in zip_desc:
+        raise _MissingKeyException('target_folder_path')
+
+    # @TODO add more validation
+
+
+def _validate_zip_kind_extract_single_files(zip_desc):
+    # @TODO add more validation
+    pass
 
 
 def _make_files_validator(db_id):
@@ -166,11 +192,43 @@ def _make_files_validator(db_id):
         for file_path, file_description in files.items():
             parts = _validate_and_extract_parts_from_path(db_id, file_path)
             if parts[0] in folders_with_non_overridable_files() and file_description.get('overwrite', True):
-                raise _InternalDbValidationException(lambda section: 'db "%s" contains save "%s" with unallowed overwrite support' % (section, file_path))
+                raise _InvalidSaveFileException(file_path)
+
+            _mandatory(file_description, 'hash', _guard(lambda v: isinstance(v, str)))
+            _mandatory(file_description, 'size', _guard(lambda v: isinstance(v, int)))
+            _optional(file_description, 'url', _guard(_is_url), None)
+            _optional(file_description, 'tags', _guard(_is_tags), None)
+            _optional(file_description, 'overwrite', _guard(_is_boolean), None)
+            _optional(file_description, 'reboot', _guard(_is_boolean), None)
 
         return True
 
     return validator
+
+
+def _is_url(url):
+    if not isinstance(url, str):
+        return False
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.netloc])
+    except ValueError:
+        return False
+
+
+def _is_boolean(v):
+    return isinstance(v, bool)
+
+
+def _is_tags(tags):
+    if not isinstance(tags, list):
+        return False
+
+    for tag in tags:
+        if not isinstance(tag, str) and not isinstance(tag, int):
+            return False
+
+    return True
 
 
 def _make_folders_validator(db_id):
@@ -180,6 +238,7 @@ def _make_folders_validator(db_id):
 
         for folder_path, folder_description in folders.items():
             _validate_and_extract_parts_from_path(db_id, folder_path)
+            _optional(folder_description, 'tags', _guard(_is_tags), None)
 
         return True
 
@@ -188,10 +247,10 @@ def _make_folders_validator(db_id):
 
 def _validate_and_extract_parts_from_path(db_id, path):
     if not isinstance(path, str):
-        raise _InternalDbValidationException(lambda section: 'db "%s" contains path that is not a string "%s"' % (section, str(path)))
+        raise _InvalidPathFormatException(path)
 
     if path == '' or path[0] == '/' or path[0] == '.' or path[0] == '\\':
-        raise _InvalidPathException(path)
+        raise _IllegalPathException(path)
 
     lower_path = path.lower()
     parts = lower_path.split('/')
@@ -203,13 +262,13 @@ def _validate_and_extract_parts_from_path(db_id, path):
         return parts
 
     if lower_path in invalid_paths():
-        raise _InvalidPathException(path)
+        raise _IllegalPathException(path)
 
     if db_id != DISTRIBUTION_MISTER_DB_ID and lower_path in no_distribution_mister_invalid_paths():
-        raise _InvalidPathException(path)
+        raise _IllegalPathException(path)
 
     if '..' in parts or len(parts) == 0 or parts[0] in invalid_root_folders():
-        raise _InvalidPathException(path)
+        raise _IllegalPathException(path)
 
     return parts
 
@@ -243,3 +302,105 @@ def exceptional_paths():
 def distribution_mister_exceptional_paths():
     return tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow])
 
+
+class DbEntityValidationException(Exception):
+    pass
+
+
+class _InternalDbValidationException(Exception):
+    pass
+
+
+class _EmptyDbException(_InternalDbValidationException): pass
+class _IncorrectFormatDbException(_InternalDbValidationException): pass
+
+
+class _MissingKeyException(_InternalDbValidationException):
+    def __init__(self, key):
+        self.key = key
+
+
+class _InvalidKeyException(_InternalDbValidationException):
+    def __init__(self, key):
+        self.key = key
+
+
+class _ZipException(_InternalDbValidationException):
+    def __init__(self, zip_id: str, exception: _InternalDbValidationException):
+        self.zip_id = zip_id
+        self.exception = exception
+
+
+class _InvalidZipId(_InternalDbValidationException):
+    def __init__(self, bad_zip_id: str):
+        self.bad_zip_id = bad_zip_id
+
+
+class _MissingSummaryException(_InternalDbValidationException): pass
+class _AmbiguousSummaryException(_InternalDbValidationException): pass
+
+
+class _WrongKindException(_InternalDbValidationException):
+    def __init__(self, kind):
+        self.kind = kind
+
+
+class _InvalidSaveFileException(_InternalDbValidationException):
+    def __init__(self, file_path):
+        self.file_path = file_path
+
+
+class _InvalidPathFormatException(_InternalDbValidationException):
+    def __init__(self, path):
+        self.path = path
+
+
+class _IllegalPathException(_InternalDbValidationException):
+    def __init__(self, path):
+        self.path = path
+
+
+def message_from_internal_exception(e: _InternalDbValidationException, section: str) -> str:
+    if isinstance(e, _ZipException):
+        message = message_from_zip_exception(e.exception, e.zip_id, section)
+    elif isinstance(e, _InvalidZipId):
+        message = f'db "{section}" has invalid zip id "{e.bad_zip_id}" in its zips section'
+    elif isinstance(e, _EmptyDbException):
+        message = f'db "{section}" is empty'
+    elif isinstance(e, _IncorrectFormatDbException):
+        message = f'db "{section}" has an incorrect format'
+    elif isinstance(e, _MissingKeyException):
+        message = f'db "{section}" does not have "{e.key}"'
+    elif isinstance(e, _InvalidKeyException):
+        message = f'db "{section}" has invalid "{e.key}"'
+    elif isinstance(e, _InvalidSaveFileException):
+        message = f'db "{section}" contains save "{e.file_path}" with forbidden overwrite support'
+    elif isinstance(e, _InvalidPathFormatException):
+        message = f'db "{section}" contains path that is not a string "{e.path}"'
+    elif isinstance(e, _IllegalPathException):
+        message = f'db "{section}" contains illegal path "{e.path}"'
+    else:
+        message = f'db "{section}" has an unknown error ({type(e).__name__})'
+
+    return f'ERROR: {message}, contact the db maintainer if this error persists.'
+
+
+def message_from_zip_exception(e: _InternalDbValidationException, zip_id: str, section: str) -> str:
+    if isinstance(e, _MissingKeyException):
+        return f'db "{section}" on zip "{zip_id}" does not have "{e.key}"'
+    if isinstance(e, _MissingSummaryException):
+        return f'db "{section}" on zip "{zip_id}" does not have summary field'
+    if isinstance(e, _AmbiguousSummaryException):
+        return f'db "{section}" on zip "{zip_id}" has an ambiguous summary, because both internal and external summaries are present'
+    if isinstance(e, _WrongKindException):
+        return f'db "{section}" on zip "{zip_id}" has wrong kind "{e.kind}"'
+    elif isinstance(e, _InvalidKeyException):
+        return f'db "{section}" on zip "{zip_id}" has invalid "{e.key}"'
+    elif isinstance(e, _InvalidSaveFileException):
+        return f'db "{section}" on zip "{zip_id}" contains save "{e.file_path}" with forbidden overwrite support'
+    elif isinstance(e, _InvalidPathFormatException):
+        return f'db "{section}" on zip "{zip_id}" contains path that is not a string "{e.path}"'
+    elif isinstance(e, _IllegalPathException):
+        return f'db "{section}" on zip "{zip_id}" contains illegal path "{e.path}"'
+    else:
+        return f'db "{section}" on zip "{zip_id}" has an unknown error ({type(e).__name__})'

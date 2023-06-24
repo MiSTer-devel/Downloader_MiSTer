@@ -23,7 +23,7 @@ import time
 from downloader.constants import K_DATABASES, K_UPDATE_LINUX, \
     K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME, K_IS_PC_LAUNCHER
 from downloader.importer_command import ImporterCommandFactory
-from downloader.other import format_files_message, format_folders_message
+from downloader.other import format_files_message, format_folders_message, format_zips_message
 
 
 class FullRunService:
@@ -122,6 +122,7 @@ class FullRunService:
         self._display_summary(self._online_importer.correctly_installed_files(),
                               self._online_importer.files_that_failed() + failed_dbs,
                               self._online_importer.folders_that_failed(),
+                              self._online_importer.zips_that_failed(),
                               self._online_importer.unused_filter_tags(),
                               self._online_importer.new_files_not_overwritten(),
                               self._config[K_START_TIME])
@@ -131,11 +132,14 @@ class FullRunService:
         if self._config[K_UPDATE_LINUX]:
             self._linux_updater.update_linux(importer_command)
 
-        if self._config[K_FAIL_ON_FILE_ERROR] and (len(self._online_importer.files_that_failed()) + len(self._online_importer.folders_that_failed())) > 0:
-            self._logger.debug('Length of files_that_failed: %d' % len(self._online_importer.files_that_failed()))
-            self._logger.debug('Length of folders_that_failed: %d' % len(self._online_importer.folders_that_failed()))
-            self._logger.debug('Length of failed_dbs: %d' % len(failed_dbs))
-            return 1
+        if self._config[K_FAIL_ON_FILE_ERROR]:
+            failure_count = len(self._online_importer.files_that_failed()) + len(self._online_importer.folders_that_failed()) + len(self._online_importer.zips_that_failed())
+            if failure_count > 0:
+                self._logger.debug('Length of files_that_failed: %d' % len(self._online_importer.files_that_failed()))
+                self._logger.debug('Length of folders_that_failed: %d' % len(self._online_importer.folders_that_failed()))
+                self._logger.debug('Length of zips_that_failed: %d' % len(self._online_importer.zips_that_failed()))
+                self._logger.debug('Length of failed_dbs: %d' % len(failed_dbs))
+                return 1
 
         if len(failed_dbs) > 0:
             self._logger.debug('Length of failed_dbs: %d' % len(failed_dbs))
@@ -143,7 +147,7 @@ class FullRunService:
 
         return 0
 
-    def _display_summary(self, installed_files, failed_files, failed_folders, unused_filter_tags, new_files_not_installed, start_time):
+    def _display_summary(self, installed_files, failed_files, failed_folders, failed_zips, unused_filter_tags, new_files_not_installed, start_time):
         run_time = str(datetime.timedelta(seconds=time.time() - start_time))[0:-4]
 
         self._logger.print()
@@ -167,6 +171,8 @@ class FullRunService:
         self._logger.print(format_files_message(failed_files))
         if len(failed_folders) > 0:
             self._logger.print(format_folders_message(failed_folders))
+        if len(failed_zips) > 0:
+            self._logger.print(format_zips_message(failed_zips))
         if len(new_files_not_installed) == 0:
             return
 

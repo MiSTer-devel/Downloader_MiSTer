@@ -90,6 +90,12 @@ def format_folders_message(folder_list):
     return f'{message} + other folders.' if len(folder_list) > len(printable) else message
 
 
+def format_zips_message(zip_list):
+    printable = [f'Zip {zip}' for zip in set(zip_list[0:10])]
+    message = ', '.join(printable)
+    return f'{message} + other zips.' if len(zip_list) > len(printable) else message
+
+
 _calling_test_only = False
 
 
