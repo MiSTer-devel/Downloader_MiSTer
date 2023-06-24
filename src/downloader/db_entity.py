@@ -188,24 +188,31 @@ def _make_files_validator(db_id, zip_id=None, mandatory_zip_path=False):
             return False
 
         for file_path, file_description in files.items():
-            parts = _validate_and_extract_parts_from_path(db_id, file_path)
-            if parts[0] in folders_with_non_overridable_files() and file_description.get('overwrite', True):
-                raise _InvalidSaveFileException(file_path)
-
-            _mandatory(file_description, 'hash', _guard(lambda v: isinstance(v, str)))
-            _mandatory(file_description, 'size', _guard(lambda v: isinstance(v, int)))
-            if zip_id is not None:
-                _mandatory(file_description, 'zip_id', _guard(lambda v: v == zip_id))
-            if mandatory_zip_path:
-                _mandatory(file_description, 'zip_path', _guard(_validate_zip_path))
-            _optional(file_description, 'url', _guard(_is_url), None)
-            _optional(file_description, 'tags', _guard(_is_tags), None)
-            _optional(file_description, 'overwrite', _guard(_is_boolean), None)
-            _optional(file_description, 'reboot', _guard(_is_boolean), None)
+            try:
+                _validate_single_file(db_id, file_path, file_description, zip_id, mandatory_zip_path)
+            except _InternalDbValidationException as e:
+                raise _InvalidFileException(file_path, e)
 
         return True
 
     return validator
+
+
+def _validate_single_file(db_id, file_path, file_description, zip_id=None, mandatory_zip_path=False):
+    parts = _validate_and_extract_parts_from_path(db_id, file_path)
+    if parts[0] in folders_with_non_overridable_files() and file_description.get('overwrite', True):
+        raise _InvalidSaveFileException(file_path)
+
+    _mandatory(file_description, 'hash', _guard(lambda v: isinstance(v, str)))
+    _mandatory(file_description, 'size', _guard(lambda v: isinstance(v, int)))
+    if zip_id is not None:
+        _mandatory(file_description, 'zip_id', _guard(lambda v: v == zip_id))
+    if mandatory_zip_path:
+        _mandatory(file_description, 'zip_path', _guard(_validate_zip_path))
+    _optional(file_description, 'url', _guard(_is_url), None)
+    _optional(file_description, 'tags', _guard(_is_tags), None)
+    _optional(file_description, 'overwrite', _guard(_is_boolean), None)
+    _optional(file_description, 'reboot', _guard(_is_boolean), None)
 
 
 def _is_url(url):
@@ -239,14 +246,21 @@ def _make_folders_validator(db_id, zip_id=None):
             return False
 
         for folder_path, folder_description in folders.items():
-            _validate_and_extract_parts_from_path(db_id, folder_path)
-            _optional(folder_description, 'tags', _guard(_is_tags), None)
-            if zip_id is not None:
-                _mandatory(folder_description, 'zip_id', _guard(lambda v: v == zip_id))
+            try:
+                _validate_single_folder(db_id, folder_path, folder_description, zip_id)
+            except _InternalDbValidationException as e:
+                raise _InvalidFolderException(folder_path, e)
 
         return True
 
     return validator
+
+
+def _validate_single_folder(db_id, folder_path, folder_description, zip_id=None):
+    _validate_and_extract_parts_from_path(db_id, folder_path)
+    _optional(folder_description, 'tags', _guard(_is_tags), None)
+    if zip_id is not None:
+        _mandatory(folder_description, 'zip_id', _guard(lambda v: v == zip_id))
 
 
 def _validate_and_extract_parts_from_path(db_id, path):
@@ -317,16 +331,15 @@ def distribution_mister_exceptional_paths():
     return tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow])
 
 
-class DbEntityValidationException(Exception):
-    pass
-
-
-class _InternalDbValidationException(Exception):
-    pass
-
-
+class DbEntityValidationException(Exception): pass
+class _InternalDbValidationException(Exception): pass
 class _EmptyDbException(_InternalDbValidationException): pass
 class _IncorrectFormatDbException(_InternalDbValidationException): pass
+class _MissingSummaryException(_InternalDbValidationException): pass
+class _AmbiguousSummaryException(_InternalDbValidationException): pass
+class _InvalidSaveFileException(_InternalDbValidationException): pass
+class _InvalidPathFormatException(_InternalDbValidationException): pass
+class _IllegalPathException(_InternalDbValidationException): pass
 
 
 class _MissingKeyException(_InternalDbValidationException):
@@ -350,28 +363,21 @@ class _InvalidZipId(_InternalDbValidationException):
         self.bad_zip_id = bad_zip_id
 
 
-class _MissingSummaryException(_InternalDbValidationException): pass
-class _AmbiguousSummaryException(_InternalDbValidationException): pass
+class _InvalidFileException(_InternalDbValidationException):
+    def __init__(self, file_path, exception):
+        self.file_path = file_path
+        self.exception = exception
+
+
+class _InvalidFolderException(_InternalDbValidationException):
+    def __init__(self, folder_path, exception):
+        self.folder_path = folder_path
+        self.exception = exception
 
 
 class _WrongKindException(_InternalDbValidationException):
     def __init__(self, kind):
         self.kind = kind
-
-
-class _InvalidSaveFileException(_InternalDbValidationException):
-    def __init__(self, file_path):
-        self.file_path = file_path
-
-
-class _InvalidPathFormatException(_InternalDbValidationException):
-    def __init__(self, path):
-        self.path = path
-
-
-class _IllegalPathException(_InternalDbValidationException):
-    def __init__(self, path):
-        self.path = path
 
 
 def message_from_internal_exception(e: _InternalDbValidationException, section: str) -> str:
@@ -387,12 +393,10 @@ def message_from_internal_exception(e: _InternalDbValidationException, section: 
         message = f'db "{section}" does not have "{e.key}"'
     elif isinstance(e, _InvalidKeyException):
         message = f'db "{section}" has invalid "{e.key}"'
-    elif isinstance(e, _InvalidSaveFileException):
-        message = f'db "{section}" contains save "{e.file_path}" with forbidden overwrite support'
-    elif isinstance(e, _InvalidPathFormatException):
-        message = f'db "{section}" contains path that is not a string "{e.path}"'
-    elif isinstance(e, _IllegalPathException):
-        message = f'db "{section}" contains illegal path "{e.path}"'
+    elif isinstance(e, _InvalidFileException):
+        message = f'db "{section}" contains invalid file "{e.file_path}" {file_folder_reason_from_exception(e.exception)}'
+    elif isinstance(e, _InvalidFolderException):
+        message = f'db "{section}" contains invalid folder "{e.folder_path}" {file_folder_reason_from_exception(e.exception)}'
     else:
         message = f'db "{section}" has an unknown error ({type(e).__name__})'
 
@@ -410,11 +414,24 @@ def message_from_zip_exception(e: _InternalDbValidationException, zip_id: str, s
         return f'db "{section}" on zip "{zip_id}" has wrong kind "{e.kind}"'
     elif isinstance(e, _InvalidKeyException):
         return f'db "{section}" on zip "{zip_id}" has invalid "{e.key}"'
-    elif isinstance(e, _InvalidSaveFileException):
-        return f'db "{section}" on zip "{zip_id}" contains save "{e.file_path}" with forbidden overwrite support'
-    elif isinstance(e, _InvalidPathFormatException):
-        return f'db "{section}" on zip "{zip_id}" contains path that is not a string "{e.path}"'
-    elif isinstance(e, _IllegalPathException):
-        return f'db "{section}" on zip "{zip_id}" contains illegal path "{e.path}"'
+    elif isinstance(e, _InvalidFileException):
+        return f'db "{section}" on zip "{zip_id}" contains invalid file "{e.file_path}" {file_folder_reason_from_exception(e.exception)}'
+    elif isinstance(e, _InvalidFolderException):
+        return f'db "{section}" on zip "{zip_id}" contains invalid folder "{e.folder_path}" {file_folder_reason_from_exception(e.exception)}'
     else:
         return f'db "{section}" on zip "{zip_id}" has an unknown error ({type(e).__name__})'
+
+
+def file_folder_reason_from_exception(e: _InternalDbValidationException) -> str:
+    if isinstance(e, _MissingKeyException):
+        return f'with no key "{e.key}"'
+    elif isinstance(e, _InvalidKeyException):
+        return f'with invalid key "{e.key}"'
+    elif isinstance(e, _InvalidSaveFileException):
+        return f'with forbidden overwrite support'
+    elif isinstance(e, _InvalidPathFormatException):
+        return f'with a path that is not a proper string'
+    elif isinstance(e, _IllegalPathException):
+        return f'with an illegal path'
+    else:
+        return ''
