@@ -120,14 +120,14 @@ def _zips_validator(zips):
         if not isinstance(zip_id, str) or len(zip_id) == 0:
             raise _InvalidZipId(str(zip_id))
         try:
-            _validate_zip_description(zip_desc)
+            _validate_zip_description(zip_id, zip_desc)
         except _InternalDbValidationException as e:
             raise _ZipException(zip_id, e)
 
     return True
 
 
-def _validate_zip_description(zip_desc):
+def _validate_zip_description(zip_id, zip_desc):
     for field in zip_mandatory_fields():
         if field not in zip_desc:
             raise _MissingKeyException(field)
@@ -141,7 +141,7 @@ def _validate_zip_description(zip_desc):
         raise _AmbiguousSummaryException()
 
     if 'internal_summary' in zip_desc:
-        _validate_zip_internal_summary(zip_desc['internal_summary'])
+        _validate_zip_internal_summary(zip_id, zip_desc['internal_summary'])
     elif 'summary_file' in zip_desc:
         _validate_zip_summary_file(zip_desc['summary_file'])
 
@@ -155,9 +155,9 @@ def _validate_zip_description(zip_desc):
         _validate_zip_kind_extract_single_files(zip_desc)
 
 
-def _validate_zip_internal_summary(summary):
-    _mandatory(summary, 'files', _guard(_make_files_validator(None)))
-    _mandatory(summary, 'folders', _guard(_make_folders_validator(None)))
+def _validate_zip_internal_summary(zip_id, summary):
+    _mandatory(summary, 'files', _guard(_make_files_validator(None, zip_id, mandatory_zip_path=True)))
+    _mandatory(summary, 'folders', _guard(_make_folders_validator(None, zip_id)))
 
 
 def _validate_zip_contents_file(description):
@@ -182,7 +182,7 @@ def _validate_zip_kind_extract_single_files(zip_desc):
     pass
 
 
-def _make_files_validator(db_id):
+def _make_files_validator(db_id, zip_id=None, mandatory_zip_path=False):
     def validator(files):
         if not isinstance(files, dict):
             return False
@@ -194,6 +194,10 @@ def _make_files_validator(db_id):
 
             _mandatory(file_description, 'hash', _guard(lambda v: isinstance(v, str)))
             _mandatory(file_description, 'size', _guard(lambda v: isinstance(v, int)))
+            if zip_id is not None:
+                _mandatory(file_description, 'zip_id', _guard(lambda v: v == zip_id))
+            if mandatory_zip_path:
+                _mandatory(file_description, 'zip_path', _guard(_validate_zip_path))
             _optional(file_description, 'url', _guard(_is_url), None)
             _optional(file_description, 'tags', _guard(_is_tags), None)
             _optional(file_description, 'overwrite', _guard(_is_boolean), None)
@@ -229,7 +233,7 @@ def _is_tags(tags):
     return True
 
 
-def _make_folders_validator(db_id):
+def _make_folders_validator(db_id, zip_id=None):
     def validator(folders):
         if not isinstance(folders, dict):
             return False
@@ -237,6 +241,8 @@ def _make_folders_validator(db_id):
         for folder_path, folder_description in folders.items():
             _validate_and_extract_parts_from_path(db_id, folder_path)
             _optional(folder_description, 'tags', _guard(_is_tags), None)
+            if zip_id is not None:
+                _mandatory(folder_description, 'zip_id', _guard(lambda v: v == zip_id))
 
         return True
 
@@ -269,6 +275,16 @@ def _validate_and_extract_parts_from_path(db_id, path):
         raise _IllegalPathException(path)
 
     return parts
+
+
+def _validate_zip_path(zip_path):
+    if not isinstance(zip_path, str):
+        raise _InvalidPathFormatException(zip_path)
+
+    if zip_path == '' or zip_path[0] == '/' or zip_path[0] == '.' or zip_path[0] == '\\':
+        raise _IllegalPathException(zip_path)
+
+    return True
 
 
 @cache

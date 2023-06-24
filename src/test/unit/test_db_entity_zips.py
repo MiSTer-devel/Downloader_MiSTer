@@ -50,25 +50,25 @@ class TestDbEntityZips(unittest.TestCase):
     def test_construct_db_entity___with_wrong_internal_zip_summary_because_of_missing_field___raises_db_entity_validation_exception(self):
         for field in {'files', 'folders'}:
             with self.subTest(field):
-                raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc(is_summary_internal=True)})
+                raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc(summary_internal_zip_id=zipped_nes_palettes_id)})
                 raw_db['zips'][zipped_nes_palettes_id]['internal_summary'].pop(field)
                 self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
 
     def test_construct_db_entity___with_correct_internal_zip_summary___returns_db(self):
-        raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc(is_summary_internal=True)})
+        raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc(summary_internal_zip_id=zipped_nes_palettes_id)})
         self.assertIsNotNone(DbEntity(raw_db, db_empty))
 
     def test_construct_db_entity___with_wrong_internal_zip_summary_because_of_illegal_file___raises_db_entity_validation_exception(self):
         for file_path, file_description in [('../wrong', file_a_descr()), (file_a, {})]:
             with self.subTest(file_path):
-                raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc(is_summary_internal=True)})
+                raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc(summary_internal_zip_id=zipped_nes_palettes_id)})
                 raw_db['zips'][zipped_nes_palettes_id]['internal_summary']['files'][file_path] = file_description
                 self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
 
     def test_construct_db_entity___with_wrong_internal_zip_summary_because_of_illegal_folder___raises_db_entity_validation_exception(self):
         for folder_path, folder_description in [('../wrong', {})]:
             with self.subTest(folder_path):
-                raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc(is_summary_internal=True)})
+                raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc(summary_internal_zip_id=zipped_nes_palettes_id)})
                 raw_db['zips'][zipped_nes_palettes_id]['internal_summary']['folders'][folder_path] = folder_description
                 self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
 

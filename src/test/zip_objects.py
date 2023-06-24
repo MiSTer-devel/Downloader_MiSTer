@@ -29,7 +29,7 @@ zipped_nes_palettes_id = 'zipped_nes_palettes_id'
 cheats_folder_name = 'Cheats'
 
 
-def zipped_nes_palettes_desc(is_summary_internal=False):
+def zipped_nes_palettes_desc(summary_internal_zip_id=None):
     return zip_desc(
         "Extracting Palettes",
         folder_games_nes,
@@ -45,7 +45,7 @@ def zipped_nes_palettes_desc(is_summary_internal=False):
             "files": {file_nes_palette_a[1:]: file_nes_palette_a_descr()},
             "folders": {}
         },
-        is_summary_internal=is_summary_internal
+        summary_internal_zip_id=summary_internal_zip_id
     )
 
 
@@ -98,31 +98,33 @@ def cheats_folder_only_nes_folders(zip_id=True, tags=True):
     }
 
 
-def cheats_folder_files(zip_id=True, tags=True, url=True):
+def cheats_folder_files(zip_id=True, tags=True, url=True, is_internal_summary=False):
     return {
-        cheats_folder_nes_file_path: cheats_folder_nes_file_descr(zip_id=zip_id, tags=tags, url=url),
-        cheats_folder_sms_file_path: cheats_folder_sms_file_descr(zip_id=zip_id, tags=tags, url=url),
+        cheats_folder_nes_file_path: cheats_folder_nes_file_descr(zip_id=zip_id, tags=tags, url=url, zip_path=is_internal_summary),
+        cheats_folder_sms_file_path: cheats_folder_sms_file_descr(zip_id=zip_id, tags=tags, url=url, zip_path=is_internal_summary),
     }
 
 
-def cheats_folder_nes_file_descr(zip_id=True, tags=True, url=True):
+def cheats_folder_nes_file_descr(zip_id=True, tags=True, url=True, zip_path=False):
     return tweak_descr({
         'hash': cheats_folder_nes_file_hash,
         'size': cheats_folder_nes_file_size,
         'url': cheats_folder_nes_file_url,
         'zip_id': cheats_folder_id,
+        'zip_path': cheats_folder_nes_file_path,
         'tags': cheats_folder_nes_tags()
-    }, zip_id=zip_id, tags=tags, url=url)
+    }, zip_id=zip_id, tags=tags, url=url, zip_path=zip_path)
 
 
-def cheats_folder_sms_file_descr(zip_id=True, tags=True, url=True):
+def cheats_folder_sms_file_descr(zip_id=True, tags=True, url=True, zip_path=False):
     return tweak_descr({
         'hash': cheats_folder_sms_file_hash,
         'size': cheats_folder_sms_file_size,
         'url': cheats_folder_sms_file_url,
         'zip_id': cheats_folder_id,
+        'zip_path': cheats_folder_sms_file_path,
         'tags': cheats_folder_sms_tags()
-    }, zip_id=zip_id, tags=tags, url=url)
+    }, zip_id=zip_id, tags=tags, url=url, zip_path=zip_path is not None)
 
 
 def cheats_folder_nes_folder_descr(zip_id=True, tags=True):
@@ -146,28 +148,29 @@ def cheats_folder_descr(zip_id=True, tags=True):
     }, zip_id=zip_id, tags=tags)
 
 
-def store_with_unzipped_cheats(url=True, folders=True, zip_id=True, zips=True, tags=True, online_database_imported=None, summary_hash=None, is_summary_internal=False):
+def store_with_unzipped_cheats(url=True, folders=True, zip_id=True, zips=True, tags=True, online_database_imported=None, summary_hash=None, is_internal_summary=False):
+    summary_internal_zip_id = cheats_folder_id if is_internal_summary else None
     o = {
         K_BASE_PATH: "/media/fat",
-        "files": {k: v for k, v in cheats_folder_files(url=url, zip_id=zip_id, tags=tags).items()},
+        "files": {k: v for k, v in cheats_folder_files(url=url, zip_id=zip_id, tags=tags, is_internal_summary=is_internal_summary).items()},
         'folders': {k: v for k, v in cheats_folder_folders(zip_id=zip_id, tags=tags).items()},
         'offline_databases_imported': online_database_imported if online_database_imported is not None else [],
         "zips": {
-            cheats_folder_id: cheats_folder_zip_desc(summary_hash=summary_hash, is_summary_internal=is_summary_internal)
+            cheats_folder_id: cheats_folder_zip_desc(summary_hash=summary_hash, summary_internal_zip_id=summary_internal_zip_id)
         }
     }
     if not folders:
         o.pop('folders')
     if not zips:
         o['zips'] = {}
-    if is_summary_internal:
+    if is_internal_summary:
         for zip_description in o['zips'].values():
             zip_description.pop('internal_summary')
     return o
 
 
-def cheats_folder_zip_desc(zipped_files=None, summary=None, summary_hash=None, is_summary_internal=False):
-    json = zip_desc("Extracting NES Cheats folder", "Cheats/", summary_hash=summary_hash, zipped_files=zipped_files, summary=summary, is_summary_internal=is_summary_internal)
+def cheats_folder_zip_desc(zipped_files=None, summary=None, summary_hash=None, summary_internal_zip_id=None):
+    json = zip_desc("Extracting NES Cheats folder", "Cheats/", summary_hash=summary_hash, zipped_files=zipped_files, summary=summary, summary_internal_zip_id=summary_internal_zip_id)
     return json
 
 

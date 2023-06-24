@@ -182,7 +182,7 @@ def temp_name():
         return temp.name
 
 
-def zip_desc(description, target_folder_path, zipped_files=None, summary=None, summary_hash=None, summary_size=None, contents_hash=None, contents_size=None, is_summary_internal=False):
+def zip_desc(description, target_folder_path, zipped_files=None, summary=None, summary_hash=None, summary_size=None, contents_hash=None, contents_size=None, summary_internal_zip_id=None):
     json = {
         "kind": "extract_all_contents",
         "base_files_url": "https://base_files_url",
@@ -197,8 +197,22 @@ def zip_desc(description, target_folder_path, zipped_files=None, summary=None, s
         "target_folder_path": target_folder_path,
         "raw_files_size": 6995290
     }
-    if is_summary_internal:
-        json['internal_summary'] = {} if summary is None else summary
+    if summary_internal_zip_id is not None:
+        json['internal_summary'] = {} if summary is None else {
+            'files': {
+                file_path: {
+                    **file_description,
+                    'zip_id': summary_internal_zip_id,
+                    'zip_path': file_description.get('zip_path', file_path)
+                } for file_path, file_description in summary['files'].items()
+            },
+            'folders': {
+                folder_path: {
+                    **folder_description,
+                    'zip_id': summary_internal_zip_id,
+                } for folder_path, folder_description in summary['folders'].items()
+            },
+        }
     else:
         json['summary_file'] = {
             "hash": summary_hash if summary_hash is not None else "b5d85d1cd6f92d714ab74a997b97130d",
@@ -560,7 +574,7 @@ def file_save_psx_castlevania_descr(overwrite=None):
     return o
 
 
-def tweak_descr(o, zip_id=True, tags=True, url=True):
+def tweak_descr(o, zip_id=True, tags=True, url=True, zip_path=False):
     if not url:
         o.pop('url')
     if not zip_id:
