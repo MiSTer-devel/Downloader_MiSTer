@@ -1,6 +1,4 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-import distutils
-from distutils.util import strtobool
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
