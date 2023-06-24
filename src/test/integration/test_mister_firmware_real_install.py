@@ -24,7 +24,7 @@ from test.fake_file_system_factory import make_production_filesystem_factory
 from test.fake_path_resolver import PathResolverFactory
 from test.fake_online_importer import OnlineImporter
 from test.objects import config_with, file_mister_descr, db_entity, store_descr
-from test.unit.online_importer_with_priority_storage_test_base import OnlineImporterWithPriorityStorageTestBase
+from test.unit.online_importer.online_importer_with_priority_storage_test_base import OnlineImporterWithPriorityStorageTestBase
 
 
 class TestMiSTerFirmwareRealInstall(OnlineImporterWithPriorityStorageTestBase):
@@ -61,10 +61,11 @@ class TestMiSTerFirmwareRealInstall(OnlineImporterWithPriorityStorageTestBase):
 
         self.assertNotEqual(new_mister_hash, old_mister_hash)
         self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, base_path=base_path, files={FILE_MiSTer: file_mister_descr(hash_code=new_mister_hash)}), actual_store)
-        self.assertReports(sut, [FILE_MiSTer], reboot=True)
+        self.assertReports(sut, [FILE_MiSTer], needs_reboot=True)
 
         self.assertEqual(new_mister_hash, file_system.hash(path_file_mister))
         self.assertEqual(old_mister_hash, file_system.hash(path_file_mister_old))
+
 
 def online_importer(config):
     path_dictionary = {'asdf': 3}

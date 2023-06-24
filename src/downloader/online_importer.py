@@ -1,5 +1,4 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -16,6 +15,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from typing import Dict
+
 from downloader.constants import K_BASE_PATH, K_ZIP_FILE_COUNT_THRESHOLD,\
     K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_new, FILE_MiSTer, FILE_MiSTer_old, K_BASE_SYSTEM_PATH
 from downloader.file_filter import BadFileFilterPartException
@@ -27,6 +28,7 @@ class _Session:
     def __init__(self):
         self.files_that_failed = []
         self.folders_that_failed = []
+        self.zips_that_failed = []
         self.correctly_installed_files = []
         self.new_files_not_overwritten = {}
         self.processed_files = {}
@@ -124,24 +126,28 @@ class OnlineImporter:
 
             delete_files = []
             for file_path, file_description in read_store.files.items():
-                base_path = config[K_BASE_PATH]
-                if 'path' in file_description and file_description['path'] == 'system':
-                    base_path = config[K_BASE_SYSTEM_PATH]
-                full_file_path = '%s/%s' % (base_path, file_path)
-                if file_system.is_file(full_file_path):
+                if is_system_path(file_description):
+                    present_file_path = f'{config[K_BASE_SYSTEM_PATH]}/{file_path}'
+                else:
+                    present_file_path = f'{config[K_BASE_PATH]}/{file_path}'
+
+                if file_system.is_file(present_file_path):
                     continue
+
                 delete_files.append(file_path)
             for file_path in delete_files:
                 write_store.remove_file(file_path)
 
             delete_folders = []
-            for folder_path, folder_description in read_store.folders.items():
-                base_path = config[K_BASE_PATH]
-                if 'path' in folder_description and folder_description['path'] == 'system':
-                    base_path = config[K_BASE_SYSTEM_PATH]
-                full_folder_path = '%s/%s' % (base_path, folder_path)
-                if file_system.is_folder(full_folder_path):
+            for folder_path in sorted(read_store.folders, key=len, reverse=True):
+
+                folder_description = read_store.folders[folder_path]
+                if is_system_path(folder_description) and \
+                        file_system.is_folder('%s/%s' % (config[K_BASE_SYSTEM_PATH], folder_path)):
                     continue
+                elif file_system.is_folder('%s/%s' % (config[K_BASE_PATH], folder_path)):
+                    continue
+
                 delete_folders.append(folder_path)
             for folder_path in delete_folders:
                 write_store.remove_folder(folder_path)
@@ -167,7 +173,7 @@ class OnlineImporter:
 
             for folder_path, folder_description in read_only_store.folders.items():
                 base_path = config[K_BASE_PATH]
-                if 'path' in folder_description and folder_description['path'] == 'system':
+                if is_system_path(folder_description):
                     base_path = config[K_BASE_SYSTEM_PATH]
 
                 if base_path not in internal_store_folders:
@@ -228,17 +234,15 @@ class OnlineImporter:
             read_store = store.read_only()
             write_store = store.write_only()
 
-            for folder_path in list(read_store.folders):
+            for folder_path in sorted(list(read_store.folders), key=len, reverse=True):
                 if folder_path in db.folders:
                     continue
 
                 folder_description = read_store.folders[folder_path]
-                base_path = config[K_BASE_PATH]
-                if 'path' in folder_description and folder_description['path'] == 'system':
-                    base_path = config[K_BASE_SYSTEM_PATH]
-
-                full_folder_path = '%s/%s' % (base_path, folder_path)
-                if system_file_system.folder_has_items(full_folder_path):
+                if is_system_path(folder_description) and \
+                        system_file_system.folder_has_items(f'{config[K_BASE_SYSTEM_PATH]}/{folder_path}'):
+                    continue
+                elif system_file_system.folder_has_items(f'{config[K_BASE_PATH]}/{folder_path}'):
                     continue
 
                 write_store.remove_folder(folder_path)
@@ -248,15 +252,21 @@ class OnlineImporter:
 
             for drive in read_store.external_drives:
                 delete_folders = []
-                for folder_path, folder_description in read_store.external_folders(drive).items():
+                external_folders = read_store.external_folders(drive)
+                for folder_path in sorted(external_folders, key=len, reverse=True):
                     if folder_path in db_folders:
                         continue
-                    base_path = config[K_BASE_PATH]
-                    if 'path' in folder_description and folder_description['path'] == 'system':
-                        base_path = config[K_BASE_SYSTEM_PATH]
 
-                    full_folder_path = '%s/%s' % (base_path, folder_path)
-                    if system_file_system.folder_has_items(full_folder_path):
+                    # Note on following folder_has_items call:
+                    #
+                    # A folder_description coming from store.external_folders() can never be a system path,
+                    # so we only check K_BASE_PATH and ignore K_BASE_SYSTEM_PATH
+                    #
+                    # If it's a system path, it's a bug but will be ignored. Note that we are filtering this cases out
+                    # currently during the translation step. So it's very unlikely to happen,
+                    # and there is no real damage if it occurs.
+
+                    if system_file_system.folder_has_items(f'{config[K_BASE_PATH]}/{folder_path}'):
                         continue
 
                     delete_folders.append(folder_path)
@@ -290,6 +300,9 @@ class OnlineImporter:
 
     def folders_that_failed(self):
         return self._base_session.folders_that_failed
+
+    def zips_that_failed(self):
+        return self._base_session.zips_that_failed
 
     def unused_filter_tags(self):
         return self._unused_filter_tags
@@ -333,67 +346,89 @@ class _Resolver:
         input_folders = self._db.folders
         self._db.folders = {}
         for target_folder_path, description in input_folders.items():
-            if self._is_external_zip(target_folder_path, description):
-                target_folder_path = '|' + target_folder_path
-
-            is_system_path = 'path' in description and description['path'] == 'system'
-            if is_system_path:
-                self._path_resolver.add_system_path(target_folder_path)
-
-            base_path = self._path_resolver.resolve_folder_path(target_folder_path)
-
-            if target_folder_path[0] == '|':
-                target_folder_path = target_folder_path[1:]
-
-            if base_path is not None and self._read_only_store.base_path != base_path and not is_system_path:
-                priority_sub_folders[target_folder_path] = base_path
-
-            self._db.folders[target_folder_path] = description
+            self._translate_input_folder_path(description, priority_sub_folders, target_folder_path)
 
         input_files = self._db.files
         self._db.files = {}
         for file_path, description in input_files.items():
-            if self._is_external_zip(file_path, description):
-                file_path = '|' + file_path
+            self._translate_input_file_path(description, file_path, priority_files)
 
-            is_system_path = 'path' in description and description['path'] == 'system'
-            if is_system_path:
-                self._path_resolver.add_system_path(file_path)
-
-            if file_path == FILE_MiSTer and is_system_path:
-                self._path_resolver.add_system_path(FILE_MiSTer_new)
-                self._path_resolver.add_system_path(FILE_MiSTer_old)
-
-                self._path_resolver.resolve_file_path(FILE_MiSTer_new)
-                self._path_resolver.resolve_file_path(FILE_MiSTer_old)
-
-            base_path = self._path_resolver.resolve_file_path(file_path)
-
-            if file_path[0] == '|':
-                file_path = file_path[1:]
-
-            if base_path is not None and self._read_only_store.base_path != base_path and not is_system_path:
-                priority_files[file_path] = base_path
-
-            self._db.files[file_path] = description
-
-        for zip_id, zip_description in self._db.zips.items():
-            kind = zip_description['kind']
-
-            if kind != 'extract_all_contents':
-                continue
-
-            target_folder_path = zip_description['target_folder_path']
-
-            base_path = self._path_resolver.resolve_folder_path(target_folder_path)
-
-            if target_folder_path[0] == '|':
-                target_folder_path = target_folder_path[1:]
-
-            if base_path is not None and self._read_only_store.base_path != base_path:
-                priority_sub_folders[target_folder_path] = base_path
+        input_zips = self._db.zips
+        self._db.zips = {}
+        for zip_id, zip_description in input_zips.items():
+            self._translate_input_zip_paths(priority_sub_folders, zip_id, zip_description)
 
         return self._db
+
+    def _translate_input_zip_paths(self, priority_sub_folders, zip_id, zip_description):
+        kind = zip_description['kind']
+        if kind == 'extract_all_contents':
+            if is_system_path(zip_description):
+                self._logger.print('ERROR: Zip %s is marked as system path, contact the db maintainer. Skipping...' % zip_id)
+                self._logger.debug(zip_description)
+                self._session.zips_that_failed.append(zip_id)
+                return
+
+            target_zip_folder_path = zip_description['target_folder_path']
+            target_zip_folder_base_path = self._path_resolver.resolve_folder_path(target_zip_folder_path)
+            if target_zip_folder_path[0] == '|':
+                target_zip_folder_path = target_zip_folder_path[1:]
+            if target_zip_folder_base_path is not None and self._read_only_store.base_path != target_zip_folder_base_path:
+                priority_sub_folders[target_zip_folder_path] = target_zip_folder_base_path
+
+        self._db.zips[zip_id] = zip_description
+
+    def _translate_input_file_path(self, description, file_path, priority_files):
+        target_is_system_path = is_system_path(description)
+        if self._is_external_zip(file_path, description):
+            file_path = '|' + file_path
+
+        if file_path[0] == '|':
+            if target_is_system_path:
+                self._logger.print('ERROR: External file %s is marked as system path, contact the db maintainer. Skipping...' % file_path)
+                self._logger.debug(description)
+                self._session.files_that_failed.append(file_path[1:])
+                return
+            base_path = self._path_resolver.resolve_file_path(file_path)
+            file_path = file_path[1:]
+        else:
+            if target_is_system_path:
+                self._path_resolver.add_system_path(file_path)
+                if file_path == FILE_MiSTer:
+                    self._path_resolver.add_system_path(FILE_MiSTer_new)
+                    self._path_resolver.add_system_path(FILE_MiSTer_old)
+
+                    self._path_resolver.resolve_file_path(FILE_MiSTer_new)
+                    self._path_resolver.resolve_file_path(FILE_MiSTer_old)
+            base_path = self._path_resolver.resolve_file_path(file_path)
+
+        if base_path is not None and self._read_only_store.base_path != base_path and not target_is_system_path:
+            priority_files[file_path] = base_path
+        self._db.files[file_path] = description
+
+    def _translate_input_folder_path(self, description, priority_sub_folders, target_folder_path):
+        is_external_zip = self._is_external_zip(target_folder_path, description)
+        target_is_system_path = is_system_path(description)
+        if is_external_zip:
+            target_folder_path = '|' + target_folder_path
+
+        if target_folder_path[0] == '|':
+            if target_is_system_path:
+                self._logger.print('ERROR: External folder %s is marked as system path, contact the db maintainer. Skipping...' % target_folder_path)
+                self._logger.debug(description)
+                self._session.folders_that_failed.append(target_folder_path[1:])
+                return
+
+            base_path = self._path_resolver.resolve_folder_path(target_folder_path)
+            target_folder_path = target_folder_path[1:]
+        else:
+            if target_is_system_path:
+                self._path_resolver.add_system_path(target_folder_path)
+            base_path = self._path_resolver.resolve_folder_path(target_folder_path)
+
+        if base_path is not None and self._read_only_store.base_path != base_path and not target_is_system_path:
+            priority_sub_folders[target_folder_path] = base_path
+        self._db.folders[target_folder_path] = description
 
 
 class _OnlineFilteredZipData:
@@ -441,6 +476,9 @@ class _OnlineZipSummaries:
         zip_ids_from_internal_summary = []
 
         for zip_id, db_zip_desc in self._db.zips.items():
+            if is_system_path(db_zip_desc):
+                continue
+
             if 'summary_file' in db_zip_desc:
                 db_summary_file_hash = db_zip_desc['summary_file']['hash']
                 store_summary_file_hash = self._store_summary_file_hash_by_zip_id(zip_id)
@@ -737,7 +775,7 @@ class _OnlineDatabaseImporter:
             self._write_only_store.remove_file(file_path)
 
             drives = {drive: True for drive in self._external_drives_repository.connected_drives()}
-            if 'path' in description and description['path'] == 'system':
+            if is_system_path(description):
                 drives[self._config[K_BASE_SYSTEM_PATH]] = False
             else:
                 drives[self._config[K_BASE_PATH]] = False
@@ -755,6 +793,10 @@ class _OnlineDatabaseImporter:
 
         if len(files_to_delete) > 0:
             self._logger.print()
+
+
+def is_system_path(description: Dict[str, str]) -> bool:
+    return 'path' in description and description['path'] == 'system'
 
 
 class WrongDatabaseOptions(Exception):

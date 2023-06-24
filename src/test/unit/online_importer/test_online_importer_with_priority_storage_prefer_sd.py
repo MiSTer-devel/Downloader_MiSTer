@@ -16,14 +16,14 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import FILE_PDFViewer, MEDIA_FAT
+from downloader.constants import FILE_PDFViewer, MEDIA_FAT, MEDIA_USB1
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data
 from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1, folder_games, \
     folder_games_nes, media_usb1, media_usb2, config_with, file_nes_contra, file_nes_palette_a, file_nes_manual, \
     folder_docs, db_id_external_drives_1, db_id_external_drives_2, file_neogeo_md, file_neogeo_md_descr, file_s32x_md, \
-    file_s32x_md_descr, media_usb0, folder_docs_neogeo, folder_docs_s32x, file_foo, empty_store
-from test.unit.online_importer_with_priority_storage_test_base import fs_folders_nes_on_usb1_and_usb2, \
+    file_s32x_md_descr, media_usb0, folder_docs_neogeo, folder_docs_s32x, file_foo, empty_store, db_entity, file_nes_smb1_descr, file_a_descr
+from test.unit.online_importer.online_importer_with_priority_storage_test_base import fs_folders_nes_on_usb1_and_usb2, \
     fs_files_smb1_on_usb1, store_smb1_on_usb1, fs_folders_nes_on_usb2, store_smb1_on_usb2, fs_files_smb1_on_usb2, \
     store_smb1_on_usb1_and_usb2, fs_files_smb1_on_usb1_and_usb2, fs_folders_games_on_usb1_and_usb2, \
     store_nes_folder_on_usb1, fs_folders_nes_on_usb1, fs_folders_games_on_usb1_usb2_and_fat, store_smb1, \
@@ -40,7 +40,8 @@ from test.unit.online_importer_with_priority_storage_test_base import fs_folders
     fs_folders_nes_on_delme, hidden_drive, store_pdfviewer_on_base_system_path_hidden, fs_folders_pdfviewers_on_hidden, \
     fs_files_pdfviewers_on_hidden, _store_files_foo, _store_files_s32x_md, _store_files_smb1, _store_folders_nes, \
     _store_folders_docs_s32x, _store_folders_docs_neogeo, _store_files_neogeo_md, _store_files_contra, \
-    OnlineImporterWithPriorityStorageTestBase, store_nes_folder
+    OnlineImporterWithPriorityStorageTestBase, store_nes_folder, store_games_folder_on_usb1_too, store_just_nes_palettes_on_usb1, fs_files_nes_palettes_on_usb1, store_smb1_and_contra_on_fat, \
+    fs_files_smb1_and_contra_on_fat_and_usb0, fs_folders_nes_on_fat_and_usb0, fs_folders_nes_on_usb0, fs_files_smb1_and_contra_on_usb0, store_smb1_on_fat, fs_files_smb1_on_usb0
 
 
 class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPriorityStorageTestBase):
@@ -374,6 +375,24 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
             folders=external_folders
         ), sut.fs_data)
         self.assertReports(sut, [file_foo, file_neogeo_md, file_s32x_md, file_nes_smb1, file_nes_contra])
+
+    def test_download_just_nes_palette_file_db___after_installing_smb1_and_nes_palettes_on_usb1___removes_everything_except_nes_palettes_on_usb1(self):
+        store = store_smb1_and_nes_palettes_on_usb1()
+
+        sut = self.download_just_nes_palette_file_db(store, fs(files=fs_files_smb1_and_nes_palettes_on_usb1(), folders=fs_folders_nes_palettes_on_usb1()))
+
+        self.assertEqual(store_just_nes_palettes_on_usb1(), store)
+        self.assertEqual(fs_data(files=fs_files_nes_palettes_on_usb1(), folders=fs_folders_nes_palettes_on_usb1()), sut.fs_data)
+        self.assertReports(sut, [])
+
+    def test_download_just_smb1_file_db___with_smb1_and_contra_on_fat_and_usb1___removes_contra_and_keeps_smb1_on_fat_and_usb1_with_its_folders(self):
+        store = store_smb1_and_contra_on_fat_and_usb1()
+
+        sut = self.download_just_smb1_file_db(store, fs(files=fs_files_smb1_and_contra_on_fat_and_usb1(), folders=fs_folders_nes_on_fat_and_usb1()))
+
+        self.assertEqual(store_smb1_on_fat_and_usb1(), store)
+        self.assertEqual(fs_data(files=fs_files_smb1_on_fat_and_usb1(), folders=fs_folders_nes_on_fat_and_usb1()), sut.fs_data)
+        self.assertReports(sut, [])
 
 
 def fs(files=None, folders=None, base_path=None, config=None):

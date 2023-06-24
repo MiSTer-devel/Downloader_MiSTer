@@ -26,7 +26,7 @@ from test.objects import empty_test_store, file_nes_smb1, folder_games_nes, medi
     db_id_external_drives_2, store_descr, db_id_external_drives_1, folder_games, media_usb2, folder_docs, \
     folder_docs_s32x, folder_docs_neogeo, media_usb3, file_nes_palette_a, \
     clean_zip_test_fields, db_palettes
-from test.unit.online_importer_with_priority_storage_test_base import fs_files_smb1_on_usb1, store_smb1_on_usb1, \
+from test.unit.online_importer.online_importer_with_priority_storage_test_base import fs_files_smb1_on_usb1, store_smb1_on_usb1, \
     fs_folders_games_on_usb1_usb2_and_fat, fs_folders_nes_on_fat_and_usb1, fs_folders_nes_on_fat_games_on_fat_usb1, \
     OnlineImporterWithPriorityStorageTestBase, fs_folders_nes_on_usb1_and_usb2, _store_files_foo, \
     _store_folders_nes, _store_files_contra, _store_files_neogeo_md, \

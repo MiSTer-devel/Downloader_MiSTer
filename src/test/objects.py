@@ -39,6 +39,7 @@ file_test_json_zip = 'test.json.zip'
 file_a = 'a/A'
 file_b = 'b/B'
 file_c = 'c/C'
+file_abc = 'a/b/C'
 file_nes_smb1 = '|games/NES/smb.nes'
 file_nes_contra = '|games/NES/contra.nes'
 file_nes_palette_a = '|games/NES/Palette/a.pal'
@@ -57,6 +58,7 @@ hash_real_test_file = '3de8f8b0dc94b8c2230fab9ec0ba0506'
 folder_a = 'a'
 folder_b = 'b'
 folder_c = 'c'
+folder_ab = 'a/b'
 folder_games = '|games'
 folder_games_nes = '|games/NES'
 folder_games_nes_palettes = '|games/NES/Palette'
@@ -364,14 +366,14 @@ def raw_db_empty_with_linux_descr():
     }
 
 
-def raw_db_empty_descr():
+def raw_db_empty_descr(zips=None):
     return {
         'db_id': db_empty,
         'db_files': [],
         'files': {},
         'folders': {},
         'base_files_url': '',
-        'zips': {},
+        'zips': zips or {},
         'default_options': {},
         'timestamp': 0
     }
@@ -467,6 +469,27 @@ def file_b_descr(delete=None):
         "hash": file_b,
         "size": 1915040,
         "url": "https://two.rbf"
+    }
+
+
+def file_c_descr(delete=None):
+    return {
+        "delete": delete if delete is not None else [],
+        "hash": file_c,
+        "size": 3915440,
+        "url": "https://three.rbf"
+    }
+
+
+def path_system(): return {'path': 'system'}
+
+
+def file_system_abc_descr():
+    return {
+        "hash": file_abc,
+        "size": 3915440,
+        "url": "https://three.rbf",
+        "path": "system"
     }
 
 

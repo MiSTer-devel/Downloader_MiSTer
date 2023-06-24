@@ -15,7 +15,6 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-import unittest
 
 from downloader.constants import FILE_PDFViewer, FOLDER_linux, DISTRIBUTION_MISTER_DB_ID
 from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1_descr, file_nes_smb1, folder_games, \
@@ -26,10 +25,11 @@ from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1
     file_s32x_md_descr, \
     folder_docs_neogeo, folder_docs_s32x, file_foo, file_foo_descr, media_usb0, zip_desc
 from test.fake_online_importer import OnlineImporter
+from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 from test.zip_objects import zipped_nes_palettes_id, file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc
 
 
-class OnlineImporterWithPriorityStorageTestBase(unittest.TestCase):
+class OnlineImporterWithPriorityStorageTestBase(OnlineImporterTestBase):
 
     def download_smb1_db(self, store, inputs):
         return self._download_db(db_with_smb1(), store, inputs)
@@ -71,17 +71,12 @@ class OnlineImporterWithPriorityStorageTestBase(unittest.TestCase):
             .add_db(db_external_drives_2(), local_store_dbs[db_id_external_drives_2]) \
             .download(False), local_store_dbs
 
-    def _download_db(self, db, store, inputs):
-        return OnlineImporter\
-            .from_implicit_inputs(inputs)\
-            .add_db(db, store)\
-            .download(False)
+    # Note: These following "just ... file" dbs are buggy, but could show up in real life
+    def download_just_smb1_file_db(self, store, inputs):
+        return self._download_db(db_entity(files={file_nes_smb1: file_nes_smb1_descr()}), store, inputs)
 
-    def assertReports(self, sut, installed, save=True, reboot=False):
-        self.assertEqual(sorted(remove_all_priority_paths(installed)), sorted(sut.correctly_installed_files()))
-        self.assertEqual([], sut.files_that_failed())
-        self.assertEqual(reboot, sut.needs_reboot())
-        self.assertEqual(save, sut.needs_save)
+    def download_just_nes_palette_file_db(self, store, inputs):
+        return self._download_db(db_entity(files={file_nes_palette_a: file_nes_palette_a_descr()}), store, inputs)
 
 
 delme_drive = '/delme'
@@ -109,6 +104,7 @@ def fs_files_smb1_and_contra_on_fat_contra_on_usb1_too(): return {**fs_files_smb
 def fs_files_smb1_on_fat_contra_on_usb1(): return {**fs_files_smb1_on_fat(), **fs_files_contra_on_usb1()}
 def fs_files_smb1_and_contra_on_usb1_smb1_on_fat_too(): return {**fs_files_smb1_on_fat(), **fs_files_smb1_and_contra_on_usb1()}
 def fs_files_smb1_and_contra_on_fat_and_usb1(): return {**fs_files_smb1_and_contra_on_fat(), **fs_files_smb1_and_contra_on_usb1()}
+def fs_files_smb1_and_contra_on_fat_and_usb0(): return {**fs_files_smb1_and_contra_on_fat(), **fs_files_smb1_and_contra_on_usb0()}
 def fs_files_pdfviewers_on_hidden(): return {media_drive(hidden_drive, FILE_PDFViewer): file_pdfviewer_descr()}
 def fs_files_nes_palettes_on_fat(): return {media_fat(file_nes_palette_a): file_nes_palette_a_descr()}
 def fs_files_smb1_and_nes_palettes_on_fat(): return {**fs_files_smb1_on_fat(), **fs_files_nes_palettes_on_fat()}
@@ -117,11 +113,13 @@ def fs_files_smb1_and_nes_palettes_on_usb1(): return {**fs_files_smb1_on_usb1(),
 def fs_files_smb1_on_usb1_and_nes_manual_on_usb2(): return {**fs_files_smb1_on_usb1(), media_usb2(file_nes_manual): file_nes_manual_descr()}
 def fs_folders_nes_on_fat(): return [media_fat(folder_games), media_fat(folder_games_nes)]
 def fs_folders_nes_on_usb1(): return [media_usb1(folder_games), media_usb1(folder_games_nes)]
+def fs_folders_nes_on_usb0(): return [media_usb0(folder_games), media_usb0(folder_games_nes)]
 def fs_folders_nes_on_usb2(): return [media_usb2(folder_games), media_usb2(folder_games_nes)]
 def fs_folders_nes_on_delme(): return [media_drive(delme_drive, folder_games), media_drive(delme_drive, folder_games_nes)]
 def fs_folders_nes_on_usb1_and_usb2(): return [*fs_folders_nes_on_usb1(), *fs_folders_nes_on_usb2()]
 def fs_folders_nes_on_fat_games_on_fat_usb1(): return [*fs_folders_nes_on_fat(), media_usb1(folder_games)]
 def fs_folders_nes_on_fat_and_usb1(): return [*fs_folders_nes_on_usb1(), *fs_folders_nes_on_fat()]
+def fs_folders_nes_on_fat_and_usb0(): return [*fs_folders_nes_on_usb0(), *fs_folders_nes_on_fat()]
 def fs_folders_docs_nes_on_usb2(): return [media_usb2(folder_docs), media_usb2(folder_docs_nes)]
 def fs_folders_games_nes_on_usb1_and_docs_nes_on_usb2(): return [*fs_folders_nes_on_usb1(), *fs_folders_docs_nes_on_usb2()]
 def fs_folders_nes_palettes_on_fat(): return [*fs_folders_nes_on_fat(), media_fat(folder_games_nes_palettes)]
@@ -135,11 +133,15 @@ def store_smb1_on_delme(): return store_descr(files=_store_files_smb1(), folders
 def store_smb1(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes())
 def store_smb1_and_nes_palettes(): return store_descr(files=_store_files_smb1_and_nes_palettes(), folders=_store_folders_nes_palettes())
 def store_smb1_and_nes_palettes_on_usb1(): return store_descr(files_usb1=_store_files_smb1_and_nes_palettes(), folders_usb1=_store_folders_nes_palettes())
+def store_just_nes_palettes_on_usb1(): return store_descr(files_usb1=_store_files_nes_palettes(), folders_usb1={})
 def store_smb1_on_usb2(): return store_descr(files_usb2=_store_files_smb1(), folders_usb2=_store_folders_nes())
 def store_smb1_on_usb1_and_usb2(): return store_descr(files_usb1=_store_files_smb1(), folders_usb1=_store_folders_nes(), files_usb2=_store_files_smb1(), folders_usb2=_store_folders_nes())
 def store_games_on_usb1_and_usb2(): return store_descr(folders_usb1=_store_folders_games(), folders_usb2=_store_folders_games())
+def store_smb1_and_contra_on_fat(): return store_descr(files=_store_files_smb1_and_contra(), folders=_store_folders_nes())
+def store_smb1_on_fat(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes())
 def store_smb1_and_contra_on_usb1(): return store_descr(files_usb1=_store_files_smb1_and_contra(), folders_usb1=_store_folders_nes())
 def store_smb1_and_contra_on_fat_and_usb1(): return store_descr(files=_store_files_smb1_and_contra(), folders=_store_folders_nes(), files_usb1=_store_files_smb1_and_contra(), folders_usb1=_store_folders_nes())
+def store_smb1_and_contra_on_fat_and_usb0(): return store_descr(files=_store_files_smb1_and_contra(), folders=_store_folders_nes(), files_usb0=_store_files_smb1_and_contra(), folders_usb0=_store_folders_nes())
 def store_smb1_on_fat_and_smb1_and_contra_on_usb1():return store_descr(files=_store_files_smb1(), folders=_store_folders_nes(), files_usb1=_store_files_smb1_and_contra(), folders_usb1=_store_folders_nes())
 def store_smb1_without_folders_on_usb1_and_usb2(): return store_descr(files_usb1=_store_files_smb1(), files_usb2=_store_files_smb1())
 def store_smb1_without_folders_on_usb2(): return store_descr(files_usb2=_store_files_smb1())
@@ -147,6 +149,7 @@ def store_nes_folder_on_usb1_and_usb2(): return store_descr(folders_usb1=_store_
 def store_nes_folder_on_usb1(): return store_descr(folders_usb1=_store_folders_nes())
 def store_nes_folder_on_usb2(): return store_descr(folders_usb2=_store_folders_nes())
 def store_nes_folder(): return store_descr(folders=_store_folders_nes())
+def store_games_folder_on_usb1_too(): return store_descr(folders=_store_folders_games(), files_usb1={}, folders_usb1=_store_folders_games())
 def store_smb1_and_games_folder_on_usb1_too(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes(), folders_usb1=_store_folders_games())
 def store_pdfviewer_on_base_system_path_hidden(): return store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files=_store_files_pdfviewer(), folders=_store_folders_linux())
 def store_smb1_and_contra(): return store_descr(files=_store_files_smb1_and_contra(), folders=_store_folders_nes())

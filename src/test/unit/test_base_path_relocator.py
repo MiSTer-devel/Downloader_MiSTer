@@ -34,7 +34,7 @@ def media_fat_store():
 
 
 def media_fat_store_with_system_file():
-    return store_test_with_file(file_a, {'path': 'system'})
+    return store_test_with_file(file_a, {'path': 'system', 'size': 0, 'hash': 'hash'})
 
 
 class TestBasePathRelocator(unittest.TestCase):

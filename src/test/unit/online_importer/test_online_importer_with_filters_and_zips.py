@@ -18,7 +18,6 @@
 
 import unittest
 from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_FILTER
-from downloader.online_importer import WrongDatabaseOptions
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data, FileSystemFactory
 from test.objects import db_test_descr, store_descr, config_with_filter, empty_test_store, db_entity

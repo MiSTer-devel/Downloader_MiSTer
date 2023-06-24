@@ -16,18 +16,18 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import unittest
 from downloader.constants import FILE_MiSTer_old, FILE_MiSTer, FILE_MiSTer_new, \
     DISTRIBUTION_MISTER_DB_ID, MEDIA_FAT, MEDIA_USB0, STORAGE_PRIORITY_PREFER_SD
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data, fs_records
 from test.objects import db_distribution_mister, file_mister_descr, \
-    store_descr, hash_MiSTer_old, remove_all_priority_paths, media_fat, config_with, file_mister_old_descr
+    store_descr, hash_MiSTer_old, media_fat, config_with, file_mister_old_descr
 from test.fake_online_importer import OnlineImporter
+from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 
 
 # See: https://github.com/MiSTer-devel/Downloader_MiSTer/issues/24
-class TestOnlineImporterMiSTerBinaryCrosslinkBug(unittest.TestCase):
+class TestOnlineImporterMiSTerBinaryCrosslinkBug(OnlineImporterTestBase):
 
     def test_installing_new_main_on_top_of_old_one___moves_old_one_to_mister_old_location_on_same_directory_despite_base_path(self):
         config = config_with(
@@ -57,14 +57,3 @@ class TestOnlineImporterMiSTerBinaryCrosslinkBug(unittest.TestCase):
             {'scope': 'move', 'data': (media_fat(FILE_MiSTer_new), media_fat(FILE_MiSTer))},
         ]), sut.fs_records)
         self.assertReports(sut, [FILE_MiSTer], needs_reboot=True)
-
-    def assertReportsNothing(self, sut, save=False):
-        self.assertReports(sut, [], save=save)
-
-    def assertReports(self, sut, installed, errors=None, needs_reboot=False, save=True):
-        if errors is None:
-            errors = []
-        self.assertEqual(remove_all_priority_paths(installed), sut.correctly_installed_files())
-        self.assertEqual(remove_all_priority_paths(errors), sut.files_that_failed())
-        self.assertEqual(needs_reboot, sut.needs_reboot())
-        self.assertEqual(save, sut.needs_save)

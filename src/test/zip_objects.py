@@ -29,7 +29,7 @@ zipped_nes_palettes_id = 'zipped_nes_palettes_id'
 cheats_folder_name = 'Cheats'
 
 
-def zipped_nes_palettes_desc():
+def zipped_nes_palettes_desc(is_summary_internal=False):
     return zip_desc(
         "Extracting Palettes",
         folder_games_nes,
@@ -44,7 +44,8 @@ def zipped_nes_palettes_desc():
         zipped_files={
             "files": {file_nes_palette_a[1:]: file_nes_palette_a_descr()},
             "folders": {}
-        }
+        },
+        is_summary_internal=is_summary_internal
     )
 
 

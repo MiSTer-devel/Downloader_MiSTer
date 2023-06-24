@@ -21,12 +21,11 @@ import unittest
 from downloader.config import default_config
 from downloader.constants import K_BASE_PATH, FILE_MiSTer, FOLDER_gamecontrollerdb, FOLDER_linux, FILE_gamecontrollerdb, \
     FILE_gamecontrollerdb_user, DISTRIBUTION_MISTER_DB_ID
-from downloader.db_entity import DbEntityValidationException, zip_mandatory_fields, invalid_paths, \
+from downloader.db_entity import DbEntityValidationException, invalid_paths, \
     no_distribution_mister_invalid_paths, invalid_root_folders, distribution_mister_exceptional_paths
 from test.fake_db_entity import DbEntity
 from test.objects import raw_db_empty_descr, db_empty, file_mister_descr, db_with_folders, file_a_descr, \
-    db_test_with_file, db_entity, file_save_psx_castlevania, file_save_psx_castlevania_descr, folder_save_psx
-from test.zip_objects import zipped_nes_palettes_id, zipped_nes_palettes_desc
+    db_test_with_file, db_entity, file_save_psx_castlevania, file_save_psx_castlevania_descr, folder_save_psx, file_a
 
 
 class TestDbEntity(unittest.TestCase):
@@ -57,7 +56,19 @@ class TestDbEntity(unittest.TestCase):
                 self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
 
     def test_construct_db_entity___with_wrong_files___raises_db_entity_validation_exception(self):
-        self.assertRaises(DbEntityValidationException, lambda: db_entity(files=''))
+        wrong_files = [
+            '',
+            {file_a: {}},
+            {file_a: {**file_a_descr(), 'url': 3}},
+            {file_a: {**file_a_descr(), 'url': 'bad_url'}},
+            {file_a: {**file_a_descr(), 'url': 'https://adsf[asdf.com'}},
+            {file_a: {**file_a_descr(), 'reboot': 'car'}},
+            {file_a: {**file_a_descr(), 'tags': '1'}},
+            {file_a: {**file_a_descr(), 'tags': [2.23]}},
+        ]
+        for i, files in enumerate(wrong_files):
+            with self.subTest(i):
+                self.assertRaises(DbEntityValidationException, lambda: db_entity(files=files))
 
     def test_construct_db_entity___with_saves_files_that_allow_overwrite___raises_db_entity_validation_exception(self):
         self.assertRaises(DbEntityValidationException, lambda: db_entity(files={file_save_psx_castlevania: file_save_psx_castlevania_descr(overwrite=True)}))
@@ -73,39 +84,6 @@ class TestDbEntity(unittest.TestCase):
 
     def test_construct_db_entity___with_saves_folders___returns_db(self):
         self.assertIsNotNone(db_entity(folders={folder_save_psx: {}}))
-
-    def test_construct_db_entity___with_wrong_zip_property___raises_db_entity_validation_exception(self):
-        raw_db = raw_db_empty_descr()
-        raw_db['zips'] = []
-        self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
-
-    def test_construct_db_entity___with_wrong_zip_field___raises_db_entity_validation_exception(self):
-        for field in zip_mandatory_fields():
-            with self.subTest(field):
-                raw_db = raw_db_empty_descr()
-                raw_db['zips'] = {zipped_nes_palettes_id: zipped_nes_palettes_desc()}
-                raw_db['zips'][zipped_nes_palettes_id].pop(field)
-                self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
-
-    def test_construct_db_entity___with_wrong_zip_because_no_summary___raises_db_entity_validation_exception(self):
-        raw_db = raw_db_empty_descr()
-        raw_db['zips'] = {zipped_nes_palettes_id: zipped_nes_palettes_desc()}
-        raw_db['zips'][zipped_nes_palettes_id].pop('summary_file')
-        self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
-
-    def test_construct_db_entity___with_wrong_zip_kind___raises_db_entity_validation_exception(self):
-        for wrong_field in ['', None, 'wrong']:
-            with self.subTest(wrong_field):
-                raw_db = raw_db_empty_descr()
-                raw_db['zips'] = {zipped_nes_palettes_id: zipped_nes_palettes_desc()}
-                raw_db['zips'][zipped_nes_palettes_id]['kind'] = wrong_field
-                self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
-
-    def test_construct_db_entity___with_zip_kind_extract_all_contents_but_no_target_folder_path___raises_db_entity_validation_exception(self):
-        raw_db = raw_db_empty_descr()
-        raw_db['zips'] = {zipped_nes_palettes_id: zipped_nes_palettes_desc()}
-        raw_db['zips'][zipped_nes_palettes_id].pop('target_folder_path')
-        self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
 
     def test_construct_db_entity___with_wrong_options___raises_db_entity_validation_exception(self):
         raw_db = raw_db_empty_descr()

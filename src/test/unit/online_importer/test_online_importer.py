@@ -16,7 +16,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import unittest
 from downloader.constants import FILE_MiSTer_old, FILE_MiSTer, FILE_PDFViewer, FILE_MiSTer_new, FOLDER_linux, \
     DISTRIBUTION_MISTER_DB_ID
 from downloader.logger import NoLogger
@@ -29,11 +28,12 @@ from test.objects import store_with_folders, db_distribution_mister, db_test_bei
     db_test_with_file, db_with_file, db_with_folders, file_a, folder_a, \
     store_test_with_file_a_descr, store_test_with_file, db_test_with_file_a, file_descr, empty_test_store, \
     file_pdfviewer_descr, store_descr, hash_MiSTer_old, db_test, media_usb0, \
-    remove_all_priority_paths, db_entity
+    db_entity, file_c_descr, file_abc, folder_ab, path_system, file_system_abc_descr
 from test.fake_online_importer import OnlineImporter
+from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 
 
-class TestOnlineImporter(unittest.TestCase):
+class TestOnlineImporter(OnlineImporterTestBase):
 
     def test_download_dbs_contents___with_trivial_db___does_nothing(self):
         sut = OnlineImporter()
@@ -117,8 +117,8 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertReportsNothing(sut)
 
     def test_download_dbs_contents___with_existing_incorrect_file_also_on_store___downloads_the_correct_one(self):
-        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: {'hash': 'does_not_match'}}))
-        store = store_test_with_file(file_a, {'hash': 'does_not_match'})
+        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: {'hash': 'does_not_match', 'size': 0}}))
+        store = store_test_with_file(file_a, {'hash': 'does_not_match', 'size': 0})
 
         sut.add_db(db_test_with_file_a(), store)
         sut.download(False)
@@ -371,19 +371,21 @@ class TestOnlineImporter(unittest.TestCase):
         self.assertIn(expected_wait, waiter.registeredWaits)
         self.assertIn((expected_log,), logger.printCalls)
 
-    def assertReportsNothing(self, sut, save=False):
-        self.assertReports(sut, [], save=save)
+    def test_download_system_abc_db___after_already_been_installed___does_nothing(self):
+        def store_file_abc(): return store_descr(files={file_abc: file_system_abc_descr()}, folders={folder_a: path_system(), folder_ab: path_system()})
+        def fs_files_abc_on_usb0(): return {media_usb0(file_abc): file_c_descr()}
+        def fs_folders_ab_on_usb0(): return [media_usb0(folder_a), media_usb0(folder_ab)]
 
-    def assertReports(self, sut, installed, errors=None, needs_reboot=False, save=True):
-        if errors is None:
-            errors = []
-        self.assertEqual(remove_all_priority_paths(installed), sut.correctly_installed_files())
-        self.assertEqual(remove_all_priority_paths(errors), sut.files_that_failed())
-        self.assertEqual(needs_reboot, sut.needs_reboot())
-        self.assertEqual(save, sut.needs_save)
+        store = store_file_abc()
+
+        db = db_entity(files={file_abc: file_system_abc_descr()})
+        sut = self._download_db(db, store, fs(files=fs_files_abc_on_usb0(), folders=fs_folders_ab_on_usb0()))
+
+        self.assertEqual(fs_data(files=fs_files_abc_on_usb0(), folders=fs_folders_ab_on_usb0()), sut.fs_data)
+        self.assertEqual(store_file_abc(), store)
+        self.assertReportsNothing(sut)
 
 
-def downloaded_single_db(db, store=None, full_resync=False):
-    sut = OnlineImporter()
-    sut.add_db(db, store if store is not None else empty_test_store())
-    sut.download(full_resync)
+def fs(files=None, folders=None, base_path=None, config=None):
+    return ImporterImplicitInputs(files=files, folders=folders, base_path=base_path, config=config)
+

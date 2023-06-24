@@ -7,7 +7,7 @@
         "MiSTer": {
             "hash": "1ebbd3e34237af26da5dc08a4e440464",
             "path": "system",
-            "reboot": "true",
+            "reboot": true,
             "size": 20,
             "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/LICENSE"
         },
