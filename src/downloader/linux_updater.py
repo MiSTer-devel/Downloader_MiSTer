@@ -213,8 +213,8 @@ class LinuxUpdater:
             try:
                 self._file_system.copy_file(source, image_destination)
             except Exception as e:
-                self._logger.print('ERROR!')
-                self._logger.print('Could not install "%s" to "%s": %s' % (source, destination, str(e)))
+                self._logger.print('ERROR! Could not be installed.')
+                self._logger.debug('Could not install "%s" to "%s": %s' % (source, destination, str(e)))
             else:
                 self._logger.print('OK!')
         self._logger.print()
