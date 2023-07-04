@@ -19,7 +19,9 @@
 import subprocess
 import json
 import sys
-from downloader.constants import FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version, FILE_Linux_7z
+import tempfile
+import os.path
+from downloader.constants import FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version, FILE_Linux_7z, FILE_Linux_user_files
 
 
 class LinuxUpdater:
@@ -29,6 +31,7 @@ class LinuxUpdater:
         self._logger = logger
         self._file_system = file_system
         self._linux_descriptions = []
+        self._user_files = []
 
     def update_linux(self, importer_command):
         self._logger.bench('Update Linux start.')
@@ -67,6 +70,11 @@ class LinuxUpdater:
         if current_linux_version == linux['version'][-6:]:
             self._logger.debug('current_linux_version "%s" matches db linux: %s' % (current_linux_version, linux['version']))
             return
+
+        # TODO: do we want debug output here?
+        for source, destination in FILE_Linux_user_files:
+            if self._file_system.is_file(source):
+                self._user_files.append((source, destination))
 
         self._logger.print('Linux will be updated from %s:' % description['id'])
         self._logger.print('Current linux version -> %s' % current_linux_version)
@@ -178,6 +186,51 @@ class LinuxUpdater:
             self._logger.print('ERROR! Something went wrong during the Linux update, try again later.')
             self._logger.print('Error code: %d' % result.returncode)
             self._logger.print()
+            return
+
+        if len(self._user_files) > 0:
+            self._restore_user_files()
+
+    def _restore_user_files(self):
+        # TODO: this mkdtemp should be in file_system?
+        temp_dir = tempfile.mkdtemp()
+
+        # TODO: the image path should be a constant?
+        result = subprocess.run(
+            'mount -t ext4 /media/fat/linux/linux.img {0}'.format(temp_dir),
+            shell=True,
+            stderr=subprocess.STDOUT
+        )
+
+        if result.returncode != 0:
+            self._logger.print('ERROR! Something went wrong during the Linux update, try again later.')
+            self._logger.print('Error code: %d' % result.returncode)
+            self._logger.print()
+            return
+
+        self._logger.print('Restoring user Linux configuration files:')
+        for source, destination in self._user_files:
+            # TODO: this join should be in file_system? could not see a "public" method for this
+            image_destination = os.path.join(temp_dir, destination)
+            self._logger.print(' - %s -> %s' % (source, destination))
+            self._file_system.copy_file(source, image_destination)
+            # TODO: check for exceptions here during copy? should i be using copy fast?
+        self._logger.print()
+
+        result = subprocess.run(
+            'umount {0}'.format(temp_dir),
+            shell=True,
+            stderr=subprocess.STDOUT
+        )
+
+        if result.returncode != 0:
+            self._logger.print('ERROR! Something went wrong during the Linux update, try again later.')
+            self._logger.print('Error code: %d' % result.returncode)
+            self._logger.print()
+
+        # TODO: couple of things here. i wouldn't call a failed unmount here a critical error. also it would be
+        #       best to delete the temp dir afterwards as well, but it depends how you feel about adding something
+        #       that deletes things around the image. it would do no real harm to leave it
 
     def needs_reboot(self):
         return self._file_system.is_file(FILE_downloader_needs_reboot_after_linux_update)
