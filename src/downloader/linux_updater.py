@@ -73,7 +73,7 @@ class LinuxUpdater:
 
         for source, destination in FILE_Linux_user_files:
             if self._file_system.is_file(source):
-                self._logger.print('"%s" will be installed to the updated Linux system from the "linux" folder.' % (os.path.basename(source)))
+                self._logger.print('Custom "%s" file will be installed to the updated Linux system from the "linux" folder.' % (os.path.basename(source)))
                 self._user_files.append((source, destination))
 
         self._logger.print('Linux will be updated from %s:' % description['id'])
@@ -193,12 +193,11 @@ class LinuxUpdater:
 
     def _restore_user_files(self):
         temp_dir = tempfile.mkdtemp()
+        self._logger.debug('Created temporary directory for image: %s' % temp_dir)
 
-        result = subprocess.run(
-            'mount -t ext4 /media/fat/linux/linux.img {0}'.format(temp_dir),
-            shell=True,
-            stderr=subprocess.STDOUT
-        )
+        mount_cmd = 'mount -t ext4 /media/fat/linux/linux.img {0}'.format(temp_dir)
+        self._logger.debug('Mounting Linux image with command: %s' % mount_cmd)
+        result = subprocess.run(mount_cmd, shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
             self._logger.print('ERROR! Could not mount updated Linux image, try again later.')
@@ -208,10 +207,11 @@ class LinuxUpdater:
 
         self._logger.print('Restoring user Linux configuration files:')
         for source, destination in self._user_files:
-            image_destination = os.path.join(temp_dir, destination)
+            image_destination = temp_dir + destination
+            self._logger.debug('Copying "%s" to "%s"' % (source, image_destination))
             self._logger.print(' - Installing "%s" to "%s"...' % (source, destination), end='')
             try:
-                self._file_system.copy_file(source, image_destination)
+                self._file_system.copy(source, image_destination)
             except Exception as e:
                 self._logger.print('ERROR! Could not be installed.')
                 self._logger.debug('Could not install "%s" to "%s": %s' % (source, destination, str(e)))
@@ -219,11 +219,9 @@ class LinuxUpdater:
                 self._logger.print('OK!')
         self._logger.print()
 
-        result = subprocess.run(
-            'umount {0}'.format(temp_dir),
-            shell=True,
-            stderr=subprocess.STDOUT
-        )
+        unmount_cmd = 'umount {0}'.format(temp_dir)
+        self._logger.debug('Unmounting Linux image with command: %s' % unmount_cmd)
+        result = subprocess.run(unmount_cmd, shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
             self._logger.print('WARNING! Could not unmount updated Linux image.')
