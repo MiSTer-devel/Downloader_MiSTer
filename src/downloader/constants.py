@@ -64,6 +64,15 @@ FILE_downloader_launcher_script = 'Scripts/downloader.sh'
 # Linux Update files
 FILE_MiSTer_version = '/MiSTer.version'
 FILE_Linux_7z = '/media/fat/linux/7za'
+FILE_Linux_user_files = [
+    # source -> destination
+    ('/media/fat/linux/hostname', '/etc/hostname'),
+    ('/media/fat/linux/hosts', '/etc/hosts'),
+    ('/media/fat/linux/interfaces', '/etc/network/interfaces'),
+    ('/media/fat/linux/resolv.conf', '/etc/resolv.conf'),
+    ('/media/fat/linux/dhcpd.conf', '/etc/dhcpd.conf'),
+    ('/media/fat/linux/fstab', '/etc/fstab'),
+]
 
 # Reboot files
 FILE_downloader_needs_reboot_after_linux_update = '/tmp/downloader_needs_reboot_after_linux_update'
