@@ -156,6 +156,11 @@ class LinuxUpdater:
             self._logger.print()
             return
 
+        if len(self._user_files) > 0:
+            restore_error = self._restore_user_files()
+            if restore_error:
+                return
+
         self._logger.print()
         self._logger.print("======================================================================================")
         self._logger.print("Hold your breath: updating the Kernel, the Linux filesystem, the bootloader and stuff.")
@@ -186,25 +191,22 @@ class LinuxUpdater:
             self._logger.print('ERROR! Something went wrong during the Linux update, try again later.')
             self._logger.print('Error code: %d' % result.returncode)
             self._logger.print()
-            return
 
-        if len(self._user_files) > 0:
-            self._restore_user_files()
-
-    def _restore_user_files(self):
+    def _restore_user_files(self) -> bool:
         temp_dir = tempfile.mkdtemp()
         self._logger.debug('Created temporary directory for image: %s' % temp_dir)
 
-        mount_cmd = 'mount -t ext4 /media/fat/linux/linux.img {0}'.format(temp_dir)
-        self._logger.debug('Mounting Linux image with command: %s' % mount_cmd)
+        mount_cmd = 'mount -t ext4 /media/fat/linux.update/files/linux/linux.img {0}'.format(temp_dir)
+        self._logger.debug('Mounting temporary Linux image with command: %s' % mount_cmd)
         result = subprocess.run(mount_cmd, shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
             self._logger.print('ERROR! Could not mount updated Linux image, try again later.')
             self._logger.print('Error code: %d' % result.returncode)
             self._logger.print()
-            return
+            return False
 
+        copy_error = False
         self._logger.print('Restoring user Linux configuration files:')
         for source, destination in self._user_files:
             image_destination = temp_dir + destination
@@ -214,7 +216,9 @@ class LinuxUpdater:
                 self._file_system.copy(source, image_destination)
             except Exception as e:
                 self._logger.print('ERROR! Could not be installed.')
-                self._logger.debug('Could not install "%s" to "%s": %s' % (source, destination, str(e)))
+                self._logger.debug('Could not copy "%s" to "%s": %s' % (source, destination, str(e)))
+                copy_error = True
+                break
             else:
                 self._logger.print('OK!')
         self._logger.print()
@@ -224,9 +228,17 @@ class LinuxUpdater:
         result = subprocess.run(unmount_cmd, shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
-            self._logger.print('WARNING! Could not unmount updated Linux image.')
+            self._logger.print('ERROR! Could not unmount updated temporary Linux image.')
             self._logger.print('Error code: %d' % result.returncode)
             self._logger.print()
+            return False
+
+        if copy_error:
+            self._logger.print('ERROR! Could not restore user Linux configuration files.')
+            self._logger.print()
+            return False
+
+        return True
 
     def needs_reboot(self):
         return self._file_system.is_file(FILE_downloader_needs_reboot_after_linux_update)
