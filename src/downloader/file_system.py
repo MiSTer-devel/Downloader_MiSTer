@@ -207,7 +207,7 @@ class _FileSystem(FileSystem):
             files = [f.path for f in os.scandir(scan_folder) if f.is_file()]
             self._existing_files.update(files)
             if base_path is not None:
-                self._existing_files.update(f.path.replace(base_path + '/', '') for f in files)
+                self._existing_files.update(f.replace(base_path + '/', '') for f in files)
 
     def read_file_contents(self, path):
         with open(self._path(path), 'r') as f:
