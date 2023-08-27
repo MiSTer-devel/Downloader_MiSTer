@@ -24,6 +24,8 @@ import tempfile
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import List
+
 from downloader.config import AllowDelete
 from downloader.constants import K_ALLOW_DELETE, K_BASE_PATH
 from downloader.other import ClosableValue
@@ -40,12 +42,13 @@ class FileSystemFactory:
         self._logger = logger
         self._unique_temp_filenames = set()
         self._unique_temp_filenames.add(None)
+        self._existing_files = set()
 
     def create_for_system_scope(self):
         return self.create_for_config(self._config)
 
     def create_for_config(self, config):
-        return _FileSystem(config, self._path_dictionary, self._logger, self._unique_temp_filenames)
+        return _FileSystem(config, self._path_dictionary, self._logger, self._unique_temp_filenames, self._existing_files)
 
 
 class FileSystem(ABC):
@@ -63,7 +66,15 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
+    def print_debug(self):
+        """interface"""
+
+    @abstractmethod
     def is_folder(self, path):
+        """interface"""
+
+    @abstractmethod
+    def precache_is_file_with_folders(self, path):
         """interface"""
 
     @abstractmethod
@@ -147,11 +158,14 @@ class FolderCreationError(Exception):
 
 
 class _FileSystem(FileSystem):
-    def __init__(self, config, path_dictionary, logger, unique_temp_filenames):
+    def __init__(self, config, path_dictionary, logger, unique_temp_filenames, existing_files):
         self._config = config
         self._path_dictionary = path_dictionary
         self._logger = logger
         self._unique_temp_filenames = unique_temp_filenames
+        self._existing_files = existing_files
+        self._quick_hit = 0
+        self._slow_hit = 0
 
     def unique_temp_filename(self):
         name = None
@@ -164,10 +178,33 @@ class _FileSystem(FileSystem):
         return str(Path(path).resolve())
 
     def is_file(self, path):
-        return os.path.isfile(self._path(path))
+        if path in self._existing_files:
+            self._quick_hit += 1
+            return True
+        else:
+            full_path = self._path(path)
+            if os.path.isfile(full_path):
+                self._slow_hit += 1
+                self._existing_files.add(path)
+                self._existing_files.add(full_path)
+                return True
+
+        return False
+
+    def print_debug(self):
+        self._logger.debug(f'IS_FILE quick hits: {self._quick_hit} slow hits: {self._slow_hit}')
 
     def is_folder(self, path):
         return os.path.isdir(self._path(path))
+
+    def precache_is_file_with_folders(self, folders: List[str]):
+        for folder in folders:
+            base_path = self._base_path(folder)
+            if base_path is None:
+                self._existing_files.update(f.path for f in os.scandir(folder) if f.is_file())
+            else:
+                self._existing_files.update(f.path.replace(base_path + '/', '') for f in os.scandir(os.path.join(base_path, folder)) if f.is_file())
+                self._existing_files.update(f.path for f in os.scandir(os.path.join(base_path, folder)) if f.is_file())
 
     def read_file_contents(self, path):
         with open(self._path(path), 'r') as f:
@@ -309,23 +346,32 @@ class _FileSystem(FileSystem):
             self._logger.print('Removing %s' % path)
         try:
             Path(self._path(path)).unlink()
+            if path in self._existing_files:
+                self._existing_files.remove(path)
             return True
         except FileNotFoundError as _:
             return False
 
     def _path(self, path):
-        if path[0] == '/':
+        base_path = self._base_path(path)
+        if base_path is None:
             return path
+        else:
+            return os.path.join(base_path, path)
+
+    def _base_path(self, path):
+        if path[0] == '/':
+            return None
 
         if is_windows and len(path) > 2 and path[1:2] == ':\\':
-            return path
+            return None
 
         path_lower = path.lower()
 
         if path_lower in self._path_dictionary:
-            return os.path.join(self._path_dictionary[path_lower], path)
+            return self._path_dictionary[path_lower]
 
-        return os.path.join(self._config[K_BASE_PATH], path)
+        return self._config[K_BASE_PATH]
 
 
 class InvalidFileResolution(Exception):
