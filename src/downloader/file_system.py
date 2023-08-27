@@ -21,7 +21,6 @@ import hashlib
 import shutil
 import json
 import tempfile
-import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List
@@ -207,7 +206,8 @@ class _FileSystem(FileSystem):
             files = [f.path for f in os.scandir(scan_folder) if f.is_file()]
             self._existing_files.update(files)
             if base_path is not None:
-                self._existing_files.update(f.replace(base_path + '/', '') for f in files)
+                files = [f.replace(base_path + '/', '') for f in files]
+                self._existing_files.update(files)
 
     def read_file_contents(self, path):
         with open(self._path(path), 'r') as f:
@@ -224,15 +224,31 @@ class _FileSystem(FileSystem):
         self._makedirs(self._parent_folder(target))
         self._logger.debug(f'Moving "{source}" to "{target}".')
         self._logger.debug(self._path_dictionary)
-        os.replace(self._path(source), self._path(target))
+        replace_source = self._path(source)
+        replace_target = self._path(target)
+        self._logger.debug(f'os.replace("{replace_source}", "{replace_target}")')
+        os.replace(replace_source, replace_target)
+        if replace_source in self._existing_files: self._existing_files.remove(replace_source)
+        if source in self._existing_files: self._existing_files.remove(source)
+        self._existing_files.add(replace_target)
+        self._existing_files.add(target)
 
     def copy(self, source, target):
-        return shutil.copyfile(self._path(source), self._path(target))
+        copy_source = self._path(source)
+        copy_target = self._path(target)
+        result = shutil.copyfile(copy_source, copy_target)
+        self._existing_files.add(copy_target)
+        self._existing_files.add(target)
+        return result
 
     def copy_fast(self, source, target):
-        with open(self._path(source), 'rb') as fsource:
-            with open(self._path(target), 'wb') as ftarget:
+        copy_source = self._path(source)
+        copy_target = self._path(target)
+        with open(copy_source, 'rb') as fsource:
+            with open(copy_target, 'wb') as ftarget:
                 shutil.copyfileobj(fsource, ftarget, length=1024 * 1024 * 4)
+        self._existing_files.add(copy_target)
+        self._existing_files.add(target)
 
     def hash(self, path):
         return hash_file(self._path(path))
