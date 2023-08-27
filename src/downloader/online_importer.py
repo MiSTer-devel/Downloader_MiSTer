@@ -3,7 +3,7 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+from concurrent.futures import ThreadPoolExecutor
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -86,6 +86,9 @@ class OnlineImporter:
 
             db_importer = _OnlineDatabaseImporter(resolved_db, write_only_store, read_only_store, externals, full_resync, config, file_system, self._file_downloader_factory, self._logger, self._base_session, self._external_drives_repository)
 
+            self._logger.bench('Precaching files...')
+            file_system.precache_is_file_with_folders(resolved_db.folders.keys())
+
             self._logger.bench('Selecting changed files...')
             changed_files, needed_zips = db_importer.select_changed_files()
 
@@ -102,6 +105,8 @@ class OnlineImporter:
             write_only_store.save_filtered_zip_data(filtered_zip_data)
             write_only_store.set_base_path(config[K_BASE_PATH])
 
+            file_system.print_debug()
+
         self._logger.bench('Removing folders...')
         self._remove_folders(importer_command)
         self._unused_filter_tags = self._file_filter_factory.unused_filter_parts()
@@ -113,7 +118,7 @@ class OnlineImporter:
 
     def _clean_stores(self, importer_command):
 
-        for _, store, config in importer_command.read_dbs():
+        for db, store, config in importer_command.read_dbs():
             write_store = store.write_only()
             read_store = store.read_only()
 
@@ -135,6 +140,7 @@ class OnlineImporter:
                     continue
 
                 delete_files.append(file_path)
+
             for file_path in delete_files:
                 write_store.remove_file(file_path)
 
@@ -149,6 +155,7 @@ class OnlineImporter:
                     continue
 
                 delete_folders.append(folder_path)
+
             for folder_path in delete_folders:
                 write_store.remove_folder(folder_path)
 

@@ -110,6 +110,9 @@ class FakeFileSystem(ProductionFileSystem):
     def is_file(self, path):
         return self._path(path) in self.state.files
 
+    def print_debug(self):
+        pass
+
     def is_folder(self, path):
         path = self._path(path)
         if path in self.state.folders:
@@ -121,6 +124,9 @@ class FakeFileSystem(ProductionFileSystem):
 
     def read_file_contents(self, path):
         return self.state.files[self._path(path)]['content']
+
+    def precache_is_file_with_folders(self, folders: list[str]):
+        pass
 
     def write_file_contents(self, path, content):
         if self._path(path) not in self.state.files:
