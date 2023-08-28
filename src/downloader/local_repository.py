@@ -141,6 +141,7 @@ class LocalRepository:
         self._file_system.touch(self._last_successful_run)
 
     def save_log_from_tmp(self, path):
+        self._file_system.turn_off_logs()
         self._file_system.make_dirs_parent(self.logfile_path)
         self._file_system.copy(path, self.logfile_path)
 
