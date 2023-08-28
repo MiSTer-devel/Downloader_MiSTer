@@ -42,7 +42,7 @@ class FileSystemFactory:
         self._logger = logger
         self._unique_temp_filenames: Set[Optional[str]] = set()
         self._unique_temp_filenames.add(None)
-        self._fs_cache = _FsCache()
+        self._fs_cache = FsCache()
 
     def create_for_system_scope(self) -> 'FileSystem':
         return self.create_for_config(self._config)
@@ -159,7 +159,7 @@ class FolderCreationError(Exception):
 
 
 class _FileSystem(FileSystem):
-    def __init__(self, config: Dict[str, Any], path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], fs_cache: '_FsCache'):
+    def __init__(self, config: Dict[str, Any], path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], fs_cache: 'FsCache'):
         self._config = config
         self._path_dictionary = path_dictionary
         self._logger = logger
@@ -179,15 +179,14 @@ class _FileSystem(FileSystem):
         return str(Path(path).resolve())
 
     def is_file(self, path: str) -> bool:
-        if self._fs_cache.contains_file(path):
+        full_path = self._path(path)
+        if self._fs_cache.contains_file(full_path):
             self._quick_hit += 1
             return True
-        else:
-            full_path = self._path(path)
-            if os.path.isfile(full_path):
-                self._slow_hit += 1
-                self._fs_cache.add_file(path, full_path)
-                return True
+        elif os.path.isfile(full_path):
+            self._slow_hit += 1
+            self._fs_cache.add_file(full_path)
+            return True
 
         return False
 
@@ -205,7 +204,7 @@ class _FileSystem(FileSystem):
                 continue
 
             files = [f.path for f in os.scandir(full_folder_path) if f.is_file()]
-            self._fs_cache.add_many_files(files, base_path)
+            self._fs_cache.add_many_files(files)
 
     def read_file_contents(self, path: str) -> str:
         with open(self._path(path), 'r') as f:
@@ -225,14 +224,14 @@ class _FileSystem(FileSystem):
         self._logger.debug(f'Moving "{source}" to "{target}". {full_source} -> {full_target}')
         self._logger.debug(self._path_dictionary)
         os.replace(full_source, full_target)
-        self._fs_cache.remove_file(source, full_source)
-        self._fs_cache.add_file(target, full_target)
+        self._fs_cache.remove_file(full_source)
+        self._fs_cache.add_file(full_target)
 
     def copy(self, source: str, target: str) -> None:
         full_source = self._path(source)
         full_target = self._path(target)
         shutil.copyfile(full_source, full_target)
-        self._fs_cache.add_file(target, full_target)
+        self._fs_cache.add_file(full_target)
 
     def copy_fast(self, source: str, target: str) -> None:
         full_source = self._path(source)
@@ -240,7 +239,7 @@ class _FileSystem(FileSystem):
         with open(full_source, 'rb') as fsource:
             with open(full_target, 'wb') as ftarget:
                 shutil.copyfileobj(fsource, ftarget, length=1024 * 1024 * 4)
-        self._fs_cache.add_file(target, full_target)
+        self._fs_cache.add_file(full_target)
 
     def hash(self, path: str) -> str:
         return hash_file(self._path(path))
@@ -358,7 +357,7 @@ class _FileSystem(FileSystem):
             self._logger.print(f'Removing {path} ({full_path})')
         try:
             Path(full_path).unlink()
-            self._fs_cache.remove_file(path, full_path)
+            self._fs_cache.remove_file(full_path)
             return True
         except FileNotFoundError as _:
             return False
@@ -417,19 +416,15 @@ def _load_json(file_path: str) -> Dict[str, Any]:
         return json.loads(f.read())
 
 
-class _FsCache:
+class FsCache:
     def __init__(self): self._files: Set[str] = set()
     def contains_file(self, path: str) -> bool: return path in self._files
 
-    def add_many_files(self, paths: List[str], base_path: Optional[str]) -> None:
+    def add_many_files(self, paths: List[str]) -> None:
         self._files.update(paths)
-        if base_path is not None:
-            self._files.update(f.replace(base_path + '/', '') for f in paths)
 
-    def add_file(self, path: str, full_path: str) -> None:
+    def add_file(self, path: str) -> None:
         self._files.add(path)
-        if len(path) != len(full_path): self._files.add(full_path)
 
-    def remove_file(self, path: str, full_path: str) -> None:
+    def remove_file(self, path: str) -> None:
         if path in self._files: self._files.remove(path)
-        if len(path) != len(full_path) and full_path in self._files: self._files.remove(full_path)

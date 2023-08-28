@@ -193,6 +193,12 @@ class TestOnlineImporter(OnlineImporterTestBase):
         ]), sut.fs_records)
         self.assertReports(sut, [FILE_MiSTer], needs_reboot=True)
 
+    def test_two_databases_one_with_mister___on_empty_store___needs_reboot_and_does_not_throw_due_to_bad_fs_cache_handling(self):
+        self.assertReports(OnlineImporter()
+                           .add_db(db_distribution_mister(files={FILE_MiSTer: file_mister_descr()}), empty_test_store())
+                           .add_db(db_test_being_empty_descr(), empty_test_store())
+                           .download(False), [FILE_MiSTer], needs_reboot=True)
+
     def test_download_distribution_mister_with_pdfviewer___on_empty_store_and_fs___needs_reboot(self):
         sut = OnlineImporter()
         store = empty_test_store()

@@ -20,7 +20,7 @@ from pathlib import Path
 
 from downloader.constants import K_BASE_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
-    absolute_parent_folder, is_windows, FolderCreationError
+    absolute_parent_folder, is_windows, FolderCreationError, FsCache
 from downloader.other import ClosableValue, UnreachableException
 from test.fake_importer_implicit_inputs import FileSystemState
 from downloader.logger import NoLogger
@@ -45,15 +45,16 @@ class FileSystemFactory:
         self._state = state if state is not None else FileSystemState(config=config)
         self._fake_failures = {}
         self._write_records = write_records if write_records is not None else []
+        self._fs_cache = FsCache()
 
     def set_create_folders_buggy(self):
         self._fake_failures['create_folders'] = True
 
     def create_for_config(self, config):
-        return FakeFileSystem(self._state, config, self._fake_failures, self._write_records)
+        return FakeFileSystem(self._state, config, self._fake_failures, self._write_records, self._fs_cache)
 
     def create_for_system_scope(self):
-        return FakeFileSystem(self._state, self._state.config, self._fake_failures, self._write_records)
+        return FakeFileSystem(self._state, self._state.config, self._fake_failures, self._write_records, self._fs_cache)
 
     @property
     def data(self):
@@ -74,12 +75,13 @@ class FileSystemFactory:
 class FakeFileSystem(ProductionFileSystem):
     unique_temp_filename_index = 0
 
-    def __init__(self, state, config, fake_failures, write_records):
+    def __init__(self, state, config, fake_failures, write_records, fs_cache: FsCache):
         self.state = state
         self._config = config
         self._fake_failures = fake_failures
         self._write_records = write_records
         self._current_temp_file_index = 0
+        self._fs_cache = fs_cache
 
     @property
     def write_records(self):
@@ -108,7 +110,15 @@ class FakeFileSystem(ProductionFileSystem):
         return self._path(path)
 
     def is_file(self, path):
-        return self._path(path) in self.state.files
+        full_path = self._path(path)
+        if self._fs_cache.contains_file(full_path):
+            return True
+
+        if full_path in self.state.files:
+            self._fs_cache.add_file(full_path)
+            return True
+
+        return False
 
     def print_debug(self):
         pass
@@ -146,9 +156,13 @@ class FakeFileSystem(ProductionFileSystem):
     def move(self, source, target):
         source_file = self._path(source)
         target_file = self._path(target)
+        if source_file not in self.state.files:
+            raise Exception('Source file "%s" does not exist!' % source_file)
         self.state.files[target_file] = self.state.files[source_file]
         self.state.files.pop(source_file)
         self._write_records.append(_Record('move', (source_file, target_file)))
+        self._fs_cache.add_file(target_file)
+        self._fs_cache.remove_file(source_file)
 
     def copy(self, source, target):
         source_file = self._path(source)
@@ -159,6 +173,7 @@ class FakeFileSystem(ProductionFileSystem):
 
         self.state.files[target_file] = source_description
         self._write_records.append(_Record('copy', (source_file, target_file)))
+        self._fs_cache.add_file(target_file)
 
     def copy_fast(self, source, target):
         self.copy(source, target)
@@ -218,10 +233,11 @@ class FakeFileSystem(ProductionFileSystem):
         return self._path(path)
 
     def unlink(self, path, verbose=True):
-        file = self._path(path)
-        if file in self.state.files:
-            self.state.files.pop(file)
-            self._write_records.append(_Record('unlink', file))
+        full_path = self._path(path)
+        if full_path in self.state.files:
+            self.state.files.pop(full_path)
+            self._write_records.append(_Record('unlink', full_path))
+            self._fs_cache.remove_file(full_path)
             return True
         else:
             return False
