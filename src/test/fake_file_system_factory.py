@@ -99,7 +99,7 @@ class FakeFileSystem(ProductionFileSystem):
         name = '/tmp/unique_temp_filename_%d' % self.unique_temp_filename_index
         self.unique_temp_filename_index += 1
         self._write_records.append(_Record('unique_temp_filename', name))
-        return ClosableValue(name, lambda: True)
+        return ClosableValue(name, lambda: None)
 
     def hash(self, path):
         return self.state.files[self._path(path)]['hash']

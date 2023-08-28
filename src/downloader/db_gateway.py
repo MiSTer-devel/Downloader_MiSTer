@@ -39,7 +39,11 @@ class DbGateway:
 
             descriptions_by_file, local_files, remote_files = self._categorize_files_on_db_url(descriptions, temp_files_pool)
 
+            self._logger.bench('Downloading databases...')
+
             downloaded_files, download_errors = self._download_files(remote_files)
+
+            self._logger.bench('Reading databases...')
 
             files_by_section = {descriptions_by_file[file][K_SECTION]: file for file in chain(downloaded_files, local_files)}
 
@@ -86,10 +90,14 @@ class DbGateway:
         dbs = []
         errors = []
         for section, description in descriptions.items():
+            self._logger.bench(f'Reading database {section}...')
+
             if section not in files_by_section:
                 continue
             try:
                 db_raw = self._file_system.load_dict_from_file(files_by_section[section], Path(description[K_DB_URL]).suffix.lower())
+                self._logger.bench(f'Validating database {section}...')
+
                 dbs.append(DbEntity(db_raw, section))
             except Exception as e:
                 self._logger.debug(e)
