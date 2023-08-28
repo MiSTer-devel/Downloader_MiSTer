@@ -23,10 +23,11 @@ import json
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Set, Dict, Any
 
 from downloader.config import AllowDelete
 from downloader.constants import K_ALLOW_DELETE, K_BASE_PATH
+from downloader.logger import Logger
 from downloader.other import ClosableValue
 import zipfile
 
@@ -35,120 +36,121 @@ is_windows = os.name == 'nt'
 
 
 class FileSystemFactory:
-    def __init__(self, config, path_dictionary, logger):
+    def __init__(self, config: Dict[str, Any], path_dictionary: Dict[str, str], logger: Logger):
         self._config = config
         self._path_dictionary = path_dictionary
         self._logger = logger
-        self._unique_temp_filenames = set()
+        self._unique_temp_filenames: Set[Optional[str]] = set()
         self._unique_temp_filenames.add(None)
-        self._existing_files = set()
+        self._fs_cache = _FsCache()
 
-    def create_for_system_scope(self):
+    def create_for_system_scope(self) -> 'FileSystem':
         return self.create_for_config(self._config)
 
-    def create_for_config(self, config):
-        return _FileSystem(config, self._path_dictionary, self._logger, self._unique_temp_filenames, self._existing_files)
+    def create_for_config(self, config) -> 'FileSystem':
+        return _FileSystem(config, self._path_dictionary, self._logger, self._unique_temp_filenames, self._fs_cache)
 
 
 class FileSystem(ABC):
 
     @abstractmethod
-    def unique_temp_filename(self):
+    def unique_temp_filename(self) -> ClosableValue:
         """interface"""
 
     @abstractmethod
-    def resolve(self, path):
+    def resolve(self, path: str) -> str:
         """interface"""
 
     @abstractmethod
-    def is_file(self, path):
+    def is_file(self, path: str) -> bool:
         """interface"""
 
     @abstractmethod
-    def print_debug(self):
+    def print_debug(self) -> None:
         """interface"""
 
     @abstractmethod
-    def is_folder(self, path):
+    def is_folder(self, path: str) -> bool:
         """interface"""
 
     @abstractmethod
-    def precache_is_file_with_folders(self, path):
+    def precache_is_file_with_folders(self, folders: List[str]) -> None:
         """interface"""
 
     @abstractmethod
-    def read_file_contents(self, path):
+    def read_file_contents(self, path: str) -> str:
         """interface"""
 
     @abstractmethod
-    def write_file_contents(self, path, content):
+    def write_file_contents(self, path: str, content: str) -> int:
         """interface"""
 
     @abstractmethod
-    def touch(self, path):
+    def touch(self, path: str) -> None:
         """interface"""
 
     @abstractmethod
-    def move(self, source, target):
+    def move(self, source: str, target: str) -> None:
         """interface"""
 
     @abstractmethod
-    def copy(self, source, target):
+    def copy(self, source: str, target: str) -> None:
         """interface"""
 
     @abstractmethod
-    def copy_fast(self, source, target):
-        """interface"""
-
-    def hash(self, path):
+    def copy_fast(self, source: str, target: str) -> None:
         """interface"""
 
     @abstractmethod
-    def make_dirs(self, path):
+    def hash(self, path: str) -> str:
         """interface"""
 
     @abstractmethod
-    def make_dirs_parent(self, path):
+    def make_dirs(self, path: str) -> None:
         """interface"""
 
     @abstractmethod
-    def folder_has_items(self, path):
+    def make_dirs_parent(self, path: str) -> None:
         """interface"""
 
     @abstractmethod
-    def folders(self):
+    def folder_has_items(self, path: str) -> bool:
         """interface"""
 
     @abstractmethod
-    def remove_folder(self, path):
+    def folders(self) -> List[str]:
         """interface"""
 
     @abstractmethod
-    def remove_non_empty_folder(self, path):
+    def remove_folder(self, path: str) -> None:
         """interface"""
 
     @abstractmethod
-    def download_target_path(self, path):
+    def remove_non_empty_folder(self, path: str) -> None:
         """interface"""
 
     @abstractmethod
-    def unlink(self, path, verbose=True):
+    def download_target_path(self, path: str) -> str:
         """interface"""
 
     @abstractmethod
-    def load_dict_from_file(self, path, suffix=None):
+    def unlink(self, path: str, verbose: bool = True) -> bool:
         """interface"""
 
     @abstractmethod
-    def save_json_on_zip(self, db, path):
+    def load_dict_from_file(self, path: str, suffix: Optional[str] = None) -> Dict[str, Any]:
         """interface"""
 
     @abstractmethod
-    def save_json(self, db, path):
+    def save_json_on_zip(self, db: Dict[str, Any], path: str) -> None:
         """interface"""
 
     @abstractmethod
-    def unzip_contents(self, file, path, contained_files):
+    def save_json(self, db: Dict[str, Any], path: str) -> None:
+        """interface"""
+
+    @abstractmethod
+    def unzip_contents(self, file: str, path: str, contained_files: Any) -> None:
         """interface"""
 
 
@@ -157,115 +159,105 @@ class FolderCreationError(Exception):
 
 
 class _FileSystem(FileSystem):
-    def __init__(self, config, path_dictionary, logger, unique_temp_filenames, existing_files):
+    def __init__(self, config: Dict[str, Any], path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], fs_cache: '_FsCache'):
         self._config = config
         self._path_dictionary = path_dictionary
         self._logger = logger
         self._unique_temp_filenames = unique_temp_filenames
-        self._existing_files = existing_files
+        self._fs_cache = fs_cache
         self._quick_hit = 0
         self._slow_hit = 0
 
-    def unique_temp_filename(self):
+    def unique_temp_filename(self) -> ClosableValue:
         name = None
         while name in self._unique_temp_filenames:
             name = os.path.join(tempfile._get_default_tempdir(), next(tempfile._get_candidate_names()))
         self._unique_temp_filenames.add(name)
         return ClosableValue(name, lambda: self._unique_temp_filenames.remove(name))
 
-    def resolve(self, path):
+    def resolve(self, path: str) -> str:
         return str(Path(path).resolve())
 
-    def is_file(self, path):
-        if path in self._existing_files:
+    def is_file(self, path: str) -> bool:
+        if self._fs_cache.contains_file(path):
             self._quick_hit += 1
             return True
         else:
             full_path = self._path(path)
             if os.path.isfile(full_path):
                 self._slow_hit += 1
-                self._existing_files.add(path)
-                self._existing_files.add(full_path)
+                self._fs_cache.add_file(path, full_path)
                 return True
 
         return False
 
-    def print_debug(self):
+    def print_debug(self) -> None:
         self._logger.debug(f'IS_FILE quick hits: {self._quick_hit} slow hits: {self._slow_hit}')
 
-    def is_folder(self, path):
+    def is_folder(self, path: str) -> bool:
         return os.path.isdir(self._path(path))
 
-    def precache_is_file_with_folders(self, folders: List[str]):
-        for folder in folders:
-            base_path = self._base_path(folder)
-            scan_folder = folder if base_path is None else os.path.join(base_path, folder)
-            if not os.path.isdir(scan_folder):
+    def precache_is_file_with_folders(self, folders: List[str]) -> None:
+        for folder_path in folders:
+            base_path = self._base_path(folder_path)
+            full_folder_path = folder_path if base_path is None else os.path.join(base_path, folder_path)
+            if not os.path.isdir(full_folder_path):
                 continue
 
-            files = [f.path for f in os.scandir(scan_folder) if f.is_file()]
-            self._existing_files.update(files)
-            if base_path is not None:
-                files = [f.replace(base_path + '/', '') for f in files]
-                self._existing_files.update(files)
+            files = [f.path for f in os.scandir(full_folder_path) if f.is_file()]
+            self._fs_cache.add_many_files(files, base_path)
 
-    def read_file_contents(self, path):
+    def read_file_contents(self, path: str) -> str:
         with open(self._path(path), 'r') as f:
             return f.read()
 
-    def write_file_contents(self, path, content):
+    def write_file_contents(self, path: str, content: str) -> int:
         with open(self._path(path), 'w') as f:
             return f.write(content)
 
-    def touch(self, path):
-        return Path(self._path(path)).touch()
+    def touch(self, path: str) -> None:
+        Path(self._path(path)).touch()
 
-    def move(self, source, target):
+    def move(self, source: str, target: str) -> None:
         self._makedirs(self._parent_folder(target))
-        self._logger.debug(f'Moving "{source}" to "{target}".')
+        full_source = self._path(source)
+        full_target = self._path(target)
+        self._logger.debug(f'Moving "{source}" to "{target}". {full_source} -> {full_target}')
         self._logger.debug(self._path_dictionary)
-        replace_source = self._path(source)
-        replace_target = self._path(target)
-        self._logger.debug(f'os.replace("{replace_source}", "{replace_target}")')
-        os.replace(replace_source, replace_target)
-        if replace_source in self._existing_files: self._existing_files.remove(replace_source)
-        if source in self._existing_files: self._existing_files.remove(source)
-        self._existing_files.add(replace_target)
-        self._existing_files.add(target)
+        os.replace(full_source, full_target)
+        self._fs_cache.remove_file(source, full_source)
+        self._fs_cache.add_file(target, full_target)
 
-    def copy(self, source, target):
-        copy_source = self._path(source)
-        copy_target = self._path(target)
-        result = shutil.copyfile(copy_source, copy_target)
-        self._existing_files.add(copy_target)
-        self._existing_files.add(target)
-        return result
+    def copy(self, source: str, target: str) -> None:
+        full_source = self._path(source)
+        full_target = self._path(target)
+        shutil.copyfile(full_source, full_target)
+        self._fs_cache.add_file(target, full_target)
 
-    def copy_fast(self, source, target):
-        copy_source = self._path(source)
-        copy_target = self._path(target)
-        with open(copy_source, 'rb') as fsource:
-            with open(copy_target, 'wb') as ftarget:
+    def copy_fast(self, source: str, target: str) -> None:
+        full_source = self._path(source)
+        full_target = self._path(target)
+        with open(full_source, 'rb') as fsource:
+            with open(full_target, 'wb') as ftarget:
                 shutil.copyfileobj(fsource, ftarget, length=1024 * 1024 * 4)
-        self._existing_files.add(copy_target)
-        self._existing_files.add(target)
+        self._fs_cache.add_file(target, full_target)
 
-    def hash(self, path):
+    def hash(self, path: str) -> str:
         return hash_file(self._path(path))
 
-    def make_dirs(self, path):
-        return self._makedirs(self._path(path))
+    def make_dirs(self, path: str) -> None:
+        self._makedirs(self._path(path))
 
-    def make_dirs_parent(self, path):
-        return self._makedirs(self._parent_folder(path))
+    def make_dirs_parent(self, path: str) -> None:
+        self._makedirs(self._parent_folder(path))
 
-    def _parent_folder(self, path):
+    def _parent_folder(self, path: str) -> str:
         result = absolute_parent_folder(self._path(path))
         if is_windows:
             result = self._path(result)
         return result
 
-    def _makedirs(self, target):
+    def _makedirs(self, target: str) -> None:
         try:
             os.makedirs(target, exist_ok=True)
         except FileExistsError as e:
@@ -276,7 +268,7 @@ class _FileSystem(FileSystem):
             self._logger.debug(e)
             raise FolderCreationError(target)
 
-    def folder_has_items(self, path):
+    def folder_has_items(self, path: str) -> bool:
         try:
             iterator = os.scandir(self._path(path))
             for _ in iterator:
@@ -290,10 +282,10 @@ class _FileSystem(FileSystem):
 
         return False
 
-    def folders(self):
+    def folders(self) -> List[str]:
         raise Exception('folders Not implemented')
 
-    def remove_folder(self, path):
+    def remove_folder(self, path: str) -> None:
         if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
             return
 
@@ -305,11 +297,11 @@ class _FileSystem(FileSystem):
         except NotADirectoryError as e:
             self._ignore_error(e)
 
-    def _ignore_error(self, e):
+    def _ignore_error(self, e: Exception) -> None:
         self._logger.debug(e)
         self._logger.debug('Ignoring error.')
 
-    def remove_non_empty_folder(self, path):
+    def remove_non_empty_folder(self, path: str) -> None:
         if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
             return
 
@@ -319,10 +311,10 @@ class _FileSystem(FileSystem):
             self._logger.debug(e)
             self._logger.debug('Ignoring error.')
 
-    def download_target_path(self, path):
+    def download_target_path(self, path: str) -> str:
         return self._path(path)
 
-    def unlink(self, path, verbose=True):
+    def unlink(self, path: str, verbose: bool = True) -> bool:
         verbose = verbose and not path.startswith('/tmp/')
         if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
             if self._config[K_ALLOW_DELETE] == AllowDelete.OLD_RBF and path[-4:].lower() == ".rbf":
@@ -332,7 +324,7 @@ class _FileSystem(FileSystem):
 
         return self._unlink(path, verbose)
 
-    def load_dict_from_file(self, path, suffix=None):
+    def load_dict_from_file(self, path: str, suffix: Optional[str] = None) -> Dict[str, Any]:
         path = self._path(path)
         if suffix is None:
             suffix = Path(path).suffix.lower()
@@ -343,42 +335,42 @@ class _FileSystem(FileSystem):
         else:
             raise Exception('File type "%s" not supported' % suffix)
 
-    def save_json_on_zip(self, db, path):
+    def save_json_on_zip(self, db: Dict[str, Any], path: str) -> None:
         json_name = Path(path).stem
         zip_path = Path(self._path(path)).absolute()
 
         with zipfile.ZipFile(zip_path, 'w') as zipf:
             zipf.writestr(json_name, json.dumps(db))
 
-    def save_json(self, db, path):
+    def save_json(self, db: Dict[str, Any], path: str) -> None:
         with open(self._path(path), 'w') as f:
             json.dump(db, f)
 
-    def unzip_contents(self, file, path, contained_files):
+    def unzip_contents(self, file: str, path: str, contained_files: Any) -> None:
         with zipfile.ZipFile(self._path(file), 'r') as zipf:
             zipf.extractall(self._path(path))
 
-        self._unlink(self._path(file), False)
+        self._unlink(file, False)
 
-    def _unlink(self, path, verbose):
+    def _unlink(self, path: str, verbose: bool) -> bool:
+        full_path = self._path(path)
         if verbose:
-            self._logger.print('Removing %s' % path)
+            self._logger.print(f'Removing {path} ({full_path})')
         try:
-            Path(self._path(path)).unlink()
-            if path in self._existing_files:
-                self._existing_files.remove(path)
+            Path(full_path).unlink()
+            self._fs_cache.remove_file(path, full_path)
             return True
         except FileNotFoundError as _:
             return False
 
-    def _path(self, path):
+    def _path(self, path: str) -> str:
         base_path = self._base_path(path)
         if base_path is None:
             return path
         else:
             return os.path.join(base_path, path)
 
-    def _base_path(self, path):
+    def _base_path(self, path: str) -> Optional[str]:
         if path[0] == '/':
             return None
 
@@ -397,7 +389,7 @@ class InvalidFileResolution(Exception):
     pass
 
 
-def hash_file(path):
+def hash_file(path: str) -> str:
     with open(path, "rb") as f:
         file_hash = hashlib.md5()
         chunk = f.read(8192)
@@ -407,11 +399,11 @@ def hash_file(path):
         return file_hash.hexdigest()
 
 
-def absolute_parent_folder(absolute_path):
+def absolute_parent_folder(absolute_path: str) -> str:
     return str(Path(absolute_path).parent)
 
 
-def load_json_from_zip(path):
+def load_json_from_zip(path: str) -> Dict[str, Any]:
     with zipfile.ZipFile(path) as jsonzipf:
         namelist = jsonzipf.namelist()
         if len(namelist) != 1:
@@ -420,6 +412,24 @@ def load_json_from_zip(path):
             return json.loads(store_json_file.read())
 
 
-def _load_json(file_path):
+def _load_json(file_path: str) -> Dict[str, Any]:
     with open(file_path, "r") as f:
         return json.loads(f.read())
+
+
+class _FsCache:
+    def __init__(self): self._files: Set[str] = set()
+    def contains_file(self, path: str) -> bool: return path in self._files
+
+    def add_many_files(self, paths: List[str], base_path: Optional[str]) -> None:
+        self._files.update(paths)
+        if base_path is not None:
+            self._files.update(f.replace(base_path + '/', '') for f in paths)
+
+    def add_file(self, path: str, full_path: str) -> None:
+        self._files.add(path)
+        if len(path) != len(full_path): self._files.add(full_path)
+
+    def remove_file(self, path: str, full_path: str) -> None:
+        if path in self._files: self._files.remove(path)
+        if len(path) != len(full_path) and full_path in self._files: self._files.remove(full_path)
