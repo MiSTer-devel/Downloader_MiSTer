@@ -275,6 +275,9 @@ class FakeFileSystem(ProductionFileSystem):
 
             self.state.folders[self._path(folder)] = {}
 
+    def turn_off_logs(self) -> None:
+        pass
+
     def _is_folder_unziped(self, contained_files, folder):
         for file in contained_files:
             if folder in file:

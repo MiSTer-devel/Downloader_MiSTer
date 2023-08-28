@@ -23,11 +23,11 @@ import json
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Set, Dict, Any
+from typing import List, Optional, Set, Dict, Any, Tuple, Union
 
 from downloader.config import AllowDelete
 from downloader.constants import K_ALLOW_DELETE, K_BASE_PATH
-from downloader.logger import Logger
+from downloader.logger import Logger, NoLogger
 from downloader.other import ClosableValue
 import zipfile
 
@@ -153,6 +153,10 @@ class FileSystem(ABC):
     def unzip_contents(self, file: str, path: str, contained_files: Any) -> None:
         """interface"""
 
+    @abstractmethod
+    def turn_off_logs(self) -> None:
+        """interface"""
+
 
 class FolderCreationError(Exception):
     pass
@@ -207,22 +211,27 @@ class _FileSystem(FileSystem):
             self._fs_cache.add_many_files(files)
 
     def read_file_contents(self, path: str) -> str:
-        with open(self._path(path), 'r') as f:
+        full_path = self._path(path)
+        self._debug_log('Reading file contents', (path, full_path))
+        with open(full_path, 'r') as f:
             return f.read()
 
     def write_file_contents(self, path: str, content: str) -> int:
-        with open(self._path(path), 'w') as f:
+        full_path = self._path(path)
+        self._debug_log('Writing file contents', (path, full_path))
+        with open(full_path, 'w') as f:
             return f.write(content)
 
     def touch(self, path: str) -> None:
-        Path(self._path(path)).touch()
+        full_path = self._path(path)
+        self._debug_log('Touching', (path, full_path))
+        Path(full_path).touch()
 
     def move(self, source: str, target: str) -> None:
         self._makedirs(self._parent_folder(target))
         full_source = self._path(source)
         full_target = self._path(target)
-        self._logger.debug(f'Moving "{source}" to "{target}". {full_source} -> {full_target}')
-        self._logger.debug(self._path_dictionary)
+        self._debug_log('Moving', (source, full_source), (target, full_target))
         os.replace(full_source, full_target)
         self._fs_cache.remove_file(full_source)
         self._fs_cache.add_file(full_target)
@@ -230,12 +239,14 @@ class _FileSystem(FileSystem):
     def copy(self, source: str, target: str) -> None:
         full_source = self._path(source)
         full_target = self._path(target)
+        self._debug_log('Copying', (source, full_source), (target, full_target))
         shutil.copyfile(full_source, full_target)
         self._fs_cache.add_file(full_target)
 
     def copy_fast(self, source: str, target: str) -> None:
         full_source = self._path(source)
         full_target = self._path(target)
+        self._debug_log('Copying', (source, full_source), (target, full_target))
         with open(full_source, 'rb') as fsource:
             with open(full_target, 'wb') as ftarget:
                 shutil.copyfileobj(fsource, ftarget, length=1024 * 1024 * 4)
@@ -288,9 +299,10 @@ class _FileSystem(FileSystem):
         if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
             return
 
-        self._logger.print('Deleting empty folder %s' % path)
+        full_path = self._path(path)
+        self._debug_log('Deleting empty folder', (path, full_path))
         try:
-            os.rmdir(self._path(path))
+            os.rmdir(full_path)
         except FileNotFoundError as e:
             self._ignore_error(e)
         except NotADirectoryError as e:
@@ -304,8 +316,10 @@ class _FileSystem(FileSystem):
         if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
             return
 
+        full_path = self._path(path)
+        self._debug_log('Deleting non-empty folder', (path, full_path))
         try:
-            shutil.rmtree(self._path(path))
+            shutil.rmtree(full_path)
         except Exception as e:
             self._logger.debug(e)
             self._logger.debug('Ignoring error.')
@@ -324,37 +338,64 @@ class _FileSystem(FileSystem):
         return self._unlink(path, verbose)
 
     def load_dict_from_file(self, path: str, suffix: Optional[str] = None) -> Dict[str, Any]:
-        path = self._path(path)
+        full_path = self._path(path)
+        self._debug_log('Loading dict from file', (path, full_path))
+
         if suffix is None:
-            suffix = Path(path).suffix.lower()
+            suffix = Path(full_path).suffix.lower()
         if suffix == '.json':
-            return _load_json(path)
+            return _load_json(full_path)
         elif suffix == '.zip':
-            return load_json_from_zip(path)
+            return load_json_from_zip(full_path)
         else:
             raise Exception('File type "%s" not supported' % suffix)
 
     def save_json_on_zip(self, db: Dict[str, Any], path: str) -> None:
+        full_path = self._path(path)
         json_name = Path(path).stem
-        zip_path = Path(self._path(path)).absolute()
+        zip_path = Path(full_path).absolute()
+
+        self._debug_log('Saving json on zip', (path, full_path))
 
         with zipfile.ZipFile(zip_path, 'w') as zipf:
             zipf.writestr(json_name, json.dumps(db))
 
     def save_json(self, db: Dict[str, Any], path: str) -> None:
-        with open(self._path(path), 'w') as f:
+        full_path = self._path(path)
+        self._debug_log('Saving json on zip', (path, full_path))
+        with open(full_path, 'w') as f:
             json.dump(db, f)
 
     def unzip_contents(self, file: str, path: str, contained_files: Any) -> None:
-        with zipfile.ZipFile(self._path(file), 'r') as zipf:
-            zipf.extractall(self._path(path))
+        full_path = self._path(path)
+        full_file = self._path(file)
+        self._debug_log('Unzipping contents', (file, full_file), (path, full_path))
+        with zipfile.ZipFile(full_file, 'r') as zipf:
+            zipf.extractall(full_path)
 
         self._unlink(file, False)
+
+    def _debug_log(self, message: str, path: Tuple[str, str], target: Optional[Tuple[str, str]] = None) -> None:
+        if path[0][0] == '/':
+            if target is None:
+                self._logger.debug(f'{message} "{path[0]}"')
+            else:
+                self._logger.debug(f'{message} "{path[0]}" to "{target[0]}"')
+        else:
+            if target is None:
+                self._logger.debug(f'{message} "{path[0]}". {path[1]}')
+            else:
+                self._logger.debug(f'{message} "{path[0]}" to "{target[0]}". {path[1]} -> {target[1]}')
+
+    def turn_off_logs(self) -> None:
+        self._logger = NoLogger()
 
     def _unlink(self, path: str, verbose: bool) -> bool:
         full_path = self._path(path)
         if verbose:
             self._logger.print(f'Removing {path} ({full_path})')
+        else:
+            self._debug_log('Removing', (path, full_path))
         try:
             Path(full_path).unlink()
             self._fs_cache.remove_file(full_path)
