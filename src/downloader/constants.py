@@ -70,7 +70,7 @@ FILE_Linux_user_files = [
     ('/media/fat/linux/hosts', '/etc/hosts'),
     ('/media/fat/linux/interfaces', '/etc/network/interfaces'),
     ('/media/fat/linux/resolv.conf', '/etc/resolv.conf'),
-    ('/media/fat/linux/dhcpd.conf', '/etc/dhcpd.conf'),
+    ('/media/fat/linux/dhcpcd.conf', '/etc/dhcpcd.conf'),
     ('/media/fat/linux/fstab', '/etc/fstab'),
 ]
 
