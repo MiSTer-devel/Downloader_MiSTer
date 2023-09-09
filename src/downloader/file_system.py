@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import List, Optional, Set, Dict, Any, Tuple, Union
 
 from downloader.config import AllowDelete
-from downloader.constants import K_ALLOW_DELETE, K_BASE_PATH
+from downloader.constants import K_ALLOW_DELETE, K_BASE_PATH, HASH_file_does_not_exist
 from downloader.logger import Logger, NoLogger
 from downloader.other import ClosableValue
 import zipfile
@@ -253,7 +253,11 @@ class _FileSystem(FileSystem):
         self._fs_cache.add_file(full_target)
 
     def hash(self, path: str) -> str:
-        return hash_file(self._path(path))
+        try:
+            return hash_file(self._path(path))
+        except FileNotFoundError as e:
+            self._logger.debug(e)
+            return HASH_file_does_not_exist
 
     def make_dirs(self, path: str) -> None:
         self._makedirs(self._path(path))

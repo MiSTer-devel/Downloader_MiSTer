@@ -78,6 +78,9 @@ FILE_Linux_user_files = [
 FILE_downloader_needs_reboot_after_linux_update = '/tmp/downloader_needs_reboot_after_linux_update'
 FILE_mister_downloader_needs_reboot = '/tmp/MiSTer_downloader_needs_reboot'
 
+# Hash exceptional cases
+HASH_file_does_not_exist = 'file_does_not_exist'
+
 # Storage Priority
 STORAGE_PRIORITY_PREFER_SD = 'prefer_sd'
 STORAGE_PRIORITY_PREFER_EXTERNAL = 'prefer_external'
