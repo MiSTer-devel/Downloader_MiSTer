@@ -58,18 +58,19 @@ class ExternalDrivesRepository:
 
     def _drives_from_os(self):
         connected_drives = set()
-        for line in self._file_system.read_file_contents('/proc/mounts').splitlines():
-            line = line.strip()
-            if not line:
-                continue
+        if self._file_system.is_file('/proc/mounts'):
+            for line in self._file_system.read_file_contents('/proc/mounts').splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+    
+                parts = line.split(' ')
+                if len(parts) < 2:
+                    continue
 
-            parts = line.split(' ')
-            if len(parts) < 2:
-                continue
-
-            mount_point = parts[1]
-            if mount_point.startswith('/media/usb') or mount_point.startswith('/media/fat/cifs'):
-                connected_drives.add(mount_point)
+                mount_point = parts[1]
+                if mount_point.startswith('/media/usb') or mount_point.startswith('/media/fat/cifs'):
+                    connected_drives.add(mount_point)
 
         return tuple(drive for drive in STORAGE_PATHS_PRIORITY_SEQUENCE if drive in connected_drives)
 

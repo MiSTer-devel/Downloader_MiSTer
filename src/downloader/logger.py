@@ -19,6 +19,7 @@ import datetime
 import tempfile
 import sys
 import time
+import traceback
 from abc import ABC, abstractmethod
 
 from downloader.constants import K_VERBOSE, K_START_TIME
@@ -66,6 +67,14 @@ class PrintLogger(Logger):
 
     def debug(self, *args, sep='', end='\n', flush=True):
         if self._verbose_mode:
+            exceptions = []
+            for a in args:
+                if isinstance(a, Exception):
+                    exceptions.append(a)
+            if len(exceptions) > 0:
+                args = list(set(args) - set(exceptions))
+                for e in exceptions:
+                    self._do_print("".join(traceback.format_exception(type(e), e, e.__traceback__)), sep=sep, end=end, file=sys.stdout, flush=flush)
             self._do_print(*args, sep=sep, end=end, file=sys.stdout, flush=flush)
 
     def bench(self, label):

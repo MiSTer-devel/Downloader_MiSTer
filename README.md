@@ -16,9 +16,6 @@ Here you can see the default parameters and the options that you may change:
 
 ```ini
 [MiSTer]
-; base_path is where most commonly installed files will be placed (cores, MRAs, Scripts, etc).
-base_path = '/media/fat/'
-
 ; storage_priority defines how this tool will use external storage during the installation
 ;         of files that are designed for external locations (usually games & docs files).
 ;         
@@ -35,7 +32,7 @@ base_path = '/media/fat/'
 ;   'prefer_external' -> This tool will always install new files on a external location
 ;                        even if no parent folders are present.
 ;
-;   'off' -> Disables this feature. Affected files will always be installed in your base_path.
+;   'off' -> Disables this feature. Affected files will always be installed in your SD.
 storage_priority = 'prefer_sd'
 
 ; allow_delete options:
@@ -54,6 +51,16 @@ allow_reboot = 1
 ;   true -> Updates Linux when there is a new update (very recommended).
 ;   false -> Doesn't update Linux.
 update_linux = true
+
+; minimum_system_free_space_mb: Fee space needed to install files with Downloader
+;   This minimum applies solely to the system partition (SD card).
+;   Reducing this value is not advised.
+minimum_system_free_space_mb = 512
+
+; minimum_external_free_space_mb: Free space needed to install files in external storages
+;   This minimum applies to all external storages (USBs & CIFS).
+;   Reducing this value is not advised.
+minimum_external_free_space_mb = 128
 
 ; downloader_timeout: Can be tweaked to increase the timeout time in seconds
 ;   It is useful to increase this value for users with slow connections.
@@ -75,7 +82,7 @@ verbose = false
 - [x] First-run optimisations
 - [x] Configurable custom download filters
 - [x] Storage Priority Resolution for auto-detecting connected drives
-- [ ] Free space check
+- [x] Free space check
 - [ ] Remove database feature
 - [ ] Integration with *MiSTer* binary
 

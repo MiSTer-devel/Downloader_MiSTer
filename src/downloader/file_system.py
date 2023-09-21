@@ -62,7 +62,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def is_file(self, path: str) -> bool:
+    def is_file(self, path: str, use_cache: bool = True) -> bool:
         """interface"""
 
     @abstractmethod
@@ -134,6 +134,10 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
+    def write_incoming_stream(self, in_stream: Any, target_path: str):
+        """interface"""
+
+    @abstractmethod
     def unlink(self, path: str, verbose: bool = True) -> bool:
         """interface"""
 
@@ -158,8 +162,45 @@ class FileSystem(ABC):
         """interface"""
 
 
-class FolderCreationError(Exception):
-    pass
+class ReadOnlyFileSystem:
+    def __init__(self, fs: FileSystem):
+        self._fs = fs
+
+    def is_file(self, path):
+        return self._fs.is_file(path)
+
+    def is_folder(self, path):
+        return self._fs.is_folder(path)
+
+    def download_target_path(self, path):
+        return self._fs.download_target_path(path)
+
+    def read_file_contents(self, path):
+        return self._fs.read_file_contents(path)
+
+    def load_dict_from_file(self, path, suffix=None):
+        return self._fs.load_dict_from_file(path, suffix)
+
+    def folder_has_items(self, path):
+        return self._fs.folder_has_items(path)
+
+    def hash(self, path):
+        return self._fs.hash(path)
+
+    def unique_temp_filename(self):
+        return self._fs.unique_temp_filename()
+
+    def unlink(self, file_path, verbose=False, exception=None):
+        if isinstance(exception, UnlinkTemporaryException):
+            self._fs.unlink(file_path)
+            return
+
+        raise Exception(f"Cannot delete file '{file_path}' from read-only filesystem wrapper")
+
+
+class UnlinkTemporaryException: pass
+class FolderCreationError(Exception): pass
+class FileCopyError(Exception): pass
 
 
 class _FileSystem(FileSystem):
@@ -182,9 +223,9 @@ class _FileSystem(FileSystem):
     def resolve(self, path: str) -> str:
         return str(Path(path).resolve())
 
-    def is_file(self, path: str) -> bool:
+    def is_file(self, path: str, use_cache: bool = True) -> bool:
         full_path = self._path(path)
-        if self._fs_cache.contains_file(full_path):
+        if use_cache and self._fs_cache.contains_file(full_path):
             self._quick_hit += 1
             return True
         elif os.path.isfile(full_path):
@@ -240,7 +281,11 @@ class _FileSystem(FileSystem):
         full_source = self._path(source)
         full_target = self._path(target)
         self._debug_log('Copying', (source, full_source), (target, full_target))
-        shutil.copyfile(full_source, full_target)
+        try:
+            shutil.copyfile(full_source, full_target, follow_symlinks=True)
+        except OSError as e:
+            self._logger.debug(e)
+            raise FileCopyError(f"Cannot copy '{source}' to '{target}'") from e
         self._fs_cache.add_file(full_target)
 
     def copy_fast(self, source: str, target: str) -> None:
@@ -280,7 +325,7 @@ class _FileSystem(FileSystem):
             raise e
         except FileNotFoundError as e:
             self._logger.debug(e)
-            raise FolderCreationError(target)
+            raise FolderCreationError(target) from e
 
     def folder_has_items(self, path: str) -> bool:
         try:
@@ -330,6 +375,10 @@ class _FileSystem(FileSystem):
 
     def download_target_path(self, path: str) -> str:
         return self._path(path)
+
+    def write_incoming_stream(self, in_stream: Any, target_path: str):
+        with open(target_path, 'wb') as out_file:
+            shutil.copyfileobj(in_stream, out_file)
 
     def unlink(self, path: str, verbose: bool = True) -> bool:
         verbose = verbose and not path.startswith('/tmp/')

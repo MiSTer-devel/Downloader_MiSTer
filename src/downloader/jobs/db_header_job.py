@@ -15,9 +15,20 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-import time
+
+from dataclasses import field, dataclass
+
+from downloader.db_entity import DbEntity
+from downloader.job_system import Job, JobSystem
+from downloader.jobs.worker_context import DownloaderWorker
 
 
-class Waiter:
-    def sleep(self, value: float) -> None:
-        time.sleep(value)
+@dataclass
+class DbHeaderJob(Job):
+    type_id: int = field(init=False, default=JobSystem.get_job_type_id())
+    db: DbEntity
+
+
+class DbHeaderWorker(DownloaderWorker):
+    def initialize(self): self._ctx.job_system.register_worker(DbHeaderJob.type_id, self)
+    def operate_on(self, job: DbHeaderJob): self._ctx.file_download_reporter.print_header(job.db)

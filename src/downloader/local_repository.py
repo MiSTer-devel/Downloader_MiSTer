@@ -15,9 +15,9 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import FILE_MiSTer_old, FILE_downloader_storage, FILE_downloader_log, \
+from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
     FILE_downloader_last_successful_run, K_CONFIG_PATH, K_BASE_SYSTEM_PATH, \
-    FILE_downloader_external_storage, K_BASE_PATH, K_LOGFILE
+    FILE_downloader_external_storage, K_LOGFILE, FILE_downloader_storage_json
 from downloader.local_store_wrapper import LocalStoreWrapper
 from downloader.other import UnreachableException, empty_store_without_base_path
 from downloader.store_migrator import make_new_local_store
@@ -30,15 +30,33 @@ class LocalRepository:
         self._file_system = file_system
         self._store_migrator = store_migrator
         self._external_drives_repository = external_drives_repository
-        self._storage_path_value = None
+        self._storage_path_save_value = None
+        self._storage_path_old_value = None
+        self._storage_path_load_value = None
         self._last_successful_run_value = None
         self._logfile_path_value = None
 
     @property
-    def _storage_path(self):
-        if self._storage_path_value is None:
-            self._storage_path_value = '%s/%s' % (self._config[K_BASE_SYSTEM_PATH], FILE_downloader_storage)
-        return self._storage_path_value
+    def _storage_save_path(self):
+        if self._storage_path_save_value is None:
+            self._storage_path_save_value = f'{self._config[K_BASE_SYSTEM_PATH]}/{FILE_downloader_storage_json}'
+        return self._storage_path_save_value
+
+    @property
+    def _storage_old_path(self):
+        if self._storage_path_old_value is None:
+            self._storage_path_old_value = f'{self._config[K_BASE_SYSTEM_PATH]}/{FILE_downloader_storage_zip}'
+        return self._storage_path_old_value
+
+    @property
+    def _storage_load_path(self):
+        if self._storage_path_load_value is None:
+            if self._file_system.is_file(self._storage_old_path):
+                store_path = self._storage_old_path
+            else:
+                store_path = self._storage_save_path
+            self._storage_path_load_value = store_path
+        return self._storage_path_load_value
 
     @property
     def _last_successful_run(self):
@@ -61,9 +79,9 @@ class LocalRepository:
     def load_store(self):
         self._logger.bench('Loading store...')
 
-        if self._file_system.is_file(self._storage_path):
+        if self._file_system.is_file(self._storage_load_path):
             try:
-                local_store = self._file_system.load_dict_from_file(self._storage_path)
+                local_store = self._file_system.load_dict_from_file(self._storage_load_path)
             except Exception as e:
                 self._logger.debug(e)
                 self._logger.print('Could not load store')
@@ -124,8 +142,12 @@ class LocalRepository:
 
             del store['external']
 
-        self._file_system.make_dirs_parent(self._storage_path)
-        self._file_system.save_json_on_zip(local_store, self._storage_path)
+        self._file_system.make_dirs_parent(self._storage_save_path)
+        self._file_system.save_json(local_store, self._storage_save_path)
+        if self._file_system.is_file(self._storage_old_path) and \
+                self._file_system.is_file(self._storage_save_path, use_cache=False):
+            self._file_system.unlink(self._storage_old_path)
+
         external_drives = set(self._store_drives())
 
         for drive, store in external_stores.items():

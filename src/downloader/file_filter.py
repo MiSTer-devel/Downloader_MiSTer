@@ -23,6 +23,7 @@ from abc import ABC, abstractmethod
 
 from downloader.constants import K_FILTER
 from downloader.db_entity import DbEntity
+from downloader.logger import Logger
 
 FileFolderDesc = Dict[str, Any]
 Config = Dict[str, Any]
@@ -51,20 +52,19 @@ class FilterCalculatorImpl(FilterCalculator):
         self._positive = positive
 
     def is_filtered(self, description: FileFolderDesc) -> bool:
-        if 'tags' not in description:
-            return False
+        tags = description.get('tags', [])
 
         filtered = len(self._positive) > 0
 
         for part in self._positive:
-            if part in description['tags']:
+            if part in tags:
                 filtered = False
 
         if filtered:
             return True
 
         for part in self._negative:
-            if part in description['tags']:
+            if part in tags:
                 filtered = True
 
         return filtered
@@ -120,7 +120,8 @@ class FileFilter:
 
 
 class FileFilterFactory:
-    def __init__(self):
+    def __init__(self, logger: Logger):
+        self._logger = logger
         self._unused: Set[str] = set()
         self._used: Set[str] = set()
 
@@ -132,8 +133,10 @@ class FileFilterFactory:
 
     def _create_filter_calculator(self, db: DbEntity, config: Config) -> Optional[FilterCalculator]:
         if config[K_FILTER] is None or config[K_FILTER] == '':
+            self._logger.debug(f'No filter for db {db.db_id}.')
             return None
         this_filter = config[K_FILTER].strip().lower()  # @TODO Remove strip after field is validated in other place
+        self._logger.debug(f'Filter for db {db.db_id}: {this_filter}')
         if this_filter == '':
             raise BadFileFilterPartException(this_filter)
         if this_filter == 'all':
@@ -174,16 +177,17 @@ class FileFilterFactory:
 
             if this_part in db.tag_dictionary:
                 this_part = db.tag_dictionary[this_part]
-            elif not _part_in_db(this_part, db):
+
+            part_in_db = _part_in_db(this_part, db)
+            if part_in_db:
+                self._used.add(used_term)
+            else:
                 self._unused.add(this_part)
-                continue
 
             if is_negative:
-                negative.append(this_part)
+                if part_in_db: negative.append(this_part)
             else:
                 positive.append(this_part)
-
-            self._used.add(used_term)
 
         essential = 'essential'
         if essential in db.tag_dictionary:

@@ -22,6 +22,8 @@ from enum import unique, Enum
 DEFAULT_CACERT_FILE = '/etc/ssl/certs/cacert.pem'
 DEFAULT_CURL_SSL_OPTIONS = '--cacert %s' % DEFAULT_CACERT_FILE
 DEFAULT_UPDATE_LINUX_ENV = 'undefined'
+DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB = 512
+DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB = 128
 
 # Pre-selected database
 DISTRIBUTION_MISTER_DB_URL = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'
@@ -54,7 +56,8 @@ FILE_gamecontrollerdb_user = 'linux/gamecontrollerdb/gamecontrollerdb_user.txt'
 FILE_yc_txt = 'yc.txt'
 
 # Downloader files
-FILE_downloader_storage = 'Scripts/.config/downloader/downloader.json.zip'
+FILE_downloader_storage_zip = 'Scripts/.config/downloader/downloader.json.zip'
+FILE_downloader_storage_json = 'Scripts/.config/downloader/downloader.json'
 FILE_downloader_external_storage = '.downloader_db.json'
 FILE_downloader_last_successful_run = 'Scripts/.config/downloader/%s.last_successful_run'
 FILE_downloader_log = 'Scripts/.config/downloader/%s.log'
@@ -139,6 +142,8 @@ K_COMMIT = 'commit'
 K_DEFAULT_DB_ID = 'default_db_id'
 K_START_TIME = 'start_time'
 K_IS_PC_LAUNCHER = 'is_pc_launcher'
+K_MINIMUM_SYSTEM_FREE_SPACE_MB = 'minimum_system_free_space_mb'
+K_MINIMUM_EXTERNAL_FREE_SPACE_MB = 'minimum_external_free_space_mb'
 
 # Env
 KENV_DOWNLOADER_LAUNCHER_PATH = 'DOWNLOADER_LAUNCHER_PATH'
@@ -150,6 +155,7 @@ KENV_UPDATE_LINUX = 'UPDATE_LINUX'
 KENV_DEFAULT_DB_URL = 'DEFAULT_DB_URL'
 KENV_DEFAULT_DB_ID = 'DEFAULT_DB_ID'
 KENV_DEFAULT_BASE_PATH = 'DEFAULT_BASE_PATH'
+KENV_FORCED_BASE_PATH = 'FORCED_BASE_PATH'
 KENV_PC_LAUNCHER = 'PC_LAUNCHER'
 KENV_DEBUG = 'DEBUG'
 KENV_FAIL_ON_FILE_ERROR = 'FAIL_ON_FILE_ERROR'

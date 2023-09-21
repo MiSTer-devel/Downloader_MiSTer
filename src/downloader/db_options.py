@@ -76,6 +76,9 @@ class DbOptions:
     def unwrap_props(self):
         return self._props
 
+    def remove_base_path(self):
+        del self._props[K_BASE_PATH]
+
     def apply_to_config(self, config: Dict[str, Any]):
         config.update(self._props)
 

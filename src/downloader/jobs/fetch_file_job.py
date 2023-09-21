@@ -15,9 +15,17 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-import time
+
+from dataclasses import dataclass, field
+from typing import Dict, Any, Optional
+
+from downloader.job_system import Job, JobSystem
 
 
-class Waiter:
-    def sleep(self, value: float) -> None:
-        time.sleep(value)
+@dataclass
+class FetchFileJob(Job):
+    type_id: int = field(init=False, default=JobSystem.get_job_type_id())
+    path: str
+    description: Dict[str, Any]
+    hash_check: bool
+    after_validation: Optional[Job] = None

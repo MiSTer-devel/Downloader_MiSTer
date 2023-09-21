@@ -1,4 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+from collections import defaultdict
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,8 +16,10 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+
 from downloader.constants import K_BASE_PATH
 from downloader.other import empty_store_without_base_path
+from typing import Any, Dict
 
 
 class LocalStoreWrapper:
@@ -42,17 +45,27 @@ class LocalStoreWrapper:
 
 class StoreWrapper:
     def __init__(self, store, local_store_wrapper):
+        self._external_additions = {'files': defaultdict(list), 'folders': defaultdict(list)}
         if 'external' in store:
             for drive, external in store['external'].items():
                 if 'files' in external:
-                    store['files'].update(external['files'])
+                    for file_path in external['files']:
+                        if file_path in store['files']:
+                            continue
+                        store['files'][file_path] = external['files'][file_path]
+                        self._external_additions['files'][file_path].append(drive)
+
                 if 'folders' in external:
-                    store['folders'].update(external['folders'])
+                    for folder_path in external['folders']:
+                        if folder_path in store['folders']:
+                            continue
+                        store['folders'][folder_path] = external['folders'][folder_path]
+                        self._external_additions['folders'][folder_path].append(drive)
 
         self._store = store
         self._local_store_wrapper = local_store_wrapper
         self._read_only = _ReadOnlyStoreAdapter(self._store)
-        self._write_only = _WriteOnlyStoreAdapter(self._store, self._local_store_wrapper)
+        self._write_only = _WriteOnlyStoreAdapter(self._store, self._local_store_wrapper, self._external_additions)
 
     def unwrap_store(self):
         return self._store
@@ -65,9 +78,10 @@ class StoreWrapper:
 
 
 class _WriteOnlyStoreAdapter:
-    def __init__(self, store, top_wrapper):
+    def __init__(self, store, top_wrapper, external_additions):
         self._store = store
         self._top_wrapper = top_wrapper
+        self._external_additions = external_additions
 
     def add_file(self, file, description):
         self._add_entry('files', file, description)
@@ -76,6 +90,8 @@ class _WriteOnlyStoreAdapter:
         self._add_entry('folders', folder, description)
 
     def _add_entry(self, kind, path, description):
+        self._clean_external_additions(kind, path)
+
         if path in self._store[kind] and equal_dicts(self._store[kind][path], description):
             return
 
@@ -114,6 +130,8 @@ class _WriteOnlyStoreAdapter:
         self._remove_external_entry('folders', drive, folder_path)
 
     def _remove_external_entry(self, kind, drive, path):
+        self._clean_external_additions(kind, path)
+
         if 'external' not in self._store or drive not in self._store['external'] or path not in self._store['external'][drive][kind]:
             return
 
@@ -126,14 +144,22 @@ class _WriteOnlyStoreAdapter:
     def remove_folder(self, folder_path):
         self._remove_entry('folders', folder_path)
 
+    def _clean_external_additions(self, kind, path):
+        if path in self._external_additions[kind]:
+            self._external_additions[kind].pop(path)
+
     def _remove_entry(self, kind, path):
+        self._clean_external_additions(kind, path)
+
         if path not in self._store[kind]:
             return
 
         self._store[kind].pop(path)
         self._top_wrapper.mark_force_save()
 
-    def add_zip(self, zip_id, description):
+    def add_zip(self, zip_id, description, _summary: Dict[str, Any]):
+        if 'zipped_files' in description.get('contents_file', {}): del description['contents_file']['zipped_files']
+        if 'unzipped_json' in description.get('summary_file', {}): del description['summary_file']['unzipped_json']
         if zip_id in self._store['zips'] and equal_dicts(self._store['zips'][zip_id], description):
             return
 
@@ -188,6 +214,26 @@ class _WriteOnlyStoreAdapter:
             self._top_wrapper.mark_force_save()
 
     def try_cleanup_externals(self):
+        for file_path in self._external_additions['files']:
+            if file_path in self._store['files']:
+                self._store['files'].pop(file_path)
+                for drive in self._external_additions['files'][file_path]:
+                    if 'external' not in self._store \
+                            or drive not in self._store['external'] \
+                            or 'files' not in self._store['external'][drive] \
+                            or file_path not in self._store['external'][drive]['files']:
+                        self._top_wrapper.mark_force_save()
+
+        for folder_path in self._external_additions['folders']:
+            if folder_path in self._store['folders']:
+                self._store['folders'].pop(folder_path)
+                for drive in self._external_additions['files'][folder_path]:
+                    if 'external' not in self._store \
+                            or drive not in self._store['external'] \
+                            or 'folders' not in self._store['external'][drive] \
+                            or folder_path not in self._store['external'][drive]['folders']:
+                        self._top_wrapper.mark_force_save()
+
         if not self._store['external']:
             del self._store['external']
             self._top_wrapper.mark_force_save()
@@ -199,6 +245,20 @@ class _WriteOnlyStoreAdapter:
                 description.pop('zip_id')
                 if 'tags' in description:
                     description.pop('tags')
+
+    def populate_with_summary(self, summaries, db_zips):
+        for zip_id, summary in summaries:
+            self.add_zip(zip_id, db_zips[zip_id], summary)
+
+    def drop_removed_zips_from_store(self, db_zips):
+        removed_zip_ids = []
+        for zip_id in self._store['zips']:
+            if zip_id in db_zips:
+                continue
+
+            removed_zip_ids.append(zip_id)
+
+        self.remove_zip_ids(removed_zip_ids)
 
     def save_filtered_zip_data(self, filtered_zip_data):
         if len(filtered_zip_data):
