@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 - Implemented file system caching that improves the speed of short runs (runs with no updates) by around 3x when the system has been recently initialized.
-- Databases are now processed in parallel during file installations, increasing overall speed. This results in a 7-15% speed improvement with stable Ethernet connections and a 50% speed improvement on less reliable Wi-Fi connections.
+- Databases are now processed in parallel during file installations, increasing overall speed. This results in a 5-15% speed improvement with stable Ethernet connections, and I've measured up to a 50% speed improvement on less reliable Wi-Fi connections.
 - Introduced a job system to manage concurrency. Currently, it is used for fetching, installing, and validating files.
 - Reworked the build script to reduce the bundle size, slightly speeding up the time the launcher takes to download it during each Downloader run.
 - Local storage is now saved without compression, saving around a second in all runs but using slightly more system space (typically less than 5 MB).
