@@ -47,7 +47,7 @@ class TestFullInstall(unittest.TestCase):
         print('test_full_install_remove_local_store_and_rerun A)')
         self.assertRunOk("test/system/fixtures/full_install/parallel.ini")
 
-        os.unlink('/tmp/delme_parallel/Scripts/.config/downloader/downloader.json.zip')
+        os.unlink('/tmp/delme_parallel/Scripts/.config/downloader/downloader.json')
 
         print('test_full_install_remove_local_store_and_rerun B)')
         self.assertRunOk("test/system/fixtures/full_install/parallel.ini")
@@ -83,5 +83,5 @@ class TestFullInstall(unittest.TestCase):
         test_env[KENV_DEBUG] = 'true'
         result = subprocess.run([tool], stderr=subprocess.STDOUT, env=test_env)
         self.assertEqual(result.returncode, 0)
-        self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json.zip" % config[K_BASE_SYSTEM_PATH]))
+        self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json" % config[K_BASE_SYSTEM_PATH]))
         os.unlink(tool)
