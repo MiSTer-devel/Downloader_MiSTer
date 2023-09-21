@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import MEDIA_USB0
 from downloader.file_filter import FileFilterFactory
+from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
 from test.fake_local_store_wrapper import StoreWrapper
@@ -32,35 +33,36 @@ from downloader.logger import NoLogger
 
 
 class OnlineImporter(ProductionOnlineImporter):
-    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, path_resolver_factory=None, local_repository=None, waiter=None, logger=None, path_dictionary=None):
+    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, path_resolver_factory=None, local_repository=None, free_space_reservation=None, waiter=None, logger=None, path_dictionary=None):
         self._config = config if config is not None else config_with(base_system_path=MEDIA_USB0)
         file_system_state = FileSystemState(config=self._config, path_dictionary=path_dictionary)
-        self._file_system_factory = FileSystemFactory(state=file_system_state) if file_system_factory is None else file_system_factory
-        file_downloader_factory = FileDownloaderFactory(config=config, file_system_factory=self._file_system_factory) if file_downloader_factory is None else file_downloader_factory
-        self.file_system = self._file_system_factory.create_for_system_scope()
+        self.fs_factory = FileSystemFactory(state=file_system_state) if file_system_factory is None else file_system_factory
+        file_downloader_factory = FileDownloaderFactory(config=config, file_system_factory=self.fs_factory) if file_downloader_factory is None else file_downloader_factory
+        self.file_system = self.fs_factory.create_for_system_scope()
         path_resolver_factory = PathResolverFactory(path_dictionary=file_system_state.path_dictionary) if path_resolver_factory is None else path_resolver_factory
 
         self.needs_save = False
 
         super().__init__(
-            FileFilterFactory(),
-            self._file_system_factory,
+            FileFilterFactory(NoLogger() if logger is None else logger),
+            self.fs_factory,
             file_downloader_factory,
             path_resolver_factory,
             LocalRepository(config=self._config, file_system=self.file_system) if local_repository is None else local_repository,
             ExternalDrivesRepository(file_system=self.file_system),
+            free_space_reservation or UnlimitedFreeSpaceReservation(),
             NoWaiter() if waiter is None else waiter,
             NoLogger() if logger is None else logger)
 
         self._importer_command = ImporterCommand(self._config, [])
 
     @staticmethod
-    def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs):
+    def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs, free_space_reservation=None):
         file_downloader_factory, file_system_factory, config = FileDownloaderFactory.from_implicit_inputs(implicit_inputs)
 
         path_resolver_factory = PathResolverFactory.from_file_system_state(implicit_inputs.file_system_state)
 
-        return OnlineImporter(config=config, file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory, path_resolver_factory=path_resolver_factory)
+        return OnlineImporter(config=config, file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory, path_resolver_factory=path_resolver_factory, free_space_reservation=free_space_reservation)
 
     @property
     def fs_data(self):

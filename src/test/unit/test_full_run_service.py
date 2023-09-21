@@ -74,7 +74,7 @@ class TestFullRunService(unittest.TestCase):
 
     def test_full_run___test_database_but_failing_folders_on_fs___returns_exit_code_1(self):
         db_id, db_descr, file_system_factory = test_database_setup()
-        file_system_factory.set_create_folders_buggy()
+        file_system_factory.set_create_folders_will_error()
         exit_code = FullRunService.with_single_db(db_id, db_descr, file_system_factory=file_system_factory).full_run()
         self.assertEqual(1, exit_code)
 

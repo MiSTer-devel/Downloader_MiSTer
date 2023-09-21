@@ -55,17 +55,27 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
             ('all', store_with_cheats_and_console_files),
             ('nes gb', store_with_cheats_and_console_files),
             ('nes gb cheats', store_with_cheats_and_console_files),
-            ('something_not_in_db', store_with_cheats_and_console_files),
+            ('something_not_in_db', empty_test_store),
             ('nes something_not_in_db', store_with_all_nes_files),
-            ('!nes something_not_in_db', store_with_all_gb_files),
+            ('!nes something_not_in_db', empty_test_store),
         ])
 
     def test_download_db_with_essential_and_cheats_files___given_nes_filter___install_nes_and_essential_files(self):
         self.assertEqual(store_with_essential_and_nes_files(), self.download_db_with_essential_and_cheats_files(config_with_filter('nes')))
 
+    def test_download_two_dbs_with_files_with_tags_a_b_c___using_filter_b___installs_only_b_files(self):
+        first_store = empty_test_store()
+        second_store = empty_test_store()
+
+        sut = OnlineImporter(config=config_with_filter('b'))
+        sut.add_db(db_with_files_a_b_c(), first_store)
+        sut.add_db(db_with_files_a_b_c_alt(), second_store)
+        sut.download(False)
+
+        self.assertEqual([store_with_file_b(), store_with_file_b_alt()], [first_store, second_store])
+
     def test_download_db_with_files_a_b_c___using_filter_b___installs_b_only(self):
         self.assertEqual(store_with_file_b(), self.download_db_with_files_a_b_c(config_with_filter('b')))
-
     def test_download_db_with_files_a_b_c___using_given_filter___installs_expected_stores(self):
         self.assertFilters(self.download_db_with_files_a_b_c, [
             ('b', store_with_file_b),
@@ -89,13 +99,13 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
             ('!a !b c', store_with_file_c),
             ('!a !b !c', empty_test_store),
             ('!all', empty_test_store),
-            ('something_not_in_db', store_with_files_a_b_c),
+            ('something_not_in_db', empty_test_store),
             ('a something_not_in_db', store_with_file_a),
-            ('!a something_not_in_db', store_with_files_b_and_c),
+            ('!a something_not_in_db', empty_test_store),
         ])
 
     def test_download_db_with_one_non_tagged_file_and_tagged_a_file___using_filter_a___installs_file_a_and_non_tagged_file(self):
-        self.assertEqual(store_with_one_non_tagged_file_and_file_a(), self.download_db_with_one_non_tagged_file_and_tagged_a_file(config_with_filter('a')))
+        self.assertEqual(store_with_file_a(), self.download_db_with_one_non_tagged_file_and_tagged_a_file(config_with_filter('a')))
 
     def test_download_db_with_one_non_tagged_file_and_tagged_a_file___using_negative_all_filter___installs_nothing(self):
         self.assertEqual(empty_test_store(), self.download_db_with_one_non_tagged_file_and_tagged_a_file(config_with_filter('!all')))
@@ -142,9 +152,21 @@ def db_with_files_a_b_c():
         file_b: file_descr(tags=['b']),
         file_c: file_descr(tags=['c'])
     }, folders={
-        folder_a: {'tags':['a']},
-        folder_b: {'tags':['b']},
-        folder_c: {'tags':['c']}
+        folder_a: {'tags': ['a']},
+        folder_b: {'tags': ['b']},
+        folder_c: {'tags': ['c']}
+    })
+
+
+def db_with_files_a_b_c_alt():
+    return db_test_descr(files={
+        'alt' + file_a: file_descr(tags=['a']),
+        'alt' + file_b: file_descr(tags=['b']),
+        'alt' + file_c: file_descr(tags=['c'])
+    }, folders={
+        folder_a: {'tags': ['a']},
+        folder_b: {'tags': ['b']},
+        folder_c: {'tags': ['c']}
     })
 
 
@@ -154,6 +176,7 @@ def store_with_files_a_b_c():
         file_b: file_descr(),
         file_c: file_descr()
     }, folders={folder_a: {}, folder_b: {}, folder_c: {}})
+
 
 def store_with_file_a():
     return store_descr(files={file_a: file_descr()}, folders={folder_a: {}})
@@ -166,6 +189,9 @@ def store_with_files_a_and_c():
 
 def store_with_file_b():
     return store_descr(files={file_b: file_descr()}, folders={folder_b: {}})
+
+def store_with_file_b_alt():
+    return store_descr(files={'alt' + file_b: file_descr()}, folders={folder_b: {}})
 
 def store_with_files_b_and_c():
     return store_descr(files={file_b: file_descr(), file_c: file_descr()}, folders={folder_b: {}, folder_c: {}})

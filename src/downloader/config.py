@@ -32,7 +32,8 @@ from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_BASE_SYSTEM
     K_FAIL_ON_FILE_ERROR, K_COMMIT, K_DEFAULT_DB_ID, DISTRIBUTION_MISTER_DB_ID, \
     K_START_TIME, KENV_LOGFILE, K_LOGFILE, K_DOWNLOADER_THREADS_LIMIT, \
     KENV_PC_LAUNCHER, K_IS_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, STORAGE_PRIORITY_PREFER_SD, \
-    STORAGE_PRIORITY_PREFER_EXTERNAL, STORAGE_PRIORITY_OFF
+    STORAGE_PRIORITY_PREFER_EXTERNAL, STORAGE_PRIORITY_OFF, KENV_FORCED_BASE_PATH, K_MINIMUM_SYSTEM_FREE_SPACE_MB, K_MINIMUM_EXTERNAL_FREE_SPACE_MB, DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB, \
+    DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB
 from downloader.db_options import DbOptionsKind, DbOptions, DbOptionsValidationException
 from downloader.ini_parser import IniParser
 
@@ -82,7 +83,13 @@ def default_config():
         K_USER_DEFINED_OPTIONS: [],
         K_COMMIT: 'unknown',
         K_FAIL_ON_FILE_ERROR: False,
+        K_MINIMUM_SYSTEM_FREE_SPACE_MB: DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB,
+        K_MINIMUM_EXTERNAL_FREE_SPACE_MB: DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB
     }
+
+
+def download_sensitive_configs():
+    return [K_BASE_PATH, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES]
 
 
 class ConfigReader:
@@ -159,6 +166,12 @@ class ConfigReader:
         result[K_CURL_SSL] = self._valid_max_length(KENV_CURL_SSL, self._env[KENV_CURL_SSL], 50)
         if self._env[KENV_UPDATE_LINUX] != DEFAULT_UPDATE_LINUX_ENV:
             result[K_UPDATE_LINUX] = self._env[KENV_UPDATE_LINUX] == 'true'
+
+        if self._env[KENV_FORCED_BASE_PATH] is not None:
+            result[K_BASE_PATH] = self._env[KENV_FORCED_BASE_PATH]
+            result[K_BASE_SYSTEM_PATH] = self._env[KENV_FORCED_BASE_PATH]
+            for section, db in result[K_DATABASES].items():
+                if K_OPTIONS in db: db[K_OPTIONS].remove_base_path()
 
         result[K_FAIL_ON_FILE_ERROR] = self._env[KENV_FAIL_ON_FILE_ERROR] == 'true'
         result[K_COMMIT] = self._valid_max_length(KENV_COMMIT, self._env[KENV_COMMIT], 50)
@@ -280,6 +293,8 @@ class ConfigReader:
         mister[K_DOWNLOADER_TIMEOUT] = parser.get_int(K_DOWNLOADER_TIMEOUT, result[K_DOWNLOADER_TIMEOUT])
         mister[K_DOWNLOADER_RETRIES] = parser.get_int(K_DOWNLOADER_RETRIES, result[K_DOWNLOADER_RETRIES])
         mister[K_FILTER] = parser.get_string(K_FILTER, result[K_FILTER])
+        mister[K_MINIMUM_SYSTEM_FREE_SPACE_MB] = parser.get_int(K_MINIMUM_SYSTEM_FREE_SPACE_MB, result[K_MINIMUM_SYSTEM_FREE_SPACE_MB])
+        mister[K_MINIMUM_EXTERNAL_FREE_SPACE_MB] = parser.get_int(K_MINIMUM_EXTERNAL_FREE_SPACE_MB, result[K_MINIMUM_EXTERNAL_FREE_SPACE_MB])
 
         user_defined = []
         for key in mister:

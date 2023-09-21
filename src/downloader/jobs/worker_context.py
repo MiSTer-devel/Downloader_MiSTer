@@ -16,12 +16,33 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from abc import abstractmethod
+from dataclasses import dataclass
+
+from downloader.file_system import FileSystem
+from downloader.http_gateway import HttpGateway
+from downloader.job_system import JobSystem, Worker
+from downloader.jobs.reporters import FileDownloadProgressReporter
+from downloader.logger import Logger
+from downloader.target_path_repository import TargetPathRepository
 from downloader.waiter import Waiter
 
 
-class NoWaiter(Waiter):
-    def __init__(self):
-        self.registeredWaits = []
+@dataclass
+class DownloaderWorkerContext:
+    job_system: JobSystem
+    http_gateway: HttpGateway
+    logger: Logger
+    target_path_repository: TargetPathRepository
+    file_system: FileSystem
+    waiter: Waiter
+    file_download_reporter: FileDownloadProgressReporter
 
-    def sleep(self, wait):
-        self.registeredWaits.append(wait)
+
+class DownloaderWorker(Worker):
+    def __init__(self, ctx: DownloaderWorkerContext):
+        self._ctx = ctx
+
+    @abstractmethod
+    def initialize(self):
+        """Initialize the worker"""

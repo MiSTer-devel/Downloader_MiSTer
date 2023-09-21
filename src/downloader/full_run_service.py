@@ -21,7 +21,7 @@ import sys
 import time
 
 from downloader.constants import K_DATABASES, K_UPDATE_LINUX, \
-    K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME, K_IS_PC_LAUNCHER
+    K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME, K_IS_PC_LAUNCHER, K_MINIMUM_SYSTEM_FREE_SPACE_MB, K_BASE_SYSTEM_PATH, K_MINIMUM_EXTERNAL_FREE_SPACE_MB
 from downloader.importer_command import ImporterCommandFactory
 from downloader.other import format_files_message, format_folders_message, format_zips_message
 
@@ -125,6 +125,7 @@ class FullRunService:
                               self._online_importer.zips_that_failed(),
                               self._online_importer.unused_filter_tags(),
                               self._online_importer.new_files_not_overwritten(),
+                              self._online_importer.full_partitions(),
                               self._config[K_START_TIME])
 
         self._logger.print()
@@ -147,12 +148,12 @@ class FullRunService:
 
         return 0
 
-    def _display_summary(self, installed_files, failed_files, failed_folders, failed_zips, unused_filter_tags, new_files_not_installed, start_time):
+    def _display_summary(self, installed_files, failed_files, failed_folders, failed_zips, unused_filter_tags, new_files_not_installed, full_partitions, start_time):
         run_time = str(datetime.timedelta(seconds=time.time() - start_time))[0:-4]
 
         self._logger.print()
         self._logger.print('===========================')
-        self._logger.print(f'Downloader 1.7 ({self._config[K_COMMIT][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        self._logger.print(f'Downloader 1.8 ({self._config[K_COMMIT][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
         self._logger.debug(f'Commit: {self._config[K_COMMIT]}')
         self._logger.print(f'Log: {self._local_repository.logfile_path}')
         if len(unused_filter_tags) > 0:
@@ -173,15 +174,29 @@ class FullRunService:
             self._logger.print(format_folders_message(failed_folders))
         if len(failed_zips) > 0:
             self._logger.print(format_zips_message(failed_zips))
-        if len(new_files_not_installed) == 0:
-            return
+        if len(new_files_not_installed) > 0:
+            self._logger.print()
+            self._logger.print('Following new versions were not installed:')
+            for db_id in new_files_not_installed:
+                self._logger.print(' •%s: %s' % (db_id, ', '.join(new_files_not_installed[db_id])))
+            self._logger.print()
+            self._logger.print(' * Delete the file that you wish to upgrade from the previous list, and run this again.')
+        if len(full_partitions) > 0:
+            has_system = any(partition == self._config[K_BASE_SYSTEM_PATH] for partition in full_partitions)
+            has_external = any(partition != self._config[K_BASE_SYSTEM_PATH] for partition in full_partitions)
+            self._logger.print()
+            self._logger.print("################################################################################")
+            self._logger.print("################################## IMPORTANT! ##################################")
+            self._logger.print("################################################################################")
+            self._logger.print()
+            self._logger.print("You DON'T have enough free space to run Downloader!")
+            for partition in full_partitions: self._logger.print(f' - {partition} is FULL')
+            self._logger.print()
+            if has_system: self._logger.print(f'Minimum required space for {self._config[K_BASE_SYSTEM_PATH]} is {self._config[K_MINIMUM_SYSTEM_FREE_SPACE_MB]}MB.')
+            if has_external: self._logger.print(f'Minimum required space for external storage is {self._config[K_MINIMUM_EXTERNAL_FREE_SPACE_MB]}MB.')
+            self._logger.print('Free some space and try again.')
+            self._waiter.sleep(10)
 
-        self._logger.print()
-        self._logger.print('Following new versions were not installed:')
-        for db_id in new_files_not_installed:
-            self._logger.print(' •%s: %s' % (db_id, ', '.join(new_files_not_installed[db_id])))
-        self._logger.print()
-        self._logger.print(' * Delete the file that you wish to upgrade from the previous list, and run this again.')
 
     def _needs_reboot(self):
         return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.needs_reboot())

@@ -17,37 +17,21 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-"""
-On the root of the project, follow these steps:
-
-Call the command ./src/debug.sh store pull
-open the file downloader.json
-modify json['files']['MiSTer']['hash'] to be ''
-modify json['files']['MiSTer']['size'] to be 0
-save the json at downloader.json
-Call the command ./src/debug.sh store push
-Call the command ./src/debug.sh touch MiSTer
-Call the command ./src/debug.sh run
-"""
-
-import subprocess
 import json
-from os import chdir
+from src.debug import exec_ssh, store_pull, store_push, run_build, chdir_root
 
 
 def main():
-    subprocess.run(['./src/debug.sh', 'store', 'pull'])
-    with open('downloader.json', 'r') as f:
-        downloader_json = json.load(f)
+    store_pull()
+    with open('downloader.json', 'r') as f: downloader_json = json.load(f)
     downloader_json['dbs']['distribution_mister']['files']['MiSTer']['hash'] = ''
     downloader_json['dbs']['distribution_mister']['files']['MiSTer']['size'] = 0
-    with open('downloader.json', 'w') as f:
-        json.dump(downloader_json, f)
-    subprocess.run(['./src/debug.sh', 'store', 'push'])
-    subprocess.run(['./src/debug.sh', 'touch', 'MiSTer'])
-    subprocess.run(['./src/debug.sh', 'run'])
+    with open('downloader.json', 'w') as f: json.dump(downloader_json, f)
+    store_push()
+    exec_ssh('cd /media/fat; rm -f MiSTer; touch MiSTer')
+    run_build()
 
 
 if __name__ == '__main__':
-    chdir('../../../..')
+    chdir_root()
     main()

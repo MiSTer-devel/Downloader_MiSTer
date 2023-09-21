@@ -22,7 +22,7 @@ import json
 from pathlib import Path, PurePosixPath
 from downloader.config import ConfigReader
 from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, KENV_UPDATE_LINUX, \
-    KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR, FILE_downloader_storage, KENV_DEFAULT_BASE_PATH
+    KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR, FILE_downloader_storage_json, KENV_DEFAULT_BASE_PATH
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from downloader.full_run_service_factory import FullRunServiceFactory
 from downloader.logger import PrintLogger
@@ -32,7 +32,7 @@ from test.fake_logger import SpyLoggerDecorator
 from test.objects import debug_env, default_env
 from downloader.logger import NoLogger
 from test.fake_store_migrator import StoreMigrator
-from downloader.file_system import hash_file, is_windows, load_json_from_zip
+from downloader.file_system import hash_file, is_windows
 from downloader.main import execute_full_run
 from downloader.local_repository import LocalRepositoryProvider
 from downloader.store_migrator import make_new_local_store
@@ -61,7 +61,7 @@ class SandboxTestBase(unittest.TestCase):
         if 'local_store' in expected:
             counter += 1
             with self.subTestAdapter('local_store'):
-                actual_store = load_json_from_zip(os.path.join(config[K_BASE_SYSTEM_PATH], FILE_downloader_storage))
+                actual_store = load_json(os.path.join(config[K_BASE_SYSTEM_PATH], FILE_downloader_storage_json))
                 self.assertEqual(expected['local_store'], actual_store)
 
         if 'files' in expected:

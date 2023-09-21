@@ -18,30 +18,63 @@
 
 import unittest
 
+from test.fake_file_system_factory import fs_data
 from test.fake_online_importer import OnlineImporter
-from test.objects import remove_all_priority_paths
+from test.objects import remove_all_priority_paths, db_entity, db_reboot_descr, empty_test_store
 
 
 class OnlineImporterTestBase(unittest.TestCase):
     def assertReportsNothing(self, sut, save=False, failed_folders=None, failed_zips=None):
         self.assertReports(sut, [], save=save, failed_folders=failed_folders, failed_zips=failed_zips)
 
-    def assertReports(self, sut, installed, errors=None, needs_reboot=False, save=True, failed_folders=None, failed_zips=None):
+    def assertReports(self, sut, installed, errors=None, needs_reboot=False, save=True, failed_folders=None, failed_zips=None, full_partitions=None):
         if errors is None:
             errors = []
         if failed_folders is None:
             failed_folders = []
         if failed_zips is None:
             failed_zips = []
+        if full_partitions is None:
+            full_partitions = []
         self.assertEqual(sorted(remove_all_priority_paths(installed)), sorted(sut.correctly_installed_files()))
         self.assertEqual(sorted(remove_all_priority_paths(errors)), sorted(sut.files_that_failed()))
         self.assertEqual(needs_reboot, sut.needs_reboot())
         self.assertEqual(sorted(remove_all_priority_paths(failed_folders)), sorted(sut.folders_that_failed()))
         self.assertEqual(sorted(remove_all_priority_paths(failed_zips)), sorted(sut.zips_that_failed()))
+        self.assertEqual(sorted(full_partitions), sorted(sut.full_partitions()))
         self.assertEqual(save, sut.needs_save)
+
+    def assertEverythingIsClean(self, sut, store, save=False):
+        self.assertEqual(empty_test_store(), store)
+        self.assertEqual(fs_data(), sut.fs_data)
+        self.assertReportsNothing(sut, save=save)
 
     def _download_db(self, db, store, inputs):
         return OnlineImporter\
             .from_implicit_inputs(inputs)\
             .add_db(db, store)\
             .download(False)
+
+    def _download_databases(self, fs_inputs, dbs, input_stores=None, free_space_reservation=None):
+        sut = OnlineImporter.from_implicit_inputs(fs_inputs, free_space_reservation=free_space_reservation)
+
+        stores = input_stores or [empty_test_store() for _ in dbs]
+        for db, store in zip(dbs, stores):
+            sut.add_db(db, store)
+
+        sut.download(False)
+
+        return sut, stores
+
+    def download_reboot_file(self, store, inputs):
+        return self._download_db(db_reboot_descr(), store, inputs)
+
+    def assertSystem(self, expected, sut, stores, free=None):
+        self.assertEqual(expected["fs"], sut.fs_data)
+        self.assertEqual(expected["stores"], stores)
+        self.assertReports(sut,
+                           installed=expected.get("ok", []),
+                           errors=expected.get("errors", []),
+                           full_partitions=expected.get("full_partitions", []),
+                           save=expected.get("save", True),)
+        if free is not None or "free" in expected: self.assertEqual(expected["free"], free)

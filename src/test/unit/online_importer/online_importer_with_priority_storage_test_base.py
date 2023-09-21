@@ -18,12 +18,12 @@
 
 from downloader.constants import FILE_PDFViewer, FOLDER_linux, DISTRIBUTION_MISTER_DB_ID
 from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1_descr, file_nes_smb1, folder_games, \
-    folder_games_nes, media_usb1, media_usb2, db_entity, remove_all_priority_paths, media_drive, \
+    folder_games_nes, media_usb1, media_usb2, db_entity, media_drive, \
     file_pdfviewer_descr, file_nes_contra, file_nes_contra_descr, file_nes_palette_a, file_nes_palette_a_descr, \
     folder_games_nes_palettes, db_test, file_nes_manual, file_nes_manual_descr, folder_docs, folder_docs_nes, db_demo, \
     db_id_external_drives_1, db_id_external_drives_2, file_neogeo_md, file_neogeo_md_descr, file_s32x_md, \
     file_s32x_md_descr, \
-    folder_docs_neogeo, folder_docs_s32x, file_foo, file_foo_descr, media_usb0, zip_desc
+    folder_docs_neogeo, folder_docs_s32x, file_foo, file_foo_descr, media_usb0, zip_desc, file_md_sonic_descr, file_md_sonic, folder_games_md
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 from test.zip_objects import zipped_nes_palettes_id, file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc
@@ -93,6 +93,8 @@ def fs_files_contra_on_usb0(): return {media_usb0(file_nes_contra): file_nes_con
 def fs_files_contra_on_usb1(): return {media_usb1(file_nes_contra): file_nes_contra_descr()}
 def fs_files_contra_on_usb2(): return {media_usb2(file_nes_contra): file_nes_contra_descr()}
 def fs_files_contra_on_delme(): return {media_drive(delme_drive, file_nes_contra): file_nes_contra_descr()}
+def fs_files_sonic_on_fat(): return {media_fat(file_md_sonic): file_md_sonic_descr()}
+def fs_files_sonic_on_usb1(): return {media_usb1(file_md_sonic): file_md_sonic_descr()}
 def fs_files_smb1_on_fat_and_usb1(): return {**fs_files_smb1_on_fat(), **fs_files_smb1_on_usb1()}
 def fs_files_smb1_on_usb1_and_usb2(): return {**fs_files_smb1_on_usb1(), **fs_files_smb1_on_usb2()}
 def fs_files_smb1_and_contra_on_fat(): return {**fs_files_smb1_on_fat(), **fs_files_contra_on_fat()}
@@ -128,6 +130,9 @@ def fs_folders_games_on_usb1_usb2_and_fat(): return [media_fat(folder_games), *f
 def fs_folders_games_on_usb1_and_usb2(): return [media_usb1(folder_games), media_usb2(folder_games)]
 def fs_folders_pdfviewers_on_hidden(): return [media_drive(hidden_drive, FOLDER_linux)]
 def store_smb1_on_usb1(): return store_descr(files_usb1=_store_files_smb1(), folders_usb1=_store_folders_nes())
+def store_smb1_on_usb1_but_just_folders(): return store_descr(files_usb1={}, folders_usb1=_store_folders_nes())
+def store_sonic_on_usb1(): return store_descr(files_usb1=_store_files_sonic(), folders_usb1=_store_folders_md())
+def store_sonic_on_usb1_but_just_folders(): return store_descr(files_usb1={}, folders_usb1=_store_folders_md())
 def store_smb1_on_fat_and_usb1(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes(), files_usb1=_store_files_smb1(), folders_usb1=_store_folders_nes())
 def store_smb1_on_delme(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes(), base_path=delme_drive)
 def store_smb1(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes())
@@ -157,6 +162,7 @@ def store_nes_manual_on_usb2(): return store_descr(files_usb2=_store_files_nes_m
 def store_smb1_on_usb1_and_nes_manual_on_usb2(): return {db_test: store_smb1_on_usb1(), db_demo: store_nes_manual_on_usb2()}
 def _store_files_smb1(): return {file_nes_smb1: file_nes_smb1_descr()}
 def _store_files_contra(): return {file_nes_contra: file_nes_contra_descr()}
+def _store_files_sonic(): return {file_md_sonic: file_md_sonic_descr()}
 def _store_files_nes_manual(): return {file_nes_manual: file_nes_manual_descr()}
 def _store_files_smb1_and_contra(): return {**_store_files_smb1(), **_store_files_contra()}
 def _store_files_nes_palettes(): return {file_nes_palette_a: file_nes_palette_a_descr()}
@@ -169,6 +175,7 @@ def _store_files_contra_and_neogeo_md(): return {**_store_files_contra(), **_sto
 def _store_folders_games(): return {folder_games: {}}
 def _store_folders_docs(): return {folder_docs: {}}
 def _store_folders_nes(): return {**_store_folders_games(), folder_games_nes: {}}
+def _store_folders_md(): return {**_store_folders_games(), folder_games_md: {}}
 def _store_folders_docs_nes(): return {**_store_folders_docs(), folder_docs_nes: {}}
 def _store_folders_docs_s32x(): return {**_store_folders_docs(), folder_docs_s32x: {}}
 def _store_folders_docs_neogeo(): return {**_store_folders_docs(), folder_docs_neogeo: {}}

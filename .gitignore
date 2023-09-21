@@ -1,8 +1,20 @@
 .idea
 venv
 __pycache__
+.DS_Store
+
+# TEST FILES:
 delme
-mister.ip
-dont_download.ini
+
+# BUILD FILES:
 src/downloader.zip
 src/commit.py
+
+# DEBUG FILES:
+delme.py
+stop
+mister.ip
+dont_download.ini
+downloader.json.zip
+downloader.json
+*.log

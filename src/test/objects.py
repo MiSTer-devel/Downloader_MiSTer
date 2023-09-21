@@ -28,7 +28,8 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     MEDIA_FAT, K_BASE_SYSTEM_PATH, K_CONFIG_PATH, K_ZIP_FILE_COUNT_THRESHOLD, K_STORAGE_PRIORITY, MEDIA_USB0, \
     MEDIA_USB1, \
     MEDIA_USB2, KENV_FAIL_ON_FILE_ERROR, KENV_UPDATE_LINUX, KENV_CURL_SSL, KENV_COMMIT, DEFAULT_CURL_SSL_OPTIONS, \
-    K_DEFAULT_DB_ID, MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, K_DB_URL, K_SECTION, K_OPTIONS, K_USER_DEFINED_OPTIONS
+    K_DEFAULT_DB_ID, MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, K_DB_URL, K_SECTION, K_OPTIONS, K_USER_DEFINED_OPTIONS, KENV_FORCED_BASE_PATH, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
+    K_ZIP_ACCUMULATED_MB_THRESHOLD
 from downloader.db_options import DbOptions, DbOptionsKind
 from downloader.other import empty_store_without_base_path
 from test.fake_db_entity import DbEntity
@@ -44,6 +45,7 @@ file_nes_smb1 = '|games/NES/smb.nes'
 file_nes_contra = '|games/NES/contra.nes'
 file_nes_palette_a = '|games/NES/Palette/a.pal'
 file_nes_manual = '|docs/NES/nes.md'
+file_md_sonic = '|games/MegaDrive/sonic.md'
 file_boot_rom = 'boot.rom'
 file_menu_rbf = 'menu.rbf'
 file_s32x_md = '|docs/S32X/S32X.md'
@@ -62,6 +64,7 @@ folder_ab = 'a/b'
 folder_games = '|games'
 folder_games_nes = '|games/NES'
 folder_games_nes_palettes = '|games/NES/Palette'
+folder_games_md = '|games/MegaDrive'
 folder_docs = '|docs'
 folder_docs_nes = '|docs/NES'
 folder_docs_neogeo = '|docs/NeoGeo'
@@ -77,8 +80,16 @@ hash_one = 'one'
 file_big = 'big'
 hash_big = 'big'
 hash_updated_big = 'updated_big'
+file_reboot = 'reboot.file'
+hash_reboot = 'reboot.hash'
 db_empty = 'empty'
 big_size = 100_000_000
+binary_content = b'This is a test file.'
+file_size_a = 2915040
+file_size_b = 1915040
+file_size_c = 3915440
+file_size_sonic = 2915020
+file_size_smb1 = 2915020
 
 
 def media_fat(path):
@@ -136,9 +147,11 @@ def config_with(
         storage_priority=None,
         config_path=None,
         zip_file_count_threshold=None,
+        zip_accumulated_mb_threshold=None,
         downloader_retries=None,
         default_db_id=None,
         user_defined_options=None,
+        minimum_free_space=None,
         databases: Dict[str, Any] = None):
 
     config = default_config()
@@ -154,6 +167,8 @@ def config_with(
         config[K_CONFIG_PATH] = Path(config_path)
     if zip_file_count_threshold is not None:
         config[K_ZIP_FILE_COUNT_THRESHOLD] = zip_file_count_threshold
+    if zip_accumulated_mb_threshold is not None:
+        config[K_ZIP_ACCUMULATED_MB_THRESHOLD] = zip_accumulated_mb_threshold
     if downloader_retries is not None:
         config[K_DOWNLOADER_RETRIES] = downloader_retries
     if default_db_id is not None:
@@ -162,6 +177,8 @@ def config_with(
         config[K_DATABASES] = databases
     if user_defined_options is not None:
         config[K_USER_DEFINED_OPTIONS] = user_defined_options
+    if minimum_free_space is not None:
+        config[K_MINIMUM_SYSTEM_FREE_SPACE_MB] = minimum_free_space
     return config
 
 
@@ -173,8 +190,20 @@ def file_test_json_zip_descr():
     return {'hash': file_test_json_zip, 'unzipped_json': db_test_with_file_a().testable}
 
 
+def file_reboot_descr(custom_hash=None):
+    return {'url': 'https://fake.com/bar', 'hash': custom_hash or hash_reboot, 'reboot': True, 'size': 23}
+
+
 def db_test_being_empty_descr():
     return db_entity(db_id=db_test)
+
+
+def db_reboot_descr(custom_hash=None):
+    return db_entity(files={file_reboot: file_reboot_descr(custom_hash)})
+
+
+def store_reboot_descr(custom_hash=None):
+    return db_to_store(db_reboot_descr(custom_hash))
 
 
 def temp_name():
@@ -230,8 +259,8 @@ def zip_desc(description, target_folder_path, zipped_files=None, summary=None, s
 
 def clean_zip_test_fields(store):
     for zip_desc in store['zips'].values():
-        del zip_desc['contents_file']['zipped_files']
-        del zip_desc['summary_file']['unzipped_json']
+        if 'zipped_files' in zip_desc['contents_file']: del zip_desc['contents_file']['zipped_files']
+        if 'unzipped_json' in zip_desc['summary_file']: del zip_desc['summary_file']['unzipped_json']
 
     return store
 
@@ -468,29 +497,36 @@ def file_mister_old_descr():
     }
 
 
-def file_a_descr(delete=None):
+def file_a_descr(delete=None, size=None):
     return {
         "delete": delete if delete is not None else [],
         "hash": file_a,
-        "size": 2915040,
+        "size": file_size_a if size is None else size,
         "url": "https://one.rbf"
     }
 
 
-def file_b_descr(delete=None):
+def files_a(size=None): return {file_a: file_a_descr(size=size)}
+def files_b(size=None): return {file_b: file_b_descr(size=size)}
+def files_c(size=None): return {file_c: file_c_descr(size=size)}
+def files_smb1(size=None): return {file_nes_smb1: file_nes_smb1_descr(size=size)}
+def files_sonic(size=None): return {file_md_sonic: file_md_sonic_descr(size=size)}
+
+
+def file_b_descr(delete=None, size=None):
     return {
         "delete": delete if delete is not None else [],
         "hash": file_b,
-        "size": 1915040,
+        "size": file_size_b if size is None else size,
         "url": "https://two.rbf"
     }
 
 
-def file_c_descr(delete=None):
+def file_c_descr(delete=None, size=None):
     return {
         "delete": delete if delete is not None else [],
         "hash": file_c,
-        "size": 3915440,
+        "size": file_size_c if size is None else size,
         "url": "https://three.rbf"
     }
 
@@ -507,12 +543,28 @@ def file_system_abc_descr():
     }
 
 
-def file_nes_smb1_descr():
+def file_nes_smb1_descr(size=None):
     return {
         "hash": file_nes_smb1[1:],
-        "size": 2915020,
+        "size": file_size_smb1 if size is None else size,
         "url": "https://smb.nes"
     }
+
+
+def file_md_sonic_descr(size=None):
+    return {
+        "hash": file_md_sonic[1:],
+        "size": file_size_sonic if size is None else size,
+        "url": "https://sonic.md"
+    }
+
+
+def db_smb1(db_id=None, descr=None):
+    return db_entity(db_id=db_id, folders=[folder_games, folder_games_nes], files={file_nes_smb1: file_nes_smb1_descr() if descr is None else descr})
+
+
+def db_sonic(db_id=None, descr=None):
+    return db_entity(db_id=db_id, folders=[folder_games, folder_games_md], files={file_md_sonic: file_md_sonic_descr() if descr is None else descr})
 
 
 def file_nes_manual_descr():
@@ -581,6 +633,8 @@ def tweak_descr(o, zip_id=True, tags=True, url=True, zip_path=False):
         o.pop('zip_id')
     if not tags:
         o.pop('tags')
+    if 'zip_path' in o and not zip_path:
+        o.pop('zip_path')
     return o
 
 
@@ -668,25 +722,29 @@ def empty_test_store():
     return empty_store(base_path=MEDIA_FAT)
 
 
-def store_with_folders(db_id, folders):
-    return db_to_store(db_with_folders(db_id, folders))
+def store_with_folders(folders):
+    return db_to_store(db_with_folders(db_test, folders))
 
 
-def db_test_with_file_a(input_descr=None):
-    descr = file_a_descr() if input_descr is None else input_descr
-    return db_entity(db_id=db_test, db_files=[file_test_json_zip], files={file_a: descr}, folders={folder_a: {}})
+def db_test_with_file_a(db_id=None, descr=None):
+    return db_entity(db_id=db_id, db_files=[file_test_json_zip], files={file_a: file_a_descr() if descr is None else descr}, folders={folder_a: {}})
 
 
-def store_test_with_file_a_descr():
-    return db_to_store(db_test_with_file_a())
+def db_test_with_file_b(db_id=None, descr=None):
+    return db_entity(db_id=db_id, files={file_b: file_b_descr() if descr is None else descr}, folders={folder_b: {}})
 
 
-def store_test_with_file(file, description):
-    return db_to_store(db_test_with_file(file, description))
+def db_test_with_file_c(db_id=None, descr=None):
+    return db_entity(db_id=db_id, files={file_c: file_c_descr() if descr is None else descr}, folders={folder_c: {}})
 
 
-def not_found_ini():
-    return _not_file('not_found.ini')
+def store_test_with_file_a_descr(descr=None): return db_to_store(db_test_with_file_a(descr=descr))
+def store_test_with_file_b_descr(descr=None): return db_to_store(db_test_with_file_b(descr=descr))
+def store_test_with_file_c_descr(descr=None): return db_to_store(db_test_with_file_c(descr=descr))
+def store_test_with_smb1_descr(descr=None): return db_to_store(db_smb1(descr=descr))
+def store_test_with_sonic_descr(descr=None): return db_to_store(db_sonic(descr=descr))
+def store_test_with_file(file, description): return db_to_store(db_test_with_file(file, description))
+def not_found_ini(): return _not_file('not_found.ini')
 
 
 def _not_file(file):
@@ -703,6 +761,7 @@ def default_env():
         KENV_DEFAULT_DB_URL: DISTRIBUTION_MISTER_DB_URL,
         KENV_DEFAULT_DB_ID: DISTRIBUTION_MISTER_DB_ID,
         KENV_DEFAULT_BASE_PATH: default_base_path(),
+        KENV_FORCED_BASE_PATH: None,
         KENV_ALLOW_REBOOT: None,
         KENV_DEBUG: 'false',
         KENV_CURL_SSL: DEFAULT_CURL_SSL_OPTIONS,

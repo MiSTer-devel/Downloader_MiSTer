@@ -56,7 +56,7 @@ class TestFileDownloader(unittest.TestCase):
         self.file_system_state.set_non_base_path(self.installed_system_path, FILE_MiSTer_new)
         self.file_system_state.set_non_base_path(self.installed_system_path, FILE_MiSTer_old)
         file_system_factory = FileSystemFactory(state=self.file_system_state)
-        self.file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory, network_state=self.network_state)
+        self.file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory, network_state=self.network_state, state=self.file_system_state)
         self.file_system = file_system_factory.create_for_config(config)
         external_drives_repository = ExternalDrivesRepository(file_system=self.file_system)
         self.local_repository = ProductionLocalRepository(config, NoLogger(), self.file_system, StoreMigrator(), external_drives_repository)
@@ -89,6 +89,7 @@ class TestFileDownloader(unittest.TestCase):
             self.file_system.data
         )
         self.assertEqual([
+            {"scope": "write_incoming_stream", "data": on_installed(downloader_in_progress_file)},
             {"scope": "copy", "data": [on_installed(downloader_in_progress_file), on_installed(file_big)]},
             {"scope": "unlink", "data": on_installed(downloader_in_progress_file)},
         ], self.file_system.write_records)
@@ -108,36 +109,15 @@ class TestFileDownloader(unittest.TestCase):
         self.download_one()
         self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
 
-    def test_download_reboot_file___from_scratch_no_issues___needs_reboot(self):
-        self.file_system_state.set_non_base_path(self.installed_system_path, file_menu_rbf)
-        self.download_reboot()
-        self.assertDownloaded([file_menu_rbf], [file_menu_rbf], need_reboot=True)
-        self.assertTrue(self.file_system.is_file(on_installed_system(file_menu_rbf)))
-
-    def test_download_reboot_file___update_no_issues___needs_reboot(self):
-        self.file_system_state.add_file(self.installed_system_path, file_menu_rbf, {'hash': 'old', 'size': 23})
-        self.download_reboot()
-        self.assertDownloaded([file_menu_rbf], [file_menu_rbf], need_reboot=True)
-        self.assertEqual(fs_records([
-            {'data': on_tmp('unique_temp_filename_0'), 'scope': 'unique_temp_filename'},
-            {'data': [on_tmp('unique_temp_filename_0'), on_installed_system('menu.rbf')], 'scope': 'copy'},
-            {'data': on_tmp('unique_temp_filename_0'), 'scope': 'unlink'}
-        ]), self.file_system.write_records)
-
-    def test_download_reboot_file___no_changes_no_issues___no_need_to_reboot(self):
-        self.file_system_state.add_file(self.installed_system_path, file_menu_rbf, {'hash': hash_menu_rbf})
-
-        self.download_reboot()
-        self.assertDownloaded([file_menu_rbf])
-
     def test_download_mister_file___with_old_mister_file_present___stores_it_as_mister_and_moves_old_one_to_mister_old(self):
         self.file_system_state.add_old_mister_binary(self.installed_system_path)
         self.sut.queue_file(file_mister_descr(), FILE_MiSTer)
         self.sut.download_files(False)
-        self.assertDownloaded([FILE_MiSTer], [FILE_MiSTer], need_reboot=True)
+        self.assertDownloaded([FILE_MiSTer], [FILE_MiSTer])
         self.assertEqual(hash_MiSTer, self.file_system.hash(FILE_MiSTer))
         self.assertEqual(hash_MiSTer_old, self.file_system.hash(FILE_MiSTer_old))
         self.assertEqual(fs_records([
+            {'scope': 'write_incoming_stream', 'data': on_installed_system(FILE_MiSTer_new)},
             {'scope': 'move', 'data': (on_installed_system(FILE_MiSTer), on_installed_system(FILE_MiSTer_old))},
             {'scope': 'move', 'data': (on_installed_system(FILE_MiSTer_new), on_installed_system(FILE_MiSTer))},
         ]), self.file_system.write_records)
@@ -145,18 +125,18 @@ class TestFileDownloader(unittest.TestCase):
     def test_download_mister_file___from_scratch___stores_it_as_mister_and_mister_old_doesnt_exist(self):
         self.sut.queue_file(file_mister_descr(), FILE_MiSTer)
         self.sut.download_files(False)
-        self.assertDownloaded([FILE_MiSTer], [FILE_MiSTer], need_reboot=True)
+        self.assertDownloaded([FILE_MiSTer], [FILE_MiSTer])
         self.assertEqual(hash_MiSTer, self.file_system.hash(FILE_MiSTer))
         self.assertFalse(self.file_system.is_file(FILE_MiSTer_old))
         self.assertEqual(fs_records([
+            {'scope': 'write_incoming_stream', 'data': on_installed_system(FILE_MiSTer_new)},
             {'scope': 'move', 'data': (on_installed_system(FILE_MiSTer_new), on_installed_system(FILE_MiSTer))},
         ]), self.file_system.write_records)
 
-    def assertDownloaded(self, oks, run=None, errors=None, need_reboot=False):
+    def assertDownloaded(self, oks, run=None, errors=None):
         self.assertEqual(oks, self.sut.correctly_downloaded_files())
         self.assertEqual(errors if errors is not None else [], self.sut.errors())
         self.assertEqual(run if run is not None else [], self.sut.run_files())
-        self.assertEqual(need_reboot, self.sut.needs_reboot())
 
     def download_one(self):
         self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_one, 'size': 1}, file_one)

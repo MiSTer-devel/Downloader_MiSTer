@@ -18,7 +18,7 @@
 import json
 import unittest
 
-from downloader.constants import MEDIA_FAT, MEDIA_USB0, FILE_downloader_storage, FILE_downloader_external_storage
+from downloader.constants import MEDIA_FAT, MEDIA_USB0, FILE_downloader_storage_zip, FILE_downloader_external_storage, FILE_downloader_storage_json
 from downloader.local_store_wrapper import LocalStoreWrapper
 from downloader.store_migrator import make_new_local_store
 from test.fake_store_migrator import StoreMigrator
@@ -30,7 +30,8 @@ from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_local_repository import LocalRepository
 
 
-internal_db_fat_zip_file = media_fat(FILE_downloader_storage).lower()
+internal_db_fat_zip_file = media_fat(FILE_downloader_storage_zip).lower()
+internal_db_fat_json_file = media_fat(FILE_downloader_storage_json).lower()
 usb0_db_json_file = media_usb0(FILE_downloader_external_storage).lower()
 
 
@@ -38,9 +39,10 @@ def db_files_usb0_b(): return {usb0_db_json_file: store_to_db_files(store_usb0_b
 def db_files_usb0_b_games(): return {usb0_db_json_file: store_to_db_files(store_usb0_b_games_internal_a_docs())[MEDIA_USB0]}
 def db_files_internal_a_usb0_b(): return {**db_files_internal_a(), **db_files_usb0_b()}
 def db_files_internal_a_docs_usb0_b_games(): return {**db_files_internal_a_docs(), **db_files_usb0_b_games()}
-def db_files_internal_empty(): return {internal_db_fat_zip_file: {}}
-def db_files_internal_a(): return {internal_db_fat_zip_file: store_internal_a()}
-def db_files_internal_a_docs(): return {internal_db_fat_zip_file: store_to_db_files(store_usb0_b_games_internal_a_docs())[MEDIA_FAT]}
+def db_files_internal_empty(): return {internal_db_fat_json_file: {}}
+def db_files_internal_a(): return {internal_db_fat_json_file: store_internal_a()}
+def db_files_internal_zip_a(): return {internal_db_fat_zip_file: store_internal_a()}
+def db_files_internal_a_docs(): return {internal_db_fat_json_file: store_to_db_files(store_usb0_b_games_internal_a_docs())[MEDIA_FAT]}
 def files_a(): return {file_a: file_a_descr()}
 def folders_a(): return {folder_a: {}}
 def files_b(): return {file_b: file_b_descr()}
@@ -68,6 +70,10 @@ class TestLocalRepository(unittest.TestCase):
 
     def test_save_store__on_internal_a_with_input_store_empty___stores_internal_empty(self):
         actual = save_store(fs(files=db_files_internal_a()), local_store())
+        self.assertEqual(db_files_internal_empty(), actual)
+
+    def test_save_store__on_internal_zip_a_with_input_store_empty___stores_internal_empty(self):
+        actual = save_store(fs(files=db_files_internal_zip_a()), local_store())
         self.assertEqual(db_files_internal_empty(), actual)
 
     def test_save_store___on_internal_empty_with_input_store_internal_a___stores_internal_a(self):
@@ -100,6 +106,10 @@ class TestLocalRepository(unittest.TestCase):
 
     def test_load_store___on_internal_a___returns_store_internal_a(self):
         store = load_store(fs(files=db_files_internal_a()))
+        self.assertEqual(store_internal_a(), store)
+
+    def test_load_store___on_internal_zip_a___returns_store_internal_a(self):
+        store = load_store(fs(files=db_files_internal_zip_a()))
         self.assertEqual(store_internal_a(), store)
 
     def test_load_store___on_internal_a_usb0_b___returns_store_usb0_b_internal_a(self):
@@ -143,7 +153,7 @@ def fs(files=None, folders=None):
 
     for file_path, dbs in files.items():
         store = local_store(dbs, internal=not file_path.startswith('/media/usb'))
-        if FILE_downloader_storage.lower() in file_path:
+        if FILE_downloader_storage_zip.lower() in file_path:
             file_system.save_json_on_zip(store, file_path)
         else:
             file_system.save_json(store, file_path)

@@ -95,7 +95,10 @@ class DbGateway:
             if section not in files_by_section:
                 continue
             try:
-                db_raw = self._file_system.load_dict_from_file(files_by_section[section], Path(description[K_DB_URL]).suffix.lower())
+                file = files_by_section[section]
+                db_raw = self._file_system.load_dict_from_file(file, Path(description[K_DB_URL]).suffix.lower())
+                if file.startswith('/tmp/'):
+                    self._file_system.unlink(file)
                 self._logger.bench(f'Validating database {section}...')
 
                 dbs.append(DbEntity(db_raw, section))

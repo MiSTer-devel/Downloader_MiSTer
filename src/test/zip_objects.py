@@ -148,7 +148,7 @@ def cheats_folder_descr(zip_id=True, tags=True):
     }, zip_id=zip_id, tags=tags)
 
 
-def store_with_unzipped_cheats(url=True, folders=True, zip_id=True, zips=True, tags=True, online_database_imported=None, summary_hash=None, is_internal_summary=False):
+def store_with_unzipped_cheats(url=False, folders=True, files=True, zip_id=True, zips=True, tags=True, online_database_imported=None, summary_hash=None, is_internal_summary=False):
     summary_internal_zip_id = cheats_folder_id if is_internal_summary else None
     o = {
         K_BASE_PATH: "/media/fat",
@@ -160,7 +160,9 @@ def store_with_unzipped_cheats(url=True, folders=True, zip_id=True, zips=True, t
         }
     }
     if not folders:
-        o.pop('folders')
+        o['folders'] = {}
+    if not files:
+        o['files'] = {}
     if not zips:
         o['zips'] = {}
     if is_internal_summary:

@@ -1,4 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -15,18 +16,21 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict
+from typing import Dict, Set
 
+from downloader.config import download_sensitive_configs
 from downloader.constants import K_BASE_PATH, K_ZIP_FILE_COUNT_THRESHOLD,\
     K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_new, FILE_MiSTer, FILE_MiSTer_old, K_BASE_SYSTEM_PATH
 from downloader.file_filter import BadFileFilterPartException
-from downloader.file_system import FolderCreationError
-from downloader.other import UnreachableException
+from downloader.file_system import FolderCreationError, ReadOnlyFileSystem, UnlinkTemporaryException, FileCopyError
+from downloader.free_space_reservation import FreeSpaceReservation
+from downloader.other import UnreachableException, calculate_url
 
 
 class _Session:
     def __init__(self):
         self.files_that_failed = []
+        self.files_that_failed_from_zip = []
         self.folders_that_failed = []
         self.zips_that_failed = []
         self.correctly_installed_files = []
@@ -43,35 +47,55 @@ class _Session:
 
 class OnlineImporter:
     def __init__(self, file_filter_factory, file_system_factory, file_downloader_factory, path_resolver_factory,
-                 local_repository, external_drives_repository, waiter, logger):
+                 local_repository, external_drives_repository, free_space_reservation: FreeSpaceReservation, waiter, logger):
         self._file_filter_factory = file_filter_factory
         self._file_system_factory = file_system_factory
         self._file_downloader_factory = file_downloader_factory
         self._path_resolver_factory = path_resolver_factory
         self._local_repository = local_repository
         self._external_drives_repository = external_drives_repository
+        self._free_space_reservation = free_space_reservation
         self._waiter = waiter
         self._logger = logger
         self._unused_filter_tags = []
+        self._full_partitions = []
         self._base_session = _Session()
 
     def download_dbs_contents(self, importer_command, full_resync):
         # TODO: Move the filter validation to earlier (before downloading dbs).
         self._logger.bench('Online Importer start.')
 
+        packages = self._unpack_dbs_data(importer_command, full_resync)
+        self._process_already_present_files(packages)
+        not_fitting_files = self._filter_not_fitting_files()
+        self._create_folders(packages)
+        config_map = self._build_config_map(packages)
+        self._process_config_map(config_map, not_fitting_files)
+        self._remove_files(packages)
+        self._finish_stores(packages)
+        self._remove_folders(importer_command)
+        self._unused_filter_tags = self._file_filter_factory.unused_filter_parts()
+        self._clean_stores(importer_command)
+
+        self._logger.bench('Online Importer done.')
+
+    def _unpack_dbs_data(self, importer_command, full_resync):
+        packages = []
+
+        self._logger.print("Preparing databases ...")
+
         for db, store, config in importer_command.read_dbs():
             read_only_store = store.read_only()
-            write_only_store = store.write_only()
 
-            self._print_db_header(db)
-            file_system = self._file_system_factory.create_for_config(config)
+            self._logger.debug(f"Preparing db '{db.db_id}'...")
+            file_system = ReadOnlyFileSystem(self._file_system_factory.create_for_config(config))
 
             self._logger.bench('Restoring filtered ZIP data...')
             restored_db = _OnlineFilteredZipData(db, read_only_store).restore_filtered_zip_data()
 
             self._logger.bench('Expanding summaries...')
-            zip_summaries = _OnlineZipSummaries(restored_db, write_only_store, read_only_store, full_resync, config, file_system, self._file_downloader_factory, self._logger, self._base_session)
-            expanded_db = zip_summaries.expand_summaries()
+            zip_summaries_expander = _OnlineZipSummaries(restored_db, read_only_store, full_resync, config, file_system, self._file_downloader_factory, self._logger, self._base_session)
+            expanded_db, zip_summaries = zip_summaries_expander.expand_summaries()
 
             self._logger.bench('Filtering Database...')
             file_filter = self._create_file_filter(expanded_db, config)
@@ -84,41 +108,179 @@ class OnlineImporter:
             resolver = _Resolver(filtered_db, read_only_store, config, path_resolver, self._local_repository, self._logger, self._base_session, externals)
             resolved_db = resolver.translate_paths()
 
-            db_importer = _OnlineDatabaseImporter(resolved_db, write_only_store, read_only_store, externals, full_resync, config, file_system, self._file_downloader_factory, self._logger, self._base_session, self._external_drives_repository)
-
-            self._logger.bench('Precaching files...')
-            file_system.precache_is_file_with_folders(resolved_db.folders.keys())
+            db_file_selector = _DatabaseFileSelector(resolved_db, read_only_store, full_resync, file_system, self._logger, self._base_session, self._free_space_reservation)
 
             self._logger.bench('Selecting changed files...')
-            changed_files, needed_zips = db_importer.select_changed_files()
+            changed_files, already_present_files, needed_zips = db_file_selector.select_changed_files()
 
-            self._logger.bench('Creating folders...')
+            packages.append((resolved_db, config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries))
+
+        return packages
+
+    def _process_already_present_files(self, packages):
+        for db, config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries in packages:
+            self._logger.bench(f'Process {db.db_id} already present files...')
+
+            read_only_store = store.read_only()
+            write_only_store = store.write_only()
+
+            file_system = self._file_system_factory.create_for_config(config)
+            db_importer = _OnlineDatabaseImporter(db, write_only_store, read_only_store, externals, config, file_system, self._file_downloader_factory, self._logger, self._base_session, self._external_drives_repository)
+
+            db_importer.process_already_present_files(already_present_files)
+
+    def _filter_not_fitting_files(self) -> Set[str]:
+        self._logger.debug(f"Free space: {self._free_space_reservation.free_space()}")
+
+        full_partitions = self._free_space_reservation.get_full_partitions()
+        if len(full_partitions) == 0:
+            return set()
+
+        self._logger.bench(f'Filtering out not fitting files...')
+
+        not_fitting_files = set()
+        for partition in full_partitions:
+            self._logger.print(f"Partition {partition.partition_path} is full!")
+            self._full_partitions.append(partition.partition_path)
+            not_fitting_files.update(partition.files)
+
+        return not_fitting_files
+
+    def _create_folders(self, packages):
+        for db, config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries in packages:
+            self._logger.bench(f'Creating db {db.db_id} folders...')
+
+            read_only_store = store.read_only()
+            write_only_store = store.write_only()
+
+            file_system = self._file_system_factory.create_for_config(config)
+            db_importer = _OnlineDatabaseImporter(db, write_only_store, read_only_store, externals, config, file_system, self._file_downloader_factory, self._logger, self._base_session, self._external_drives_repository)
             db_importer.create_folders()
 
-            self._logger.bench('Remove deleting files...')
+    def _build_config_map(self, packages):
+        self._logger.debug(f"Building config map...")
+        config_map = {}
+        for db, config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries in packages:
+            config_key = ''
+            for key in download_sensitive_configs():
+                config_key += f'{key}:{str(config[key])};'
+
+            if config_key not in config_map:
+                config_map[config_key] = []
+            config_map[config_key].append((db, config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries))
+
+        return config_map
+
+    def _process_config_map(self, config_map, not_fitting_files: Set[str]):
+        for config_json, subpackages in config_map.items():
+            self._logger.debug(f"Processing config '{config_json}'...")
+            config = None if len(subpackages) == 0 else subpackages[0][1]
+            file_system = self._file_system_factory.create_for_config(config)
+            file_downloader = self._file_downloader_factory.create(config, parallel_update=True)
+
+            files_to_download = []
+            store_by_file = {}
+            is_first_run = False
+
+            for db, _config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries in subpackages:
+                self._logger.bench(f'Process db {db.db_id} changed files...')
+
+                read_only_store = store.read_only()
+                write_only_store = store.write_only()
+
+                if len(changed_files) > 0:
+                    files_to_download.append((f'[{db.db_id}]', {'db': db}))
+                else:
+                    self._print_db_header(db)
+                    self._logger.print("Nothing new to download from given sources.")
+
+                db_importer = _OnlineDatabaseImporter(db, write_only_store, read_only_store, externals, config, file_system, self._file_downloader_factory, self._logger, self._base_session,
+                                                      self._external_drives_repository)
+
+                for file_path, file_description in changed_files.items():
+                    download_description = {'hash': file_description['hash'], 'size': file_description['size']}
+                    if 'url' in file_description:
+                        download_description['url'] = file_description['url']
+
+                    base_files_url = db.base_files_url
+                    if 'zip_id' in file_description and file_description['zip_id'] in db.zips:
+                        zip_id = file_description['zip_id']
+                        download_description['zip_id'] = zip_id
+                        if 'zip_path' in file_description:
+                            download_description['zip_path'] = file_description['zip_path']
+                        zip_base_files_url = db.zips[zip_id].get('base_files_url', None)
+                        if zip_base_files_url is not None and len(zip_base_files_url) > 0:
+                            base_files_url = zip_base_files_url
+
+                    if 'url' not in download_description:
+                        maybe_url = calculate_url(base_files_url, file_path)
+                        if maybe_url is not None:
+                            download_description['url'] = maybe_url
+
+                    files_to_download.append((file_path, download_description))
+                    store_by_file[file_path] = [write_only_store, db_importer, file_description]
+
+                is_first_run = is_first_run or db_importer._is_first_run()
+                if len(needed_zips) > 0:
+                    db_importer._import_zip_contents(needed_zips, filtered_zip_data, file_downloader, not_fitting_files)
+
+            if len(files_to_download) == 0:
+                continue
+
+            not_downloaded_files = []
+            for file_path, download_description in files_to_download:
+                if 'size' in download_description and file_system.download_target_path(file_path) in not_fitting_files:
+                    not_downloaded_files.append(file_path)
+                    continue
+                file_downloader.queue_file(download_description, file_path)
+
+            self._logger.print("\nDownloading %d files:" % len(files_to_download))
+            file_downloader.download_files(is_first_run)
+
+            self._base_session.files_that_failed.extend(file_downloader.errors() + not_downloaded_files)
+            self._base_session.folders_that_failed.extend(file_downloader.failed_folders())
+            self._base_session.correctly_installed_files.extend(file_downloader.correctly_downloaded_files())
+
+            for file_path in file_downloader.errors():
+                write_only_store, db_importer, file_description = store_by_file[file_path]
+                write_only_store.remove_file(file_path)
+
+            for file_path in file_downloader.correctly_downloaded_files():
+                write_only_store, db_importer, file_description = store_by_file[file_path]
+                if file_description.get('reboot', False):
+                    self._base_session.needs_reboot = True
+                db_importer._add_file_to_store(file_path, file_description)
+
+            for file_path in set(self._base_session.files_that_failed_from_zip) - set(file_downloader.correctly_downloaded_files()):
+                write_only_store, db_importer, file_description = store_by_file[file_path]
+                db_importer._add_file_to_store(file_path, file_description)
+
+    def _remove_files(self, packages):
+        for db, config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries in packages:
+            self._logger.bench(f'Remove db {db.db_id} deleted files...')
+
+            read_only_store = store.read_only()
+            write_only_store = store.write_only()
+
+            file_system = self._file_system_factory.create_for_config(config)
+            db_importer = _OnlineDatabaseImporter(db, write_only_store, read_only_store, externals, config, file_system, self._file_downloader_factory, self._logger, self._base_session, self._external_drives_repository)
+
             db_importer.remove_deleted_files()
 
-            self._logger.bench('Process changed files...')
-            db_importer.process_changed_files(changed_files, needed_zips, filtered_zip_data)
+    def _finish_stores(self, packages):
+        for db, config, store, _externals, _changed_files, _already_present_files, _needed_zips, filtered_zip_data, zip_summaries in packages:
+            self._logger.bench(f'Finishing db {db.db_id} store...')
 
-            self._logger.bench('Finishing store...')
+            write_only_store = store.write_only()
+            write_only_store.populate_with_summary(zip_summaries, db.zips)
+            write_only_store.drop_removed_zips_from_store(db.zips)
             write_only_store.save_filtered_zip_data(filtered_zip_data)
             write_only_store.set_base_path(config[K_BASE_PATH])
 
-            file_system.print_debug()
-
-        self._logger.bench('Removing folders...')
-        self._remove_folders(importer_command)
-        self._unused_filter_tags = self._file_filter_factory.unused_filter_parts()
-
-        self._logger.bench('Cleaning stores...')
-        self._clean_stores(importer_command)
-
-        self._logger.bench('Online Importer done.')
-
     def _clean_stores(self, importer_command):
+        self._logger.bench('Cleaning stores...')
 
-        for db, store, config in importer_command.read_dbs():
+        for _, store, config in importer_command.read_dbs():
             write_store = store.write_only()
             read_store = store.read_only()
 
@@ -131,6 +293,9 @@ class OnlineImporter:
 
             delete_files = []
             for file_path, file_description in read_store.files.items():
+                if 'zip_id' in file_description and file_path in self._base_session.files_that_failed_from_zip:
+                    continue
+
                 if is_system_path(file_description):
                     present_file_path = f'{config[K_BASE_SYSTEM_PATH]}/{file_path}'
                 else:
@@ -140,7 +305,6 @@ class OnlineImporter:
                     continue
 
                 delete_files.append(file_path)
-
             for file_path in delete_files:
                 write_store.remove_file(file_path)
 
@@ -155,11 +319,12 @@ class OnlineImporter:
                     continue
 
                 delete_folders.append(folder_path)
-
             for folder_path in delete_folders:
                 write_store.remove_folder(folder_path)
 
     def _remove_folders(self, importer_command):
+        self._logger.bench('Removing folders...')
+
         store_by_id = {}
         db_folders = {}
         internal_store_folders = {}
@@ -320,6 +485,9 @@ class OnlineImporter:
     def needs_reboot(self):
         return self._base_session.needs_reboot
 
+    def full_partitions(self):
+        return self._full_partitions
+
     def new_files_not_overwritten(self):
         return self._base_session.new_files_not_overwritten
 
@@ -455,10 +623,8 @@ class _OnlineFilteredZipData:
 
 
 class _OnlineZipSummaries:
-    def __init__(self, db, write_only_store, read_only_store, full_resync, config, file_system, file_downloader_factory,
-                 logger, session):
+    def __init__(self, db, read_only_store, full_resync, config, file_system, file_downloader_factory, logger, session):
         self._db = db
-        self._write_only_store = write_only_store
         self._read_only_store = read_only_store
         self._full_resync = full_resync
         self._config = config
@@ -466,16 +632,6 @@ class _OnlineZipSummaries:
         self._file_downloader_factory = file_downloader_factory
         self._logger = logger
         self._session = session
-
-    def _drop_removed_zips_from_store(self):
-        removed_zip_ids = []
-        for zip_id in self._read_only_store.zips:
-            if zip_id in self._db.zips:
-                continue
-
-            removed_zip_ids.append(zip_id)
-
-        self._write_only_store.remove_zip_ids(removed_zip_ids)
 
     def expand_summaries(self):
         zip_ids_from_store = []
@@ -499,18 +655,17 @@ class _OnlineZipSummaries:
                 raise UnreachableException(
                     'Unreachable code path for: %s.%s' % (self._db.db_id, zip_id))  # pragma: no cover
 
+        summaries = []
         if len(zip_ids_from_internal_summary) > 0:
-            self._import_zip_ids_from_internal_summaries(zip_ids_from_internal_summary)
+            summaries.extend(self._import_zip_ids_from_internal_summaries(zip_ids_from_internal_summary))
 
         if len(zip_ids_from_store) > 0:
             self._import_zip_ids_from_store(zip_ids_from_store)
 
         if len(zip_ids_to_download) > 0:
-            self._import_zip_ids_from_network(zip_ids_to_download)
+            summaries.extend(self._import_zip_ids_from_network(zip_ids_to_download))
 
-        self._drop_removed_zips_from_store()
-
-        return self._db
+        return self._db, summaries
 
     def _store_summary_file_hash_by_zip_id(self, zip_id):
         store_zip_desc = self._read_only_store.zip_description(zip_id)
@@ -518,10 +673,14 @@ class _OnlineZipSummaries:
         return store_summary_file['hash'] if 'hash' in store_summary_file else None
 
     def _import_zip_ids_from_internal_summaries(self, zip_ids_from_internal_summaries):
+        summaries = []
         for zip_id in zip_ids_from_internal_summaries:
             summary = self._db.zips[zip_id]['internal_summary']
             self._populate_with_summary(zip_id, summary)
             self._db.zips[zip_id].pop('internal_summary')
+            summaries.append((zip_id, summary))
+
+        return summaries
 
     def _import_zip_ids_from_network(self, zip_ids_to_download):
         summary_downloader = self._file_downloader_factory.create(self._config, parallel_update=True, silent=True)
@@ -541,12 +700,12 @@ class _OnlineZipSummaries:
                                 summary_downloader.correctly_downloaded_files()]
         failed_zip_ids = [zip_ids_by_temp_zip[temp_zip] for temp_zip in summary_downloader.errors()]
 
-        self._logger.print()
-
+        summaries = []
         for zip_id, temp_zip in downloaded_summaries:
             summary = self._file_system.load_dict_from_file(temp_zip)
             self._populate_with_summary(zip_id, summary)
-            self._file_system.unlink(temp_zip)
+            self._file_system.unlink(temp_zip, exception=UnlinkTemporaryException())
+            summaries.append((zip_id, summary))
 
         zip_ids_falling_back_to_store = [zip_id for zip_id in failed_zip_ids if zip_id in self._read_only_store.zips]
         if len(zip_ids_falling_back_to_store) > 0:
@@ -555,10 +714,11 @@ class _OnlineZipSummaries:
         self._session.files_that_failed.extend(summary_downloader.errors())
         self._session.folders_that_failed.extend(summary_downloader.failed_folders())
 
+        return summaries
+
     def _populate_with_summary(self, zip_id, summary):
         self._db.files.update(summary['files'])
         self._db.folders.update(summary['folders'])
-        self._write_only_store.add_zip(zip_id, self._db.zips[zip_id])
 
     def _import_zip_ids_from_store(self, zip_ids):
         self._db.files.update(self._read_only_store.entries_in_zip('files', zip_ids))
@@ -568,23 +728,19 @@ class _OnlineZipSummaries:
         return self._read_only_store.has_no_files
 
 
-class _OnlineDatabaseImporter:
-    def __init__(self, db, write_only_store, read_only_store, externals, full_resync, config, file_system,
-                 file_downloader_factory, logger, session, external_drives_repository):
+class _DatabaseFileSelector:
+    def __init__(self, db, read_only_store, full_resync, file_system, logger, session, free_space_reservation: FreeSpaceReservation):
         self._db = db
-        self._write_only_store = write_only_store
         self._read_only_store = read_only_store
-        self._externals = externals
         self._full_resync = full_resync
-        self._config = config
         self._file_system = file_system
-        self._file_downloader_factory = file_downloader_factory
         self._logger = logger
         self._session = session
-        self._external_drives_repository = external_drives_repository
+        self._free_space_reservation = free_space_reservation
 
     def select_changed_files(self):
         changed_files = {}
+        already_present_files = {}
         needed_zips = {}
 
         for file_path, file_description in self._db.files.items():
@@ -597,14 +753,11 @@ class _OnlineDatabaseImporter:
                 store_hash = self._read_only_store.hash_file(file_path)
 
                 if not self._full_resync and store_hash == file_description['hash']:
-                    self._add_file_to_store(file_path, file_description)
+                    already_present_files[file_path] = [file_description, True]
                     continue
 
                 if store_hash == 'file_does_not_exist_so_cant_get_hash' and self._file_system.hash(file_path) == file_description['hash']:
-                    self._logger.print('No changes: %s' % file_path)
-                    self._add_file_to_store(file_path, file_description)
-                    self._session.correctly_installed_files.append(file_path)
-                    self._session.processed_files[file_path] = self._db.db_id
+                    already_present_files[file_path] = [file_description, False]
                     continue
 
                 if 'overwrite' in file_description and not file_description['overwrite']:
@@ -613,6 +766,8 @@ class _OnlineDatabaseImporter:
                     continue
 
             changed_files[file_path] = file_description
+            self._session.processed_files[file_path] = self._db.db_id
+            self._free_space_reservation.reserve_space_for_file(self._file_system.download_target_path(file_path), file_description)
 
             if 'zip_id' not in file_description:
                 continue
@@ -623,14 +778,38 @@ class _OnlineDatabaseImporter:
             needed_zips[zip_id]['files'][file_path] = file_description
             needed_zips[zip_id]['total_size'] += file_description['size']
 
-        return changed_files, needed_zips
+        return changed_files, already_present_files, needed_zips
+
+
+class _OnlineDatabaseImporter:
+    def __init__(self, db, write_only_store, read_only_store, externals, config, file_system,
+                 file_downloader_factory, logger, session, external_drives_repository):
+        self._db = db
+        self._write_only_store = write_only_store
+        self._read_only_store = read_only_store
+        self._externals = externals
+        self._config = config
+        self._file_system = file_system
+        self._file_downloader_factory = file_downloader_factory
+        self._logger = logger
+        self._session = session
+        self._external_drives_repository = external_drives_repository
+
+    def process_already_present_files(self, already_existing_files):
+        for file_path, [file_description, has_matching_hash] in already_existing_files.items():
+            self._add_file_to_store(file_path, file_description)
+            if has_matching_hash:
+                continue
+
+            self._logger.print('No changes: %s' % file_path)
+            self._session.correctly_installed_files.append(file_path)
+            self._session.processed_files[file_path] = self._db.db_id
 
     def process_changed_files(self, changed_files, needed_zips, filtered_zip_data):
         file_downloader = self._file_downloader_factory.create(self._config, parallel_update=True)
         file_downloader.set_base_files_url(self._db.base_files_url)
 
         for file_path, file_description in changed_files.items():
-            self._session.processed_files[file_path] = self._db.db_id
             file_downloader.queue_file(file_description, file_path)
 
         if len(needed_zips) > 0:
@@ -641,12 +820,13 @@ class _OnlineDatabaseImporter:
         self._session.files_that_failed.extend(file_downloader.errors())
         self._session.folders_that_failed.extend(file_downloader.failed_folders())
         self._session.correctly_installed_files.extend(file_downloader.correctly_downloaded_files())
-        self._session.needs_reboot = self._session.needs_reboot or file_downloader.needs_reboot()
 
         for file_path in file_downloader.errors():
             self._write_only_store.remove_file(file_path)
 
         for file_path in file_downloader.correctly_downloaded_files():
+            if changed_files[file_path].get('reboot', False):
+                self._session.needs_reboot = True
             self._add_file_to_store(file_path, changed_files[file_path])
 
     def _add_file_to_store(self, file_path, file_description):
@@ -661,7 +841,7 @@ class _OnlineDatabaseImporter:
     def _is_first_run(self):
         return self._read_only_store.has_no_files
 
-    def _import_zip_contents(self, needed_zips, filtered_zip_data, file_downloader):
+    def _import_zip_contents(self, needed_zips, filtered_zip_data, file_downloader, not_fitting_files):
         zip_downloader = self._file_downloader_factory.create(self._config, parallel_update=True)
         zip_ids_by_temp_zip = dict()
 
@@ -677,6 +857,16 @@ class _OnlineDatabaseImporter:
             if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
                 continue
 
+            if len(not_fitting_files):
+                any_not_fitting = False
+                for file_path in zipped_files['files']:
+                    if self._file_system.download_target_path(file_path) in not_fitting_files:
+                        self._session.files_that_failed_from_zip.append(file_path)
+                        any_not_fitting = True
+
+                if any_not_fitting:
+                    continue
+
             temp_zip = '%s_%s_contents.zip' % (temp_filename.value, zip_id)
             zip_ids_by_temp_zip[temp_zip] = zip_id
             zip_downloader.queue_file(self._db.zips[zip_id]['contents_file'], temp_zip)
@@ -687,7 +877,6 @@ class _OnlineDatabaseImporter:
             return
 
         zip_downloader.download_files(self._is_first_run())
-        self._logger.print()
         for temp_zip in sorted(zip_downloader.correctly_downloaded_files()):
             zip_id = zip_ids_by_temp_zip[temp_zip]
             zipped_files = needed_zips[zip_id]
@@ -695,7 +884,6 @@ class _OnlineDatabaseImporter:
 
             self._import_zip_contents_from_temp_zip(temp_zip, zip_id, zipped_files, zip_description, filtered_zip_data, file_downloader)
 
-        self._logger.print()
         self._session.files_that_failed.extend(zip_downloader.errors())
 
     def _import_zip_contents_from_temp_zip(self, temp_zip, zip_id, zipped_files, zip_description, filtered_zip_data, file_downloader):
@@ -729,7 +917,12 @@ class _OnlineDatabaseImporter:
             tmp_path = '%s_%s/' % (temp_filename.value, zip_id)
             self._file_system.unzip_contents(temp_zip, tmp_path, list(zipped_files['files']))
             for file_path, file_description in zipped_files['files'].items():
-                self._file_system.copy('%s%s' % (tmp_path, file_description['zip_path']), file_path)
+                try:
+                    self._file_system.copy('%s%s' % (tmp_path, file_description['zip_path']), file_path)
+                except FileCopyError as _e:
+                    self._session.files_that_failed_from_zip.append(file_path)
+                    self._logger.print('ERROR: File "%s" could not be copied, skipping.' % file_path)
+
             self._file_system.unlink(temp_zip)
             self._file_system.remove_non_empty_folder(tmp_path)
             temp_filename.close()

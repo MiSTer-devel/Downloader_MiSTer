@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Version 1.8 - 2023-09-21
+
+### Added
+- Introduced a free space check before installing files. The minimum free space can be adjusted at your own risk using the `minimum_system_free_space_mb` and `minimum_external_free_space_mb` options in `downloader.ini`. More information is available in the README file.
+- Added the capability to back up and restore system files during Linux updates (wizzo). For more information, see: https://github.com/MiSTer-devel/Downloader_MiSTer/pull/35
+- Introduced a new test bench to realistically measure system performance during development.
+
+### Changed
+- Implemented file system caching that improves the speed of short runs (runs with no updates) by around 3x when the system has been recently initialized.
+- Databases are now processed in parallel during file installations, increasing overall speed. This results in a 7-15% speed improvement with stable Ethernet connections and a 50% speed improvement on less reliable Wi-Fi connections.
+- Introduced a job system to manage concurrency. Currently, it is used for fetching, installing, and validating files.
+- Reworked the build script to reduce the bundle size, slightly speeding up the time the launcher takes to download it during each Downloader run.
+- Local storage is now saved without compression, saving around a second in all runs but using slightly more system space (typically less than 5 MB).
+- Improved handling of file and folder creation errors.
+- Fixed a bug affecting non-Keep-Alive connections.
+- Fixed a bug that occurred when trying to hash a corrupted file.
+- Fixed a bug affecting the download filters feature under certain conditions.
+- Reimplemented the debug script in Python, adding additional options and features. This is useful primarily for development.
+- Various other fixes and improvements.
+
+### Removed
+- Deprecated the `base_path` option. While it is still used internally, it has been removed from the README and is no longer intended for user customization.
+
 ## Version 1.7 - 2023-04-28
 
 ### Added

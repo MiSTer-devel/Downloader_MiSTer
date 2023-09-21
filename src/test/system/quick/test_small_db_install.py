@@ -93,4 +93,4 @@ class TestSmallDbInstall(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0)
         time.sleep(0.25)
-        self.assertEqual(save, os.path.isfile("%s/Scripts/.config/downloader/downloader.json.zip" % config[K_BASE_SYSTEM_PATH]))
+        self.assertEqual(save, os.path.isfile("%s/Scripts/.config/downloader/downloader.json" % config[K_BASE_SYSTEM_PATH]))

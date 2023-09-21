@@ -107,7 +107,7 @@ class _OfflineDatabaseImporter:
             self._import_folders(summary['folders'], read_store, write_store)
             self._import_files(summary['files'], read_store, write_store)
             db.zips[zip_id].pop('internal_summary')
-            write_store.add_zip(zip_id, db.zips[zip_id])
+            write_store.add_zip(zip_id, db.zips[zip_id], summary)
 
         temp_filename = self._file_system.unique_temp_filename()
 
@@ -132,7 +132,7 @@ class _OfflineDatabaseImporter:
             if 'summary_file' in db.zips[zip_id] and 'unzipped_json' in db.zips[zip_id]['summary_file']:
                 db.zips[zip_id]['summary_file'].pop('unzipped_json')
 
-            write_store.add_zip(zip_id, db.zips[zip_id])
+            write_store.add_zip(zip_id, db.zips[zip_id], summary)
             self._import_folders(summary['folders'], read_store, write_store)
             self._import_files(summary['files'], read_store, write_store)
             self._file_system.unlink(temp_zip)

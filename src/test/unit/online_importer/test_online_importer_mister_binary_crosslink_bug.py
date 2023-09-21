@@ -53,6 +53,7 @@ class TestOnlineImporterMiSTerBinaryCrosslinkBug(OnlineImporterTestBase):
             },
         ), sut.fs_data)
         self.assertEqual(fs_records([
+            {'scope': 'write_incoming_stream', 'data': media_fat(FILE_MiSTer_new)},
             {'scope': 'move', 'data': (media_fat(FILE_MiSTer), media_fat(FILE_MiSTer_old))},
             {'scope': 'move', 'data': (media_fat(FILE_MiSTer_new), media_fat(FILE_MiSTer))},
         ]), sut.fs_records)

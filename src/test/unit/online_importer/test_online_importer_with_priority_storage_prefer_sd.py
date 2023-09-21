@@ -16,13 +16,14 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import FILE_PDFViewer, MEDIA_FAT, MEDIA_USB1
+from downloader.constants import FILE_PDFViewer, MEDIA_FAT
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data
 from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1, folder_games, \
     folder_games_nes, media_usb1, media_usb2, config_with, file_nes_contra, file_nes_palette_a, file_nes_manual, \
     folder_docs, db_id_external_drives_1, db_id_external_drives_2, file_neogeo_md, file_neogeo_md_descr, file_s32x_md, \
-    file_s32x_md_descr, media_usb0, folder_docs_neogeo, folder_docs_s32x, file_foo, empty_store, db_entity, file_nes_smb1_descr, file_a_descr
+    file_s32x_md_descr, media_usb0, folder_docs_neogeo, folder_docs_s32x, file_foo, empty_store, folder_a, folder_games_md, files_a, \
+    store_test_with_file_a_descr, file_a, file_md_sonic, db_test_with_file_a, db_smb1, db_sonic
 from test.unit.online_importer.online_importer_with_priority_storage_test_base import fs_folders_nes_on_usb1_and_usb2, \
     fs_files_smb1_on_usb1, store_smb1_on_usb1, fs_folders_nes_on_usb2, store_smb1_on_usb2, fs_files_smb1_on_usb2, \
     store_smb1_on_usb1_and_usb2, fs_files_smb1_on_usb1_and_usb2, fs_folders_games_on_usb1_and_usb2, \
@@ -40,8 +41,8 @@ from test.unit.online_importer.online_importer_with_priority_storage_test_base i
     fs_folders_nes_on_delme, hidden_drive, store_pdfviewer_on_base_system_path_hidden, fs_folders_pdfviewers_on_hidden, \
     fs_files_pdfviewers_on_hidden, _store_files_foo, _store_files_s32x_md, _store_files_smb1, _store_folders_nes, \
     _store_folders_docs_s32x, _store_folders_docs_neogeo, _store_files_neogeo_md, _store_files_contra, \
-    OnlineImporterWithPriorityStorageTestBase, store_nes_folder, store_games_folder_on_usb1_too, store_just_nes_palettes_on_usb1, fs_files_nes_palettes_on_usb1, store_smb1_and_contra_on_fat, \
-    fs_files_smb1_and_contra_on_fat_and_usb0, fs_folders_nes_on_fat_and_usb0, fs_folders_nes_on_usb0, fs_files_smb1_and_contra_on_usb0, store_smb1_on_fat, fs_files_smb1_on_usb0
+    OnlineImporterWithPriorityStorageTestBase, store_nes_folder, store_just_nes_palettes_on_usb1, fs_files_nes_palettes_on_usb1, store_smb1_and_contra_on_fat, \
+    store_smb1_on_fat, fs_files_sonic_on_usb1, store_sonic_on_usb1
 
 
 class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPriorityStorageTestBase):
@@ -394,6 +395,42 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
         self.assertEqual(fs_data(files=fs_files_smb1_on_fat_and_usb1(), folders=fs_folders_nes_on_fat_and_usb1()), sut.fs_data)
         self.assertReports(sut, [])
 
+    def test_delme_download_three_dbs_with_sd_priority_files___on_empty_system_with_some_folders____installs_all_in_fat_except_md(self):
+        sut, stores = self.download_three_dbs_with_sd_priority_files(
+            with_fs=fs(
+                folders=[folder_a, folder_games, folder_games_nes, media_usb1(folder_games), media_usb1(folder_games_md)]
+            )
+        )
+        self.assertSystem({
+            "fs": fs_data(files=installed_three_dbs_fs_files(), folders=installed_three_dbs_fs_folders()),
+            "stores": installed_three_dbs_store(),
+            "ok": [file_a, file_nes_smb1, file_md_sonic],
+        }, sut, stores)
+
+    def test_delme_download_three_dbs_with_sd_priority_files___on_second_run____doesnt_save_anything(self):
+        sut, stores = self.download_three_dbs_with_sd_priority_files(
+            input_stores=installed_three_dbs_store(),
+            with_fs=fs(files=installed_three_dbs_fs_files(), folders=installed_three_dbs_fs_folders())
+        )
+        self.assertSystem({
+            "fs": fs_data(files=installed_three_dbs_fs_files(), folders=installed_three_dbs_fs_folders()),
+            "stores": installed_three_dbs_store(),
+            "save": False,
+        }, sut, stores)
+
+    def download_three_dbs_with_sd_priority_files(self, input_stores=None, with_fs=None):
+        return self._download_databases(
+            fs(folders=[media_usb1(folder_games), media_fat(folder_games)]) if with_fs is None else with_fs,
+            [db_test_with_file_a(db_id='1'), db_smb1(db_id='2'), db_sonic(db_id='3')],
+            input_stores=input_stores
+        )
+
 
 def fs(files=None, folders=None, base_path=None, config=None):
     return ImporterImplicitInputs(files=files, folders=folders, base_path=base_path, config=config)
+
+
+def installed_three_dbs_fs_files(): return {**files_a(), **fs_files_smb1_on_fat(), **fs_files_sonic_on_usb1()}
+def installed_three_dbs_fs_folders(): return [folder_a, folder_games, folder_games_nes, media_usb1(folder_games), media_usb1(folder_games_md)]
+def installed_three_dbs_store(): return [store_test_with_file_a_descr(), store_smb1_on_fat(), store_sonic_on_usb1()]
+

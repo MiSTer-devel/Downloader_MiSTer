@@ -17,10 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import json
 from pathlib import Path
+from typing import Any
 
 from downloader.constants import K_BASE_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE
+from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
-    absolute_parent_folder, is_windows, FolderCreationError, FsCache
+    absolute_parent_folder, is_windows, FolderCreationError, FsCache, FileCopyError
 from downloader.other import ClosableValue, UnreachableException
 from test.fake_importer_implicit_inputs import FileSystemState
 from downloader.logger import NoLogger
@@ -47,8 +49,11 @@ class FileSystemFactory:
         self._write_records = write_records if write_records is not None else []
         self._fs_cache = FsCache()
 
-    def set_create_folders_buggy(self):
-        self._fake_failures['create_folders'] = True
+    def set_create_folders_will_error(self):
+        self._fake_failures['create_folders_error'] = True
+
+    def set_copy_will_error(self):
+        self._fake_failures['copy_error'] = True
 
     def create_for_config(self, config):
         return FakeFileSystem(self._state, config, self._fake_failures, self._write_records, self._fs_cache)
@@ -109,7 +114,7 @@ class FakeFileSystem(ProductionFileSystem):
     def resolve(self, path):
         return self._path(path)
 
-    def is_file(self, path):
+    def is_file(self, path, use_cache: bool = True):
         full_path = self._path(path)
         if self._fs_cache.contains_file(full_path):
             return True
@@ -170,6 +175,8 @@ class FakeFileSystem(ProductionFileSystem):
         source_description = self.state.files[source_file]
         if 'copy_buggy' in self._fake_failures:
             source_description['hash'] = 'buggy'
+        elif 'copy_error' in self._fake_failures:
+            raise FileCopyError(target)
 
         self.state.files[target_file] = source_description
         self._write_records.append(_Record('copy', (source_file, target_file)))
@@ -182,7 +189,7 @@ class FakeFileSystem(ProductionFileSystem):
         folder = self._path(path)
         self.state.folders[folder] = {}
         self._write_records.append(_Record('make_dirs', folder))
-        if 'create_folders' in self._fake_failures:
+        if 'create_folders_error' in self._fake_failures:
             raise FolderCreationError(folder)
 
     def make_dirs_parent(self, path):
@@ -192,7 +199,7 @@ class FakeFileSystem(ProductionFileSystem):
         parent = self._path(str(path_object.parent))
         self.state.folders[parent] = {}
         self._write_records.append(_Record('make_dirs_parent', parent))
-        if 'create_folders' in self._fake_failures:
+        if 'create_folders_error' in self._fake_failures:
             raise FolderCreationError(parent)
 
     def _parent_folder(self, path):
@@ -231,6 +238,14 @@ class FakeFileSystem(ProductionFileSystem):
 
     def download_target_path(self, path):
         return self._path(path)
+
+    def write_incoming_stream(self, in_stream: Any, target_path: str):
+        if in_stream.storing_problems:
+            return
+
+        self._write_records.append(_Record('write_incoming_stream', target_path))
+        self.state.files[target_path] = in_stream.description
+        self._fs_cache.add_file(target_path)
 
     def unlink(self, path, verbose=True):
         full_path = self._path(path)
