@@ -27,6 +27,7 @@ pin_metadata "${DOWNLOADER_ZIP}"
 echo '#!/usr/bin/env python3' | cat - "${DOWNLOADER_ZIP}" > "${TEMP_ZIP2}"
 pin_metadata "${TEMP_ZIP2}"
 popd >/dev/null 2>&1
+cp "${TEMPDIR}/${DOWNLOADER_ZIP}" .
 cd ..
 
 cat <<-EOF
