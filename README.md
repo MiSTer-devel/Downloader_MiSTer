@@ -115,7 +115,7 @@ NOTE: If you manually add custom databases, you might want to make sure that you
 
 ### Supporters+ shout-out!
 
-Daniel Tarsky, James D Eberhart, Kristian Hall, MiSTerFPGA.co.uk, Tony Escobar and turbochop3300
+Daniel Tarsky, James D Eberhart, Koala Koa, MiSTerFPGA.co.uk, Tony Escobar, turbochop3300 and Wayne Booker
 
 Thank you so much for supporting this project! If you would like to show up here, join us as **Supporter+** on Patreon:
 
