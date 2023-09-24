@@ -194,7 +194,7 @@ class FullRunService:
             self._logger.print()
             if has_system: self._logger.print(f'Minimum required space for {self._config[K_BASE_SYSTEM_PATH]} is {self._config[K_MINIMUM_SYSTEM_FREE_SPACE_MB]}MB.')
             if has_external: self._logger.print(f'Minimum required space for external storage is {self._config[K_MINIMUM_EXTERNAL_FREE_SPACE_MB]}MB.')
-            self._logger.print('Free some space and try again.')
+            self._logger.print('Free some space and try again. [Waiting 10 seconds...]')
             self._waiter.sleep(10)
 
 
