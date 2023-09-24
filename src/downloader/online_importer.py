@@ -252,6 +252,8 @@ class OnlineImporter:
                 db_importer._add_file_to_store(file_path, file_description)
 
             for file_path in set(self._base_session.files_that_failed_from_zip) - set(file_downloader.correctly_downloaded_files()):
+                if file_path not in store_by_file:
+                    continue
                 write_only_store, db_importer, file_description = store_by_file[file_path]
                 db_importer._add_file_to_store(file_path, file_description)
 

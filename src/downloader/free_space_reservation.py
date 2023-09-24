@@ -75,7 +75,7 @@ class LinuxFreeSpaceReservation(FreeSpaceReservation):
         statvfs = os.statvfs(partition_path)
         free_space = statvfs.f_frsize * statvfs.f_bavail
         block_size = statvfs.f_frsize
-        self._logger.debug(f'Partition {partition_path} has {free_space} bytes available')
+        self._logger.debug(f'Partition {partition_path} has {free_space} bytes available [{block_size} bytes per block]')
         return Partition(available_space=free_space, min_space=partition_min_space(self._config, partition_path), block_size=block_size)
 
 
