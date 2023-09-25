@@ -172,6 +172,9 @@ class ReadOnlyFileSystem:
     def is_folder(self, path):
         return self._fs.is_folder(path)
 
+    def precache_is_file_with_folders(self, folders):
+        return self._fs.precache_is_file_with_folders(folders)
+
     def download_target_path(self, path):
         return self._fs.download_target_path(path)
 

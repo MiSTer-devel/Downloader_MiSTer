@@ -110,6 +110,9 @@ class OnlineImporter:
 
             db_file_selector = _DatabaseFileSelector(resolved_db, read_only_store, full_resync, file_system, self._logger, self._base_session, self._free_space_reservation)
 
+            self._logger.bench('Precaching files...')
+            file_system.precache_is_file_with_folders(resolved_db.folders.keys())
+
             self._logger.bench('Selecting changed files...')
             changed_files, already_present_files, needed_zips = db_file_selector.select_changed_files()
 
@@ -268,6 +271,7 @@ class OnlineImporter:
             db_importer = _OnlineDatabaseImporter(db, write_only_store, read_only_store, externals, config, file_system, self._file_downloader_factory, self._logger, self._base_session, self._external_drives_repository)
 
             db_importer.remove_deleted_files()
+            file_system.print_debug()
 
     def _finish_stores(self, packages):
         for db, config, store, _externals, _changed_files, _already_present_files, _needed_zips, filtered_zip_data, zip_summaries in packages:
