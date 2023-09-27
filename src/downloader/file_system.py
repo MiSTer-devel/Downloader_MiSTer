@@ -21,9 +21,10 @@ import hashlib
 import shutil
 import json
 import tempfile
+import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Set, Dict, Any, Tuple, Union
+from typing import List, Optional, Set, Dict, Any, Tuple
 
 from downloader.config import AllowDelete
 from downloader.constants import K_ALLOW_DELETE, K_BASE_PATH, HASH_file_does_not_exist
@@ -33,6 +34,7 @@ import zipfile
 
 
 is_windows = os.name == 'nt'
+COPY_BUFSIZE = 1024 * 1024 if is_windows else 64 * 1024
 
 
 class FileSystemFactory:
@@ -55,6 +57,10 @@ class FileSystem(ABC):
 
     @abstractmethod
     def unique_temp_filename(self) -> ClosableValue:
+        """interface"""
+
+    @abstractmethod
+    def persistent_temp_dir(self) -> str:
         """interface"""
 
     @abstractmethod
@@ -134,7 +140,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def write_incoming_stream(self, in_stream: Any, target_path: str):
+    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int):
         """interface"""
 
     @abstractmethod
@@ -222,6 +228,9 @@ class _FileSystem(FileSystem):
             name = os.path.join(tempfile._get_default_tempdir(), next(tempfile._get_candidate_names()))
         self._unique_temp_filenames.add(name)
         return ClosableValue(name, lambda: self._unique_temp_filenames.remove(name))
+
+    def persistent_temp_dir(self) -> str:
+        return tempfile._get_default_tempdir()
 
     def resolve(self, path: str) -> str:
         return str(Path(path).resolve())
@@ -379,9 +388,18 @@ class _FileSystem(FileSystem):
     def download_target_path(self, path: str) -> str:
         return self._path(path)
 
-    def write_incoming_stream(self, in_stream: Any, target_path: str):
+    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int):
+        start_time = time.time()
         with open(target_path, 'wb') as out_file:
-            shutil.copyfileobj(in_stream, out_file)
+            while True:
+                elapsed_time = time.time() - start_time
+                if elapsed_time > timeout:
+                    raise TimeoutError(f"Copy operation timed out after {timeout} seconds")
+
+                buf = in_stream.read(COPY_BUFSIZE)
+                if not buf:
+                    break
+                out_file.write(buf)
 
     def unlink(self, path: str, verbose: bool = True) -> bool:
         verbose = verbose and not path.startswith('/tmp/')

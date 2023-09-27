@@ -24,9 +24,11 @@ from urllib.error import URLError
 
 from downloader.db_entity import DbEntity
 from downloader.http_gateway import HttpGatewayException
+from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.errors import FileDownloadException
+from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.waiter import Waiter
 from downloader.job_system import ProgressReporter, Job
 from downloader.logger import Logger
@@ -101,6 +103,12 @@ class FileDownloadProgressReporter(ProgressReporter):
                 self._needs_newline = False
             self._logger.print(job.path)
             self._started_files.append(job.path)
+        if isinstance(job, FetchFileJob2) and not job.silent:
+            if self._needs_newline:
+                self._logger.print()
+                self._needs_newline = False
+            self._logger.print(job.info)
+            self._started_files.append(job.info)
 
         self._active_jobs[job.type_id] = self._active_jobs.get(job.type_id, 0) + 1
         self._check_time = time.time() + 2.0
@@ -116,7 +124,7 @@ class FileDownloadProgressReporter(ProgressReporter):
             self._check_time = time.time() + 1.0
 
     def notify_job_completed(self, job: Job):
-        if isinstance(job, FetchFileJob):
+        if isinstance(job, FetchFileJob) or isinstance(job, FetchFileJob2):
             self._accumulated_dots += 1
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
@@ -127,6 +135,12 @@ class FileDownloadProgressReporter(ProgressReporter):
                 self._print_symbols()
 
             self._downloaded_files.append(job.fetch_job.path)
+        elif isinstance(job, ValidateFileJob2):
+            self._accumulated_pluses += 1
+            if self._needs_newline or self._check_time < time.time():
+                self._print_symbols()
+
+            self._downloaded_files.append(job.fetch_job.info)
 
         self._remove_in_progress(job)
 
@@ -198,12 +212,14 @@ class FileDownloadProgressReporter(ProgressReporter):
         self._check_time = time.time() + 2.0
 
     def _url_path_from_job(self, job: Job) -> Optional[Tuple[str, str]]:
-        if isinstance(job, ValidateFileJob):
+        if isinstance(job, ValidateFileJob) or isinstance(job, ValidateFileJob2):
             job = job.fetch_job
         if isinstance(job, FetchFileJob):
             url, path = job.description.get('url', None) or '', job.path
+        elif isinstance(job, FetchFileJob2):
+            url, path = job.url, job.info
         else:
-            return None
+            return None, None
         return url, path
 
     def _message_from_exception(self, job: Job, exception: BaseException):

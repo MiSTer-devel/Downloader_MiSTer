@@ -30,6 +30,8 @@ from downloader.http_gateway import HttpGateway
 from downloader.importer_command import ImporterCommandFactory
 from downloader.job_system import JobSystem
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter
+from downloader.jobs.worker_context import DownloaderWorkerContext
+from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.logger import DebugOnlyLoggerDecorator
 from downloader.os_utils import LinuxOsUtils
 from downloader.storage_priority_resolver import StoragePriorityResolver
@@ -66,26 +68,44 @@ class FullRunServiceFactory:
         self._local_repository_provider.initialize(local_repository)
         importer_command_factory = ImporterCommandFactory(config)
 
+        http_connection_timeout = config[K_DOWNLOADER_TIMEOUT] / 4 if config[K_DOWNLOADER_TIMEOUT] > 60 else 15
+
         http_gateway = HttpGateway(
             ssl_ctx=context_from_curl_ssl(config[K_CURL_SSL]),
-            timeout=config[K_DOWNLOADER_TIMEOUT],
+            timeout=http_connection_timeout,
             logger=DebugOnlyLoggerDecorator(self._logger) if config[K_DEBUG] else None
         )
         atexit.register(http_gateway.cleanup)
         file_download_reporter = FileDownloadProgressReporter(self._logger, waiter)
         job_system = JobSystem(
             reporter=DownloaderProgressReporter(self._logger, [file_download_reporter]),
+            logger=self._logger,
             max_threads=config[K_DOWNLOADER_THREADS_LIMIT],
-            max_tries=config[K_DOWNLOADER_RETRIES]
+            max_tries=config[K_DOWNLOADER_RETRIES],
+            max_timeout=config[K_DOWNLOADER_TIMEOUT] * 2,
         )
 
         file_filter_factory = FileFilterFactory(self._logger)
-        file_downloader_factory = FileDownloaderFactory(file_system_factory, waiter, self._logger, job_system, file_download_reporter, http_gateway)
+        free_space_reservation = LinuxFreeSpaceReservation(logger=self._logger, config=config) if system_file_system.is_file(FILE_MiSTer_version) else UnlimitedFreeSpaceReservation()
+        file_downloader_factory = FileDownloaderFactory(file_system_factory, waiter, self._logger, job_system, file_download_reporter, http_gateway, free_space_reservation, external_drives_repository)
         db_gateway = DbGateway(config, system_file_system, file_downloader_factory, self._logger)
         offline_importer = OfflineImporter(file_system_factory, file_downloader_factory, self._logger)
-        free_space_reservation = LinuxFreeSpaceReservation(logger=self._logger, config=config) if system_file_system.is_file(FILE_MiSTer_version) else UnlimitedFreeSpaceReservation()
         online_importer = OnlineImporter(file_filter_factory, file_system_factory, file_downloader_factory, path_resolver_factory, local_repository, external_drives_repository, free_space_reservation, waiter, self._logger)
         linux_updater = LinuxUpdater(config, system_file_system, file_downloader_factory, self._logger)
+
+        workers_factory = DownloaderWorkersFactory(DownloaderWorkerContext(
+            job_system=job_system,
+            waiter=waiter,
+            logger=self._logger,
+            http_gateway=http_gateway,
+            file_system=system_file_system,
+            target_path_repository=None,
+            file_download_reporter=file_download_reporter,
+            free_space_reservation=free_space_reservation,
+            external_drives_repository=external_drives_repository,
+            config=config
+        ))
+
         return FullRunService(
             config,
             self._logger,
@@ -100,5 +120,7 @@ class FullRunServiceFactory:
             external_drives_repository,
             LinuxOsUtils(),
             waiter,
-            importer_command_factory
+            importer_command_factory,
+            job_system,
+            workers_factory
         )
