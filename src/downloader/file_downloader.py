@@ -21,29 +21,46 @@ import ssl
 from typing import Dict, Any
 
 from downloader.constants import FILE_MiSTer_new, FILE_MiSTer, FILE_MiSTer_old
+from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FolderCreationError
+from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import JobSystem
 from downloader.jobs.db_header_job import DbHeaderJob
 from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.worker_context import DownloaderWorkerContext
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.logger import DebugOnlyLoggerDecorator
 from downloader.target_path_repository import TargetPathRepository
 
 
 class FileDownloaderFactory:
-    def __init__(self, file_system_factory, waiter, logger, job_system, file_download_reporter, http_gateway):
+    def __init__(self, file_system_factory, waiter, logger, job_system, file_download_reporter, http_gateway, free_space_reservation: FreeSpaceReservation, external_drives_repository: ExternalDrivesRepository):
         self._file_system_factory = file_system_factory
         self._waiter = waiter
         self._logger = logger
         self._job_system = job_system
         self._file_download_reporter = file_download_reporter
         self._http_gateway = http_gateway
+        self._free_space_reservation = free_space_reservation
+        self._external_drives_repository = external_drives_repository
 
     def create(self, config, parallel_update, silent=False, hash_check=True):
         logger = DebugOnlyLoggerDecorator(self._logger) if silent else self._logger
         file_system = self._file_system_factory.create_for_config(config)
         target_path_repository = TargetPathRepository(config, file_system)
+        workers_factory = DownloaderWorkersFactory(DownloaderWorkerContext(
+            job_system=self._job_system,
+            waiter=self._waiter,
+            logger=self._logger,
+            http_gateway=self._http_gateway,
+            file_system=file_system,
+            target_path_repository=target_path_repository,
+            file_download_reporter=self._file_download_reporter,
+            free_space_reservation=self._free_space_reservation,
+            external_drives_repository=self._external_drives_repository,
+            config=config
+        ))
         return FileDownloader(
             parallel_update,
             hash_check,
@@ -51,7 +68,7 @@ class FileDownloaderFactory:
             file_system,
             target_path_repository,
             logger,
-            DownloaderWorkersFactory(config, self._waiter, logger, file_system, target_path_repository, self._file_download_reporter, self._job_system, self._http_gateway),
+            workers_factory,
             self._file_download_reporter,
             self._http_gateway,
             self._job_system
@@ -59,7 +76,6 @@ class FileDownloaderFactory:
 
 
 class FileDownloader:
-
     def __init__(self, parallel_update, hash_check, config, file_system, target_path_repository, logger, workers_factory: 'DownloaderWorkersFactory', file_reporter: 'FileDownloadProgressReporter', http_gateway: HttpGateway, job_system: JobSystem):
         self._parallel_update = parallel_update
         self._hash_check = hash_check
