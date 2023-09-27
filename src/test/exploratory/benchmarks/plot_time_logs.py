@@ -71,6 +71,9 @@ def main(log_path):
     avg_baseline, raw_avg_baseline, outliers_baseline = average(baseline)
 
     print(f'Improvement: {percent_faster(avg_improved, avg_baseline)}%')
+    print(f'Improved Outliers:', outliers_improved)
+    print(f'Baseline Outliers:', outliers_baseline)
+    print(f'Improvement with outliers: {percent_faster(raw_avg_improved, raw_avg_baseline)}%')
 
     valid_improved = list(set(improved) - set(outliers_improved))
     valid_baseline = list(set(baseline) - set(outliers_baseline))

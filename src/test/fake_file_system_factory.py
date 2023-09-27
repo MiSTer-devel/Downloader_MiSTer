@@ -108,6 +108,9 @@ class FakeFileSystem(ProductionFileSystem):
         self._write_records.append(_Record('unique_temp_filename', name))
         return ClosableValue(name, lambda: None)
 
+    def persistent_temp_dir(self) -> str:
+        return '/tmp'
+
     def hash(self, path):
         return self.state.files[self._path(path)]['hash']
 
@@ -239,7 +242,7 @@ class FakeFileSystem(ProductionFileSystem):
     def download_target_path(self, path):
         return self._path(path)
 
-    def write_incoming_stream(self, in_stream: Any, target_path: str):
+    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int):
         if in_stream.storing_problems:
             return
 

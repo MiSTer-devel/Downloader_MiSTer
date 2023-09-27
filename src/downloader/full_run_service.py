@@ -23,11 +23,15 @@ import time
 from downloader.constants import K_DATABASES, K_UPDATE_LINUX, \
     K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME, K_IS_PC_LAUNCHER, K_MINIMUM_SYSTEM_FREE_SPACE_MB, K_BASE_SYSTEM_PATH, K_MINIMUM_EXTERNAL_FREE_SPACE_MB
 from downloader.importer_command import ImporterCommandFactory
+from downloader.job_system import JobSystem
+from downloader.jobs.download_db_job import DownloadDbJob
+from downloader.jobs.worker_context import DownloaderWorkerContext
+from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.other import format_files_message, format_folders_message, format_zips_message
 
 
 class FullRunService:
-    def __init__(self, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter, importer_command_factory: ImporterCommandFactory):
+    def __init__(self, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter, importer_command_factory: ImporterCommandFactory, job_system: JobSystem, workers_factory: DownloaderWorkersFactory):
         self._importer_command_factory = importer_command_factory
         self._waiter = waiter
         self._os_utils = os_utils
@@ -42,6 +46,8 @@ class FullRunService:
         self._local_repository = local_repository
         self._logger = logger
         self._config = config
+        self._job_system = job_system
+        self._workers_factory = workers_factory
 
     def print_drives(self):
         self._logger.bench('Print Drives start.')
@@ -99,23 +105,33 @@ class FullRunService:
             return 1
 
         local_store = self._local_repository.load_store()
-
-        databases, failed_dbs = self._db_gateway.fetch_all(self._config[K_DATABASES])
-
-        importer_command = self._importer_command_factory.create()
-        for db in databases:
-            description = self._config[K_DATABASES][db.db_id]
-
-            importer_command.add_db(db, local_store.store_by_id(db.db_id), description)
-
-        for relocation_package in self._base_path_relocator.relocating_base_paths(importer_command):
-            self._base_path_relocator.relocate_non_system_files(relocation_package)
-            self._local_repository.save_store(local_store)
-
         full_resync = not self._local_repository.has_last_successful_run()
 
-        self._offline_importer.apply_offline_databases(importer_command)
-        self._online_importer.download_dbs_contents(importer_command, full_resync)
+        self._workers_factory.prepare_workers()
+        for section, ini_description in self._config[K_DATABASES].items():
+            self._job_system.push_job(DownloadDbJob(
+                ini_section=section,
+                ini_description=ini_description,
+                store=local_store.store_by_id(section),
+                full_resync=full_resync
+            ))
+
+        self._job_system.accomplish_pending_jobs()
+        failed_dbs = []
+
+        # databases, failed_dbs = self._db_gateway.fetch_all(self._config[K_DATABASES])
+        #
+        # importer_command = self._importer_command_factory.create()
+        # for db in databases:
+        #     description = self._config[K_DATABASES][db.db_id]
+        #     importer_command.add_db(db, local_store.store_by_id(db.db_id), description)
+        #
+        # for relocation_package in self._base_path_relocator.relocating_base_paths(importer_command):
+        #     self._base_path_relocator.relocate_non_system_files(relocation_package)
+        #     self._local_repository.save_store(local_store)
+        #
+        # self._offline_importer.apply_offline_databases(importer_command)
+        # self._online_importer.download_dbs_contents(importer_command, full_resync)
 
         self._local_repository.save_store(local_store)
 
@@ -130,8 +146,8 @@ class FullRunService:
 
         self._logger.print()
 
-        if self._config[K_UPDATE_LINUX]:
-            self._linux_updater.update_linux(importer_command)
+        # if self._config[K_UPDATE_LINUX]:
+        #     self._linux_updater.update_linux(importer_command)
 
         if self._config[K_FAIL_ON_FILE_ERROR]:
             failure_count = len(self._online_importer.files_that_failed()) + len(self._online_importer.folders_that_failed()) + len(self._online_importer.zips_that_failed())

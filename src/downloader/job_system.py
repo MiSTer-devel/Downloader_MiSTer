@@ -1,6 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-import sys
-import time
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -20,11 +19,14 @@ import time
 from abc import abstractmethod, ABC
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
+import sys
+import time
 from typing import Dict, Optional, Callable, List, Tuple, Any
 import queue
 import threading
-import logging
 import signal
+
+from downloader.logger import Logger
 
 _thread_local_storage = threading.local()
 
@@ -37,19 +39,22 @@ class JobSystem:
         JobSystem._next_job_type_id += 1
         return JobSystem._next_job_type_id
 
-    def __init__(self, reporter: 'ProgressReporter', max_threads: int = 6, max_tries: int = 3, wait_timeout: float = 0.1):
+    def __init__(self, reporter: 'ProgressReporter', logger: Logger, max_threads: int = 6, max_tries: int = 3, wait_timeout: float = 0.1, max_cycle: int = 3, max_timeout: int = 300):
+        self._reporter: ProgressReporter = reporter
+        self._logger: Logger = logger
         self._max_threads: int = max_threads
         self._max_tries: int = max_tries
         self._wait_timeout: float = wait_timeout
-        self._reporter: ProgressReporter = reporter
+        self._max_cycle = max_cycle
+        self._max_timeout = max_timeout
         self._lock = threading.Lock()
         self._job_queue: queue.PriorityQueue['_JobPackage'] = queue.PriorityQueue()
         self._workers: Dict[int, 'Worker'] = {}
         self._pending_jobs_amount: int = 0
         self._pending_jobs_cancelled: bool = False
         self._is_accomplishing_jobs: bool = False
-        self._package_parents: Dict[int, _JobPackage] = {}
         self._jobs_pushed = 0
+        self._timeout_clock = 0
 
     def pending_jobs_amount(self) -> int:
         return self._pending_jobs_amount
@@ -83,6 +88,7 @@ class JobSystem:
 
         self._is_accomplishing_jobs = True
         self._pending_jobs_cancelled = False
+        self._update_timeout_clock()
         try:
             if self._max_threads > 1:
                 self._accomplish_with_threads(self._max_threads)
@@ -113,10 +119,13 @@ class JobSystem:
                     self._handle_notifications(notifications)
                     futures = self._handle_futures(futures)
                     self._report_work_in_progress()
+                    self._check_clock()
                     sys.stdout.flush()
 
-            self._handle_notifications(notifications)
-            self._handle_futures(futures)
+            if self._pending_jobs_cancelled:
+                self._handle_notifications(notifications)
+                self._cancel_futures(self._handle_futures(futures))
+
         finally:
             signal.signal(signal.SIGINT, previous_handler)
 
@@ -154,9 +163,9 @@ class JobSystem:
     def _retry_package(self, package: '_JobPackage', e: BaseException) -> None:
         if isinstance(e, JobSystemAbortException):
             raise e
-        should_retry = package.tries < self._max_tries
+        retry_job = package.job.retry_job()
+        should_retry = package.tries < self._max_tries and retry_job is not None
         if should_retry:
-            retry_job = package.job.retry_job()
             self._job_queue.put(_JobPackage(
                 job=retry_job,
                 worker=self._get_worker(retry_job),
@@ -171,9 +180,9 @@ class JobSystem:
             else:
                 self._report_job_failed(package, e)
         except ReportException as report_exception:
-            logger = logging.getLogger()
-            logger.exception(e)
-            logger.exception(report_exception)
+            self._logger.print('CRITICAL! Exception while reporting job failed')
+            self._logger.print(e)
+            self._logger.print(report_exception)
 
     def _get_worker(self, job: 'Job') -> 'Worker':
         worker = self._workers.get(job.type_id, None)
@@ -204,32 +213,43 @@ class JobSystem:
                 still_pending.append((package, future))
         return still_pending
 
+    def _cancel_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> None:
+        for package, future in futures:
+            future.cancel()
+            self._report_job_failed(package, TimeoutError(f'ERROR! {str(package)} timed out.'))
+
+    def _check_clock(self) -> None:
+        if self._timeout_clock > time.time():
+            return
+
+        self.cancel_pending_jobs()
+        self._logger.print(f'WARNING! Jobs timeout reached after {self._max_timeout} seconds!')
+
     def _assert_there_are_no_cycles(self, package: '_JobPackage') -> None:
         parent_package = package.parent
         if parent_package is None:
             return
 
-        job = package.job
-        seen = set()
+        seen: Dict[int] = dict()
         current = parent_package
 
         while current is not None:
-            if current.job.type_id in seen:
-                raise CycleDetectedException(f'Can not push Job {package.job.type_id} because it introduced a cycle')
+            seen_value = seen.get(current.job.type_id, 0)
+            if seen_value >= self._max_cycle:
+                raise CycleDetectedException(f'Can not push Job {package.job.type_id} because it introduced a cycle of length {seen_value}')
 
-            seen.add(current.job.type_id)
-            with self._lock:
-                current = self._package_parents.get(current.job.type_id)
-
-        if parent_package is not None:
-            with self._lock:
-                self._package_parents[job.type_id] = parent_package
+            seen[current.job.type_id] = seen_value + 1
+            current = current.parent
 
     def _sigint_handler(self, previous_handler: Any, sig: Any, frame: Any) -> None:
-        print('SHUTTING DOWN, PLEASE WAIT...')
+        self._logger.print('SIGINT RECEIVED!')
+        self._logger.print('SHUTTING DOWN, PLEASE WAIT...')
         self.cancel_pending_jobs()
         if previous_handler is not None:
             previous_handler(sig, frame)
+
+    def _update_timeout_clock(self) -> None:
+        self._timeout_clock = time.time() + self._max_timeout
 
     def _report_job_started(self, package: '_JobPackage') -> None:
         self._try_report('started', lambda: self._reporter_for_package(package).notify_job_started(package.job))
@@ -247,6 +267,7 @@ class JobSystem:
         self._try_report('in progress', lambda: self._reporter.notify_work_in_progress())
 
     def _try_report(self, context: str, cb: Callable[[], None]) -> None:
+        if context != 'in progress': self._update_timeout_clock()
         try:
             cb()
         except Exception as e:
@@ -270,7 +291,7 @@ class Job(ABC):
     def type_id(self) -> int:
         """Returns the job type id"""
 
-    def retry_job(self) -> 'Job':
+    def retry_job(self) -> Optional['Job']:
         return self
 
 
@@ -314,5 +335,5 @@ class _JobPackage:
     priority: int
     parent: Optional['_JobPackage'] = None
 
-    def __lt__(self, other: '_JobPackage') -> bool:
-        return self.priority < other.priority
+    def __lt__(self, other: '_JobPackage') -> bool: return self.priority < other.priority
+    def __str__(self): return f'JobPackage(job_type_id={self.job.type_id}, tries={self.tries}, priority={self.priority})'
