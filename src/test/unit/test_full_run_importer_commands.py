@@ -75,7 +75,7 @@ class TestFullProducedImporterCommands(unittest.TestCase):
         service = FullRunService(file_system_factory=fsf, config=config, importer_command_factory=importer_factory, file_downloader_factory=file_downloader_factory)
         service.full_run()
         actual = first_filter(importer_factory)
-        self.assertEquals('' if actual is None else actual.lower().strip(), '' if output_filter is None else output_filter.lower().strip())
+        self.assertEqual('' if actual is None else actual.lower().strip(), '' if output_filter is None else output_filter.lower().strip())
 
 
 def first_filter(spy: ImporterCommandFactorySpy):

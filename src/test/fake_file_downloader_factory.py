@@ -19,8 +19,10 @@
 from typing import Dict, Any, List, Tuple
 
 from downloader.file_downloader import FileDownloaderFactory as ProductionFileDownloaderFactory
+from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.job_system import JobSystem
 from downloader.jobs.reporters import FileDownloadProgressReporter
+from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs, NetworkState, FileSystemState
 from test.fake_file_system_factory import FileSystemFactory
@@ -29,12 +31,12 @@ from test.fake_waiter import NoWaiter
 
 
 class FileDownloaderFactory(ProductionFileDownloaderFactory):
-    def __init__(self, file_system_factory=None, state=None, config=None, network_state=None, file_download_reporter=None, job_system=None, http_gateway=None):
+    def __init__(self, file_system_factory=None, state=None, config=None, network_state=None, file_download_reporter=None, job_system=None, http_gateway=None, free_space_reservation=None, external_drives_repository=None):
         state = state if state is not None else FileSystemState(config=config)
         file_system_factory = file_system_factory if file_system_factory is not None else FileSystemFactory(state=state, config=state.config)
         network_state = NetworkState() if network_state is None else network_state
         file_download_reporter = file_download_reporter if file_download_reporter is not None else FileDownloadProgressReporter(NoLogger(), NoWaiter())
-        job_system = job_system if job_system is not None else JobSystem(file_download_reporter, max_threads=1)
+        job_system = job_system if job_system is not None else JobSystem(file_download_reporter, logger=NoLogger(), max_threads=1)
         http_gateway = http_gateway if http_gateway is not None else FakeHttpGateway(state.config, network_state)
         super().__init__(
             file_system_factory=file_system_factory,
@@ -42,7 +44,9 @@ class FileDownloaderFactory(ProductionFileDownloaderFactory):
             logger=NoLogger(),
             job_system=job_system,
             file_download_reporter=file_download_reporter,
-            http_gateway=http_gateway
+            http_gateway=http_gateway,
+            free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation(),
+            external_drives_repository=external_drives_repository or ExternalDrivesRepository(file_system_factory.create_for_system_scope())
         )
 
     @staticmethod

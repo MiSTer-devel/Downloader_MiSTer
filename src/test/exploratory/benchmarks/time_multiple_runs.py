@@ -103,7 +103,7 @@ def files_in(path):
     return int(exec_ssh(f"find /media/fat/{path} -type f | wc -l", out=subprocess.PIPE).stdout.decode().strip())
 
 
-def average(results, threshold=2):
+def average(results, threshold=4):
     def median(data): return sorted(data)[len(data) // 2]
     def mean(data): return sum(data) / len(data)
     def standard_deviation(data): return (sum((x - mean(data)) ** 2 for x in data) / len(data)) ** 0.5

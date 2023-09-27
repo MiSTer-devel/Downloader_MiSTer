@@ -21,13 +21,19 @@ from pathlib import Path
 from downloader.config import default_config
 from downloader.constants import K_DATABASES, K_DB_URL, K_SECTION, K_VERBOSE, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, \
     K_COMMIT, K_FAIL_ON_FILE_ERROR, K_UPDATE_LINUX
+from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.full_run_service import FullRunService as ProductionFullRunService
 from downloader.importer_command import ImporterCommandFactory
+from downloader.job_system import JobSystem
+from downloader.jobs.reporters import FileDownloadProgressReporter
+from downloader.jobs.worker_context import DownloaderWorkerContext
+from downloader.jobs.workers_factory import DownloaderWorkersFactory
+from test.fake_http_gateway import FakeHttpGateway
 from test.fake_os_utils import SpyOsUtils
 from test.fake_waiter import NoWaiter
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_file_downloader_factory import FileDownloaderFactory
-from test.fake_importer_implicit_inputs import FileSystemState
+from test.fake_importer_implicit_inputs import FileSystemState, NetworkState
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_db_gateway import DbGateway
 from test.fake_file_system_factory import FileSystemFactory
@@ -52,13 +58,18 @@ class FullRunService(ProductionFullRunService):
             certificates_fix=None,
             external_drives_repository=None,
             importer_command_factory=None,
-            file_downloader_factory=None):
+            file_downloader_factory=None,
+            job_system=None,
+            file_download_reporter=None
+    ):
 
         config = config or default_config()
         file_system_factory = FileSystemFactory(config=config) if file_system_factory is None else file_system_factory
         system_file_system = file_system_factory.create_for_system_scope()
         file_downloader_factory = file_downloader_factory or FileDownloaderFactory(file_system_factory=file_system_factory)
         linux_updater = linux_updater or LinuxUpdater(file_system=system_file_system, file_downloader_factory=file_downloader_factory)
+        file_download_reporter = file_download_reporter if file_download_reporter is not None else FileDownloadProgressReporter(NoLogger(), NoWaiter())
+        job_system = job_system if job_system is not None else JobSystem(file_download_reporter, logger=NoLogger(), max_threads=1)
         super().__init__(config,
                          NoLogger(),
                          LocalRepository(config=config, file_system=system_file_system),
@@ -72,7 +83,21 @@ class FullRunService(ProductionFullRunService):
                          external_drives_repository or ExternalDrivesRepository(file_system=system_file_system),
                          os_utils or SpyOsUtils(),
                          NoWaiter(),
-                         importer_command_factory or ImporterCommandFactory(config))
+                         importer_command_factory or ImporterCommandFactory(config),
+                         job_system,
+                         DownloaderWorkersFactory(DownloaderWorkerContext(
+                             job_system=job_system,
+                             waiter=NoWaiter(),
+                             logger=NoLogger(),
+                             http_gateway=FakeHttpGateway(config=config, network_state=NetworkState()),
+                             file_system=system_file_system,
+                             target_path_repository=None,
+                             file_download_reporter=file_download_reporter,
+                             free_space_reservation=UnlimitedFreeSpaceReservation(),
+                             external_drives_repository=external_drives_repository,
+                             config=config
+                         ))
+                         )
 
     @staticmethod
     def with_single_empty_db() -> ProductionFullRunService:

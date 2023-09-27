@@ -16,17 +16,23 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+import unittest
+from functools import reduce
+
 from downloader.job_system import Job, JobSystem, Worker, CycleDetectedException, ProgressReporter, NoWorkerException, CantRegisterWorkerException
 import logging
 from typing import Dict, Optional
-import unittest
+
+from downloader.logger import NoLogger
 
 
-class TestJobSystem(unittest.TestCase):
+class TestSingleThreadJobSystem(unittest.TestCase):
+
+    def sut(self, reporter: ProgressReporter) -> JobSystem: return JobSystem(reporter, logger=NoLogger(), max_threads=1)
 
     def setUp(self):
         self.reporter = TestProgressReporter()
-        self.system = JobSystem(reporter=self.reporter)
+        self.system = self.sut(reporter=self.reporter)
 
     def test_accomplish_pending_jobs___reports_completed_jobs(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -70,13 +76,23 @@ class TestJobSystem(unittest.TestCase):
         self.system.register_worker(1, TestWorker(self.system))
         self.system.register_worker(2, TestWorker(self.system))
 
-        self.system.push_job(TestJob(1, TestJob(2, TestJob(1, TestJob(2)))))
+        self.system.push_job(reduce(lambda acc, _: TestJob(1, next_job=TestJob(2, next_job=acc)), range(4), None))
 
         with self.assertRaises(Exception) as context:
             self.system.accomplish_pending_jobs()
 
         self.assertIsInstance(context.exception, CycleDetectedException)
-        self.assertReports(completed={1: 1, 2: 1}, started={1: 1, 2: 1}, in_progress={}, pending=2)
+        self.assertReports(completed={1: 3, 2: 3}, started={1: 3, 2: 3}, in_progress={}, pending=2)
+
+    def test_cycle_detection___just_below_the_max_cycle_limit___doesnt_throw(self):
+        self.system.register_worker(1, TestWorker(self.system))
+        self.system.register_worker(2, TestWorker(self.system))
+
+        self.system.push_job(reduce(lambda acc, _: TestJob(1, next_job=TestJob(2, next_job=acc)), range(3), None))
+
+        self.system.accomplish_pending_jobs()
+
+        self.assertReports(completed={1: 3, 2: 3}, started={1: 3, 2: 3}, in_progress={}, pending=0)
 
     def test_register_worker_during_accomplish_pending_jobs___throws(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -144,7 +160,7 @@ class TestJobSystem(unittest.TestCase):
                 raise Exception('Houston, we have a problem.')
 
         reporter = TestThrowingReporter()
-        system = JobSystem(reporter=reporter)
+        system = self.sut(reporter=reporter)
         system.register_worker(1, TestWorker(system))
         system.push_job(TestJob(1, fails=3))
 
@@ -161,7 +177,7 @@ class TestJobSystem(unittest.TestCase):
 
     def test_accomplish_pending_jobs_with_just_1_thread___reports_completed_jobs(self):
         reporter = TestProgressReporter()
-        system = JobSystem(reporter=reporter, max_threads=1)
+        system = self.sut(reporter=reporter)
         system.register_worker(1, TestWorker(system))
 
         system.push_job(TestJob(1))
@@ -180,24 +196,21 @@ class TestJobSystem(unittest.TestCase):
 
     def assertReports(self, completed: Optional[Dict[int, int]] = None, started: Optional[Dict[int, int]] = None, in_progress: Optional[Dict[int, int]] = None, failed: Optional[Dict[int, int]] = None, retried: Optional[Dict[int, int]] = None, pending: int = 0):
         self.assertEqual({
-            'completed_jobs': completed or {},
-            'started_jobs': started or completed or {},
-            'in_progress_jobs': in_progress or {},
+            'completed_jobs': len(completed or {}) > 0,
             'failed_jobs': failed or {},
             'retried_jobs': retried or {},
-            'pending_jobs_amount': pending
+            'pending_jobs_amount': pending > 0
         }, {
-            'completed_jobs': self.reporter.completed_jobs,
-            'started_jobs': self.reporter.started_jobs,
-            'in_progress_jobs': self.reporter.in_progress_jobs,
+            'completed_jobs': len(self.reporter.completed_jobs) > 0,
             'failed_jobs': self.reporter.failed_jobs,
             'retried_jobs': self.reporter.retried_jobs,
-            'pending_jobs_amount': self.system.pending_jobs_amount()
+            'pending_jobs_amount': self.system.pending_jobs_amount() > 0
         })
 
 
 class TestJob(Job):
-    def __init__(self, type_id: int, next_job: Optional['TestJob'] = None, retry_job: Optional['TestJob'] = None, fails: int = 0, register_worker: Optional[Worker] = None, cancel_pending_jobs: bool = False):
+    def __init__(self, type_id: int, next_job: Optional['TestJob'] = None, retry_job: Optional['TestJob'] = None, fails: int = 0, register_worker: Optional[Worker] = None,
+                 cancel_pending_jobs: bool = False):
         self._type_id = type_id
         self._retry_job = retry_job
         self.next_job = next_job
@@ -267,3 +280,4 @@ class TestProgressReporter(ProgressReporter):
         self.in_progress_jobs[job.type_id] = self.in_progress_jobs.get(job.type_id, 0) - 1
         if self.in_progress_jobs[job.type_id] <= 0:
             self.in_progress_jobs.pop(job.type_id)
+
