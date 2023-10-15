@@ -17,10 +17,10 @@ By default **downloader** will download everything that's available, based on yo
 
 ```
 [mister]
-filter = snes !genesis
+filter = snes !cheats
 ```
 
-  -  The above filter will download the Super NES core, but not the Genesis core.
+  -  The filter above will download only the Super NES core, without its cheats, and nothing else.
   -  Anything listed after `filter =` will be downloaded, unless it's prefixed with an exclamation mark ❗ (which means NOT).
   -  Note that the symbols `-` and `_` are ignored by the filter, so terms like `pc_engine-cd` and `pcenginecd` are the same.
   -  Filter terms cannot have spaces in them.  `!pokemon mini` will be interpreted as *no* to pokemon, *yes* to mini.
@@ -33,10 +33,10 @@ filter = snes !genesis
 
 ### Examples
 
-  -  `filter = console !computer`  will only download console cores.  Even though !computer is explicity excluded, the positive `console` term is the *only* positive, and so it's the only inclusion.
   -  `filter = arcade !arcade-astrocade` will download only the arcade cores, except the astrocade core.
   -  `filter = arcade console` will download every arcade and console core, but nothing else.
   -  `filter= !computer` will download every core except computer cores.
+  -  `filter = console !computer`  will only download console cores.  Even though !computer is explicity excluded, the positive `console` term is the *only* positive, and so it's the only inclusion.
 
 👉 The `essential` cores will always be included unless you specifically remove them with `!essential`.  The `essential` cores include the MiSTer menus, etc, and should not be excluded for most purposes.  
 
