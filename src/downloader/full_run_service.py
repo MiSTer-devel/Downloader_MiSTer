@@ -107,31 +107,32 @@ class FullRunService:
         local_store = self._local_repository.load_store()
         full_resync = not self._local_repository.has_last_successful_run()
 
-        self._workers_factory.prepare_workers()
-        for section, ini_description in self._config[K_DATABASES].items():
-            self._job_system.push_job(DownloadDbJob(
-                ini_section=section,
-                ini_description=ini_description,
-                store=local_store.store_by_id(section),
-                full_resync=full_resync
-            ))
+        # self._workers_factory.prepare_workers()
+        # for section, ini_description in self._config[K_DATABASES].items():
+        #     self._job_system.push_job(DownloadDbJob(
+        #         ini_section=section,
+        #         ini_description=ini_description,
+        #         store=local_store.store_by_id(section),
+        #         full_resync=full_resync
+        #     ))
+        #
+        # self._logger.print()
+        # self._job_system.accomplish_pending_jobs()
+        # failed_dbs = []
 
-        self._job_system.accomplish_pending_jobs()
-        failed_dbs = []
+        databases, failed_dbs = self._db_gateway.fetch_all(self._config[K_DATABASES])
 
-        # databases, failed_dbs = self._db_gateway.fetch_all(self._config[K_DATABASES])
-        #
-        # importer_command = self._importer_command_factory.create()
-        # for db in databases:
-        #     description = self._config[K_DATABASES][db.db_id]
-        #     importer_command.add_db(db, local_store.store_by_id(db.db_id), description)
-        #
-        # for relocation_package in self._base_path_relocator.relocating_base_paths(importer_command):
-        #     self._base_path_relocator.relocate_non_system_files(relocation_package)
-        #     self._local_repository.save_store(local_store)
-        #
-        # self._offline_importer.apply_offline_databases(importer_command)
-        # self._online_importer.download_dbs_contents(importer_command, full_resync)
+        importer_command = self._importer_command_factory.create()
+        for db in databases:
+            description = self._config[K_DATABASES][db.db_id]
+            importer_command.add_db(db, local_store.store_by_id(db.db_id), description)
+
+        for relocation_package in self._base_path_relocator.relocating_base_paths(importer_command):
+            self._base_path_relocator.relocate_non_system_files(relocation_package)
+            self._local_repository.save_store(local_store)
+
+        self._offline_importer.apply_offline_databases(importer_command)
+        self._online_importer.download_dbs_contents(importer_command, full_resync)
 
         self._local_repository.save_store(local_store)
 
@@ -146,8 +147,8 @@ class FullRunService:
 
         self._logger.print()
 
-        # if self._config[K_UPDATE_LINUX]:
-        #     self._linux_updater.update_linux(importer_command)
+        if self._config[K_UPDATE_LINUX]:
+            self._linux_updater.update_linux(importer_command)
 
         if self._config[K_FAIL_ON_FILE_ERROR]:
             failure_count = len(self._online_importer.files_that_failed()) + len(self._online_importer.folders_that_failed()) + len(self._online_importer.zips_that_failed())

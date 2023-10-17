@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
 import sys
 import time
-from typing import Dict, Optional, Callable, List, Tuple, Any
+from typing import Dict, Optional, Callable, List, Tuple, Any, TypeVar, Generic, Union
 import queue
 import threading
 import signal
@@ -45,16 +45,16 @@ class JobSystem:
         self._max_threads: int = max_threads
         self._max_tries: int = max_tries
         self._wait_timeout: float = wait_timeout
-        self._max_cycle = max_cycle
-        self._max_timeout = max_timeout
-        self._lock = threading.Lock()
+        self._max_cycle: int = max_cycle
+        self._max_timeout: int = max_timeout
         self._job_queue: queue.PriorityQueue['_JobPackage'] = queue.PriorityQueue()
         self._workers: Dict[int, 'Worker'] = {}
+        self._lock = threading.Lock()
         self._pending_jobs_amount: int = 0
         self._pending_jobs_cancelled: bool = False
         self._is_accomplishing_jobs: bool = False
-        self._jobs_pushed = 0
-        self._timeout_clock = 0
+        self._jobs_pushed: int = 0
+        self._timeout_clock: int = 0
 
     def pending_jobs_amount(self) -> int:
         return self._pending_jobs_amount
@@ -75,19 +75,17 @@ class JobSystem:
             priority=priority or self._jobs_pushed,
             parent=parent_package
         ))
-        with self._lock:
-            self._pending_jobs_amount += 1
+        with self._lock: self._pending_jobs_amount += 1
 
     def cancel_pending_jobs(self) -> None:
-        with self._lock:
-            self._pending_jobs_cancelled = True
+        with self._lock: self._pending_jobs_cancelled = True
 
     def accomplish_pending_jobs(self) -> None:
         if self._is_accomplishing_jobs:
             raise CantAccomplishJobs('Can not call to accomplish jobs when its already running.')
 
         self._is_accomplishing_jobs = True
-        self._pending_jobs_cancelled = False
+        with self._lock: self._pending_jobs_cancelled = False
         self._update_timeout_clock()
         try:
             if self._max_threads > 1:
@@ -105,7 +103,7 @@ class JobSystem:
             futures = []
             notifications: queue.Queue[Tuple[bool, '_JobPackage']] = queue.Queue()
             with ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
-                while self._pending_jobs_amount > 0 and not self._pending_jobs_cancelled:
+                while self._pending_jobs_amount > 0 and self._pending_jobs_cancelled is False:
                     try:
                         package = self._job_queue.get(timeout=self._wait_timeout)
                     except queue.Empty:
@@ -131,7 +129,7 @@ class JobSystem:
 
     def _accomplish_without_threads(self) -> None:
         notifications: queue.Queue[Tuple[bool, '_JobPackage']] = queue.Queue()
-        while self._pending_jobs_amount > 0 and not self._pending_jobs_cancelled and not self._job_queue.empty():
+        while self._pending_jobs_amount > 0 and self._pending_jobs_cancelled is False and self._job_queue.empty() is False:
             package = self._job_queue.get(block=False)
             self._job_queue.task_done()
             if package is not None:
@@ -173,7 +171,7 @@ class JobSystem:
                 priority=package.priority
             ))
         else:
-            self._pending_jobs_amount -= 1
+            with self._lock: self._pending_jobs_amount -= 1
         try:
             if should_retry:
                 self._report_job_retried(package, e)
@@ -191,13 +189,13 @@ class JobSystem:
         return worker
 
     def _handle_notifications(self, notification_queue: queue.Queue[Tuple[bool, '_JobPackage']]) -> None:
-        while not notification_queue.empty():
+        while notification_queue.empty() is False:
             notification = notification_queue.get(block=False)
             notification_queue.task_done()
 
             completed, package = notification
             if completed:
-                self._pending_jobs_amount -= 1
+                with self._lock: self._pending_jobs_amount -= 1
                 self._report_job_completed(package)
             else:
                 self._report_job_started(package)

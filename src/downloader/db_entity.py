@@ -174,11 +174,11 @@ def _validate_zip_kind_extract_all_contents(zip_desc):
     if 'target_folder_path' not in zip_desc:
         raise _MissingKeyException('target_folder_path')
 
-    # @TODO add more validation
+    # @TODO: add more validation
 
 
 def _validate_zip_kind_extract_single_files(zip_desc):
-    # @TODO add more validation
+    # @TODO: add more validation
     pass
 
 

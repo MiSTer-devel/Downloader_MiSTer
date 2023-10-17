@@ -21,6 +21,8 @@ from contextlib import contextmanager
 
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.job_system import _thread_local_storage
+from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from test.objects import binary_content
 
 
@@ -35,12 +37,18 @@ class FakeHttpGateway:
         job = None if parent_package is None else parent_package.job
 
         description = None
-        file_path = None
+        target_file_path = None
+        info_path = None
         if isinstance(job, FetchFileJob):
             description = {**job.description}
-            file_path = job.path
+            target_file_path = job.path
+        elif isinstance(job, FetchFileJob2):
+            if isinstance(job.after_job, ValidateFileJob2):
+                description = {**job.after_job.description}
+            info_path = job.info
+            target_file_path = job.download_path
 
-        match_path = file_path if file_path is not None else url
+        match_path = info_path if info_path is not None else target_file_path if target_file_path is not None else url
 
         status = 200
         self._network_state.remote_failures[match_path] = self._network_state.remote_failures.get(match_path, 0)
@@ -53,13 +61,19 @@ class FakeHttpGateway:
             description = {'hash': match_path, 'size': 1}
         if 'url' in description:
             del description['url']
+        if 'delete' in description:
+            del description['delete']
+
+        storing_problems = match_path in self._network_state.storing_problems and self._network_state.storing_problems[match_path] > 0
+        if storing_problems:
+            self._network_state.storing_problems[match_path] -= 1
 
         yield url, FakeHTTPResponse(
             url=url,
             status=status,
-            storing_problems=file_path in self._network_state.storing_problems,
+            storing_problems=storing_problems,
             description=description,
-            file_path=file_path
+            file_path=target_file_path
         )
 
     def cleanup(self) -> None:

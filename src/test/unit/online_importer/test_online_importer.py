@@ -246,13 +246,15 @@ class TestOnlineImporter(OnlineImporterTestBase):
 
     def test_download_dbs_contents___with_duplicated_file___just_accounts_for_the_first_added(self):
         sut = OnlineImporter()
-        store = empty_test_store()
+        store_test = empty_test_store()
+        store_bar = empty_test_store()
 
-        sut.add_db(db_with_file('test', file_a, file_a_descr()), store)
-        sut.add_db(db_with_file('bar', file_a, file_a_updated_descr()), store)
+        sut.add_db(db_with_file('test', file_a, file_a_descr()), store_test)
+        sut.add_db(db_with_file('bar', file_a, file_a_updated_descr()), store_bar)
         sut.download(False)
 
-        self.assertEqual(store_test_with_file(file_a, file_a_descr()), store)
+        self.assertEqual(store_test_with_file(file_a, file_a_descr()), store_test)
+        self.assertEqual(empty_test_store(), store_bar)
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders={folder_a: {}}), sut.fs_data)
         self.assertReports(sut, [file_a])
 
@@ -391,7 +393,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         OnlineImporter(waiter=waiter, logger=logger).add_db(db, empty_test_store()).download(False)
 
         self.assertIn(expected_wait, waiter.registeredWaits)
-        self.assertIn((expected_log,), logger.printCalls)
+        self.assertIn(expected_log, [line for call in logger.printCalls for line in call[0].split('\n') if line])
 
     def test_download_system_abc_db___after_already_been_installed___does_nothing(self):
         def store_file_abc(): return store_descr(files={file_abc: file_system_abc_descr()}, folders={folder_a: path_system(), folder_ab: path_system()})

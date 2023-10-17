@@ -18,7 +18,7 @@ cd src
 cp -r downloader "${TEMPDIR}/downloader"
 echo "default_commit = '$(git rev-parse --short HEAD)'" > "${TEMPDIR}/commit.py"
 cp __main__.py "${TEMPDIR}/__main__.py"
-find "${TEMPDIR}" -type f -name '*.py' -exec sed -i.bak -E '/^\s*#/d;/^$/d' {} +; find . -name '*.bak' -exec rm {} +
+find "${TEMPDIR}" -type f -name '*.py' -exec perl -i -0pe 's/"""(.*?)"""/""/sg; s/^\s*#.*\n//mg; s/^\s*\n//mg' {} +
 find "${TEMPDIR}" -type f ! -name '*.py' -exec rm -f {} +
 find "${TEMPDIR}" -type f -iname "*.py" -print0 | while IFS= read -r -d '' file ; do pin_metadata "${file}" ; done
 pushd "${TEMPDIR}" >/dev/null 2>&1

@@ -135,7 +135,7 @@ class FileFilterFactory:
         if config[K_FILTER] is None or config[K_FILTER] == '':
             self._logger.debug(f'No filter for db {db.db_id}.')
             return None
-        this_filter = config[K_FILTER].strip().lower()  # @TODO Remove strip after field is validated in other place
+        this_filter = config[K_FILTER].strip().lower()  # @TODO: Remove strip after field is validated in other place
         self._logger.debug(f'Filter for db {db.db_id}: {this_filter}')
         if this_filter == '':
             raise BadFileFilterPartException(this_filter)

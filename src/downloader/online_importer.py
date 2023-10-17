@@ -63,7 +63,7 @@ class OnlineImporter:
         self._base_session = _Session()
 
     def download_dbs_contents(self, importer_command, full_resync):
-        # TODO: Move the filter validation to earlier (before downloading dbs).
+        # @TODO: Move the filter validation to earlier (before downloading dbs).
         self._logger.bench('Online Importer start.')
 
         packages = self._unpack_dbs_data(importer_command, full_resync)
@@ -909,7 +909,7 @@ class _OnlineDatabaseImporter:
             for file_path in filtered_files:
                 self._file_system.unlink(file_path)
 
-            # TODO: Add this back when adding official support fort zips
+            # @TODO: Add this back when adding official support fort zips
             # for folder_path in sorted(filtered_zip_data[zip_id]['folders'].keys(), key=len, reverse=True):
             #     if not self._file_system.is_folder(folder_path):
             #         continue

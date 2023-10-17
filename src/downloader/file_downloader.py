@@ -172,7 +172,7 @@ class FileDownloader:
                 if 'zip_id' in file_description and file_description['zip_id'] in self._unpacked_zips:
                     self._logger.print('Unpacked: %s' % file_path)
                 else:
-                    self._logger.print('No changes: %s' % file_path)  # @TODO This scenario might be redundant now, since it's also checked in the Online Importer
+                    self._logger.print('No changes: %s' % file_path)  # @TODO: This scenario might be redundant now, since it's also checked in the Online Importer
                 return False
             else:
                 self._logger.debug('%s: %s != %s' % (file_path, file_description['hash'], path_hash))

@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Callable
 
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
@@ -31,5 +31,7 @@ class ValidateFileJob2(Job):
     info: str
     fetch_job: FetchFileJob2
     after_job: Optional[Job] = None
+    after_action: Optional[Callable[[], None]] = None
+    after_action_failure: Optional[Callable[[], None]] = None
 
     def retry_job(self): return self.fetch_job

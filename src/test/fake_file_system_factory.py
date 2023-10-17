@@ -246,9 +246,10 @@ class FakeFileSystem(ProductionFileSystem):
         if in_stream.storing_problems:
             return
 
-        self._write_records.append(_Record('write_incoming_stream', target_path))
-        self.state.files[target_path] = in_stream.description
-        self._fs_cache.add_file(target_path)
+        lower_path = target_path.lower()
+        self._write_records.append(_Record('write_incoming_stream', lower_path))
+        self.state.files[lower_path] = in_stream.description
+        self._fs_cache.add_file(lower_path)
 
     def unlink(self, path, verbose=True):
         full_path = self._path(path)
