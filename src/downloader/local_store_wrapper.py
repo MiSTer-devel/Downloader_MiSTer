@@ -1,5 +1,4 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-from collections import defaultdict
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,6 +19,9 @@ from collections import defaultdict
 from downloader.constants import K_BASE_PATH
 from downloader.other import empty_store_without_base_path
 from typing import Any, Dict
+from collections import defaultdict
+
+NO_HASH_IN_STORE_CODE = 'file_does_not_exist_so_cant_get_hash'
 
 
 class LocalStoreWrapper:
@@ -279,7 +281,7 @@ class _ReadOnlyStoreAdapter:
 
     def hash_file(self, file):
         if file not in self._store['files']:
-            return 'file_does_not_exist_so_cant_get_hash'
+            return NO_HASH_IN_STORE_CODE
 
         return self._store['files'][file]['hash']
 
