@@ -32,17 +32,25 @@ from downloader.jobs.worker_context import DownloaderWorkerContext, DownloaderWo
 class DownloaderWorkersFactory:
     def __init__(self, ctx: DownloaderWorkerContext):
         self._ctx = ctx
+        self.FetchFileWorker = FetchFileWorker(self._ctx)
+        self.FetchFileWorker2 = FetchFileWorker2(self._ctx)
+        self.ValidateFileWorker = ValidateFileWorker(self._ctx)
+        self.ValidateFileWorker2 = ValidateFileWorker2(self._ctx)
+        self.DbHeaderWorker = DbHeaderWorker(self._ctx)
+        self.DownloadDbWorker = DownloadDbWorker(self._ctx)
+        self.OpenDbWorker = OpenDbWorker(self._ctx)
+        self.ProcessDbWorker = ProcessDbWorker(self._ctx)
 
     def prepare_workers(self):
         workers: List[DownloaderWorker] = [
-            FetchFileWorker(self._ctx),
-            FetchFileWorker2(self._ctx),
-            ValidateFileWorker(self._ctx),
-            ValidateFileWorker2(self._ctx),
-            DbHeaderWorker(self._ctx),
-            DownloadDbWorker(self._ctx),
-            OpenDbWorker(self._ctx),
-            ProcessDbWorker(self._ctx),
+            self.FetchFileWorker,
+            self.FetchFileWorker2,
+            self.ValidateFileWorker,
+            self.ValidateFileWorker2,
+            self.DbHeaderWorker,
+            self.DownloadDbWorker,
+            self.OpenDbWorker,
+            self.ProcessDbWorker,
         ]
         for w in workers:
             w.initialize()

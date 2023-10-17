@@ -16,6 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from typing import Optional
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.jobs.worker_context import DownloaderWorker
 from downloader.jobs.errors import FileDownloadException
@@ -27,13 +28,18 @@ class ValidateFileWorker2(DownloaderWorker):
 
     def operate_on(self, job: ValidateFileJob2):
         download_path, target_file_path, info, description = job.fetch_job.download_path, job.target_file_path, job.info, job.description
-        self._validate_file(download_path, target_file_path, info, description['hash'])
+        exception = self._validate_file(download_path, target_file_path, info, description['hash'])
+        if exception is not None:
+            if job.after_action_failure is not None: job.after_action_failure()
+            raise exception
+
+        if job.after_action is not None: job.after_action()
         if job.after_job is not None: self._ctx.job_system.push_job(job.after_job)
 
-    def _validate_file(self, download_path: str, target_file_path: str, info: str, file_hash: str):
+    def _validate_file(self, download_path: str, target_file_path: str, info: str, file_hash: str) -> Optional[FileDownloadException]:
         path_hash = self._ctx.file_system.hash(download_path)
         if path_hash != file_hash:
-            if download_path != target_file_path: self._ctx.file_system.unlink(download_path)
-            raise FileDownloadException(f'Bad hash on {info} ({file_hash} != {path_hash})')
+            self._ctx.file_system.unlink(download_path)
+            return FileDownloadException(f'Bad hash on {info} ({file_hash} != {path_hash})')
 
         if download_path != target_file_path: self._ctx.file_system.move(download_path, target_file_path)

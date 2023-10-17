@@ -149,9 +149,11 @@ class ConfigReader:
             if section_id == 'mister':
                 self._parse_mister_section(result, parser)
                 continue
+            elif section_id in result[K_DATABASES]:
+                raise InvalidConfigParameter("Can't import db for section '%s' twice" % section_id)
 
             self._logger.print("Reading '%s' db section" % section)
-            self._parse_database_section(default_db, parser, result, section_id)
+            result[K_DATABASES][section_id] = self._parse_database_section(default_db, parser, section_id)
 
         if len(result[K_DATABASES]) == 0:
             self._logger.print('Reading default db')
@@ -242,14 +244,12 @@ class ConfigReader:
             K_SECTION: default_db[K_SECTION]
         }
 
-    def _parse_database_section(self, default_db, parser, result, section_id):
+    def _parse_database_section(self, default_db, parser, section_id):
         default_db_url = default_db[K_DB_URL] if section_id == default_db[K_SECTION].lower() else None
         db_url = parser.get_string(K_DB_URL, default_db_url)
 
         if db_url is None:
             raise InvalidConfigParameter("Can't import db for section '%s' without an url field" % section_id)
-        if section_id in result[K_DATABASES]:
-            raise InvalidConfigParameter("Can't import db for section '%s' twice" % section_id)
 
         description = {
             K_DB_URL: db_url,
@@ -260,7 +260,7 @@ class ConfigReader:
         if len(options.items()) > 0:
             description[K_OPTIONS] = options
 
-        result[K_DATABASES][section_id] = description
+        return description
 
     def _parse_database_options(self, parser, section_id):
         options = dict()
