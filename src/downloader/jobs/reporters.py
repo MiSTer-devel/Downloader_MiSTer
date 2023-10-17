@@ -17,17 +17,17 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import socket
+import threading
 import time
 from http.client import HTTPException
 from typing import Dict, Optional, Tuple, List
 from urllib.error import URLError
 
 from downloader.db_entity import DbEntity
-from downloader.http_gateway import HttpGatewayException
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.errors import FileDownloadException
+from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.waiter import Waiter
 from downloader.job_system import ProgressReporter, Job
@@ -75,8 +75,8 @@ class FileDownloadProgressReporter(ProgressReporter):
         self._active_jobs: Dict[int] = {}
         self._deactivated: bool = False
         self._needs_newline: bool = False
-        self._accumulated_dots: int = 0
-        self._accumulated_pluses: int = 0
+        self._need_clear_header: bool = False
+        self._symbols: List[str] = []
 
     def start_session(self):
         self.__init__(self._logger, self._waiter)
@@ -98,16 +98,10 @@ class FileDownloadProgressReporter(ProgressReporter):
 
     def notify_job_started(self, job: Job):
         if isinstance(job, FetchFileJob):
-            if self._needs_newline:
-                self._logger.print()
-                self._needs_newline = False
-            self._logger.print(job.path)
+            self._print_line(job.path)
             self._started_files.append(job.path)
         if isinstance(job, FetchFileJob2) and not job.silent:
-            if self._needs_newline:
-                self._logger.print()
-                self._needs_newline = False
-            self._logger.print(job.info)
+            self._print_line(job.info)
             self._started_files.append(job.info)
 
         self._active_jobs[job.type_id] = self._active_jobs.get(job.type_id, 0) + 1
@@ -118,25 +112,23 @@ class FileDownloadProgressReporter(ProgressReporter):
             return
         now = time.time()
         if self._check_time < now:
+            self._symbols.append('*')
             self._print_symbols()
-            self._logger.print('*', end='')
-            self._needs_newline = True
-            self._check_time = time.time() + 1.0
 
     def notify_job_completed(self, job: Job):
         if isinstance(job, FetchFileJob) or isinstance(job, FetchFileJob2):
-            self._accumulated_dots += 1
+            self._symbols.append('.')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
         elif isinstance(job, ValidateFileJob):
-            self._accumulated_pluses += 1
+            self._symbols.append('+')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
             self._downloaded_files.append(job.fetch_job.path)
         elif isinstance(job, ValidateFileJob2):
-            self._accumulated_pluses += 1
+            self._symbols.append('+')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
@@ -145,20 +137,27 @@ class FileDownloadProgressReporter(ProgressReporter):
         self._remove_in_progress(job)
 
     def _print_symbols(self):
-        dots = self._accumulated_dots
-        if dots > 0:
-            self._accumulated_dots -= dots
-            self._logger.print('.' * dots, end='')
-
-        pluses = self._accumulated_pluses
-        if pluses > 0:
-            self._accumulated_pluses -= pluses
-            self._logger.print('+' * pluses, end='')
-
-        if pluses == 0 and dots == 0:
+        if len(self._symbols) == 0:
             return
 
+        last_is_asterisk = self._symbols[-1] == '*'
+
+        self._logger.print(('\n' if self._need_clear_header else '') + ''.join(self._symbols), end='')
+        self._symbols.clear()
+
+        self._need_clear_header = False
         self._needs_newline = True
+        self._check_time = time.time() + (1.0 if last_is_asterisk else 2.0)
+
+    def _print_line(self, line):
+        if self._need_clear_header: line = '\n' + line
+        if self._needs_newline: line = '\n' + line
+        self._logger.print(line)
+        self._needs_newline = False
+        self._need_clear_header = False
+
+    def print_progress_line(self, line):
+        self._print_line(line)
         self._check_time = time.time() + 2.0
 
     def print_pending(self):
@@ -167,7 +166,10 @@ class FileDownloadProgressReporter(ProgressReporter):
             self._logger.print()
             self._needs_newline = False
 
-    def print_header(self, db: DbEntity):
+    def print_header(self, db: DbEntity, nothing_to_download: bool = False):
+        self._print_symbols()
+        first_line = '\n' if self._needs_newline else ''
+        self._needs_newline = False
         if len(db.header):
             count_float = 0
             for line in db.header:
@@ -176,7 +178,7 @@ class FileDownloadProgressReporter(ProgressReporter):
             if count_float > 100:
                 self._deactivate()
 
-            text = '\n\n' + \
+            text = first_line + '\n' + \
                 '################################################################################\n'
 
             for line in db.header:
@@ -188,15 +190,20 @@ class FileDownloadProgressReporter(ProgressReporter):
                 else:
                     text += line
 
-            if len(text) > 0:
-                self._logger.print(text)
+            if nothing_to_download: text += "\n\nNothing new to download from given sources."
+            if len(text) > 0: self._logger.print(text)
 
         else:
             self._logger.print(
+                first_line +
                 '\n' +
                 '################################################################################\n' +
-                f'SECTION: {db.db_id}\n'
+                f'SECTION: {db.db_id}' +
+                ("\n\nNothing new to download from given sources." if nothing_to_download else '')
             )
+
+        self._need_clear_header = True
+        self._check_time = time.time() + 2.0
 
     def notify_job_failed(self, job: Job, exception: BaseException):
         _, path = self._url_path_from_job(job)
@@ -206,10 +213,9 @@ class FileDownloadProgressReporter(ProgressReporter):
     def notify_job_retried(self, job: Job, exception: BaseException):
         self._logger.debug(self._message_from_exception(job, exception))
         self._logger.debug(exception)
-        self._logger.print('~', end='')
-        self._needs_newline = True
+        self._symbols.append('~')
+        self._print_symbols()
         self._remove_in_progress(job)
-        self._check_time = time.time() + 2.0
 
     def _url_path_from_job(self, job: Job) -> Optional[Tuple[str, str]]:
         if isinstance(job, ValidateFileJob) or isinstance(job, ValidateFileJob2):
@@ -219,7 +225,7 @@ class FileDownloadProgressReporter(ProgressReporter):
         elif isinstance(job, FetchFileJob2):
             url, path = job.url, job.info
         else:
-            return None, None
+            return None
         return url, path
 
     def _message_from_exception(self, job: Job, exception: BaseException):
@@ -235,8 +241,6 @@ class FileDownloadProgressReporter(ProgressReporter):
             return f'Socket Address Error! {url}: {str(e)}'
         except URLError as e:
             return f'URL Error! {url}: {e.reason}'
-        except HttpGatewayException as e:
-            return f'Http Gateway Error {type(e).__name__}! {url}: {str(e)}'
         except HTTPException as e:
             return f'HTTP Error {type(e).__name__}! {url}: {str(e)}'
         except ConnectionResetError as e:

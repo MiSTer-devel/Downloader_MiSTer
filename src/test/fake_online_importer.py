@@ -15,24 +15,143 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+
 from downloader.constants import MEDIA_USB0
 from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.importer_command import ImporterCommand, ImporterCommandFactory
+from downloader.job_system import JobSystem
+from downloader.jobs.process_db_job import ProcessDbJob
+from downloader.jobs.reporters import FileDownloadProgressReporter
+from downloader.jobs.worker_context import DownloaderWorkerContext
+from downloader.jobs.workers_factory import DownloaderWorkersFactory
+from downloader.jobs.download_db_job import DownloadDbJob
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
-from test.fake_local_store_wrapper import StoreWrapper
+from test.fake_http_gateway import FakeHttpGateway
+from test.fake_local_store_wrapper import StoreWrapper, LocalStoreWrapper
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_local_repository import LocalRepository
 from test.fake_path_resolver import PathResolverFactory
 from test.objects import config_with
 from test.fake_waiter import NoWaiter
-from test.fake_importer_implicit_inputs import ImporterImplicitInputs, FileSystemState
+from test.fake_importer_implicit_inputs import ImporterImplicitInputs, FileSystemState, NetworkState
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
 from downloader.logger import NoLogger
 
 
 class OnlineImporter(ProductionOnlineImporter):
+    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, path_resolver_factory=None, local_repository=None, free_space_reservation=None, waiter=None, logger=None, path_dictionary=None, network_state=None):
+        self._config = config if config is not None else config_with(base_system_path=MEDIA_USB0)
+        file_system_state = FileSystemState(config=self._config, path_dictionary=path_dictionary)
+        self.fs_factory = FileSystemFactory(state=file_system_state) if file_system_factory is None else file_system_factory
+        file_downloader_factory = FileDownloaderFactory(config=config, file_system_factory=self.fs_factory, state=file_system_state) if file_downloader_factory is None else file_downloader_factory
+        self.file_system = self.fs_factory.create_for_system_scope()
+        path_resolver_factory = PathResolverFactory(path_dictionary=file_system_state.path_dictionary, file_system_factory=self.fs_factory) if path_resolver_factory is None else path_resolver_factory
+
+        self.needs_save = False
+        waiter = NoWaiter() if waiter is None else waiter
+        logger = NoLogger() if logger is None else logger
+
+        super().__init__(
+            FileFilterFactory(logger),
+            self.fs_factory,
+            file_downloader_factory,
+            path_resolver_factory,
+            LocalRepository(config=self._config, file_system=self.file_system, file_system_factory=self.fs_factory) if local_repository is None else local_repository,
+            ExternalDrivesRepository(file_system=self.file_system),
+            free_space_reservation or UnlimitedFreeSpaceReservation(),
+            waiter,
+            logger)
+
+        self.dbs = []
+        self._file_download_reporter = FileDownloadProgressReporter(logger, waiter)
+        self._job_system = JobSystem(self._file_download_reporter, logger=logger, max_threads=1)
+        self._worker_ctx = DownloaderWorkerContext(
+            job_system=self._job_system,
+            waiter=waiter,
+            logger=logger,
+            http_gateway=FakeHttpGateway(self._config, network_state or NetworkState()),
+            file_system=self.file_system,
+            target_path_repository=None,
+            file_download_reporter=self._file_download_reporter,
+            free_space_reservation=UnlimitedFreeSpaceReservation(),
+            external_drives_repository=ExternalDrivesRepository(file_system=self.file_system),
+            config=self._config
+        )
+        self._workers_factory = DownloaderWorkersFactory(self._worker_ctx)
+
+    @staticmethod
+    def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs, free_space_reservation=None):
+        file_downloader_factory, file_system_factory, config = FileDownloaderFactory.from_implicit_inputs(implicit_inputs)
+
+        path_resolver_factory = PathResolverFactory.from_file_system_state(implicit_inputs.file_system_state)
+
+        return OnlineImporter(
+            config=config,
+            file_system_factory=file_system_factory,
+            file_downloader_factory=file_downloader_factory,
+            path_resolver_factory=path_resolver_factory,
+            free_space_reservation=free_space_reservation,
+            network_state=implicit_inputs.network_state
+        )
+
+    @property
+    def fs_data(self):
+        return self._file_system_factory.data
+
+    @property
+    def fs_records(self):
+        return self._file_system_factory.records
+
+    def download(self, full_resync):
+
+        stores = dict()
+        for db, store, ini_description in self.dbs:
+            stores[db.db_id] = store
+
+        local_store = LocalStoreWrapper({'dbs': stores})
+
+        self._workers_factory.prepare_workers()
+
+        for db, store, ini_description in self.dbs:
+            self._job_system.push_job(ProcessDbJob(db=db, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
+
+        self._job_system.accomplish_pending_jobs()
+
+        for db, store, _ in self.dbs:
+            self._clean_store(store)
+
+        self.needs_save = local_store.needs_save()
+
+        return self
+
+    def add_db(self, db, store, description=None):
+        self.dbs.append((db, store, {} if description is None else description))
+        return self
+
+    def download_db(self, db, store, full_resync=False):
+        self.add_db(db, store)
+        self.download(full_resync)
+        self._clean_store(store)
+        return store
+
+    def correctly_installed_files(self):
+        return self._workers_factory.ProcessDbWorker.correctly_installed_files()
+
+    def files_that_failed(self):
+        return self._worker_ctx.file_download_reporter.failed_files()
+
+    @staticmethod
+    def _clean_store(store):
+        for zip_description in store['zips'].values():
+            if 'zipped_files' in zip_description['contents_file']:
+                zip_description['contents_file'].pop('zipped_files')
+            if 'summary_file' in zip_description and 'unzipped_json' in zip_description['summary_file']:
+                zip_description['summary_file'].pop('unzipped_json')
+
+
+class OnlineImporter2(ProductionOnlineImporter):
     def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, path_resolver_factory=None, local_repository=None, free_space_reservation=None, waiter=None, logger=None, path_dictionary=None):
         self._config = config if config is not None else config_with(base_system_path=MEDIA_USB0)
         file_system_state = FileSystemState(config=self._config, path_dictionary=path_dictionary)
