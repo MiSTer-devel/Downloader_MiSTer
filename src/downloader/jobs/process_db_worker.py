@@ -1,5 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-
+import tempfile
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -20,7 +20,6 @@ from typing import Dict, Any, List, Set, Tuple
 import os
 from pathlib import Path
 import threading
-import functools
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import BadFileFilterPartException, FileFilterFactory
@@ -29,7 +28,7 @@ from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 from downloader.constants import K_USER_DEFINED_OPTIONS, K_FILTER, K_OPTIONS, K_BASE_PATH, K_STORAGE_PRIORITY, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL, \
-    K_BASE_SYSTEM_PATH, PathType
+    K_BASE_SYSTEM_PATH, PathType, FILE_MiSTer, FILE_MiSTer_old, FILE_MiSTer_new
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.local_store_wrapper import StoreWrapper, NO_HASH_IN_STORE_CODE
 from downloader.online_importer import WrongDatabaseOptions
@@ -53,10 +52,7 @@ class ProcessDbWorker(DownloaderWorker):
     def __init__(self, ctx: DownloaderWorkerContext):
         super().__init__(ctx)
         self._lock = threading.Lock()
-        self._processed_files: Dict[str, str] = dict()
         self._full_partitions: Set[str] = set()
-        self._correctly_installed_files: List[str] = []
-        self._files_that_failed: List[str] = []
 
     def initialize(self): self._ctx.job_system.register_worker(ProcessDbJob.type_id, self)
     def reporter(self): return self._ctx.file_download_reporter
@@ -76,7 +72,7 @@ class ProcessDbWorker(DownloaderWorker):
         fetch_pkgs, validate_pkgs = self._process_check_file_packages(check_file_pkgs, db_id, job.store, job.full_resync)
 
         logger.debug(f"Processing validate file packages '{db_id}'...")
-        fetch_pkgs.extend(self._process_validate_packages(validate_pkgs, db_id, job.store))
+        fetch_pkgs.extend(self._process_validate_packages(validate_pkgs, job.store))
 
         self._ctx.file_download_reporter.print_header(job.db, nothing_to_download=len(fetch_pkgs) == 0)
 
@@ -91,17 +87,15 @@ class ProcessDbWorker(DownloaderWorker):
         self._process_create_folder_packages(create_folder_pkgs, job.store)
 
         logger.debug(f"Processing remove file packages '{db_id}'...")
-        self._process_remove_file_packages(remove_files_pkgs, job.store)
+        self._process_remove_file_packages(remove_files_pkgs, db_id)
 
         logger.debug(f"Processing delete folder packages '{db_id}'...")
         self._process_delete_folder_packages(delete_folder_pkgs, job.store)
 
         logger.debug(f"Launching fetch jobs '{db_id}'...")
         for target_file_path, file_path, file_description in fetch_pkgs:
-            fetch_job = FetchFileJob2(url=self._url(file_path, file_description, base_files_url), info=file_path, download_path=target_file_path, silent=False)
+            fetch_job = FetchFileJob2(url=self._url(file_path, file_description, base_files_url), info=file_path, download_path=target_file_path + '._temp', silent=False)
             fetch_job.after_job = ValidateFileJob2(target_file_path=target_file_path, description=file_description, info=file_path, fetch_job=fetch_job)
-            fetch_job.after_job.after_action = functools.partial(self._add_file, file_path, file_description, job.store)
-            fetch_job.after_job.after_action_failure = functools.partial(self._remove_file, file_path, file_description, job.store)
             self._ctx.job_system.push_job(fetch_job)
 
     def _add_missing_create_folder_packages(self, fetch_pkgs: List[_FetchFilePackage], store: StoreWrapper, existing_folders: Set[str]) -> List[_CreateFolderPackage]:
@@ -119,24 +113,8 @@ class ProcessDbWorker(DownloaderWorker):
 
         return result
 
-    def _add_file(self, file_path: str, file_description: Dict[str, Any], store: StoreWrapper):
-        with self._lock:
-            store.write_only().add_file(file_path, file_description)
-            self._correctly_installed_files.append(file_path)
-
-    def _remove_file(self, file_path: str, file_description: Dict[str, Any], store: StoreWrapper):
-        with self._lock:
-            store.write_only().remove_file(file_path, file_description)
-            self._files_that_failed.append(file_path)
-
     def _url(self, file_path: str, file_description: _Desc, base_files_url: str):
         return file_description['url'] if 'url' in file_description else calculate_url(base_files_url, file_path if file_path[0] != '|' else file_path[1:])
-
-    def correctly_installed_files(self) -> List[str]:
-        return self._correctly_installed_files
-
-    def files_that_failed(self) -> List[str]:
-        return self._ctx.file_download_reporter.failed_files()
 
     @staticmethod
     def _build_db_config(input_config: Dict[str, Any], db: DbEntity, ini_description: Dict[str, Any]) -> Dict[str, Any]:
@@ -185,7 +163,15 @@ class ProcessDbWorker(DownloaderWorker):
         check_file_pkgs: List[_CheckFilePackage] = translate_items(filtered_db.files, PathType.FILE, {})
         create_folder_pkgs: List[_CreateFolderPackage] = translate_items(filtered_db.folders, PathType.FOLDER, {})
         remove_files_pkgs: List[_RemoveFilePackage] = translate_items(read_only_store.files, PathType.FILE, filtered_db.files)
-        delete_folder_pkgs: List[_DeleteFolderPackage] = translate_items(read_only_store.folders, PathType.FOLDER, filtered_db.folders)
+
+        existing_folders = filtered_db.folders.copy()
+        for target_file_path, file_path, _ in check_file_pkgs:
+            path_obj = Path(file_path)
+            while len(path_obj.parts) > 1:
+                path_obj = path_obj.parent
+                existing_folders[str(path_obj)] = True
+
+        delete_folder_pkgs: List[_DeleteFolderPackage] = translate_items(read_only_store.folders, PathType.FOLDER, existing_folders)
 
         return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs
 
@@ -258,21 +244,20 @@ class ProcessDbWorker(DownloaderWorker):
         duplicated_files = []
         with self._lock:
             for target_file_path, file_path, file_description in check_file_pkgs:
-                if file_path in self._processed_files:
+                if self._ctx.installation_report.is_file_processed(file_path):
                     duplicated_files.append(file_path)
                 else:
-                    self._processed_files[file_path] = db_id
+                    self._ctx.installation_report.add_processed_file(target_file_path, file_path, file_description, db_id)
                     non_duplicated_pkgs.append((target_file_path, file_path, file_description))
 
         for file_path in duplicated_files:
-            self._ctx.file_download_reporter.print_progress_line(f'DUPLICATED: {file_path} [using {self._processed_files[file_path]} instead]')
+            self._ctx.file_download_reporter.print_progress_line(f'DUPLICATED: {file_path} [using {self._ctx.installation_report.processed_file(file_path).db_id} instead]')
 
         fetch_pkgs: List[_FetchFilePackage] = []
         validate_pkgs: List[_ValidateFilePackage] = []
         for target_file_path, file_path, file_description in non_duplicated_pkgs:
             if file_system.is_file(target_file_path):
                 if not full_resync and read_only_store.hash_file(file_path) == file_description['hash']:
-                    store.write_only().add_file(file_path, file_description)
                     continue
 
                 validate_pkgs.append((target_file_path, file_path, file_description))
@@ -281,7 +266,7 @@ class ProcessDbWorker(DownloaderWorker):
 
         return fetch_pkgs, validate_pkgs
 
-    def _process_validate_packages(self, validate_pkgs: List[_ValidateFilePackage], db_id: str, store: StoreWrapper) -> List[_FetchFilePackage]:
+    def _process_validate_packages(self, validate_pkgs: List[_ValidateFilePackage], store: StoreWrapper) -> List[_FetchFilePackage]:
         read_only_store = store.read_only()
         file_system = ReadOnlyFileSystem(self._ctx.file_system)
 
@@ -290,25 +275,29 @@ class ProcessDbWorker(DownloaderWorker):
         for target_file_path, file_path, file_description in validate_pkgs:
             # @TODO: Parallelize the slow hash calculations
             if read_only_store.hash_file(file_path) == NO_HASH_IN_STORE_CODE and file_system.hash(target_file_path) == file_description['hash']:
-                store.write_only().add_file(file_path, file_description)
                 with self._lock:
                     self._ctx.file_download_reporter.print_progress_line(f'No changes: {file_path}')
-                    self._correctly_installed_files.append(file_path)
+                    self._ctx.installation_report.add_already_present_file(file_path)
                 continue
 
             if 'overwrite' in file_description and not file_description['overwrite']:
                 if file_system.hash(target_file_path) != file_description['hash']:
-                    store.write_only().add_new_file_not_overwritten(db_id, file_path)
+                    with self._lock:
+                        self._ctx.installation_report.add_skipped_updated_file(file_path)
                 continue
 
             more_fetch_pkgs.append((target_file_path, file_path, file_description))
 
         return more_fetch_pkgs
 
-    def _process_remove_file_packages(self, remove_files_pkgs: List[_RemoveFilePackage], store: StoreWrapper):
-        for target_file_path, file_path, file_description in remove_files_pkgs:
-            store.write_only().remove_file(file_path)
+    def _process_remove_file_packages(self, remove_files_pkgs: List[_RemoveFilePackage], db_id: str):
+        for target_file_path, _, _ in remove_files_pkgs:
             self._ctx.file_system.unlink(target_file_path)
+
+        with self._lock:
+            for target_file_path, file_path, file_description in remove_files_pkgs:
+                self._ctx.installation_report.add_processed_file(target_file_path, file_path, file_description, db_id)
+                self._ctx.installation_report.add_removed_file(file_path)
 
     def _process_delete_folder_packages(self, delete_folder_pkgs: List[_DeleteFolderPackage], store: StoreWrapper):
         for target_folder_path, folder_path, folder_description in delete_folder_pkgs:

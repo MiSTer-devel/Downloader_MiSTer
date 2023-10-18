@@ -90,7 +90,7 @@ def partition_min_space(config, path: str) -> int:
     return config[K_MINIMUM_SYSTEM_FREE_SPACE_MB] if path == config[K_BASE_SYSTEM_PATH] else config[K_MINIMUM_EXTERNAL_FREE_SPACE_MB]
 
 
-class UnlimitedFreeSpaceReservation(abc.ABC):
+class UnlimitedFreeSpaceReservation(FreeSpaceReservation):
     def reserve_space_for_file(self, full_file_path: str, file_description: Dict[str, Any]) -> None: pass
     def release_space_for_file(self, full_file_path: str, file_description: Dict[str, Any]) -> None: pass
     def get_full_partitions(self) -> List[FullPartition]: return []
