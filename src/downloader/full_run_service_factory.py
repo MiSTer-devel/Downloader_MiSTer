@@ -29,7 +29,7 @@ from downloader.full_run_service import FullRunService
 from downloader.http_gateway import HttpGateway
 from downloader.importer_command import ImporterCommandFactory
 from downloader.job_system import JobSystem
-from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter
+from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import DownloaderWorkerContext
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.logger import DebugOnlyLoggerDecorator
@@ -76,7 +76,8 @@ class FullRunServiceFactory:
             logger=DebugOnlyLoggerDecorator(self._logger) if config[K_DEBUG] else None
         )
         atexit.register(http_gateway.cleanup)
-        file_download_reporter = FileDownloadProgressReporter(self._logger, waiter)
+        installation_report = InstallationReportImpl()
+        file_download_reporter = FileDownloadProgressReporter(self._logger, waiter, installation_report)
         job_system = JobSystem(
             reporter=DownloaderProgressReporter(self._logger, [file_download_reporter]),
             logger=self._logger,
@@ -100,6 +101,7 @@ class FullRunServiceFactory:
             http_gateway=http_gateway,
             file_system=system_file_system,
             target_path_repository=None,
+            installation_report=installation_report,
             file_download_reporter=file_download_reporter,
             free_space_reservation=free_space_reservation,
             external_drives_repository=external_drives_repository,

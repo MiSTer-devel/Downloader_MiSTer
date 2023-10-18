@@ -31,7 +31,5 @@ class ValidateFileJob2(Job):
     info: str
     fetch_job: FetchFileJob2
     after_job: Optional[Job] = None
-    after_action: Optional[Callable[[], None]] = None
-    after_action_failure: Optional[Callable[[], None]] = None
 
     def retry_job(self): return self.fetch_job
