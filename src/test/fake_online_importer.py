@@ -22,7 +22,7 @@ from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.job_system import JobSystem
 from downloader.jobs.process_db_job import ProcessDbJob
-from downloader.jobs.reporters import FileDownloadProgressReporter
+from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import DownloaderWorkerContext
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.jobs.download_db_job import DownloadDbJob
@@ -50,6 +50,8 @@ class OnlineImporter(ProductionOnlineImporter):
         path_resolver_factory = PathResolverFactory(path_dictionary=file_system_state.path_dictionary, file_system_factory=self.fs_factory) if path_resolver_factory is None else path_resolver_factory
 
         self.needs_save = False
+        self._needs_reboot = False
+        self._new_files_not_overwritten = {}
         waiter = NoWaiter() if waiter is None else waiter
         logger = NoLogger() if logger is None else logger
 
@@ -65,7 +67,8 @@ class OnlineImporter(ProductionOnlineImporter):
             logger)
 
         self.dbs = []
-        self._file_download_reporter = FileDownloadProgressReporter(logger, waiter)
+        installation_report = InstallationReportImpl()
+        self._file_download_reporter = FileDownloadProgressReporter(logger, waiter, installation_report)
         self._job_system = JobSystem(self._file_download_reporter, logger=logger, max_threads=1)
         self._worker_ctx = DownloaderWorkerContext(
             job_system=self._job_system,
@@ -75,6 +78,7 @@ class OnlineImporter(ProductionOnlineImporter):
             file_system=self.file_system,
             target_path_repository=None,
             file_download_reporter=self._file_download_reporter,
+            installation_report=installation_report,
             free_space_reservation=UnlimitedFreeSpaceReservation(),
             external_drives_repository=ExternalDrivesRepository(file_system=self.file_system),
             config=self._config
@@ -106,18 +110,33 @@ class OnlineImporter(ProductionOnlineImporter):
 
     def download(self, full_resync):
 
-        stores = dict()
-        for db, store, ini_description in self.dbs:
-            stores[db.db_id] = store
-
-        local_store = LocalStoreWrapper({'dbs': stores})
+        local_store = LocalStoreWrapper({'dbs': {db.db_id: store for db, store, _ in self.dbs}})
 
         self._workers_factory.prepare_workers()
 
+        stores = {}
         for db, store, ini_description in self.dbs:
-            self._job_system.push_job(ProcessDbJob(db=db, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
+            stores[db.db_id] = local_store.store_by_id(db.db_id)
+            self._job_system.push_job(ProcessDbJob(db=db, ini_description=ini_description, store=stores[db.db_id], full_resync=full_resync))
 
         self._job_system.accomplish_pending_jobs()
+
+        report = self._worker_ctx.file_download_reporter.report()
+        for file_path in report.installed_files():
+            file = report.processed_file(file_path)
+            if 'reboot' in file.desc and file.desc['reboot']:
+                self._needs_reboot = True
+            stores[file.db_id].write_only().add_file(file.path, file.desc)
+
+        for file_path in report.uninstalled_files():
+            file = report.processed_file(file_path)
+            stores[file.db_id].write_only().remove_file(file.path)
+
+        for file_path in report.skipped_updated_files():
+            file = report.processed_file(file_path)
+            if file.db_id not in self._new_files_not_overwritten:
+                self._new_files_not_overwritten[file.db_id] = []
+            self._new_files_not_overwritten[file.db_id].append(file.path)
 
         for db, store, _ in self.dbs:
             self._clean_store(store)
@@ -125,6 +144,12 @@ class OnlineImporter(ProductionOnlineImporter):
         self.needs_save = local_store.needs_save()
 
         return self
+
+    def new_files_not_overwritten(self):
+        return self._new_files_not_overwritten
+
+    def needs_reboot(self):
+        return self._needs_reboot
 
     def add_db(self, db, store, description=None):
         self.dbs.append((db, store, {} if description is None else description))
@@ -137,10 +162,10 @@ class OnlineImporter(ProductionOnlineImporter):
         return store
 
     def correctly_installed_files(self):
-        return self._workers_factory.ProcessDbWorker.correctly_installed_files()
+        return self._worker_ctx.file_download_reporter.report().installed_files()
 
     def files_that_failed(self):
-        return self._worker_ctx.file_download_reporter.failed_files()
+        return self._worker_ctx.file_download_reporter.report().failed_files()
 
     @staticmethod
     def _clean_store(store):

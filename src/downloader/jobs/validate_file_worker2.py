@@ -33,7 +33,6 @@ class ValidateFileWorker2(DownloaderWorker):
             if job.after_action_failure is not None: job.after_action_failure()
             raise exception
 
-        if job.after_action is not None: job.after_action()
         if job.after_job is not None: self._ctx.job_system.push_job(job.after_job)
 
     def _validate_file(self, download_path: str, target_file_path: str, info: str, file_hash: str) -> Optional[FileDownloadException]:
@@ -42,4 +41,5 @@ class ValidateFileWorker2(DownloaderWorker):
             self._ctx.file_system.unlink(download_path)
             return FileDownloadException(f'Bad hash on {info} ({file_hash} != {path_hash})')
 
-        if download_path != target_file_path: self._ctx.file_system.move(download_path, target_file_path)
+        if download_path != target_file_path:
+            self._ctx.file_system.move(download_path, target_file_path)
