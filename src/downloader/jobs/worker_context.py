@@ -25,7 +25,7 @@ from downloader.file_system import FileSystem
 from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import JobSystem, Worker
-from downloader.jobs.reporters import FileDownloadProgressReporter
+from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from downloader.logger import Logger
 from downloader.target_path_repository import TargetPathRepository
 from downloader.waiter import Waiter
@@ -40,6 +40,7 @@ class DownloaderWorkerContext:
     file_system: FileSystem
     waiter: Waiter
     file_download_reporter: FileDownloadProgressReporter
+    installation_report: InstallationReportImpl
     free_space_reservation: FreeSpaceReservation
     external_drives_repository: ExternalDrivesRepository
     config: Dict[str, Any]

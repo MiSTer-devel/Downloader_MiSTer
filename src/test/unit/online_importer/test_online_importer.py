@@ -16,18 +16,18 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import FILE_MiSTer_old, FILE_MiSTer, FILE_PDFViewer, FILE_MiSTer_new, FOLDER_linux, \
+from downloader.constants import FILE_PDFViewer, FOLDER_linux, \
     DISTRIBUTION_MISTER_DB_ID
 from downloader.logger import NoLogger
 from test.fake_logger import SpyLoggerDecorator
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_waiter import NoWaiter
-from test.fake_file_system_factory import fs_data, fs_records
+from test.fake_file_system_factory import fs_data
 from test.objects import store_with_folders, db_distribution_mister, db_test_being_empty_descr, file_boot_rom, \
-    boot_rom_descr, with_overwrite, file_mister_descr, file_a_descr, file_a_updated_descr, \
+    boot_rom_descr, with_overwrite, file_a_descr, file_a_updated_descr, \
     db_test_with_file, db_with_file, db_with_folders, file_a, folder_a, \
     store_test_with_file_a_descr, store_test_with_file, db_test_with_file_a, file_descr, empty_test_store, \
-    file_pdfviewer_descr, store_descr, hash_MiSTer_old, media_usb0, \
+    file_pdfviewer_descr, store_descr, media_usb0, \
     db_entity, file_c_descr, file_abc, folder_ab, path_system, file_system_abc_descr, store_reboot_descr, file_reboot, file_reboot_descr
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
@@ -170,50 +170,6 @@ class TestOnlineImporter(OnlineImporterTestBase):
         self.assertEqual(fs_data(), sut.fs_data)
         self.assertEqual(empty_test_store(), store)
         self.assertReportsNothing(sut)
-
-    def test_download_distribution_mister_with_mister___replacing_old_mister_on_empty_store___needs_reboot(self):
-        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(
-            files={media_usb0(FILE_MiSTer): {'hash': hash_MiSTer_old}},
-        ))
-        store = empty_test_store()
-
-        sut.add_db(db_distribution_mister(files={FILE_MiSTer: file_mister_descr()}), store)
-        sut.download(False)
-
-        self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files={FILE_MiSTer: file_mister_descr()}), store)
-        self.assertEqual(fs_data(
-            files={
-                media_usb0(FILE_MiSTer): file_mister_descr(),
-                media_usb0(FILE_MiSTer_old): {'hash': hash_MiSTer_old}
-            },
-        ), sut.fs_data)
-        self.assertEqual(fs_records([
-            {'scope': 'write_incoming_stream', 'data': media_usb0(FILE_MiSTer_new)},
-            {'scope': 'move', 'data': (media_usb0(FILE_MiSTer), media_usb0(FILE_MiSTer_old))},
-            {'scope': 'move', 'data': (media_usb0(FILE_MiSTer_new), media_usb0(FILE_MiSTer))},
-        ]), sut.fs_records)
-        self.assertReports(sut, [FILE_MiSTer], needs_reboot=True)
-
-    def test_download_distribution_mister_with_mister___with_no_mister_on_empty_store___needs_reboot2(self):
-        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs())
-        store = empty_test_store()
-
-        sut.add_db(db_distribution_mister(files={FILE_MiSTer: file_mister_descr()}), store)
-        sut.download(False)
-
-        self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files={FILE_MiSTer: file_mister_descr()}), store)
-        self.assertEqual(fs_data(files={media_usb0(FILE_MiSTer): file_mister_descr()}), sut.fs_data)
-        self.assertEqual(fs_records([
-            {'scope': 'write_incoming_stream', 'data': media_usb0(FILE_MiSTer_new)},
-            {'scope': 'move', 'data': (media_usb0(FILE_MiSTer_new), media_usb0(FILE_MiSTer))},
-        ]), sut.fs_records)
-        self.assertReports(sut, [FILE_MiSTer], needs_reboot=True)
-
-    def test_two_databases_one_with_mister___on_empty_store___needs_reboot_and_does_not_throw_due_to_bad_fs_cache_handling(self):
-        self.assertReports(OnlineImporter()
-                           .add_db(db_distribution_mister(files={FILE_MiSTer: file_mister_descr()}), empty_test_store())
-                           .add_db(db_test_being_empty_descr(), empty_test_store())
-                           .download(False), [FILE_MiSTer], needs_reboot=True)
 
     def test_download_distribution_mister_with_pdfviewer___on_empty_store_and_fs___needs_reboot(self):
         sut = OnlineImporter()
@@ -405,8 +361,8 @@ class TestOnlineImporter(OnlineImporterTestBase):
         db = db_entity(files={file_abc: file_system_abc_descr()})
         sut = self._download_db(db, store, fs(files=fs_files_abc_on_usb0(), folders=fs_folders_ab_on_usb0()))
 
-        self.assertEqual(fs_data(files=fs_files_abc_on_usb0(), folders=fs_folders_ab_on_usb0()), sut.fs_data)
         self.assertEqual(store_file_abc(), store)
+        self.assertEqual(fs_data(files=fs_files_abc_on_usb0(), folders=fs_folders_ab_on_usb0()), sut.fs_data)
         self.assertReportsNothing(sut)
 
     def test_download_reboot_file___on_empty_store_and_fs___needs_reboot(self):

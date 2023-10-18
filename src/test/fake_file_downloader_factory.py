@@ -21,7 +21,7 @@ from typing import Dict, Any, List, Tuple
 from downloader.file_downloader import FileDownloaderFactory as ProductionFileDownloaderFactory
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.job_system import JobSystem
-from downloader.jobs.reporters import FileDownloadProgressReporter
+from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs, NetworkState, FileSystemState
@@ -35,7 +35,7 @@ class FileDownloaderFactory(ProductionFileDownloaderFactory):
         state = state if state is not None else FileSystemState(config=config)
         file_system_factory = file_system_factory if file_system_factory is not None else FileSystemFactory(state=state, config=state.config)
         network_state = NetworkState() if network_state is None else network_state
-        file_download_reporter = file_download_reporter if file_download_reporter is not None else FileDownloadProgressReporter(NoLogger(), NoWaiter())
+        file_download_reporter = file_download_reporter if file_download_reporter is not None else FileDownloadProgressReporter(NoLogger(), NoWaiter(), InstallationReportImpl())
         job_system = job_system if job_system is not None else JobSystem(file_download_reporter, logger=NoLogger(), max_threads=1)
         http_gateway = http_gateway if http_gateway is not None else FakeHttpGateway(state.config, network_state)
         super().__init__(

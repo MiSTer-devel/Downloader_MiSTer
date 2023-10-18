@@ -63,10 +63,7 @@ class FileSystemFactory:
 
     @property
     def data(self):
-        data = self._state.__dict__.copy()
-        del data['config']
-        del data['path_dictionary']
-        return data
+        return fs_state_to_data(self._state)
 
     @property
     def records(self):
@@ -75,6 +72,17 @@ class FileSystemFactory:
     @staticmethod
     def from_state(files=None, folders=None, config=None, base_path=None, path_dictionary=None):
         return FileSystemFactory(state=FileSystemState(files=files, folders=folders, config=config, base_path=base_path, path_dictionary=path_dictionary))
+
+
+def fs_state_to_data(state: FileSystemState):
+    def change_files(files): return {
+        k: {
+            'hash': v['hash'] if 'hash' in v else 'NO_HASH', 'size': v['size'] if 'size' in v else 1
+        } for k, v in files.items()
+    }
+    def change_folders(folders): return {k: {} for k in folders}
+
+    return {'files': change_files(state.files), 'folders': change_folders(state.folders)}
 
 
 class FakeFileSystem(ProductionFileSystem):
@@ -94,10 +102,7 @@ class FakeFileSystem(ProductionFileSystem):
 
     @property
     def data(self):
-        data = self.state.__dict__.copy()
-        del data['config']
-        del data['path_dictionary']
-        return data
+        return fs_state_to_data(self.state)
 
     def _fix_paths(self, paths):
         return [p.replace(self._base_path(p) + '/', '') for p in paths]

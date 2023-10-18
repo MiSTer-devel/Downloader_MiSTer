@@ -1,5 +1,6 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-
+import abc
+import dataclasses
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -20,7 +21,7 @@ import socket
 import threading
 import time
 from http.client import HTTPException
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Optional, Tuple, List, Any
 from urllib.error import URLError
 
 from downloader.db_entity import DbEntity
@@ -63,14 +64,62 @@ class DownloaderProgressReporter(ProgressReporter):
         pass
 
 
+@dataclasses.dataclass
+class ProcessedFile:
+    path: str
+    target_path: str
+    desc: Dict[str, Any]
+    db_id: str
+
+
+class InstallationReport(abc.ABC):
+    def processed_file(self, path: str) -> ProcessedFile: """File that a database is currently processing."""
+    def downloaded_files(self) -> List[str]: """Files that has just been downloaded and validated."""
+    def already_present_files(self) -> List[str]: """File previously in the system, that were not in the store, and now have been validated."""
+    def fetch_started_files(self) -> List[str]: """Files that have been queued for download."""
+    def failed_files(self) -> List[str]: """Files that couldn't be downloaded properly or didn't pass validation."""
+    def removed_files(self) -> List[str]: """Files that have just been removed."""
+    def installed_files(self) -> List[str]: """Files that have just been installed and need to be updated in the store."""
+    def uninstalled_files(self) -> List[str]: """Files that have just been uninstalled for various reasons and need to be removed from the store."""
+
+    def skipped_updated_files(self) -> List[str]: """File with an available update that didn't get updated because it has override false in its file description."""
+
+
+class InstallationReportImpl(InstallationReport):
+    def __init__(self):
+        self._downloaded_files = []
+        self._already_present_files = []
+        self._fetch_started_files = []
+        self._failed_files = []
+        self._removed_files = []
+        self._skipped_updated_files = []
+        self._processed_files: Dict[str, ProcessedFile] = {}
+
+    def add_downloaded_file(self, path: str): self._downloaded_files.append(path)
+    def add_already_present_file(self, path: str): self._already_present_files.append(path)
+    def add_file_fetch_started(self, path: str): self._fetch_started_files.append(path)
+    def add_failed_file(self, path: str): self._failed_files.append(path)
+    def add_removed_file(self, path: str): self._removed_files.append(path)
+    def is_file_processed(self, path: str) -> bool: return path in self._processed_files
+    def add_processed_file(self, target_path: str, path: str, desc: Dict[str, Any], db_id: str): self._processed_files[path] = ProcessedFile(path, target_path, desc, db_id)
+    def add_skipped_updated_file(self, path: str): self._skipped_updated_files.append(path)
+    def processed_file(self, path: str) -> ProcessedFile: return self._processed_files[path]
+    def downloaded_files(self): return self._downloaded_files
+    def already_present_files(self): return self._already_present_files
+    def fetch_started_files(self): return self._fetch_started_files
+    def failed_files(self): return self._failed_files
+    def removed_files(self): return self._removed_files
+    def installed_files(self): return self._downloaded_files + self._already_present_files
+    def uninstalled_files(self): return self._removed_files + self._failed_files
+    def skipped_updated_files(self): return self._skipped_updated_files
+
+
 class FileDownloadProgressReporter(ProgressReporter):
 
-    def __init__(self, logger: Logger, waiter: Waiter):
+    def __init__(self, logger: Logger, waiter: Waiter, report: InstallationReportImpl):
         self._logger = logger
         self._waiter = waiter
-        self._downloaded_files = []
-        self._started_files = []
-        self._failed_files = []
+        self._report = report
         self._check_time: float = 0
         self._active_jobs: Dict[int] = {}
         self._deactivated: bool = False
@@ -79,7 +128,7 @@ class FileDownloadProgressReporter(ProgressReporter):
         self._symbols: List[str] = []
 
     def start_session(self):
-        self.__init__(self._logger, self._waiter)
+        self.__init__(self._logger, self._waiter, InstallationReportImpl())
 
     def _deactivate(self):
         self._deactivated = True
@@ -87,22 +136,16 @@ class FileDownloadProgressReporter(ProgressReporter):
     def is_active(self) -> bool:
         return len(self._active_jobs) > 0 and not self._deactivated
 
-    def downloaded_files(self):
-        return self._downloaded_files
-
-    def failed_files(self):
-        return self._failed_files
-
-    def started_files(self):
-        return self._started_files
+    def report(self) -> InstallationReport:
+        return self._report
 
     def notify_job_started(self, job: Job):
         if isinstance(job, FetchFileJob):
             self._print_line(job.path)
-            self._started_files.append(job.path)
+            self._report.add_file_fetch_started(job.path)
         if isinstance(job, FetchFileJob2) and not job.silent:
             self._print_line(job.info)
-            self._started_files.append(job.info)
+            self._report.add_file_fetch_started(job.info)
 
         self._active_jobs[job.type_id] = self._active_jobs.get(job.type_id, 0) + 1
         self._check_time = time.time() + 2.0
@@ -126,13 +169,13 @@ class FileDownloadProgressReporter(ProgressReporter):
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
-            self._downloaded_files.append(job.fetch_job.path)
+            self._report.add_downloaded_file(job.fetch_job.path)
         elif isinstance(job, ValidateFileJob2):
             self._symbols.append('+')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
-            self._downloaded_files.append(job.fetch_job.info)
+            self._report.add_downloaded_file(job.fetch_job.info)
 
         self._remove_in_progress(job)
 
@@ -207,7 +250,7 @@ class FileDownloadProgressReporter(ProgressReporter):
 
     def notify_job_failed(self, job: Job, exception: BaseException):
         _, path = self._url_path_from_job(job)
-        self._failed_files.append(path)
+        self._report.add_failed_file(path)
         self.notify_job_retried(job, exception)
 
     def notify_job_retried(self, job: Job, exception: BaseException):
