@@ -1,6 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-import abc
-import dataclasses
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -18,18 +17,22 @@ import dataclasses
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import socket
-import threading
+import abc
+import dataclasses
 import time
 from http.client import HTTPException
 from typing import Dict, Optional, Tuple, List, Any
 from urllib.error import URLError
 
 from downloader.db_entity import DbEntity
+from downloader.file_filter import BadFileFilterPartException
+from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.errors import FileDownloadException
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
+from downloader.online_importer import WrongDatabaseOptions
 from downloader.waiter import Waiter
 from downloader.job_system import ProgressReporter, Job
 from downloader.logger import Logger
@@ -81,6 +84,7 @@ class InstallationReport(abc.ABC):
     def removed_files(self) -> List[str]: """Files that have just been removed."""
     def installed_files(self) -> List[str]: """Files that have just been installed and need to be updated in the store."""
     def uninstalled_files(self) -> List[str]: """Files that have just been uninstalled for various reasons and need to be removed from the store."""
+    def wrong_db_options(self) -> List[WrongDatabaseOptions]: """Databases that have been unprocessed because of their database."""
 
     def skipped_updated_files(self) -> List[str]: """File with an available update that didn't get updated because it has override false in its file description."""
 
@@ -91,6 +95,7 @@ class InstallationReportImpl(InstallationReport):
         self._already_present_files = []
         self._fetch_started_files = []
         self._failed_files = []
+        self._failed_db_options: List[WrongDatabaseOptions] = []
         self._removed_files = []
         self._skipped_updated_files = []
         self._processed_files: Dict[str, ProcessedFile] = {}
@@ -99,6 +104,7 @@ class InstallationReportImpl(InstallationReport):
     def add_already_present_file(self, path: str): self._already_present_files.append(path)
     def add_file_fetch_started(self, path: str): self._fetch_started_files.append(path)
     def add_failed_file(self, path: str): self._failed_files.append(path)
+    def add_failed_db_options(self, exception: WrongDatabaseOptions): self._failed_db_options.append(exception)
     def add_removed_file(self, path: str): self._removed_files.append(path)
     def is_file_processed(self, path: str) -> bool: return path in self._processed_files
     def add_processed_file(self, target_path: str, path: str, desc: Dict[str, Any], db_id: str): self._processed_files[path] = ProcessedFile(path, target_path, desc, db_id)
@@ -111,6 +117,7 @@ class InstallationReportImpl(InstallationReport):
     def removed_files(self): return self._removed_files
     def installed_files(self): return self._downloaded_files + self._already_present_files
     def uninstalled_files(self): return self._removed_files + self._failed_files
+    def wrong_db_options(self): return self._failed_db_options
     def skipped_updated_files(self): return self._skipped_updated_files
 
 
@@ -249,8 +256,14 @@ class FileDownloadProgressReporter(ProgressReporter):
         self._check_time = time.time() + 2.0
 
     def notify_job_failed(self, job: Job, exception: BaseException):
-        _, path = self._url_path_from_job(job)
-        self._report.add_failed_file(path)
+        if isinstance(job, ProcessDbJob) and isinstance(exception, BadFileFilterPartException):
+            self._report.add_failed_db_options(
+                WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(exception)}' is invalid.")
+            )
+        result = self._url_path_from_job(job)
+        if result is not None:
+            _, path = result
+            self._report.add_failed_file(path)
         self.notify_job_retried(job, exception)
 
     def notify_job_retried(self, job: Job, exception: BaseException):

@@ -225,4 +225,18 @@ class AlwaysFilters(FilterCalculator):
 
 
 class BadFileFilterPartException(Exception):
-    pass
+    def __init__(self, part: str):
+        super().__init__(f'Bad filter part: {part}')
+        self.part: str = part
+        self.db_id: Optional[str] = None
+
+    def on_db(self, db_id: str):
+        self.db_id = db_id
+
+    def __str__(self):
+        base_message = f"Part '{self.part}' is invalid."
+        if self.db_id is None:
+            return f"Bad filter part: {base_message}"
+        else:
+            return f"Wrong custom download filter on database {self.db_id}. {base_message}"
+
