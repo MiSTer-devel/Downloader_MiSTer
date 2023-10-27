@@ -159,7 +159,7 @@ def db_with_files_a_b_c():
 
 
 def db_with_files_a_b_c_alt():
-    return db_test_descr(files={
+    return db_test_descr(db_id='test_alt', files={
         'alt' + file_a: file_descr(tags=['a']),
         'alt' + file_b: file_descr(tags=['b']),
         'alt' + file_c: file_descr(tags=['c'])

@@ -1,5 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-import tempfile
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -28,7 +28,7 @@ from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 from downloader.constants import K_USER_DEFINED_OPTIONS, K_FILTER, K_OPTIONS, K_BASE_PATH, K_STORAGE_PRIORITY, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL, \
-    K_BASE_SYSTEM_PATH, PathType, FILE_MiSTer, FILE_MiSTer_old, FILE_MiSTer_new
+    K_BASE_SYSTEM_PATH, PathType, FILE_MiSTer, FILE_MiSTer_old
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.local_store_wrapper import StoreWrapper, NO_HASH_IN_STORE_CODE
 from downloader.online_importer import WrongDatabaseOptions
@@ -81,8 +81,6 @@ class ProcessDbWorker(DownloaderWorker):
             logger.debug(f"Not enough space '{db_id}'!")
             return
 
-        create_folder_pkgs.extend(self._add_missing_create_folder_packages(fetch_pkgs, job.store, {target_path for target_path, _, _ in create_folder_pkgs}))
-
         logger.debug(f"Processing create folder packages '{db_id}'...")
         self._process_create_folder_packages(create_folder_pkgs, job.store)
 
@@ -94,24 +92,9 @@ class ProcessDbWorker(DownloaderWorker):
 
         logger.debug(f"Launching fetch jobs '{db_id}'...")
         for target_file_path, file_path, file_description in fetch_pkgs:
-            fetch_job = FetchFileJob2(url=self._url(file_path, file_description, base_files_url), info=file_path, download_path=target_file_path + '._temp', silent=False)
+            fetch_job = FetchFileJob2(url=self._url(file_path, file_description, base_files_url), info=file_path, download_path=target_file_path + '.new', silent=False)
             fetch_job.after_job = ValidateFileJob2(target_file_path=target_file_path, description=file_description, info=file_path, fetch_job=fetch_job)
             self._ctx.job_system.push_job(fetch_job)
-
-    def _add_missing_create_folder_packages(self, fetch_pkgs: List[_FetchFilePackage], store: StoreWrapper, existing_folders: Set[str]) -> List[_CreateFolderPackage]:
-        # @TODO This method should be totally removed at some point
-        result: List[_CreateFolderPackage] = []
-        read_only_store = store.read_only()
-        for target_file_path, file_path, _ in fetch_pkgs:
-            target_parent_folder = str(Path(target_file_path).parent)
-            parent_folder = str(Path(file_path).parent)
-            if target_parent_folder not in existing_folders and target_parent_folder and parent_folder not in read_only_store.folders:
-                existing_folders.add(target_parent_folder)
-
-                # @TODO append to result instead of calling the file system
-                self._ctx.file_system.make_dirs(target_parent_folder)
-
-        return result
 
     def _url(self, file_path: str, file_description: _Desc, base_files_url: str):
         return file_description['url'] if 'url' in file_description else calculate_url(base_files_url, file_path if file_path[0] != '|' else file_path[1:])
@@ -161,17 +144,25 @@ class ProcessDbWorker(DownloaderWorker):
         ) for path, description in items.items() if path not in exclude_items]
 
         check_file_pkgs: List[_CheckFilePackage] = translate_items(filtered_db.files, PathType.FILE, {})
-        create_folder_pkgs: List[_CreateFolderPackage] = translate_items(filtered_db.folders, PathType.FOLDER, {})
         remove_files_pkgs: List[_RemoveFilePackage] = translate_items(read_only_store.files, PathType.FILE, filtered_db.files)
 
         existing_folders = filtered_db.folders.copy()
-        for target_file_path, file_path, _ in check_file_pkgs:
+        for target_file_path, file_path, file_description in check_file_pkgs:
             path_obj = Path(file_path)
+            target_path_obj = Path(target_file_path)
             while len(path_obj.parts) > 1:
                 path_obj = path_obj.parent
-                existing_folders[str(path_obj)] = True
+                target_path_obj = target_path_obj.parent
+                path_str = str(path_obj)
+                if path_str not in existing_folders:
+                    existing_folders[path_str] = read_only_store.folders.get(path_str, {})
+                    self._ctx.file_system.make_dirs(str(target_path_obj))
 
+        create_folder_pkgs: List[_CreateFolderPackage] = translate_items(filtered_db.folders, PathType.FOLDER, {})
         delete_folder_pkgs: List[_DeleteFolderPackage] = translate_items(read_only_store.folders, PathType.FOLDER, existing_folders)
+
+        for target_file_path, file_path, file_description in check_file_pkgs:
+            if file_path is FILE_MiSTer: file_description['backup'] = FILE_MiSTer_old
 
         return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs
 
@@ -205,10 +196,7 @@ class ProcessDbWorker(DownloaderWorker):
         return os.path.join(priority_top_folders[first_folder].folders[second_folder], source_path)
 
     def _create_file_filter(self, db, config):
-        try:
-            return FileFilterFactory(self._ctx.logger).create(db, config)
-        except BadFileFilterPartException as e:
-            raise WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e)))
+        return FileFilterFactory(self._ctx.logger).create(db, config)
 
     def _search_drive_for_directory(self, drives, base_path, priority, directory):
         if priority == STORAGE_PRIORITY_OFF:

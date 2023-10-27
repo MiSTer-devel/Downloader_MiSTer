@@ -290,7 +290,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         sut.add_db(db_test_with_file(file_a, with_overwrite(file_a_updated_descr(), False)), store)
         sut.download(False)
 
-        self.assertEqual(fs_data(files={file_a: file_a_descr()}), sut.fs_data)
+        self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(empty_test_store(), store)
         self.assertReportsNothing(sut)
         self.assertEqual([file_a], sut.new_files_not_overwritten()['test'])

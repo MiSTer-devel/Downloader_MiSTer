@@ -141,6 +141,9 @@ class OnlineImporter(ProductionOnlineImporter):
         for db, store, _ in self.dbs:
             self._clean_store(store)
 
+        for e in report.wrong_db_options():
+            raise e
+
         self.needs_save = local_store.needs_save()
 
         return self
@@ -169,6 +172,10 @@ class OnlineImporter(ProductionOnlineImporter):
 
     @staticmethod
     def _clean_store(store):
+        for file_description in store['files'].values():
+            if 'tags' in file_description: file_description.pop('tags')
+        for folder_description in store['folders'].values():
+            if 'tags' in folder_description: folder_description.pop('tags')
         for zip_description in store['zips'].values():
             if 'zipped_files' in zip_description['contents_file']:
                 zip_description['contents_file'].pop('zipped_files')
