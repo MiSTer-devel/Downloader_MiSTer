@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
 import sys
 import time
-from typing import Dict, Optional, Callable, List, Tuple, Any, TypeVar, Generic, Union
+from typing import Dict, Optional, Callable, List, Tuple, Any
 import queue
 import threading
 import signal
@@ -136,7 +136,7 @@ class JobSystem:
                 self._assert_there_are_no_cycles(package)
                 try:
                     self._operate_on_next_job(package, notifications)
-                except BaseException as e:
+                except Exception as e:
                     self._retry_package(package, e)
 
             self._handle_notifications(notifications)
@@ -158,7 +158,7 @@ class JobSystem:
         finally:
             del _thread_local_storage.current_package
 
-    def _retry_package(self, package: '_JobPackage', e: BaseException) -> None:
+    def _retry_package(self, package: '_JobPackage', e: Exception) -> None:
         if isinstance(e, JobSystemAbortException):
             raise e
         retry_job = package.job.retry_job()
@@ -205,8 +205,11 @@ class JobSystem:
         for package, future in futures:
             if future.done():
                 future_exception = future.exception()
-                if future_exception:
-                    self._retry_package(package, future_exception)
+                if future_exception is not None:
+                    if isinstance(future_exception, Exception):
+                        self._retry_package(package, future_exception)
+                    else:
+                        raise future_exception
             else:
                 still_pending.append((package, future))
         return still_pending
@@ -255,10 +258,10 @@ class JobSystem:
     def _report_job_completed(self, package: '_JobPackage') -> None:
         self._try_report('completed', lambda: self._reporter_for_package(package).notify_job_completed(package.job))
 
-    def _report_job_retried(self, package: '_JobPackage', e: BaseException) -> None:
+    def _report_job_retried(self, package: '_JobPackage', e: Exception) -> None:
         self._try_report('retried', lambda: self._reporter_for_package(package).notify_job_retried(package.job, e))
 
-    def _report_job_failed(self, package: '_JobPackage', e: BaseException) -> None:
+    def _report_job_failed(self, package: '_JobPackage', e: Exception) -> None:
         self._try_report('failed', lambda: self._reporter_for_package(package).notify_job_failed(package.job, e))
 
     def _report_work_in_progress(self) -> None:
@@ -317,11 +320,11 @@ class ProgressReporter(ABC):
         """Called when a job is completed. Must not throw exceptions."""
 
     @abstractmethod
-    def notify_job_failed(self, job: Job, exception: BaseException) -> None:
+    def notify_job_failed(self, job: Job, exception: Exception) -> None:
         """Called when a job fails. Must not throw exceptions."""
 
     @abstractmethod
-    def notify_job_retried(self, job: Job, exception: BaseException) -> None:
+    def notify_job_retried(self, job: Job, exception: Exception) -> None:
         """Called when a job is retried. Must not throw exceptions."""
 
 
