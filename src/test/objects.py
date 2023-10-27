@@ -28,8 +28,9 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     MEDIA_FAT, K_BASE_SYSTEM_PATH, K_CONFIG_PATH, K_ZIP_FILE_COUNT_THRESHOLD, K_STORAGE_PRIORITY, MEDIA_USB0, \
     MEDIA_USB1, \
     MEDIA_USB2, KENV_FAIL_ON_FILE_ERROR, KENV_UPDATE_LINUX, KENV_CURL_SSL, KENV_COMMIT, DEFAULT_CURL_SSL_OPTIONS, \
-    K_DEFAULT_DB_ID, MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, K_DB_URL, K_SECTION, K_OPTIONS, K_USER_DEFINED_OPTIONS, KENV_FORCED_BASE_PATH, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
-    K_ZIP_ACCUMULATED_MB_THRESHOLD
+    K_DEFAULT_DB_ID, MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, K_DB_URL, K_SECTION, K_OPTIONS, K_USER_DEFINED_OPTIONS, KENV_FORCED_BASE_PATH, \
+    K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
+    K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_old
 from downloader.db_options import DbOptions, DbOptionsKind
 from downloader.other import empty_store_without_base_path
 from test.fake_db_entity import DbEntity
@@ -281,9 +282,9 @@ def db_test_with_default_filter_descr(db_default_option_filter=None):
     )
 
 
-def db_test_descr(zips=None, folders=None, files=None, db_files=None, tag_dictionary=None):
+def db_test_descr(db_id=None, zips=None, folders=None, files=None, db_files=None, tag_dictionary=None):
     return db_entity(
-        db_id=db_test,
+        db_id=db_id or db_test,
         db_files=db_files if db_files is not None else [],
         files=files if files is not None else {},
         folders=folders if folders is not None else {},
@@ -480,6 +481,7 @@ def with_base_path(description, base_path):
 def file_mister_descr(hash_code=None):
     return {
         "hash": hash_code or hash_MiSTer,
+        "backup": FILE_MiSTer_old,
         "path": "system",
         "reboot": True,
         "size": 2915040,
