@@ -83,7 +83,7 @@ verbose = false
 - [x] Configurable custom download filters
 - [x] Storage Priority Resolution for auto-detecting connected drives
 - [x] Free space check
-- [ ] Remove database feature
+- [ ] Uninstall database feature
 - [ ] Integration with *MiSTer* binary
 
 Check the [CHANGELOG](CHANGELOG.md) for more information about past releases.
