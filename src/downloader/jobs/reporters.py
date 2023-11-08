@@ -21,17 +21,20 @@ import abc
 import dataclasses
 import time
 from http.client import HTTPException
-from typing import Dict, Optional, Tuple, List, Any
+from typing import Dict, Optional, Tuple, List, Any, Iterable
 from urllib.error import URLError
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import BadFileFilterPartException
-from downloader.jobs.process_db_job import ProcessDbJob
+from downloader.jobs.get_file_job import GetFileJob
+from downloader.jobs.index import Index
+from downloader.jobs.process_index_job import ProcessIndexJob
+from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.errors import FileDownloadException
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.errors import GetFileException
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
+from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.online_importer import WrongDatabaseOptions
 from downloader.waiter import Waiter
 from downloader.job_system import ProgressReporter, Job
@@ -76,6 +79,7 @@ class ProcessedFile:
 
 
 class InstallationReport(abc.ABC):
+    def is_file_processed(self, path: str) -> bool: """Returns True if the file has been processed."""
     def processed_file(self, path: str) -> ProcessedFile: """File that a database is currently processing."""
     def downloaded_files(self) -> List[str]: """Files that has just been downloaded and validated."""
     def already_present_files(self) -> List[str]: """File previously in the system, that were not in the store, and now have been validated."""
@@ -85,7 +89,7 @@ class InstallationReport(abc.ABC):
     def installed_files(self) -> List[str]: """Files that have just been installed and need to be updated in the store."""
     def uninstalled_files(self) -> List[str]: """Files that have just been uninstalled for various reasons and need to be removed from the store."""
     def wrong_db_options(self) -> List[WrongDatabaseOptions]: """Databases that have been unprocessed because of their database."""
-
+    def installed_zip_indexes(self) -> Iterable[Tuple[str, str, Index, Dict[str, Any]]]: """Zip indexes that have been installed and need to be updated in the store."""
     def skipped_updated_files(self) -> List[str]: """File with an available update that didn't get updated because it has override false in its file description."""
 
 
@@ -99,8 +103,10 @@ class InstallationReportImpl(InstallationReport):
         self._removed_files = []
         self._skipped_updated_files = []
         self._processed_files: Dict[str, ProcessedFile] = {}
+        self._installed_zip_indexes: List[Tuple[str, str, Index, Dict[str, Any]]] = []
 
     def add_downloaded_file(self, path: str): self._downloaded_files.append(path)
+    def add_installed_zip_index(self, db_id: str, zip_id: str, index: Index, description: Dict[str, Any]): self._installed_zip_indexes.append((db_id, zip_id, index, description))
     def add_already_present_file(self, path: str): self._already_present_files.append(path)
     def add_file_fetch_started(self, path: str): self._fetch_started_files.append(path)
     def add_failed_file(self, path: str): self._failed_files.append(path)
@@ -118,6 +124,7 @@ class InstallationReportImpl(InstallationReport):
     def installed_files(self): return self._downloaded_files + self._already_present_files
     def uninstalled_files(self): return self._removed_files + self._failed_files
     def wrong_db_options(self): return self._failed_db_options
+    def installed_zip_indexes(self): return self._installed_zip_indexes
     def skipped_updated_files(self): return self._skipped_updated_files
 
 
@@ -150,7 +157,7 @@ class FileDownloadProgressReporter(ProgressReporter):
         if isinstance(job, FetchFileJob):
             self._print_line(job.path)
             self._report.add_file_fetch_started(job.path)
-        if isinstance(job, FetchFileJob2) and not job.silent:
+        if isinstance(job, GetFileJob) and not job.silent:
             self._print_line(job.info)
             self._report.add_file_fetch_started(job.info)
 
@@ -166,7 +173,7 @@ class FileDownloadProgressReporter(ProgressReporter):
             self._print_symbols()
 
     def notify_job_completed(self, job: Job):
-        if isinstance(job, FetchFileJob) or isinstance(job, FetchFileJob2):
+        if isinstance(job, FetchFileJob) or (isinstance(job, GetFileJob) and not job.silent):
             self._symbols.append('.')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
@@ -177,12 +184,19 @@ class FileDownloadProgressReporter(ProgressReporter):
                 self._print_symbols()
 
             self._report.add_downloaded_file(job.fetch_job.path)
-        elif isinstance(job, ValidateFileJob2):
+        elif isinstance(job, ValidateFileJob2) and job.after_job is None:
             self._symbols.append('+')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
-            self._report.add_downloaded_file(job.fetch_job.info)
+            self._report.add_downloaded_file(job.info)
+
+        elif isinstance(job, ProcessZipJob) and job.has_new_zip_index:
+            self._report.add_installed_zip_index(job.db.db_id, job.zip_id, job.zip_index, job.zip_description)
+
+        elif isinstance(job, OpenZipContentsJob):
+            for file in job.files:
+                self._report.add_downloaded_file(file.rel_path)
 
         self._remove_in_progress(job)
 
@@ -256,11 +270,11 @@ class FileDownloadProgressReporter(ProgressReporter):
         self._check_time = time.time() + 2.0
 
     def notify_job_failed(self, job: Job, exception: BaseException):
-        if isinstance(job, ProcessDbJob) and isinstance(exception, BadFileFilterPartException):
+        if isinstance(job, ProcessIndexJob) and isinstance(exception, BadFileFilterPartException):
             self._report.add_failed_db_options(
                 WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(exception)}' is invalid.")
             )
-        result = self._url_path_from_job(job)
+        result = self._file_source_from_job(job)
         if result is not None:
             _, path = result
             self._report.add_failed_file(path)
@@ -273,40 +287,42 @@ class FileDownloadProgressReporter(ProgressReporter):
         self._print_symbols()
         self._remove_in_progress(job)
 
-    def _url_path_from_job(self, job: Job) -> Optional[Tuple[str, str]]:
-        if isinstance(job, ValidateFileJob) or isinstance(job, ValidateFileJob2):
+    def _file_source_from_job(self, job: Job) -> Optional[Tuple[str, str]]:
+        if isinstance(job, ValidateFileJob):
             job = job.fetch_job
+        elif isinstance(job, ValidateFileJob2):
+            job = job.get_file_job
         if isinstance(job, FetchFileJob):
-            url, path = job.description.get('url', None) or '', job.path
-        elif isinstance(job, FetchFileJob2):
-            url, path = job.url, job.info
+            source, path = job.description.get('url', None) or '', job.path
+        elif isinstance(job, GetFileJob):
+            source, path = job.source, job.info
         else:
             return None
-        return url, path
+        return source, path
 
     def _message_from_exception(self, job: Job, exception: BaseException):
-        result = self._url_path_from_job(job)
+        result = self._file_source_from_job(job)
         if result is None:
             return str(exception)
 
-        url, path = result
+        source, path = result
 
         try:
             raise exception
         except socket.gaierror as e:
-            return f'Socket Address Error! {url}: {str(e)}'
+            return f'Socket Address Error! {source}: {str(e)}'
         except URLError as e:
-            return f'URL Error! {url}: {e.reason}'
+            return f'URL Error! {source}: {e.reason}'
         except HTTPException as e:
-            return f'HTTP Error {type(e).__name__}! {url}: {str(e)}'
+            return f'HTTP Error {type(e).__name__}! {source}: {str(e)}'
         except ConnectionResetError as e:
-            return f'Connection reset error! {url}: {str(e)}'
+            return f'Connection reset error! {source}: {str(e)}'
         except OSError as e:
-            return f'OS Error! {url}: {e.errno} {str(e)}'
-        except FileDownloadException as e:
+            return f'OS Error! {source}: {e.errno} {str(e)}'
+        except GetFileException as e:
             return str(e)
         except BaseException as e:
-            return f'Exception during download! {url}: {str(e)}'
+            return f'Exception during download! {source}: {str(e)}'
 
     def _remove_in_progress(self, job: Job):
         self._active_jobs[job.type_id] = self._active_jobs.get(job.type_id, 0) - 1
