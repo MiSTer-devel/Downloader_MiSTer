@@ -138,13 +138,16 @@ class OnlineImporter(ProductionOnlineImporter):
                 self._new_files_not_overwritten[file.db_id] = []
             self._new_files_not_overwritten[file.db_id].append(file.path)
 
+        for db_id, zip_id, zip_index, zip_description in report.installed_zip_indexes():
+            stores[db_id].write_only().add_zip_index(zip_id, zip_index, zip_description)
+
+        self.needs_save = local_store.needs_save()
+
         for db, store, _ in self.dbs:
             self._clean_store(store)
 
         for e in report.wrong_db_options():
             raise e
-
-        self.needs_save = local_store.needs_save()
 
         return self
 
@@ -173,14 +176,16 @@ class OnlineImporter(ProductionOnlineImporter):
     @staticmethod
     def _clean_store(store):
         for file_description in store['files'].values():
-            if 'tags' in file_description: file_description.pop('tags')
+            if 'tags' in file_description and 'zip_id' not in file_description: file_description.pop('tags')
         for folder_description in store['folders'].values():
-            if 'tags' in folder_description: folder_description.pop('tags')
+            if 'tags' in folder_description and 'zip_id' not in folder_description: folder_description.pop('tags')
         for zip_description in store['zips'].values():
             if 'zipped_files' in zip_description['contents_file']:
                 zip_description['contents_file'].pop('zipped_files')
             if 'summary_file' in zip_description and 'unzipped_json' in zip_description['summary_file']:
                 zip_description['summary_file'].pop('unzipped_json')
+            if 'internal_summary' in zip_description:
+                zip_description.pop('internal_summary')
 
 
 class OnlineImporter2(ProductionOnlineImporter):

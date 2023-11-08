@@ -16,21 +16,17 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import field, dataclass
-from typing import Any, Dict
+from typing import Optional
+from dataclasses import dataclass
+from abc import ABC
 
-from downloader.db_entity import DbEntity
-from downloader.job_system import Job, JobSystem
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.job_system import Job
 
 
 @dataclass
-class ProcessDbJob(Job):
-    type_id: int = field(init=False, default=JobSystem.get_job_type_id())
-
-    db: DbEntity
-    store: StoreWrapper
-    ini_description: Dict[str, Any]
-    full_resync: bool
-
-    def retry_job(self): return None
+class GetFileJob(Job, ABC):
+    temp_path: str
+    info: str
+    source: str
+    silent: bool
+    after_job: Optional[Job] = None

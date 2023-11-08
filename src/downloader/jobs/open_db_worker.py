@@ -27,14 +27,14 @@ class OpenDbWorker(DownloaderWorker):
     def reporter(self): return self._ctx.file_download_reporter
 
     def operate_on(self, job: OpenDbJob):
-        section, temp_path, suffix = job.section, job.temp_path, job.suffix
-        db = self._open_db(section, temp_path, suffix)
+        section, temp_path = job.section, job.temp_path
+        db = self._open_db(section, temp_path)
         ini_description, store, full_resync = job.ini_description, job.store, job.full_resync
         self._ctx.job_system.push_job(ProcessDbJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync))
 
-    def _open_db(self, section: str, temp_path: str, suffix: str) -> DbEntity:
+    def _open_db(self, section: str, temp_path: str) -> DbEntity:
         try:
-            db_raw = self._ctx.file_system.load_dict_from_file(temp_path, suffix)
+            db_raw = self._ctx.file_system.load_dict_from_file(temp_path)
             self._ctx.file_system.unlink(temp_path)
             self._ctx.logger.bench(f'Validating database {section}...')
             return DbEntity(db_raw, section)

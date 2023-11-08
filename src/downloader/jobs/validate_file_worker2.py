@@ -28,21 +28,21 @@ class ValidateFileWorker2(DownloaderWorker):
     def reporter(self): return self._ctx.file_download_reporter
 
     def operate_on(self, job: ValidateFileJob2):
-        download_path, target_file_path, info, description = job.fetch_job.download_path, job.target_file_path, job.info, job.description
-        exception = self._validate_file(download_path, target_file_path, info, description['hash'], description.get('backup', None))
+        temp_path, target_file_path, info, description = job.temp_path, job.target_file_path, job.info, job.description
+        exception = self._validate_file(temp_path, target_file_path, info, description['hash'], description.get('backup', None))
         if exception is not None:
-            if job.after_action_failure is not None: job.after_action_failure()
             raise exception
 
-        if job.after_job is not None: self._ctx.job_system.push_job(job.after_job)
+        if job.after_job is not None:
+            self._ctx.job_system.push_job(job.after_job)
 
-    def _validate_file(self, download_path: str, target_file_path: str, info: str, file_hash: str, backup: Optional[str]) -> Optional[FileDownloadException]:
-        path_hash = self._ctx.file_system.hash(download_path)
+    def _validate_file(self, temp_path: str, target_file_path: str, info: str, file_hash: str, backup: Optional[str]) -> Optional[FileDownloadException]:
+        path_hash = self._ctx.file_system.hash(temp_path)
         if path_hash != file_hash:
-            self._ctx.file_system.unlink(download_path)
+            self._ctx.file_system.unlink(temp_path)
             return FileDownloadException(f'Bad hash on {info} ({file_hash} != {path_hash})')
 
-        if download_path != target_file_path:
+        if temp_path != target_file_path:
             if backup is not None and self._ctx.file_system.is_file(target_file_path, use_cache=False):
                 self._ctx.file_system.move(target_file_path, str(Path(target_file_path).parent / backup))
-            self._ctx.file_system.move(download_path, target_file_path)
+            self._ctx.file_system.move(temp_path, target_file_path)

@@ -16,17 +16,11 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
+from dataclasses import field
 
-from downloader.job_system import Job, JobSystem
+from downloader.job_system import JobSystem
+from downloader.jobs.get_file_job import GetFileJob
 
 
-@dataclass
-class FetchFileJob2(Job):
+class FetchFileJob2(GetFileJob):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
-    download_path: str
-    info: str
-    url: str
-    silent: bool
-    after_job: Optional[Job] = None

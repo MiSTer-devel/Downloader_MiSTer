@@ -23,6 +23,7 @@ from abc import ABC, abstractmethod
 
 from downloader.constants import K_FILTER
 from downloader.db_entity import DbEntity
+from downloader.jobs.index import Index
 from downloader.logger import Logger
 
 FileFolderDesc = Dict[str, Any]
@@ -74,35 +75,35 @@ class FileFilter:
     def __init__(self, filter_calculator: Optional[FilterCalculator]):
         self._filter_calculator = filter_calculator
 
-    def select_filtered_files(self, db: DbEntity) -> Tuple[DbEntity, ZipData]:
+    def select_filtered_files(self, summary: Index) -> Tuple[Index, ZipData]:
         filtered_zip_data: ZipData = {}
 
         if self._filter_calculator is None:
-            return db, filtered_zip_data
+            return summary, filtered_zip_data
 
-        for file_path, file_desc in list(db.files.items()):
+        for file_path, file_desc in list(summary.files.items()):
             if self._filter_calculator.is_filtered(file_desc):
                 if 'zip_id' in file_desc:
                     self._add_filtered_file_in_zip(filtered_zip_data, file_path, file_desc['zip_id'], file_desc)
-                db.files.pop(file_path)
+                summary.files.pop(file_path)
 
         keep_folders = set()
 
-        for folder_path in reversed(sorted(db.folders.keys(), key=len)):
+        for folder_path in reversed(sorted(summary.folders.keys(), key=len)):
             if folder_path in keep_folders:
                 continue
 
-            folder_desc = db.folders[folder_path]
+            folder_desc = summary.folders[folder_path]
 
             if self._filter_calculator.is_filtered(folder_desc):
                 if 'zip_id' in folder_desc:
                     self._add_filtered_folder_in_zip(filtered_zip_data, folder_path, folder_desc['zip_id'], folder_desc)
-                db.folders.pop(folder_path)
+                summary.folders.pop(folder_path)
             else:
                 for parent in Path(folder_path).parents:
                     keep_folders.add(str(parent))
 
-        return db, filtered_zip_data
+        return summary, filtered_zip_data
 
     @staticmethod
     def _filtered_zip_data_by_id(filtered_zip_data: ZipData, zip_id: str) -> FileFoldersHolder:

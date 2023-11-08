@@ -21,16 +21,22 @@ from typing import Any, Dict
 
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
+from downloader.jobs.index import Index
 from downloader.local_store_wrapper import StoreWrapper
 
 
 @dataclass
-class ProcessDbJob(Job):
+class ProcessZipJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
     db: DbEntity
     store: StoreWrapper
+    config: Dict[str, Any]
+    zip_id: str
     ini_description: Dict[str, Any]
+    zip_description: Dict[str, Any]
+    zip_index: Index
+    has_new_zip_index: bool
     full_resync: bool
 
     def retry_job(self): return None

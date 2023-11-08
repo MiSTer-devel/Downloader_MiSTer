@@ -17,10 +17,10 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Dict, Optional
 
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.get_file_job import GetFileJob
 
 
 @dataclass
@@ -29,7 +29,8 @@ class ValidateFileJob2(Job):
     target_file_path: str
     description: Dict[str, Any]
     info: str
-    fetch_job: FetchFileJob2
+    temp_path: str
+    get_file_job: GetFileJob
     after_job: Optional[Job] = None
 
-    def retry_job(self): return self.fetch_job
+    def retry_job(self): return self.get_file_job
