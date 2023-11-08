@@ -16,17 +16,14 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any
 from pathlib import Path
-import os
+from typing import Dict
 
 from downloader.constants import K_DB_URL
-from downloader.job_system import Job
 from downloader.jobs.download_db_job import DownloadDbJob
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.jobs_factory import make_get_file_job
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.worker_context import DownloaderWorker
-from downloader.local_store_wrapper import StoreWrapper
 
 
 class DownloadDbWorker(DownloaderWorker):
@@ -34,26 +31,19 @@ class DownloadDbWorker(DownloaderWorker):
     def reporter(self): return self._ctx.file_download_reporter
 
     def operate_on(self, job: DownloadDbJob):
-        section, description, store, full_resync = job.ini_section, job.ini_description, job.store, job.full_resync
-        result_job = self._download_db(section, description, store, full_resync)
-        self._ctx.job_system.push_job(result_job)
+        db_url, db_target = self._get_db_description_from_ini_section(job.ini_section, job.ini_description)
+        get_file_job = make_get_file_job(source=db_url, target=db_target, info=job.ini_section, silent=True, logger=self._ctx.logger)
+        get_file_job.after_job = OpenDbJob(
+            temp_path=db_target,
+            section=job.ini_section,
+            ini_description=job.ini_description,
+            store=job.store,
+            full_resync=job.full_resync,
+            get_file_job=get_file_job
+        )
+        self._ctx.job_system.push_job(get_file_job)
 
-    def _download_db(self, section: str, description: Dict[str, Any], store: StoreWrapper, full_resync: bool) -> Job:
-        db_url = description[K_DB_URL]
-        db_suffix = Path(db_url).suffix.lower()
-        db_target = os.path.join(self._ctx.file_system.persistent_temp_dir(), section.replace('/', '_'))
-        open_job = OpenDbJob(temp_path=db_target, suffix=db_suffix, section=section, ini_description=description, store=store, full_resync=full_resync, fetch_db=None)
-
-        if not db_url.startswith("http"):
-            if not db_url.startswith("/"):
-                db_url = self._ctx.file_system.resolve(db_url)
-
-            self._ctx.logger.debug(f'Loading db from local path: {db_url}')
-            self._ctx.file_system.copy(db_url, db_target)
-            return open_job
-        else:
-            self._ctx.logger.debug(f'Loading db from url: {db_url}')
-            fetch_db = FetchFileJob2(download_path=db_target, info=section, url=db_url, silent=True)
-            fetch_db.after_job = open_job
-            open_job.fetch_db = fetch_db
-            return fetch_db
+    def _get_db_description_from_ini_section(self, ini_section: str, ini_description: Dict[str, str]) -> tuple[str, str]:
+        db_url = ini_description[K_DB_URL]
+        db_target = str(Path(self._ctx.file_system.persistent_temp_dir()) / ini_section.replace('/', '_')) + Path(db_url).suffix.lower()
+        return db_url, db_target

@@ -17,22 +17,21 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import Any, Optional
+from typing import Any
 
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.get_file_job import GetFileJob
 from downloader.local_store_wrapper import StoreWrapper
 
 
 @dataclass
 class OpenDbJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
-    fetch_db: Optional[FetchFileJob2]
-    suffix: str
+    get_file_job: GetFileJob
     temp_path: str
     section: str
     ini_description: dict[str, Any]
     store: StoreWrapper
     full_resync: bool
 
-    def retry_job(self): return self.fetch_db if self.fetch_db is not None else super().retry_job()
+    def retry_job(self): return self.get_file_job

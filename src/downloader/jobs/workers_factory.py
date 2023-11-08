@@ -1,5 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-import threading
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -18,11 +18,16 @@ import threading
 
 from typing import List
 
+from downloader.jobs.copy_file_worker import CopyFileWorker
 from downloader.jobs.db_header_job import DbHeaderWorker
 from downloader.jobs.download_db_worker import DownloadDbWorker
 from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
 from downloader.jobs.open_db_worker import OpenDbWorker
+from downloader.jobs.open_zip_contents_worker import OpenZipContentsWorker
+from downloader.jobs.open_zip_index_worker import OpenZipIndexWorker
 from downloader.jobs.process_db_worker import ProcessDbWorker
+from downloader.jobs.process_index_worker import ProcessIndexWorker
+from downloader.jobs.process_zip_worker import ProcessZipWorker
 from downloader.jobs.validate_file_worker import ValidateFileWorker
 from downloader.jobs.fetch_file_worker import FetchFileWorker
 from downloader.jobs.validate_file_worker2 import ValidateFileWorker2
@@ -32,25 +37,22 @@ from downloader.jobs.worker_context import DownloaderWorkerContext, DownloaderWo
 class DownloaderWorkersFactory:
     def __init__(self, ctx: DownloaderWorkerContext):
         self._ctx = ctx
-        self.FetchFileWorker = FetchFileWorker(self._ctx)
-        self.FetchFileWorker2 = FetchFileWorker2(self._ctx)
-        self.ValidateFileWorker = ValidateFileWorker(self._ctx)
-        self.ValidateFileWorker2 = ValidateFileWorker2(self._ctx)
-        self.DbHeaderWorker = DbHeaderWorker(self._ctx)
-        self.DownloadDbWorker = DownloadDbWorker(self._ctx)
-        self.OpenDbWorker = OpenDbWorker(self._ctx)
-        self.ProcessDbWorker = ProcessDbWorker(self._ctx)
 
     def prepare_workers(self):
         workers: List[DownloaderWorker] = [
-            self.FetchFileWorker,
-            self.FetchFileWorker2,
-            self.ValidateFileWorker,
-            self.ValidateFileWorker2,
-            self.DbHeaderWorker,
-            self.DownloadDbWorker,
-            self.OpenDbWorker,
-            self.ProcessDbWorker,
+            CopyFileWorker(self._ctx),
+            FetchFileWorker(self._ctx),
+            FetchFileWorker2(self._ctx),
+            ValidateFileWorker(self._ctx),
+            ValidateFileWorker2(self._ctx),
+            DbHeaderWorker(self._ctx),
+            DownloadDbWorker(self._ctx),
+            OpenDbWorker(self._ctx),
+            ProcessIndexWorker(self._ctx),
+            ProcessDbWorker(self._ctx),
+            ProcessZipWorker(self._ctx),
+            OpenZipIndexWorker(self._ctx),
+            OpenZipContentsWorker(self._ctx)
         ]
         for w in workers:
             w.initialize()

@@ -46,7 +46,7 @@ class FakeHttpGateway:
             if isinstance(job.after_job, ValidateFileJob2):
                 description = {**job.after_job.description}
             info_path = job.info
-            target_file_path = job.download_path
+            target_file_path = job.temp_path
 
         match_path = info_path if info_path is not None else target_file_path if target_file_path is not None else url
 
