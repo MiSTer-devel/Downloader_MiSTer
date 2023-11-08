@@ -17,4 +17,6 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 
-class FileDownloadException(Exception): pass
+class GetFileException(Exception): pass
+class FileDownloadException(GetFileException): pass
+class FileCopyException(GetFileException): pass

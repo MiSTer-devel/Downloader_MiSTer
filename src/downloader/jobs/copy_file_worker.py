@@ -16,27 +16,25 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import K_DOWNLOADER_TIMEOUT
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.copy_file_job import CopyFileJob
+from downloader.jobs.errors import FileCopyException
 from downloader.jobs.worker_context import DownloaderWorker
-from downloader.jobs.errors import FileDownloadException
 
 
-class FetchFileWorker2(DownloaderWorker):
-    def initialize(self): self._ctx.job_system.register_worker(FetchFileJob2.type_id, self)
+class CopyFileWorker(DownloaderWorker):
+    def initialize(self): self._ctx.job_system.register_worker(CopyFileJob.type_id, self)
     def reporter(self): return self._ctx.file_download_reporter
 
-    def operate_on(self, job: FetchFileJob2):
-        url, download_path, info = job.source, job.temp_path, job.info
-        self._fetch_file(url, download_path, info)
+    def operate_on(self, job: CopyFileJob):
+        source, temp_path, info = job.source, job.temp_path, job.info
+        self._copy_file(source, temp_path, info)
         if job.after_job is not None: self._ctx.job_system.push_job(job.after_job)
 
-    def _fetch_file(self, url: str, download_path: str, info: str):
-        with self._ctx.http_gateway.open(url) as (final_url, in_stream):
-            if in_stream.status != 200:
-                raise FileDownloadException(f'Bad http status! {info}: {in_stream.status}')
+    def _copy_file(self, source: str, temp_path: str, info: str):
+        if not source.startswith("/"):
+            source = self._ctx.file_system.resolve(source)
 
-            self._ctx.file_system.write_incoming_stream(in_stream, download_path, timeout=self._ctx.config[K_DOWNLOADER_TIMEOUT])
+        self._ctx.file_system.copy(source, temp_path)
 
-        if not self._ctx.file_system.is_file(download_path, use_cache=False):
-            raise FileDownloadException(f'Missing {info}')
+        if not self._ctx.file_system.is_file(temp_path, use_cache=False):
+            raise FileCopyException(f'Missing {info}')

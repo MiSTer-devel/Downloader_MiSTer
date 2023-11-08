@@ -17,8 +17,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.constants import K_BASE_PATH
+from downloader.jobs.index import Index
 from downloader.other import empty_store_without_base_path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from collections import defaultdict
 
 NO_HASH_IN_STORE_CODE = 'file_does_not_exist_so_cant_get_hash'
@@ -274,6 +275,28 @@ class _WriteOnlyStoreAdapter:
 
             self._top_wrapper.mark_force_save()
 
+    def add_zip_index(self, zip_id: str, index: Index, description: Dict[str, Any]):
+        self._store['zips'] = self._store.get('zips', {})
+        self._store['zips'][zip_id] = description
+
+        for file_path, file_description in index.files.items():
+            self.add_file(file_path, file_description)
+
+        for folder_path, folder_description in index.folders.items():
+            self.add_folder(folder_path, folder_description)
+
+        #self._store['zips'][zip_id]['internal_summary'] = {
+        #    'files': index.files,
+        #    'folders': index.folders,
+        #}
+
+    def add_zip_contents(self, zip_id: str, index: Index, description: Dict[str, Any]):
+        for file_path, file_description in index.files.items():
+            self.add_file(file_path, file_description)
+
+        for folder_path, folder_description in index.folders.items():
+            self.add_folder(folder_path, folder_description)
+
 
 class _ReadOnlyStoreAdapter:
     def __init__(self, store):
@@ -293,6 +316,23 @@ class _ReadOnlyStoreAdapter:
                 if 'files' in external:
                     files.update(external['files'])
         return {f: d for f, d in files.items() if f not in db_files}
+
+    def zip_index(self, zip_id) -> Optional[Dict[str, Any]]:
+        files = {}
+        folders = {}
+        for file_path, file_description in self._store['files'].items():
+            if 'zip_id' in file_description and file_description['zip_id'] == zip_id:
+                files[file_path] = file_description
+
+        for folder_path, folder_description in self._store['folders'].items():
+            if 'zip_id' in folder_description and folder_description['zip_id'] == zip_id:
+                folders[folder_path] = folder_description
+
+        if len(files) == 0 and len(folders) == 0:
+            return None
+
+        summary_hash = self._store.get('zips', {}).get(zip_id, {}).get('summary_file', {}).get('hash', NO_HASH_IN_STORE_CODE)
+        return {'files': files, 'folders': folders, 'hash': summary_hash}
 
     @property
     def filtered_zip_data(self):
