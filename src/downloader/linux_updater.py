@@ -157,8 +157,8 @@ class LinuxUpdater:
             return
 
         if len(self._user_files) > 0:
-            restore_error = self._restore_user_files()
-            if restore_error:
+            clean_restore = self._restore_user_files()
+            if not clean_restore:
                 return
 
         self._logger.print()
