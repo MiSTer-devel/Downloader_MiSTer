@@ -58,9 +58,13 @@ If you add a filter under `[mister]` it will be global, so the filter will affec
 ## Combining Filters 
 If you want to include the global filter in another section, you can use `filter = [mister]` to include all terms under `[mister]`.  
 
-For example, if the global filter under `[mister]` is `filter = console computer` and the `[distribution_mister]` filter is , the database-specific filter will inherit terms from the global filter and add the arcade term. The resulting filter will be `filter = console computer arcade`.
+For example, if the global filter under `[mister]` is `filter = console computer` and the `[distribution_mister]` filter is `filter = [mister] arcade`, the database-specific filter will inherit terms from the global filter and add the arcade term. The resulting filter will be `filter = console computer arcade`.
 
+downloader.ini file illustrating previous example:
 ```
+[mister]
+filter = console computer
+
 [distribution_mister]
 filter = [mister] arcade
 ```
