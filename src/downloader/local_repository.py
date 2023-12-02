@@ -15,6 +15,8 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+import os
+
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
     FILE_downloader_last_successful_run, K_CONFIG_PATH, K_BASE_SYSTEM_PATH, \
     FILE_downloader_external_storage, K_LOGFILE, FILE_downloader_storage_json
@@ -61,7 +63,7 @@ class LocalRepository:
     @property
     def _last_successful_run(self):
         if self._last_successful_run_value is None:
-            self._last_successful_run_value = '%s/%s' % (self._config[K_BASE_SYSTEM_PATH], FILE_downloader_last_successful_run % self._config[K_CONFIG_PATH].stem)
+            self._last_successful_run_value = os.path.join(self._config[K_BASE_SYSTEM_PATH], FILE_downloader_last_successful_run % self._config[K_CONFIG_PATH].stem)
         return self._last_successful_run_value
 
     @property
@@ -70,7 +72,7 @@ class LocalRepository:
             if self._config[K_LOGFILE] is not None:
                 self._logfile_path_value = self._config[K_LOGFILE]
             else:
-                self._logfile_path_value = '%s/%s' % (self._config[K_BASE_SYSTEM_PATH], FILE_downloader_log % self._config[K_CONFIG_PATH].stem)
+                self._logfile_path_value = os.path.join(self._config[K_BASE_SYSTEM_PATH], FILE_downloader_log % self._config[K_CONFIG_PATH].stem)
         return self._logfile_path_value
 
     def set_logfile_path(self, value):
@@ -94,7 +96,7 @@ class LocalRepository:
         external_drives = self._store_drives()
 
         for drive in external_drives:
-            external_store_file = '%s/%s' % (drive, FILE_downloader_external_storage)
+            external_store_file = os.path.join(drive, FILE_downloader_external_storage)
             if not self._file_system.is_file(external_store_file):
                 continue
 
@@ -151,12 +153,12 @@ class LocalRepository:
         external_drives = set(self._store_drives())
 
         for drive, store in external_stores.items():
-            self._file_system.save_json(store, '%s/%s' % (drive, FILE_downloader_external_storage))
+            self._file_system.save_json(store, os.path.join(drive, FILE_downloader_external_storage))
             if drive in external_drives:
                 external_drives.remove(drive)
 
         for drive in external_drives:
-            db_to_clean = '%s/%s' % (drive, FILE_downloader_external_storage)
+            db_to_clean = os.path.join(drive, FILE_downloader_external_storage)
             if self._file_system.is_file(db_to_clean):
                 self._file_system.unlink(db_to_clean)
 
