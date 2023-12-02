@@ -25,6 +25,7 @@ from downloader.file_filter import BadFileFilterPartException
 from downloader.file_system import FolderCreationError, ReadOnlyFileSystem, UnlinkTemporaryException, FileCopyError
 from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.other import UnreachableException, calculate_url
+import os
 
 
 class _Session:
@@ -319,9 +320,9 @@ class OnlineImporter:
 
                 folder_description = read_store.folders[folder_path]
                 if is_system_path(folder_description) and \
-                        file_system.is_folder('%s/%s' % (config[K_BASE_SYSTEM_PATH], folder_path)):
+                        file_system.is_folder(os.path.join(config[K_BASE_SYSTEM_PATH], folder_path)):
                     continue
-                elif file_system.is_folder('%s/%s' % (config[K_BASE_PATH], folder_path)):
+                elif file_system.is_folder(os.path.join(config[K_BASE_PATH], folder_path)):
                     continue
 
                 delete_folders.append(folder_path)
@@ -383,7 +384,7 @@ class OnlineImporter:
                 if folder_path in db_folders:
                     continue
 
-                full_folder_path = '%s/%s' % (drive, folder_path)
+                full_folder_path = os.path.join(drive, folder_path)
                 if system_file_system.folder_has_items(full_folder_path):
                     continue
 
@@ -399,7 +400,7 @@ class OnlineImporter:
                 if len(folder_path.split('/')) <= 2:  # when storage_priority is prefer_sd
                     continue
 
-                full_folder_path = '%s/%s' % (drive, folder_path)
+                full_folder_path = os.path.join(drive, folder_path)
                 if system_file_system.folder_has_items(full_folder_path):
                     continue
 
@@ -964,7 +965,7 @@ class _OnlineDatabaseImporter:
             self._write_only_store.add_folder(folder_path, folder_description)
 
     def _write_folder(self, drive, folder_path, folder_description):
-        full_folder_path = '%s/%s' % (drive, folder_path)
+        full_folder_path = os.path.join(drive, folder_path)
         self._file_system.make_dirs(full_folder_path)
         if drive == self._config[K_BASE_PATH]:
             self._write_only_store.add_folder(folder_path, folder_description)
@@ -992,7 +993,7 @@ class _OnlineDatabaseImporter:
                 else:
                     self._write_only_store.remove_file(file_path)
 
-                full_file_path = '%s/%s' % (drive, file_path)
+                full_file_path = os.path.join(drive, file_path)
                 if not self._file_system.is_file(full_file_path):
                     continue
                 self._file_system.unlink(full_file_path)

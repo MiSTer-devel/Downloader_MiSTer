@@ -1,5 +1,4 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -16,6 +15,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from pathlib import Path
+import os
 
 from downloader.constants import K_STORAGE_PRIORITY, K_BASE_PATH, PathType, STORAGE_PRIORITY_PREFER_SD, \
     STORAGE_PRIORITY_PREFER_EXTERNAL, STORAGE_PRIORITY_OFF
@@ -68,7 +68,7 @@ class _StoragePriorityResolver:
         if first not in self._priority_top_folders:
             self._priority_top_folders[first] = StoragePriorityRegistryEntry()
         if second not in self._priority_top_folders[first].folders:
-            drive = self._search_drive_for_directory('%s/%s' % (first, second))
+            drive = self._search_drive_for_directory(os.path.join(first, second))
             self._priority_top_folders[first].folders[second] = drive
             self._priority_top_folders[first].drives.add(drive)
         return self._priority_top_folders[first].folders[second]
@@ -95,7 +95,7 @@ class _StoragePriorityResolver:
 
     def _first_drive_with_existing_directory(self, directory):
         for drive in self._drives:
-            absolute_directory = '%s/%s' % (drive, directory)
+            absolute_directory = os.path.join(drive, directory)
             if self._system_file_system.is_folder(absolute_directory):
                 return drive
 
