@@ -32,7 +32,6 @@ from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerCon
 from downloader.constants import K_BASE_PATH, PathType, FILE_MiSTer, FILE_MiSTer_old
 from downloader.local_store_wrapper import StoreWrapper, NO_HASH_IN_STORE_CODE
 from downloader.other import calculate_url
-from downloader.target_path_calculator import TargetPathsCalculator
 
 _CheckFilePackage = PathPackage
 _FetchFilePackage = PathPackage
@@ -83,10 +82,20 @@ class ProcessIndexWorker(DownloaderWorker):
 
         logger.debug(f"Launching fetch jobs '{db.db_id}'...")
         for pkg in fetch_pkgs:
-            target_file_path, file_path, file_description = pkg.full_path, pkg.rel_path, pkg.description
-            download_path = target_file_path + '.new'
-            fetch_job = FetchFileJob2(source=_url(file_path, file_description, base_files_url), info=file_path, temp_path=download_path, silent=False)
-            fetch_job.after_job = ValidateFileJob2(temp_path=download_path, target_file_path=target_file_path, description=file_description, info=file_path, get_file_job=fetch_job)
+            download_path = pkg.full_path + '.new'
+            fetch_job = FetchFileJob2(
+                source=_url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url),
+                info=pkg.rel_path,
+                temp_path=download_path,
+                silent=False
+            )
+            fetch_job.after_job = ValidateFileJob2(
+                temp_path=download_path,
+                target_file_path=pkg.full_path,
+                description=pkg.description,
+                info=pkg.rel_path,
+                get_file_job=fetch_job
+            )
             self._ctx.job_system.push_job(fetch_job)
 
     def _process_index(self, config: Dict[str, Any], summary: Index, db: DbEntity, store: StoreWrapper) -> Tuple[
@@ -102,13 +111,15 @@ class ProcessIndexWorker(DownloaderWorker):
             store.write_only().set_base_path(config[K_BASE_PATH])
 
         logger.bench('Filtering Database...')
-        filtered_summary, _ = FileFilterFactory(self._ctx.logger).create(db, config).select_filtered_files(summary)
+        filtered_summary, _ = FileFilterFactory(self._ctx.logger)\
+            .create(db, config)\
+            .select_filtered_files(summary)
 
         logger.bench('Translating paths...')
-        deduce_target_path_calculator = TargetPathsCalculator.create_target_paths_calculator(self._ctx.file_system, config, self._ctx.external_drives_repository)
+        target_paths_calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(config)
 
         def translate_items(items: Dict[str, Dict[str, Any]], path_type: PathType, exclude_items: Dict[str, Any]) -> List[PathPackage]: return [PathPackage(
-            full_path=deduce_target_path_calculator.deduce_target_path(path, description, path_type),
+            full_path=target_paths_calculator.deduce_target_path(path, description, path_type),
             rel_path=path,
             description=description
         ) for path, description in items.items() if path not in exclude_items]
@@ -116,11 +127,13 @@ class ProcessIndexWorker(DownloaderWorker):
         check_file_pkgs: List[_CheckFilePackage] = translate_items(filtered_summary.files, PathType.FILE, {})
         remove_files_pkgs: List[_RemoveFilePackage] = translate_items(read_only_store.files, PathType.FILE, filtered_summary.files)
 
+        # @REFACTOR: This looks wrong
+        remove_files_pkgs = [pkg for pkg in remove_files_pkgs if 'zip_id' not in pkg.description]
+
         existing_folders = filtered_summary.folders.copy()
         for pkg in check_file_pkgs:
-            target_file_path, file_path, file_description = pkg.full_path, pkg.rel_path, pkg.description
-            path_obj = Path(file_path)
-            target_path_obj = Path(target_file_path)
+            path_obj = Path(pkg.rel_path)
+            target_path_obj = Path(pkg.full_path)
             while len(path_obj.parts) > 1:
                 path_obj = path_obj.parent
                 target_path_obj = target_path_obj.parent
@@ -132,10 +145,12 @@ class ProcessIndexWorker(DownloaderWorker):
         create_folder_pkgs: List[_CreateFolderPackage] = translate_items(filtered_summary.folders, PathType.FOLDER, {})
         delete_folder_pkgs: List[_DeleteFolderPackage] = translate_items(read_only_store.folders, PathType.FOLDER, existing_folders)
 
+        # @REFACTOR: This looks wrong
+        delete_folder_pkgs = [pkg for pkg in delete_folder_pkgs if 'zip_id' not in pkg.description]
+
         # @TODO commenting these 2 lines make the test still pass, why?
         for pkg in check_file_pkgs:
-            target_file_path, file_path, file_description = pkg.full_path, pkg.rel_path, pkg.description
-            if file_path is FILE_MiSTer: file_description['backup'] = FILE_MiSTer_old
+            if pkg.rel_path is FILE_MiSTer: pkg.description['backup'] = FILE_MiSTer_old
 
         return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs
 
@@ -147,12 +162,11 @@ class ProcessIndexWorker(DownloaderWorker):
         duplicated_files = []
         with self._lock:
             for pkg in check_file_pkgs:
-                target_file_path, file_path, file_description = pkg.full_path, pkg.rel_path, pkg.description
-                if self._ctx.installation_report.is_file_processed(file_path):
-                    duplicated_files.append(file_path)
+                if self._ctx.installation_report.is_file_processed(pkg.rel_path):
+                    duplicated_files.append(pkg.rel_path)
                 else:
-                    self._ctx.installation_report.add_processed_file(target_file_path, file_path, file_description, db_id)
-                    non_duplicated_pkgs.append(PathPackage(full_path=target_file_path, rel_path=file_path, description=file_description))
+                    self._ctx.installation_report.add_processed_file(pkg, db_id)
+                    non_duplicated_pkgs.append(pkg)
 
         for file_path in duplicated_files:
             self._ctx.file_download_reporter.print_progress_line(f'DUPLICATED: {file_path} [using {self._ctx.installation_report.processed_file(file_path).db_id} instead]')
@@ -160,14 +174,13 @@ class ProcessIndexWorker(DownloaderWorker):
         fetch_pkgs: List[_FetchFilePackage] = []
         validate_pkgs: List[_ValidateFilePackage] = []
         for pkg in non_duplicated_pkgs:
-            target_file_path, file_path, file_description = pkg.full_path, pkg.rel_path, pkg.description
-            if file_system.is_file(target_file_path):
-                if not full_resync and read_only_store.hash_file(file_path) == file_description['hash']:
+            if file_system.is_file(pkg.full_path):
+                if not full_resync and read_only_store.hash_file(pkg.rel_path) == pkg.description['hash']:
                     continue
 
-                validate_pkgs.append(PathPackage(full_path=target_file_path, rel_path=file_path, description=file_description))
+                validate_pkgs.append(pkg)
             else:
-                fetch_pkgs.append(PathPackage(full_path=target_file_path, rel_path=file_path, description=file_description))
+                fetch_pkgs.append(pkg)
 
         return fetch_pkgs, validate_pkgs
 
@@ -178,21 +191,20 @@ class ProcessIndexWorker(DownloaderWorker):
         more_fetch_pkgs: List[_FetchFilePackage] = []
 
         for pkg in validate_pkgs:
-            target_file_path, file_path, file_description = pkg.full_path, pkg.rel_path, pkg.description
             # @TODO: Parallelize the slow hash calculations
-            if read_only_store.hash_file(file_path) == NO_HASH_IN_STORE_CODE and file_system.hash(target_file_path) == file_description['hash']:
+            if read_only_store.hash_file(pkg.rel_path) == NO_HASH_IN_STORE_CODE and file_system.hash(pkg.full_path) == pkg.description['hash']:
                 with self._lock:
-                    self._ctx.file_download_reporter.print_progress_line(f'No changes: {file_path}')
-                    self._ctx.installation_report.add_already_present_file(file_path)
+                    self._ctx.file_download_reporter.print_progress_line(f'No changes: {pkg.rel_path}')
+                    self._ctx.installation_report.add_already_present_file(pkg.rel_path)
                 continue
 
-            if 'overwrite' in file_description and not file_description['overwrite']:
-                if file_system.hash(target_file_path) != file_description['hash']:
+            if 'overwrite' in pkg.description and not pkg.description['overwrite']:
+                if file_system.hash(pkg.full_path) != pkg.description['hash']:
                     with self._lock:
-                        self._ctx.installation_report.add_skipped_updated_file(file_path)
+                        self._ctx.installation_report.add_skipped_updated_file(pkg.rel_path)
                 continue
 
-            more_fetch_pkgs.append(PathPackage(full_path=target_file_path, rel_path=file_path, description=file_description))
+            more_fetch_pkgs.append(pkg)
 
         return more_fetch_pkgs
 
@@ -202,27 +214,23 @@ class ProcessIndexWorker(DownloaderWorker):
 
         with self._lock:
             for pkg in remove_files_pkgs:
-                target_file_path, file_path, file_description = pkg.full_path, pkg.rel_path, pkg.description
-                self._ctx.installation_report.add_processed_file(target_file_path, file_path, file_description, db_id)
-                self._ctx.installation_report.add_removed_file(file_path)
+                self._ctx.installation_report.add_processed_file(pkg, db_id)
+                self._ctx.installation_report.add_removed_file(pkg.rel_path)
 
     def _process_delete_folder_packages(self, delete_folder_pkgs: List[_DeleteFolderPackage], store: StoreWrapper):
         for pkg in delete_folder_pkgs:
-            target_folder_path, folder_path, _ = pkg.full_path, pkg.rel_path, pkg.description
-            store.write_only().remove_folder(folder_path)
-            self._ctx.file_system.remove_folder(target_folder_path)
+            store.write_only().remove_folder(pkg.rel_path)
+            self._ctx.file_system.remove_folder(pkg.full_path)
 
     def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], store: StoreWrapper):
         for pkg in create_folder_pkgs:
-            target_folder_path, folder_path, folder_description = pkg.full_path, pkg.rel_path, pkg.description
-            self._ctx.file_system.make_dirs(target_folder_path)
-            store.write_only().add_folder(folder_path, folder_description)
+            self._ctx.file_system.make_dirs(pkg.full_path)
+            store.write_only().add_folder(pkg.rel_path, pkg.description)
 
     def _try_reserve_space(self, fetch_pkgs: List[_FetchFilePackage]) -> bool:
         with self._lock:
             for pkg in fetch_pkgs:
-                target_file_path, _, file_description = pkg.full_path, pkg.rel_path, pkg.description
-                self._ctx.free_space_reservation.reserve_space_for_file(target_file_path, file_description)
+                self._ctx.free_space_reservation.reserve_space_for_file(pkg.full_path,  pkg.description)
 
             self._ctx.logger.debug(f"Free space: {self._ctx.free_space_reservation.free_space()}")
             full_partitions = self._ctx.free_space_reservation.get_full_partitions()
@@ -232,8 +240,7 @@ class ProcessIndexWorker(DownloaderWorker):
                     self._full_partitions.add(partition.partition_path)
 
                 for pkg in fetch_pkgs:
-                    target_file_path, _, file_description = pkg.full_path, pkg.rel_path, pkg.description
-                    self._ctx.free_space_reservation.release_space_for_file(target_file_path, file_description)
+                    self._ctx.free_space_reservation.release_space_for_file(pkg.full_path, pkg.description)
 
                 return False
 

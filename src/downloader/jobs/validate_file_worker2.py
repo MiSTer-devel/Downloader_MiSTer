@@ -28,19 +28,22 @@ class ValidateFileWorker2(DownloaderWorker):
     def reporter(self): return self._ctx.file_download_reporter
 
     def operate_on(self, job: ValidateFileJob2):
-        temp_path, target_file_path, info, description = job.temp_path, job.target_file_path, job.info, job.description
-        exception = self._validate_file(temp_path, target_file_path, info, description['hash'], description.get('backup', None))
-        if exception is not None:
-            raise exception
+        self._validate_file(
+            temp_path=job.temp_path,
+            target_file_path=job.target_file_path,
+            info=job.info,
+            file_hash=job.description['hash'],
+            backup=job.description.get('backup', None)
+        )
 
         if job.after_job is not None:
             self._ctx.job_system.push_job(job.after_job)
 
-    def _validate_file(self, temp_path: str, target_file_path: str, info: str, file_hash: str, backup: Optional[str]) -> Optional[FileDownloadException]:
-        path_hash = self._ctx.file_system.hash(temp_path)
-        if path_hash != file_hash:
+    def _validate_file(self, temp_path: str, target_file_path: str, info: str, file_hash: str, backup: Optional[str]):
+        fs_hash = self._ctx.file_system.hash(temp_path)
+        if fs_hash != file_hash:
             self._ctx.file_system.unlink(temp_path)
-            return FileDownloadException(f'Bad hash on {info} ({file_hash} != {path_hash})')
+            raise FileDownloadException(f'Bad hash on {info} ({file_hash} != {fs_hash})')
 
         if temp_path != target_file_path:
             if backup is not None and self._ctx.file_system.is_file(target_file_path, use_cache=False):

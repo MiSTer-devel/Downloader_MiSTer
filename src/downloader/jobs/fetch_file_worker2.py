@@ -27,8 +27,7 @@ class FetchFileWorker2(DownloaderWorker):
     def reporter(self): return self._ctx.file_download_reporter
 
     def operate_on(self, job: FetchFileJob2):
-        url, download_path, info = job.source, job.temp_path, job.info
-        self._fetch_file(url, download_path, info)
+        self._fetch_file(url=job.source, download_path=job.temp_path, info=job.info)
         if job.after_job is not None: self._ctx.job_system.push_job(job.after_job)
 
     def _fetch_file(self, url: str, download_path: str, info: str):

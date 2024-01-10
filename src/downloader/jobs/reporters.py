@@ -28,6 +28,7 @@ from downloader.db_entity import DbEntity
 from downloader.file_filter import BadFileFilterPartException
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.index import Index
+from downloader.jobs.path_package import PathPackage
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.validate_file_job import ValidateFileJob
@@ -72,9 +73,7 @@ class DownloaderProgressReporter(ProgressReporter):
 
 @dataclasses.dataclass
 class ProcessedFile:
-    path: str
-    target_path: str
-    desc: Dict[str, Any]
+    pkg: PathPackage
     db_id: str
 
 
@@ -113,7 +112,7 @@ class InstallationReportImpl(InstallationReport):
     def add_failed_db_options(self, exception: WrongDatabaseOptions): self._failed_db_options.append(exception)
     def add_removed_file(self, path: str): self._removed_files.append(path)
     def is_file_processed(self, path: str) -> bool: return path in self._processed_files
-    def add_processed_file(self, target_path: str, path: str, desc: Dict[str, Any], db_id: str): self._processed_files[path] = ProcessedFile(path, target_path, desc, db_id)
+    def add_processed_file(self, pkg: PathPackage, db_id: str): self._processed_files[pkg.rel_path] = ProcessedFile(pkg, db_id)
     def add_skipped_updated_file(self, path: str): self._skipped_updated_files.append(path)
     def processed_file(self, path: str) -> ProcessedFile: return self._processed_files[path]
     def downloaded_files(self): return self._downloaded_files

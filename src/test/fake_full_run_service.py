@@ -28,6 +28,7 @@ from downloader.job_system import JobSystem
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import DownloaderWorkerContext
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
+from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_os_utils import SpyOsUtils
 from test.fake_waiter import NoWaiter
@@ -98,6 +99,7 @@ class FullRunService(ProductionFullRunService):
                              installation_report=installation_report,
                              free_space_reservation=UnlimitedFreeSpaceReservation(),
                              external_drives_repository=external_drives_repository,
+                             target_paths_calculator_factory=TargetPathsCalculatorFactory(system_file_system, external_drives_repository),
                              config=config
                          ))
                          )

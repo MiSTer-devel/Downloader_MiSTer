@@ -38,6 +38,8 @@ class ProcessZipWorker(DownloaderWorker):
     def reporter(self): return self._ctx.file_download_reporter
 
     def operate_on(self, job: ProcessZipJob):
+        self._ctx.zip_barrier_lock.release_zip(job.db.db_id, job.zip_id)
+
         total_files_size = 0
         for file_path, file_description in job.zip_index.files.items():
             total_files_size += file_description['size']
@@ -57,9 +59,9 @@ class ProcessZipWorker(DownloaderWorker):
             ))
         else:
             file_packs: List[PathPackage] = []
-            deduce_target_path_calculator = TargetPathsCalculator.create_target_paths_calculator(self._ctx.file_system, job.config, self._ctx.external_drives_repository)
+            target_paths_calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(job.config)
             for file_path, file_description in job.zip_index.files.items():
-                target_file_path = deduce_target_path_calculator.deduce_target_path(file_path, file_description, PathType.FILE)
+                target_file_path = target_paths_calculator.deduce_target_path(file_path, file_description, PathType.FILE)
                 file_packs.append(PathPackage(full_path=target_file_path, rel_path=file_path, description=file_description))
 
             already_processed: Optional[Tuple[str, str]] = None
@@ -69,7 +71,7 @@ class ProcessZipWorker(DownloaderWorker):
                         already_processed = (pkg.rel_path, self._ctx.installation_report.processed_file(pkg.rel_path).db_id)
                         break
                     else:
-                        self._ctx.installation_report.add_processed_file(pkg.full_path, pkg.rel_path, pkg.description, job.db.db_id)
+                        self._ctx.installation_report.add_processed_file(pkg, job.db.db_id)
 
             if already_processed is not None:
                 self._ctx.logger.print(f'Skipping zip "{job.zip_id}" because file "{already_processed[0]}" was already processed by db "{already_processed[1]}"')

@@ -48,6 +48,7 @@ class JobSystem:
         self._max_cycle: int = max_cycle
         self._max_timeout: int = max_timeout
         self._job_queue: queue.PriorityQueue['_JobPackage'] = queue.PriorityQueue()
+        self._notifications: queue.Queue[Tuple[bool, '_JobPackage']] = queue.Queue()
         self._workers: Dict[int, 'Worker'] = {}
         self._lock = threading.Lock()
         self._pending_jobs_amount: int = 0
@@ -95,13 +96,22 @@ class JobSystem:
         finally:
             self._is_accomplishing_jobs = False
 
+    def wait_for_other_jobs(self):
+        if not self._is_accomplishing_jobs:
+            raise CantWaitWhenNotAccomplishingJobs('Can not wait when not accomplishing jobs')
+        if self._job_queue.empty():
+            raise CantAccomplishJobs('Can not wait when there are no pending jobs')
+        if self._max_threads > 1:
+            time.sleep(self._wait_timeout)
+        else:
+            self._no_threads_accomplish_tick()
+
     def _accomplish_with_threads(self, max_threads: int) -> None:
         previous_handler = signal.getsignal(signal.SIGINT)
         try:
             signal.signal(signal.SIGINT, lambda sig, frame: self._sigint_handler(previous_handler, sig, frame))
 
             futures = []
-            notifications: queue.Queue[Tuple[bool, '_JobPackage']] = queue.Queue()
             with ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
                 while self._pending_jobs_amount > 0 and self._pending_jobs_cancelled is False:
                     try:
@@ -111,17 +121,17 @@ class JobSystem:
 
                     if package is not None:
                         self._assert_there_are_no_cycles(package)
-                        future = thread_executor.submit(self._operate_on_next_job, package, notifications)
+                        future = thread_executor.submit(self._operate_on_next_job, package, self._notifications)
                         futures.append((package, future))
 
-                    self._handle_notifications(notifications)
+                    self._handle_notifications(self._notifications)
                     futures = self._handle_futures(futures)
                     self._report_work_in_progress()
                     self._check_clock()
                     sys.stdout.flush()
 
             if self._pending_jobs_cancelled:
-                self._handle_notifications(notifications)
+                self._handle_notifications(self._notifications)
                 self._cancel_futures(self._handle_futures(futures))
 
         finally:
@@ -130,19 +140,22 @@ class JobSystem:
     def _accomplish_without_threads(self) -> None:
         notifications: queue.Queue[Tuple[bool, '_JobPackage']] = queue.Queue()
         while self._pending_jobs_amount > 0 and self._pending_jobs_cancelled is False and self._job_queue.empty() is False:
-            package = self._job_queue.get(block=False)
-            self._job_queue.task_done()
-            if package is not None:
-                self._assert_there_are_no_cycles(package)
-                try:
-                    self._operate_on_next_job(package, notifications)
-                except Exception as e:
-                    self._retry_package(package, e)
-
-            self._handle_notifications(notifications)
-            self._report_work_in_progress()
+            self._no_threads_accomplish_tick()
 
         self._handle_notifications(notifications)
+
+    def _no_threads_accomplish_tick(self) -> None:
+        package = self._job_queue.get(block=False)
+        self._job_queue.task_done()
+        if package is not None:
+            self._assert_there_are_no_cycles(package)
+            try:
+                self._operate_on_next_job(package, self._notifications)
+            except Exception as e:
+                self._retry_package(package, e)
+
+        self._handle_notifications(self._notifications)
+        self._report_work_in_progress()
 
     @staticmethod
     def _operate_on_next_job(package: '_JobPackage', notifications: queue.Queue[Tuple[bool, '_JobPackage']]) -> None:
@@ -156,7 +169,10 @@ class JobSystem:
 
             notifications.put((True, package))
         finally:
-            del _thread_local_storage.current_package
+            try:
+                del _thread_local_storage.current_package
+            except AttributeError:
+                pass
 
     def _retry_package(self, package: '_JobPackage', e: Exception) -> None:
         if isinstance(e, JobSystemAbortException):
@@ -283,6 +299,7 @@ class CycleDetectedException(JobSystemAbortException): pass
 class NoWorkerException(JobSystemAbortException): pass
 class CantRegisterWorkerException(JobSystemAbortException): pass
 class CantAccomplishJobs(JobSystemAbortException): pass
+class CantWaitWhenNotAccomplishingJobs(JobSystemAbortException): pass
 class ReportException(Exception): pass
 
 
