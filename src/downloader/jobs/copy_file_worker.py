@@ -26,8 +26,7 @@ class CopyFileWorker(DownloaderWorker):
     def reporter(self): return self._ctx.file_download_reporter
 
     def operate_on(self, job: CopyFileJob):
-        source, temp_path, info = job.source, job.temp_path, job.info
-        self._copy_file(source, temp_path, info)
+        self._copy_file(source=job.source, temp_path=job.temp_path, info=job.info)
         if job.after_job is not None: self._ctx.job_system.push_job(job.after_job)
 
     def _copy_file(self, source: str, temp_path: str, info: str):

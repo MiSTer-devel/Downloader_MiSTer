@@ -41,7 +41,20 @@ class ProcessDbWorker(DownloaderWorker):
     def reporter(self): return self._ctx.file_download_reporter
 
     def operate_on(self, job: ProcessDbJob):
-        config = self._build_db_config(self._ctx.config, job.db, job.ini_description)
+        config = self._build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
+
+        for zip_id, zip_description in job.db.zips.items():
+            self._ctx.zip_barrier_lock.require_zip(job.db.db_id, zip_id)
+            self._push_zip_jobs(_ZipCtx(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
+
+        for zip_id, zip_description in job.store.read_only().zips.items():
+            if zip_id in job.db.zips:
+                continue
+
+            print(zip_id)
+
+        while not self._ctx.zip_barrier_lock.is_barrier_free(job.db.db_id):
+            self._ctx.job_system.wait_for_other_jobs()
 
         self._ctx.job_system.push_job(ProcessIndexJob(
             db=job.db,
@@ -51,9 +64,6 @@ class ProcessDbWorker(DownloaderWorker):
             store=job.store,
             full_resync=job.full_resync,
         ))
-
-        for zip_id, zip_description in job.db.zips.items():
-            self._push_zip_jobs(_ZipCtx(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
 
     def _build_db_config(self, input_config: Dict[str, Any], db: DbEntity, ini_description: Dict[str, Any]) -> Dict[str, Any]:
         self._ctx.logger.debug(f"Building db config '{db.db_id}'...")
