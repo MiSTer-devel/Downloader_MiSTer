@@ -17,8 +17,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from abc import abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Any
+import threading
 
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
@@ -27,6 +28,7 @@ from downloader.http_gateway import HttpGateway
 from downloader.job_system import JobSystem, Worker
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from downloader.logger import Logger
+from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.target_path_repository import TargetPathRepository
 from downloader.waiter import Waiter
 
@@ -43,7 +45,9 @@ class DownloaderWorkerContext:
     installation_report: InstallationReportImpl
     free_space_reservation: FreeSpaceReservation
     external_drives_repository: ExternalDrivesRepository
+    target_paths_calculator_factory: TargetPathsCalculatorFactory
     config: Dict[str, Any]
+    zip_barrier_lock: 'ZipBarrierLock' = field(default_factory=lambda: ZipBarrierLock())
 
 
 class DownloaderWorker(Worker):
@@ -53,3 +57,23 @@ class DownloaderWorker(Worker):
     @abstractmethod
     def initialize(self):
         """Initialize the worker"""
+
+
+class ZipBarrierLock:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._zips_by_db = dict()
+
+    def require_zip(self, db_id: str, zip_id: str):
+        with self._lock: self._db_zips(db_id).add(zip_id)
+
+    def release_zip(self, db_id: str, zip_id: str):
+        with self._lock: self._db_zips(db_id).remove(zip_id)
+
+    def release_all_zips(self, db_id: str):
+        with self._lock: self._db_zips(db_id).clear()
+
+    def is_barrier_free(self, db_id: str):
+        with self._lock: return len(self._db_zips(db_id)) == 0
+
+    def _db_zips(self, db_id: str): return self._zips_by_db.setdefault(db_id, set())

@@ -32,6 +32,7 @@ from downloader.jobs.reporters import FileDownloadProgressReporter, Installation
 from downloader.jobs.worker_context import DownloaderWorkerContext
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.logger import DebugOnlyLoggerDecorator
+from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.target_path_repository import TargetPathRepository
 
 
@@ -61,6 +62,7 @@ class FileDownloaderFactory:
             file_download_reporter=self._file_download_reporter,
             free_space_reservation=self._free_space_reservation,
             external_drives_repository=self._external_drives_repository,
+            target_paths_calculator_factory=TargetPathsCalculatorFactory(file_system, self._external_drives_repository),
             config=config
         ))
         return FileDownloader(

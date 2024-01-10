@@ -43,6 +43,7 @@ from downloader.online_importer import OnlineImporter
 from downloader.path_resolver import PathResolverFactory
 from downloader.reboot_calculator import RebootCalculator
 from downloader.store_migrator import StoreMigrator
+from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.waiter import Waiter
 import atexit
 
@@ -105,6 +106,7 @@ class FullRunServiceFactory:
             file_download_reporter=file_download_reporter,
             free_space_reservation=free_space_reservation,
             external_drives_repository=external_drives_repository,
+            target_paths_calculator_factory=TargetPathsCalculatorFactory(system_file_system, external_drives_repository),
             config=config
         ))
 

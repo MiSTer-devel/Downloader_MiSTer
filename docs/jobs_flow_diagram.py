@@ -31,7 +31,7 @@ dot.node('END', 'END', shape='ellipse', fillcolor='#77DD77')  # Pastel green for
 
 # Adding edges (transitions)
 # The normal workflow without labeled edges
-dot.edges(['AB', 'BC', 'CD', 'GH', 'HI', 'JK', 'KL', 'MN'])
+dot.edges(['AB', 'BC', 'CD', 'DE', 'FJ', 'FE', 'IF', 'GH', 'HI', 'JK', 'KL', 'MN'])
 
 # The workflow with labeled edges "1 to N"
 dot.edge('START', 'A', label='1 to N')
@@ -39,13 +39,9 @@ dot.edge('D', 'G', label='1 to N')
 dot.edge('D', 'F', label='1 to N')
 dot.edge('E', 'M', label='1 to N')
 
-# Additional edges as per the diagram requirements
-dot.edge('D', 'E')
-dot.edge('F', 'J')
-dot.edge('I', 'F')
+# End edges
 dot.edge('L', 'END')
 dot.edge('N', 'END')
-dot.edge('F', 'E')
 
 # Backward "retry" edges
 dot.edge('B', 'A', label=' retry', constraint='false', minlen='10')
