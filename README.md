@@ -35,22 +35,16 @@ Here you can see the default parameters and the options that you may change:
 ;   'off' -> Disables this feature. Affected files will always be installed in your SD.
 storage_priority = 'prefer_sd'
 
-; allow_delete options:
-;   0 -> Don't allow this tool to delete anything at all.
-;   1 -> Allow this tool to delete any old file from previous updates.
-;   2 -> Allow this tool to delete only old cores that receive a new version.
-allow_delete = 1
+; update_linux options:
+;   true -> Updates Linux when there is a new update (very recommended).
+;   false -> Doesn't update Linux.
+update_linux = true
 
 ; allow_reboot options:
 ;   0 -> Don't allow this tool to ever reboot automatically.
 ;   1 -> Allow this tool to reboot the system after any system file has been updated.
 ;   2 -> Allow this tool to reboot the system only after Linux has been updated.
 allow_reboot = 1
-
-; update_linux options:
-;   true -> Updates Linux when there is a new update (very recommended).
-;   false -> Doesn't update Linux.
-update_linux = true
 
 ; minimum_system_free_space_mb: Fee space needed to install files with Downloader
 ;   This minimum applies solely to the system partition (SD card).

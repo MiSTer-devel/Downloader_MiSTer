@@ -16,8 +16,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import unittest
-
 from downloader.config import default_config
 from downloader.constants import K_BASE_PATH, K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD
 from test.fake_file_system_factory import fs_data
@@ -81,7 +79,17 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         expected_store = store_with_unzipped_cheats(is_internal_summary=True)
         self.assertEqual(expected_store, self.download_zipped_cheats_folder(store_with_unzipped_cheats(zip_id=False, zips=False), from_zip_content=False, is_internal_summary=True))
 
-    def test_download_zipped_contents___on_existing_store_with_zips___removes_old_zip_id_and_inserts_new_one(self):
+    def test_download_empty_test_db___on_existing_store_with_zips___removes_old_zips_and_saves_the_store(self):
+        with_installed_cheats_folder_on_fs(self.implicit_inputs.file_system_state)
+
+        store = self.download(db_test_descr(), store_with_unzipped_cheats())
+
+        self.assertSutReports([])
+        self.assertEqual(empty_test_store(), store)
+        self.assertFalse(self.sut.file_system.is_file(cheats_folder_nes_file_path))
+        self.assertFalse(self.sut.file_system.is_file(cheats_folder_sms_file_path))
+
+    def test_download_zipped_contents___on_existing_store_with_zips___removes_old_zip_id_and_inserts_new_one2(self):
         with_installed_cheats_folder_on_fs(self.implicit_inputs.file_system_state)
 
         different_zip_id = 'a_different_id'
@@ -90,9 +98,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         store = self.download(db_test_descr(zips={
             different_zip_id: zip_desc(different_folder, "../", summary={
                 "files": {file_a: zipped_file_a_descr(different_zip_id)},
-                "files_count": 1,
                 "folders": {different_folder: {"zip_id": different_zip_id}},
-                "folders_count": 1,
             })
         }), store_with_unzipped_cheats())
 

@@ -25,8 +25,8 @@ from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import DownloaderWorkerContext
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
-from downloader.jobs.download_db_job import DownloadDbJob
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
+from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_local_store_wrapper import StoreWrapper, LocalStoreWrapper
 from test.fake_external_drives_repository import ExternalDrivesRepository
@@ -70,6 +70,7 @@ class OnlineImporter(ProductionOnlineImporter):
         installation_report = InstallationReportImpl()
         self._file_download_reporter = FileDownloadProgressReporter(logger, waiter, installation_report)
         self._job_system = JobSystem(self._file_download_reporter, logger=logger, max_threads=1)
+        external_drives_repository = ExternalDrivesRepository(file_system=self.file_system)
         self._worker_ctx = DownloaderWorkerContext(
             job_system=self._job_system,
             waiter=waiter,
@@ -81,6 +82,7 @@ class OnlineImporter(ProductionOnlineImporter):
             installation_report=installation_report,
             free_space_reservation=UnlimitedFreeSpaceReservation(),
             external_drives_repository=ExternalDrivesRepository(file_system=self.file_system),
+            target_paths_calculator_factory=TargetPathsCalculatorFactory(self.file_system, external_drives_repository),
             config=self._config
         )
         self._workers_factory = DownloaderWorkersFactory(self._worker_ctx)
@@ -124,19 +126,19 @@ class OnlineImporter(ProductionOnlineImporter):
         report = self._worker_ctx.file_download_reporter.report()
         for file_path in report.installed_files():
             file = report.processed_file(file_path)
-            if 'reboot' in file.desc and file.desc['reboot']:
+            if 'reboot' in file.pkg.description and file.pkg.description['reboot']:
                 self._needs_reboot = True
-            stores[file.db_id].write_only().add_file(file.path, file.desc)
+            stores[file.db_id].write_only().add_file(file.pkg.rel_path, file.pkg.description)
 
         for file_path in report.uninstalled_files():
             file = report.processed_file(file_path)
-            stores[file.db_id].write_only().remove_file(file.path)
+            stores[file.db_id].write_only().remove_file(file.pkg.rel_path)
 
         for file_path in report.skipped_updated_files():
             file = report.processed_file(file_path)
             if file.db_id not in self._new_files_not_overwritten:
                 self._new_files_not_overwritten[file.db_id] = []
-            self._new_files_not_overwritten[file.db_id].append(file.path)
+            self._new_files_not_overwritten[file.db_id].append(file.pkg.rel_path)
 
         for db_id, zip_id, zip_index, zip_description in report.installed_zip_indexes():
             stores[db_id].write_only().add_zip_index(zip_id, zip_index, zip_description)
