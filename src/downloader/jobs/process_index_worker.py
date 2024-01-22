@@ -74,11 +74,12 @@ class ProcessIndexWorker(DownloaderWorker):
         logger.debug(f"Processing create folder packages '{db.db_id}'...")
         self._process_create_folder_packages(create_folder_pkgs, store)
 
-        logger.debug(f"Processing remove file packages '{db.db_id}'...")
-        self._process_remove_file_packages(remove_files_pkgs, db.db_id)
-
-        logger.debug(f"Processing delete folder packages '{db.db_id}'...")
-        self._process_delete_folder_packages(delete_folder_pkgs, store)
+        logger.debug(f"Postponing remove packages '{db.db_id}'...")
+        with self._lock:
+            for pkg in remove_files_pkgs:
+                self._ctx.pending_removals.queue_file_removal(pkg, db.db_id)
+            for pkg in delete_folder_pkgs:
+                self._ctx.pending_removals.queue_directory_removal(pkg, db.db_id)
 
         logger.debug(f"Launching fetch jobs '{db.db_id}'...")
         for pkg in fetch_pkgs:
@@ -208,24 +209,11 @@ class ProcessIndexWorker(DownloaderWorker):
 
         return more_fetch_pkgs
 
-    def _process_remove_file_packages(self, remove_files_pkgs: List[_RemoveFilePackage], db_id: str):
-        for pkg in remove_files_pkgs:
-            self._ctx.file_system.unlink(pkg.full_path)
-
-        with self._lock:
-            for pkg in remove_files_pkgs:
-                self._ctx.installation_report.add_processed_file(pkg, db_id)
-                self._ctx.installation_report.add_removed_file(pkg.rel_path)
-
-    def _process_delete_folder_packages(self, delete_folder_pkgs: List[_DeleteFolderPackage], store: StoreWrapper):
-        for pkg in delete_folder_pkgs:
-            store.write_only().remove_folder(pkg.rel_path)
-            self._ctx.file_system.remove_folder(pkg.full_path)
-
     def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], store: StoreWrapper):
         for pkg in create_folder_pkgs:
             self._ctx.file_system.make_dirs(pkg.full_path)
             store.write_only().add_folder(pkg.rel_path, pkg.description)
+            self._ctx.installation_report.add_installed_folder(pkg.rel_path)
 
     def _try_reserve_space(self, fetch_pkgs: List[_FetchFilePackage]) -> bool:
         with self._lock:

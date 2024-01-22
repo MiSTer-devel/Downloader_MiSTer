@@ -21,7 +21,7 @@ import abc
 import dataclasses
 import time
 from http.client import HTTPException
-from typing import Dict, Optional, Tuple, List, Any, Iterable
+from typing import Dict, Optional, Tuple, List, Any, Iterable, Set
 from urllib.error import URLError
 
 from downloader.db_entity import DbEntity
@@ -79,6 +79,7 @@ class ProcessedFile:
 
 class InstallationReport(abc.ABC):
     def is_file_processed(self, path: str) -> bool: """Returns True if the file has been processed."""
+    def is_folder_installed(self, path: str) -> bool: """Returns True if the file has been processed."""
     def processed_file(self, path: str) -> ProcessedFile: """File that a database is currently processing."""
     def downloaded_files(self) -> List[str]: """Files that has just been downloaded and validated."""
     def already_present_files(self) -> List[str]: """File previously in the system, that were not in the store, and now have been validated."""
@@ -86,6 +87,7 @@ class InstallationReport(abc.ABC):
     def failed_files(self) -> List[str]: """Files that couldn't be downloaded properly or didn't pass validation."""
     def removed_files(self) -> List[str]: """Files that have just been removed."""
     def installed_files(self) -> List[str]: """Files that have just been installed and need to be updated in the store."""
+    def installed_folders(self) -> List[str]: """Folders that have just been installed and need to be updated in the store."""
     def uninstalled_files(self) -> List[str]: """Files that have just been uninstalled for various reasons and need to be removed from the store."""
     def wrong_db_options(self) -> List[WrongDatabaseOptions]: """Databases that have been unprocessed because of their database."""
     def installed_zip_indexes(self) -> Iterable[Tuple[str, str, Index, Dict[str, Any]]]: """Zip indexes that have been installed and need to be updated in the store."""
@@ -103,6 +105,7 @@ class InstallationReportImpl(InstallationReport):
         self._skipped_updated_files = []
         self._processed_files: Dict[str, ProcessedFile] = {}
         self._installed_zip_indexes: List[Tuple[str, str, Index, Dict[str, Any]]] = []
+        self._installed_folders: Set[str] = set()
 
     def add_downloaded_file(self, path: str): self._downloaded_files.append(path)
     def add_installed_zip_index(self, db_id: str, zip_id: str, index: Index, description: Dict[str, Any]): self._installed_zip_indexes.append((db_id, zip_id, index, description))
@@ -111,7 +114,9 @@ class InstallationReportImpl(InstallationReport):
     def add_failed_file(self, path: str): self._failed_files.append(path)
     def add_failed_db_options(self, exception: WrongDatabaseOptions): self._failed_db_options.append(exception)
     def add_removed_file(self, path: str): self._removed_files.append(path)
+    def add_installed_folder(self, path: str): self._installed_folders.add(path)
     def is_file_processed(self, path: str) -> bool: return path in self._processed_files
+    def is_folder_installed(self, path: str) -> bool: return path in self._installed_folders
     def add_processed_file(self, pkg: PathPackage, db_id: str): self._processed_files[pkg.rel_path] = ProcessedFile(pkg, db_id)
     def add_skipped_updated_file(self, path: str): self._skipped_updated_files.append(path)
     def processed_file(self, path: str) -> ProcessedFile: return self._processed_files[path]
@@ -121,6 +126,7 @@ class InstallationReportImpl(InstallationReport):
     def failed_files(self): return self._failed_files
     def removed_files(self): return self._removed_files
     def installed_files(self): return self._downloaded_files + self._already_present_files
+    def installed_folders(self): return list(self._installed_folders)
     def uninstalled_files(self): return self._removed_files + self._failed_files
     def wrong_db_options(self): return self._failed_db_options
     def installed_zip_indexes(self): return self._installed_zip_indexes
