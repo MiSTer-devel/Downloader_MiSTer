@@ -18,7 +18,7 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Dict, Any, Tuple, Set, List
 import threading
 
 from downloader.external_drives_repository import ExternalDrivesRepository
@@ -26,6 +26,7 @@ from downloader.file_system import FileSystem
 from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import JobSystem, Worker
+from downloader.jobs.path_package import PathPackage
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from downloader.logger import Logger
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
@@ -48,6 +49,7 @@ class DownloaderWorkerContext:
     target_paths_calculator_factory: TargetPathsCalculatorFactory
     config: Dict[str, Any]
     zip_barrier_lock: 'ZipBarrierLock' = field(default_factory=lambda: ZipBarrierLock())
+    pending_removals: 'PendingRemovals' = field(default_factory=lambda: PendingRemovals())
 
 
 class DownloaderWorker(Worker):
@@ -77,3 +79,22 @@ class ZipBarrierLock:
         with self._lock: return len(self._db_zips(db_id)) == 0
 
     def _db_zips(self, db_id: str): return self._zips_by_db.setdefault(db_id, set())
+
+
+class PendingRemovals:
+    def __init__(self):
+        self._directories = dict()
+        self._files = dict()
+
+    def queue_directory_removal(self, pkg: PathPackage, db_id: str) -> None: self._directories.setdefault(pkg.rel_path, (pkg, set()))[1].add(db_id)
+    def queue_file_removal(self, pkg: PathPackage, db_id: str) -> None: self._files.setdefault(pkg.rel_path, (pkg, set()))[1].add(db_id)
+
+    def consume_files(self) -> List[Tuple[PathPackage, Set[str]]]:
+        result = sorted([(x[0], x[1]) for x in self._files.values()], key=lambda x: x[0].rel_path)
+        self._files.clear()
+        return result
+
+    def consume_directories(self) -> List[Tuple[PathPackage, Set[str]]]:
+        result = sorted([(x[0], x[1]) for x in self._directories.values()], key=lambda x: len(x[0].rel_path))
+        self._directories.clear()
+        return result
