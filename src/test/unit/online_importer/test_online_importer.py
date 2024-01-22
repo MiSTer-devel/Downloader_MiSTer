@@ -18,6 +18,7 @@
 
 from downloader.constants import FILE_PDFViewer, FOLDER_linux, \
     DISTRIBUTION_MISTER_DB_ID
+from downloader.file_system import FileSystemFactory
 from downloader.logger import NoLogger
 from test.fake_logger import SpyLoggerDecorator
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
@@ -376,6 +377,69 @@ class TestOnlineImporter(OnlineImporterTestBase):
     def test_download_reboot_file___system_already_containing_it___needs_no_reboot2(self):
         sut = self.download_reboot_file(store_reboot_descr(custom_hash='other_hash'), fs(files={file_reboot: file_reboot_descr()}))
         self.assertReports(sut, [file_reboot], needs_reboot=True)
+
+    def test_download_db2_with_file_a_and_emtpy_db1___after_having_db1_with_file_a_and_empty_db2___updates_stores_but_no_changes_on_fs(self):
+        store1 = empty_test_store()
+        store2 = empty_test_store()
+
+        sut = OnlineImporter()\
+            .add_db(db_test_with_file_a(db_id='1'), store1)\
+            .add_db(db_entity(db_id='2'), store2)\
+            .download(False)
+
+        self.assertEqual([
+            {'data': '/media/fat/a', 'scope': 'make_dirs'},
+            {'data': '/media/fat/a/a.new', 'scope': 'write_incoming_stream'},
+            {'data': ['/media/fat/a/a.new', '/media/fat/a/a'], 'scope': 'move'}
+        ], sut.fs_records)
+        self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
+        self.assertEqual(store_test_with_file_a_descr(), store1)
+        self.assertEqual(empty_test_store(), store2)
+        self.assertReports(sut, [file_a])
+
+        store1 = store_test_with_file_a_descr()
+        store2 = empty_test_store()
+        sut = OnlineImporter().from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))\
+            .add_db(db_entity(db_id='1'), store1)\
+            .add_db(db_test_with_file_a(db_id='2'), store2)\
+            .download(False)
+
+        self.assertEqual([{'data': '/media/fat/a', 'scope': 'make_dirs'}], sut.fs_records)
+        self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
+        self.assertEqual(empty_test_store(), store1)
+        self.assertEqual(store_test_with_file_a_descr(), store2)
+        self.assertReports(sut, [file_a])
+
+    def test_download_db1_with_file_a_and_emtpy_db2___after_having_db2_with_file_a_and_empty_db1___updates_stores_but_no_changes_on_fs(self):
+        store1 = empty_test_store()
+        store2 = empty_test_store()
+
+        sut = OnlineImporter()\
+            .add_db(db_entity(db_id='1'), store1)\
+            .add_db(db_test_with_file_a(db_id='2'), store2)\
+            .download(False)
+
+        self.assertEqual([
+            {'data': '/media/fat/a', 'scope': 'make_dirs'},
+            {'data': '/media/fat/a/a.new', 'scope': 'write_incoming_stream'},
+            {'data': ['/media/fat/a/a.new', '/media/fat/a/a'], 'scope': 'move'}
+        ], sut.fs_records)
+        self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
+        self.assertEqual(empty_test_store(), store1)
+        self.assertEqual(store_test_with_file_a_descr(), store2)
+        self.assertReports(sut, [file_a])
+
+        sut = OnlineImporter().from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))\
+            .add_db(db_test_with_file_a(db_id='1'), store1)\
+            .add_db(db_entity(db_id='2'), store2)\
+            .download(False)
+
+        self.assertEqual([{'data': '/media/fat/a', 'scope': 'make_dirs'}], sut.fs_records)
+        self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
+        self.assertEqual(store_test_with_file_a_descr(), store1)
+        self.assertEqual(empty_test_store(), store2)
+        self.assertReports(sut, [file_a])
+
 
 
 def fs(files=None, folders=None, base_path=None, config=None):

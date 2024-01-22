@@ -124,6 +124,27 @@ class OnlineImporter(ProductionOnlineImporter):
         self._job_system.accomplish_pending_jobs()
 
         report = self._worker_ctx.file_download_reporter.report()
+        for pkg, dbs in self._worker_ctx.pending_removals.consume_files():
+            for db_id in dbs:
+                stores[db_id].write_only().remove_file(pkg.rel_path)
+
+            if report.is_file_processed(pkg.rel_path):
+               continue
+
+            self._worker_ctx.file_system.unlink(pkg.full_path)
+            self._worker_ctx.installation_report.add_processed_file(pkg, list(dbs)[0])
+            self._worker_ctx.installation_report.add_removed_file(pkg.rel_path)
+
+        for pkg, dbs in self._worker_ctx.pending_removals.consume_directories():
+            for db_id in dbs:
+                stores[db_id].write_only().remove_folder(pkg.rel_path)
+
+            if report.is_folder_installed(pkg.rel_path):
+               continue
+
+            self._worker_ctx.installation_report.add_installed_folder(pkg.rel_path)
+            self._worker_ctx.file_system.remove_folder(pkg.full_path)
+
         for file_path in report.installed_files():
             file = report.processed_file(file_path)
             if 'reboot' in file.pkg.description and file.pkg.description['reboot']:

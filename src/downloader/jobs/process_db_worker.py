@@ -47,11 +47,11 @@ class ProcessDbWorker(DownloaderWorker):
             self._ctx.zip_barrier_lock.require_zip(job.db.db_id, zip_id)
             self._push_zip_jobs(_ZipCtx(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
 
-        for zip_id, zip_description in job.store.read_only().zips.items():
+        for zip_id in list(job.store.read_only().zips):
             if zip_id in job.db.zips:
                 continue
 
-            print(zip_id)
+            job.store.write_only().remove_zip_id(zip_id)
 
         while not self._ctx.zip_barrier_lock.is_barrier_free(job.db.db_id):
             self._ctx.job_system.wait_for_other_jobs()

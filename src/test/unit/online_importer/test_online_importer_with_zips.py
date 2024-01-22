@@ -132,8 +132,8 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
             cheats_folder_id: cheats_folder_zip_desc(summary_hash="something_new", summary=summary_json_from_cheats_folder())
         }), previous_store)
 
-        self.assertSutReports([])
         self.assertEqual(expected_store, actual_store)
+        self.assertSutReports([])
 
     def test_download_zip_summary_without_files___for_the_first_time___adds_zip_id_to_store(self):
         zip_descriptions = {cheats_folder_id: cheats_folder_zip_desc(summary=empty_zip_summary())}

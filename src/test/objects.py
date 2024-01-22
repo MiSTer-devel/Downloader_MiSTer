@@ -724,8 +724,8 @@ def empty_test_store():
     return empty_store(base_path=MEDIA_FAT)
 
 
-def store_with_folders(folders):
-    return db_to_store(db_with_folders(db_test, folders))
+def store_with_folders(folders, db_id=None):
+    return db_to_store(db_with_folders(db_id or db_test, folders))
 
 
 def db_test_with_file_a(db_id=None, descr=None):
