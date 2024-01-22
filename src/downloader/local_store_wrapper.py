@@ -185,6 +185,9 @@ class _WriteOnlyStoreAdapter:
 
         self._store[K_BASE_PATH] = base_path
 
+    def remove_zip_id(self, zip_id):
+        self.remove_zip_ids([zip_id])
+
     def remove_zip_ids(self, removed_zip_ids):
         if not len(removed_zip_ids):
             return
@@ -276,7 +279,13 @@ class _WriteOnlyStoreAdapter:
             self._top_wrapper.mark_force_save()
 
     def add_zip_index(self, zip_id: str, index: Index, description: Dict[str, Any]):
-        self._store['zips'] = self._store.get('zips', {})
+        if zip_id in self._store['zips']:
+            if not are_zip_descriptions_equal(self._store['zips'][zip_id], description):
+                self._store['zips'][zip_id] = description
+                self._top_wrapper.mark_force_save()
+        else:
+            self._store['zips'] = {}
+
         self._store['zips'][zip_id] = description
 
         for file_path, file_description in index.files.items():
@@ -438,3 +447,24 @@ def equal_values(a, b):
         return False
 
     return a == b
+
+
+def are_zip_descriptions_equal(desc1: Dict[str, Any], desc2: Dict[str, Any]) -> bool:
+    if set(desc1.keys()) != set(desc2.keys()):
+        return False
+
+    file_keys = ['summary_file', 'contents_file']
+
+    if not all(desc1[k] == desc2[k] for k in desc1.keys() if k not in file_keys):
+        return False
+
+    for key in file_keys:
+        if key in desc1 and not are_zip_file_info_equal(desc1[key], desc2[key]):
+            return False
+
+    return True
+
+
+def are_zip_file_info_equal(file_info1, file_info2):
+    return all(file_info1[k] == file_info2[k] for k in ['hash', 'size', 'url'])
+
