@@ -28,6 +28,7 @@ from downloader.db_entity import DbEntity
 from downloader.file_filter import BadFileFilterPartException
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.index import Index
+from downloader.jobs.open_zip_index_job import OpenZipIndexJob
 from downloader.jobs.path_package import PathPackage
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.process_zip_job import ProcessZipJob
@@ -200,8 +201,10 @@ class FileDownloadProgressReporter(ProgressReporter):
             self._report.add_installed_zip_index(job.db.db_id, job.zip_id, job.zip_index, job.zip_description)
 
         elif isinstance(job, OpenZipContentsJob):
-            for file in job.files:
-                self._report.add_downloaded_file(file.rel_path)
+            for file in job.downloaded_files:
+                self._report.add_downloaded_file(file)
+            for file in job.failed_files:
+                self._report.add_failed_file(file)
 
         self._remove_in_progress(job)
 

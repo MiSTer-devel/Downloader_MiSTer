@@ -29,7 +29,7 @@ from downloader.job_system import JobSystem
 from downloader.jobs.db_header_job import DbHeaderJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
-from downloader.jobs.worker_context import DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerContext, make_downloader_worker_context
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.logger import DebugOnlyLoggerDecorator
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
@@ -51,7 +51,7 @@ class FileDownloaderFactory:
         logger = DebugOnlyLoggerDecorator(self._logger) if silent else self._logger
         file_system = self._file_system_factory.create_for_config(config)
         target_path_repository = TargetPathRepository(config, file_system)
-        workers_factory = DownloaderWorkersFactory(DownloaderWorkerContext(
+        workers_factory = DownloaderWorkersFactory(make_downloader_worker_context(
             job_system=self._job_system,
             waiter=self._waiter,
             logger=self._logger,

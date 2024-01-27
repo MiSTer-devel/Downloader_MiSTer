@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from typing import Dict, Any, List
+from pathlib import Path
 
 from downloader.constants import PathType
 from downloader.db_entity import DbEntity
@@ -32,7 +33,6 @@ from downloader.target_path_calculator import TargetPathsCalculator
 class OpenZipContentsWorker(DownloaderWorker):
     def __init__(self, ctx: DownloaderWorkerContext):
         super().__init__(ctx)
-        self._files_that_failed_from_zip = []
 
     def initialize(self): self._ctx.job_system.register_worker(OpenZipContentsJob.type_id, self)
     def reporter(self): return self._ctx.file_download_reporter
@@ -40,27 +40,22 @@ class OpenZipContentsWorker(DownloaderWorker):
     def operate_on(self, job: OpenZipContentsJob):
         kind = job.zip_description.get('kind', None)
         if kind == 'extract_all_contents':
-            self._extract_all_contents(
-                db=job.db,
-                config=job.config,
-                zip_id=job.zip_id,
-                zip_description=job.zip_description,
-                download_path=job.download_path,
-                index=job.index,
-                files=job.files
-            )
+            self._extract_all_contents(job)
         elif kind == 'extract_single_files':
-            self._extract_single_files(
-                zip_id=job.zip_id,
-                zip_description=job.zip_description,
-                download_path=job.download_path,
-                index=job.index
-            )
+            self._extract_single_files(job)
         else:
             # @TODO: Handle this case
             raise Exception(f"Unknown kind '{kind}' for zip '{job.zip_id}' in db '{job.db.db_id}'")
 
-    def _extract_all_contents(self, db: DbEntity, config: Dict[str, Any], zip_id: str, zip_description: Dict[str, Any], download_path: str, index: Index, files: List[PathPackage]):
+    def _extract_all_contents(self, job: OpenZipContentsJob):
+        db = job.db
+        config = job.config
+        zip_id = job.zip_id
+        zip_description = job.zip_description
+        download_path = job.download_path
+        index = job.index
+        files = job.files
+
         self._ctx.logger.print(zip_description['description'])
 
         target_folder_path = self._ctx.target_paths_calculator_factory\
@@ -81,21 +76,31 @@ class OpenZipContentsWorker(DownloaderWorker):
         for pkg in files:
             if pkg.rel_path in filtered_files:
                 self._ctx.file_system.unlink(pkg.full_path)
+            else:
+                job.downloaded_files.append(pkg.rel_path)
 
-    def _extract_single_files(self, zip_id: str, zip_description: Dict[str, Any], download_path: str, index: Index):
+    def _extract_single_files(self, job: OpenZipContentsJob):
+        zip_id = job.zip_id
+        zip_description = job.zip_description
+        download_path = job.download_path
+        index = job.index
+
         self._ctx.logger.print(zip_description['description'])
 
         temp_filename = self._ctx.file_system.unique_temp_filename()
-        tmp_path = '%s_%s/' % (temp_filename.value, zip_id)
+        tmp_path = f'{temp_filename.value}_{zip_id}'
 
         self._ctx.file_system.unzip_contents(download_path, tmp_path, list(index.files))
 
         for file_path, file_description in index.files.items():
             try:
-                self._ctx.file_system.copy('%s%s' % (tmp_path, file_description['zip_path']), file_path)
+                self._ctx.file_system.copy(str(Path(tmp_path) / Path(file_description['zip_path'])), file_path)
             except FileCopyError as _e:
-                self._files_that_failed_from_zip.append(file_path)
+                job.failed_files.append(file_path)
                 self._ctx.logger.print('ERROR: File "%s" could not be copied, skipping.' % file_path)
+                continue
+
+            job.downloaded_files.append(file_path)
 
         self._ctx.file_system.unlink(download_path)
         self._ctx.file_system.remove_non_empty_folder(tmp_path)

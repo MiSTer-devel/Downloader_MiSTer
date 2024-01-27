@@ -17,11 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from abc import abstractmethod, ABC
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
 import sys
 import time
-from typing import Dict, Optional, Callable, List, Tuple, Any
+from typing import Dict, Optional, Callable, List, Tuple, Any, Iterable
 import queue
 import threading
 import signal
@@ -54,6 +55,7 @@ class JobSystem:
         self._pending_jobs_amount: int = 0
         self._pending_jobs_cancelled: bool = False
         self._is_accomplishing_jobs: bool = False
+        self._tag_dict: Dict[str, int] = defaultdict(int)
         self._jobs_pushed: int = 0
         self._timeout_clock: int = 0
 
@@ -76,7 +78,7 @@ class JobSystem:
             priority=priority or self._jobs_pushed,
             parent=parent_package
         ))
-        with self._lock: self._pending_jobs_amount += 1
+        self._increase_jobs_amount(job)
 
     def cancel_pending_jobs(self) -> None:
         with self._lock: self._pending_jobs_cancelled = True
@@ -99,12 +101,34 @@ class JobSystem:
     def wait_for_other_jobs(self):
         if not self._is_accomplishing_jobs:
             raise CantWaitWhenNotAccomplishingJobs('Can not wait when not accomplishing jobs')
+
         if self._job_queue.empty():
             raise CantAccomplishJobs('Can not wait when there are no pending jobs')
+
         if self._max_threads > 1:
             time.sleep(self._wait_timeout)
         else:
             self._no_threads_accomplish_tick()
+
+    def any_tag_active(self, tags: Iterable[str]) -> bool:
+        with self._lock:
+            return any(self._tag_dict[tag] > 0 for tag in tags)
+
+    def wait_for_jobs_with_tags(self, tags: Iterable[str]) -> None:
+        while self.any_tag_active(tags):
+            self.wait_for_other_jobs()
+
+    def _decrease_jobs_amount(self, job: 'Job') -> None:
+        with self._lock:
+            for tag in job.tags:
+                self._tag_dict[tag] -= 1
+            self._pending_jobs_amount -= 1
+
+    def _increase_jobs_amount(self, job: 'Job') -> None:
+        with self._lock:
+            for tag in job.tags:
+                self._tag_dict[tag] += 1
+            self._pending_jobs_amount += 1
 
     def _accomplish_with_threads(self, max_threads: int) -> None:
         previous_handler = signal.getsignal(signal.SIGINT)
@@ -187,7 +211,7 @@ class JobSystem:
                 priority=package.priority
             ))
         else:
-            with self._lock: self._pending_jobs_amount -= 1
+            self._decrease_jobs_amount(package.job)
         try:
             if should_retry:
                 self._report_job_retried(package, e)
@@ -211,7 +235,7 @@ class JobSystem:
 
             completed, package = notification
             if completed:
-                with self._lock: self._pending_jobs_amount -= 1
+                self._decrease_jobs_amount(package.job)
                 self._report_job_completed(package)
             else:
                 self._report_job_started(package)
@@ -304,6 +328,7 @@ class ReportException(Exception): pass
 
 
 class Job(ABC):
+
     @property
     @abstractmethod
     def type_id(self) -> int:
@@ -311,6 +336,19 @@ class Job(ABC):
 
     def retry_job(self) -> Optional['Job']:
         return self
+
+    def add_tag(self, tag: str) -> None:
+        tags = getattr(self, '_tags', None)
+        if tags is None:
+            tags = list()
+            setattr(self, '_tags', tags)
+        elif len(tags) != len(set(tags)):
+            raise CantAccomplishJobs(f'Tag {tag} already added to job {self.type_id}')
+        tags.append(tag)
+
+    @property
+    def tags(self) -> Iterable[str]:
+        return getattr(self, '_tags', [])
 
 
 class Worker(ABC):
