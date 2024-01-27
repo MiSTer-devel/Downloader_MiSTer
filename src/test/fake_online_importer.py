@@ -23,7 +23,7 @@ from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.job_system import JobSystem
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
-from downloader.jobs.worker_context import DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerContext, make_downloader_worker_context
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
@@ -71,7 +71,7 @@ class OnlineImporter(ProductionOnlineImporter):
         self._file_download_reporter = FileDownloadProgressReporter(logger, waiter, installation_report)
         self._job_system = JobSystem(self._file_download_reporter, logger=logger, max_threads=1)
         external_drives_repository = ExternalDrivesRepository(file_system=self.file_system)
-        self._worker_ctx = DownloaderWorkerContext(
+        self._worker_ctx = make_downloader_worker_context(
             job_system=self._job_system,
             waiter=waiter,
             logger=logger,
@@ -151,7 +151,13 @@ class OnlineImporter(ProductionOnlineImporter):
                 self._needs_reboot = True
             stores[file.db_id].write_only().add_file(file.pkg.rel_path, file.pkg.description)
 
-        for file_path in report.uninstalled_files():
+        for file_path in report.removed_files():
+            file = report.processed_file(file_path)
+            stores[file.db_id].write_only().remove_file(file.pkg.rel_path)
+
+        for file_path in report.failed_files():
+            if not report.is_file_processed(file_path):
+                continue
             file = report.processed_file(file_path)
             stores[file.db_id].write_only().remove_file(file.pkg.rel_path)
 
