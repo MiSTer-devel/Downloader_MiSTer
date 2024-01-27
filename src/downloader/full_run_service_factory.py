@@ -30,7 +30,7 @@ from downloader.http_gateway import HttpGateway
 from downloader.importer_command import ImporterCommandFactory
 from downloader.job_system import JobSystem
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
-from downloader.jobs.worker_context import DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerContext, make_downloader_worker_context
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.logger import DebugOnlyLoggerDecorator
 from downloader.os_utils import LinuxOsUtils
@@ -95,7 +95,7 @@ class FullRunServiceFactory:
         online_importer = OnlineImporter(file_filter_factory, file_system_factory, file_downloader_factory, path_resolver_factory, local_repository, external_drives_repository, free_space_reservation, waiter, self._logger)
         linux_updater = LinuxUpdater(config, system_file_system, file_downloader_factory, self._logger)
 
-        workers_factory = DownloaderWorkersFactory(DownloaderWorkerContext(
+        workers_factory = DownloaderWorkersFactory(make_downloader_worker_context(
             job_system=job_system,
             waiter=waiter,
             logger=self._logger,
