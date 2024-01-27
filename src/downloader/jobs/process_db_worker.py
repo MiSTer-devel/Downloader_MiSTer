@@ -16,12 +16,13 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, Set
+from typing import Dict, Any, Set, List
 from dataclasses import dataclass
 import threading
+from pathlib import Path
 
 from downloader.db_entity import DbEntity
-from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_process_zip_job
+from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_process_zip_job, make_open_zip_index_job, ZipJobContext
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
@@ -43,9 +44,12 @@ class ProcessDbWorker(DownloaderWorker):
     def operate_on(self, job: ProcessDbJob):
         config = self._build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
 
+        zip_dispatcher = _ZipJobDispatcher(self._ctx)
+
+        job_tags = []
         for zip_id, zip_description in job.db.zips.items():
-            self._ctx.zip_barrier_lock.require_zip(job.db.db_id, zip_id)
-            self._push_zip_jobs(_ZipCtx(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
+            zip_dispatcher.push_zip_jobs(ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
+            job_tags.append(f'{job.db.db_id}:{zip_id}')
 
         for zip_id in list(job.store.read_only().zips):
             if zip_id in job.db.zips:
@@ -53,8 +57,12 @@ class ProcessDbWorker(DownloaderWorker):
 
             job.store.write_only().remove_zip_id(zip_id)
 
-        while not self._ctx.zip_barrier_lock.is_barrier_free(job.db.db_id):
-            self._ctx.job_system.wait_for_other_jobs()
+        self._ctx.job_system.wait_for_jobs_with_tags(job_tags)
+
+        for file_info in self._ctx.file_download_reporter.report().failed_files():
+            zip_dispatcher.try_push_summary_job_if_recovery_is_needed(file_info)
+
+        self._ctx.job_system.wait_for_jobs_with_tags(job_tags)
 
         self._ctx.job_system.push_job(ProcessIndexJob(
             db=job.db,
@@ -84,22 +92,40 @@ class ProcessDbWorker(DownloaderWorker):
 
         return config
 
-    def _push_zip_jobs(self, z: '_ZipCtx'):
+
+class _ZipJobDispatcher:
+    def __init__(self, ctx: DownloaderWorkerContext):
+        self._ctx = ctx
+        self._summaries_requested: Dict[str, ZipJobContext] = dict()
+
+    def push_zip_jobs(self, z: ZipJobContext):
         if 'summary_file' in z.zip_description:
             index = z.job.store.read_only().zip_index(z.zip_id)
             there_is_a_recent_store_index = index is not None and index['hash'] == z.zip_description['summary_file']['hash'] and index['hash'] != NO_HASH_IN_STORE_CODE
             if there_is_a_recent_store_index:
-                self._push_process_zip_job(z, zip_index=index, has_new_zip_index=False)
+                self.push_process_zip_job(z, zip_index=index, has_new_zip_index=False)
             else:
-                self._push_get_zip_index_and_open_jobs(z, z.zip_description['summary_file'])
+                summary_info = self.push_get_zip_index_and_open_jobs(z, z.zip_description['summary_file'])
+                self._summaries_requested[summary_info] = z
 
         elif 'internal_summary' in z.zip_description:
-            self._push_process_zip_job(z, zip_index=z.zip_description['internal_summary'], has_new_zip_index=True)
+            self.push_process_zip_job(z, zip_index=z.zip_description['internal_summary'], has_new_zip_index=True)
         else:
             raise Exception(f"Unknown zip description for zip '{z.zip_id}' in db '{z.job.db.db_id}'")
             # @TODO: Handle this case
 
-    def _push_process_zip_job(self, z: '_ZipCtx', zip_index: Dict[str, Any], has_new_zip_index: bool):
+    def try_push_summary_job_if_recovery_is_needed(self, summary_info: str):
+        if summary_info not in self._summaries_requested:
+            return
+
+        z = self._summaries_requested[summary_info]
+        index = z.job.store.read_only().zip_index(z.zip_id)
+        if index is None:
+            return
+
+        self.push_process_zip_job(z, zip_index=index, has_new_zip_index=False)
+
+    def push_process_zip_job(self, z: ZipJobContext, zip_index: Dict[str, Any], has_new_zip_index: bool):
         self._ctx.job_system.push_job(make_process_zip_job(
             zip_id=z.zip_id,
             zip_description=z.zip_description,
@@ -112,25 +138,7 @@ class ProcessDbWorker(DownloaderWorker):
             has_new_zip_index=has_new_zip_index
         ))
 
-    def _push_get_zip_index_and_open_jobs(self, z: '_ZipCtx', file_description: Dict[str, Any]):
-        get_file_job, validate_job = make_get_zip_file_jobs(db=z.job.db, zip_id=z.zip_id, description=file_description)
-        validate_job.after_job = OpenZipIndexJob(
-            zip_id=z.zip_id,
-            zip_description=z.zip_description,
-            db=z.job.db,
-            ini_description=z.job.ini_description,
-            store=z.job.store,
-            full_resync=z.job.full_resync,
-            download_path=validate_job.target_file_path,
-            config=z.config,
-            get_file_job=get_file_job
-        )
-        self._ctx.job_system.push_job(get_file_job)
-
-
-@dataclass
-class _ZipCtx:
-    zip_id: str
-    zip_description: Dict[str, Any]
-    config: Dict[str, Any]
-    job: ProcessDbJob
+    def push_get_zip_index_and_open_jobs(self, z: ZipJobContext, file_description: Dict[str, Any]) -> str:
+        job, info = make_open_zip_index_job(z, file_description)
+        self._ctx.job_system.push_job(job)
+        return info

@@ -19,7 +19,7 @@
 from threading import Lock
 from typing import List, Tuple, Optional
 
-from downloader.jobs.jobs_factory import make_get_zip_file_jobs
+from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_open_zip_contents_job
 from downloader.jobs.path_package import PathPackage
 from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
@@ -38,8 +38,6 @@ class ProcessZipWorker(DownloaderWorker):
     def reporter(self): return self._ctx.file_download_reporter
 
     def operate_on(self, job: ProcessZipJob):
-        self._ctx.zip_barrier_lock.release_zip(job.db.db_id, job.zip_id)
-
         total_files_size = 0
         for file_path, file_description in job.zip_index.files.items():
             total_files_size += file_description['size']
@@ -77,18 +75,5 @@ class ProcessZipWorker(DownloaderWorker):
                 self._ctx.logger.print(f'Skipping zip "{job.zip_id}" because file "{already_processed[0]}" was already processed by db "{already_processed[1]}"')
                 return
 
-            get_file_job, validate_job = make_get_zip_file_jobs(db=job.db, zip_id=job.zip_id, description=job.zip_description['contents_file'])
-            validate_job.after_job = OpenZipContentsJob(
-                zip_id=job.zip_id,
-                zip_description=job.zip_description,
-                db=job.db,
-                ini_description=job.ini_description,
-                store=job.store,
-                full_resync=job.full_resync,
-                download_path=validate_job.target_file_path,
-                files=file_packs,
-                config=job.config,
-                index=job.zip_index,
-                get_file_job=get_file_job
-            )
+            get_file_job, info = make_open_zip_contents_job(job=job, file_packs=file_packs)
             self._ctx.job_system.push_job(get_file_job)

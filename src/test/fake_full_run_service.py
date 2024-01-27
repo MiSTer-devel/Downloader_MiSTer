@@ -26,7 +26,7 @@ from downloader.full_run_service import FullRunService as ProductionFullRunServi
 from downloader.importer_command import ImporterCommandFactory
 from downloader.job_system import JobSystem
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
-from downloader.jobs.worker_context import DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerContext, make_downloader_worker_context
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from test.fake_http_gateway import FakeHttpGateway
@@ -88,7 +88,7 @@ class FullRunService(ProductionFullRunService):
                          NoWaiter(),
                          importer_command_factory or ImporterCommandFactory(config),
                          job_system,
-                         DownloaderWorkersFactory(DownloaderWorkerContext(
+                         DownloaderWorkersFactory(make_downloader_worker_context(
                              job_system=job_system,
                              waiter=NoWaiter(),
                              logger=NoLogger(),

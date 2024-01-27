@@ -22,6 +22,7 @@ from contextlib import contextmanager
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.job_system import _thread_local_storage
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.open_zip_index_job import OpenZipIndexJob
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from test.objects import binary_content
 
@@ -45,7 +46,9 @@ class FakeHttpGateway:
         elif isinstance(job, FetchFileJob2):
             if isinstance(job.after_job, ValidateFileJob2):
                 description = {**job.after_job.description}
-            info_path = job.info
+
+            if info_path is None:
+                info_path = job.info
             target_file_path = job.temp_path
 
         match_path = info_path if info_path is not None else target_file_path if target_file_path is not None else url
