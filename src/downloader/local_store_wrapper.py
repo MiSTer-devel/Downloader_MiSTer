@@ -19,7 +19,7 @@
 from downloader.constants import K_BASE_PATH
 from downloader.jobs.index import Index
 from downloader.other import empty_store_without_base_path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 from collections import defaultdict
 
 NO_HASH_IN_STORE_CODE = 'file_does_not_exist_so_cant_get_hash'
@@ -449,8 +449,12 @@ def equal_values(a, b):
     return a == b
 
 
+def zip_description_keys(desc: Dict[str, Any]) -> Set[str]:
+    return set(desc.keys()) - {'internal_summary'}
+
+
 def are_zip_descriptions_equal(desc1: Dict[str, Any], desc2: Dict[str, Any]) -> bool:
-    if set(desc1.keys()) != set(desc2.keys()):
+    if zip_description_keys(desc1) != zip_description_keys(desc2):
         return False
 
     file_keys = ['summary_file', 'contents_file']
