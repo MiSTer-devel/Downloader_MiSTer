@@ -55,6 +55,7 @@ class OpenZipContentsWorker(DownloaderWorker):
         download_path = job.download_path
         index = job.index
         files = job.files
+        store = job.store.read_only()
 
         self._ctx.logger.print(zip_description['description'])
 
@@ -62,9 +63,9 @@ class OpenZipContentsWorker(DownloaderWorker):
             .target_paths_calculator(config)\
             .deduce_target_path(zip_description['target_folder_path'], {}, PathType.FOLDER)
 
-        contained_files = [pkg.full_path for pkg in files]
+        contained_files = [pkg for pkg in files if store.hash_file(pkg.rel_path) != pkg.description.get('hash', None)]
 
-        self._ctx.file_system.unzip_contents(download_path, target_folder_path, contained_files)
+        self._ctx.file_system.unzip_contents(download_path, target_folder_path, [pkg.full_path for pkg in contained_files])
         self._ctx.file_system.unlink(download_path)
 
         # @TODO: This filtering looks like should be done in a previous step, but the removal of the files should be here. There should be a job.files_to_remove for that
@@ -73,7 +74,7 @@ class OpenZipContentsWorker(DownloaderWorker):
         _, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(db, config).select_filtered_files(index)
 
         filtered_files = filtered_zip_data[zip_id]['files'] if zip_id in filtered_zip_data else []
-        for pkg in files:
+        for pkg in contained_files:
             if pkg.rel_path in filtered_files:
                 self._ctx.file_system.unlink(pkg.full_path)
             else:
@@ -83,24 +84,30 @@ class OpenZipContentsWorker(DownloaderWorker):
         zip_id = job.zip_id
         zip_description = job.zip_description
         download_path = job.download_path
-        index = job.index
+        store = job.store.read_only()
+        files = job.files
 
         self._ctx.logger.print(zip_description['description'])
 
         temp_filename = self._ctx.file_system.unique_temp_filename()
         tmp_path = f'{temp_filename.value}_{zip_id}'
 
-        self._ctx.file_system.unzip_contents(download_path, tmp_path, list(index.files))
+        contained_files = [pkg for pkg in files if store.hash_file(pkg.rel_path) != pkg.description.get('hash', None)]
 
-        for file_path, file_description in index.files.items():
-            try:
-                self._ctx.file_system.copy(str(Path(tmp_path) / Path(file_description['zip_path'])), file_path)
-            except FileCopyError as _e:
-                job.failed_files.append(file_path)
-                self._ctx.logger.print('ERROR: File "%s" could not be copied, skipping.' % file_path)
-                continue
+        if len(contained_files) > 0:
+            self._ctx.file_system.unzip_contents(download_path, tmp_path, [pkg.rel_path for pkg in contained_files])
 
-            job.downloaded_files.append(file_path)
+            for pkg in contained_files:
+                file_path = pkg.rel_path
+                file_description = pkg.description
+                try:
+                    self._ctx.file_system.copy(str(Path(tmp_path) / Path(file_description['zip_path'])), file_path)
+                except FileCopyError as _e:
+                    job.failed_files.append(file_path)
+                    self._ctx.logger.print('ERROR: File "%s" could not be copied, skipping.' % file_path)
+                    continue
+
+                job.downloaded_files.append(file_path)
 
         self._ctx.file_system.unlink(download_path)
         self._ctx.file_system.remove_non_empty_folder(tmp_path)
