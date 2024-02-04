@@ -63,9 +63,12 @@ class OpenZipContentsWorker(DownloaderWorker):
             .target_paths_calculator(config)\
             .deduce_target_path(zip_description['target_folder_path'], {}, PathType.FOLDER)
 
-        contained_files = [pkg for pkg in files if store.hash_file(pkg.rel_path) != pkg.description.get('hash', None)]
+        # @TODO: self._ctx.file_system.precache_is_file_with_folders() THIS IS MISSING FOR PROPER PERFORMANCE!
+        contained_files = [pkg for pkg in files if store.hash_file(pkg.rel_path) != pkg.description.get('hash', None) or self._ctx.file_system.is_file(pkg.full_path) is False]
 
-        self._ctx.file_system.unzip_contents(download_path, target_folder_path, [pkg.full_path for pkg in contained_files])
+        if len(contained_files) > 0:
+            self._ctx.file_system.unzip_contents(download_path, target_folder_path, [pkg.full_path for pkg in contained_files])
+
         self._ctx.file_system.unlink(download_path)
 
         # @TODO: This filtering looks like should be done in a previous step, but the removal of the files should be here. There should be a job.files_to_remove for that
