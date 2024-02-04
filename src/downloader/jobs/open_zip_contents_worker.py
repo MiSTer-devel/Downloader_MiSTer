@@ -92,7 +92,9 @@ class OpenZipContentsWorker(DownloaderWorker):
         temp_filename = self._ctx.file_system.unique_temp_filename()
         tmp_path = f'{temp_filename.value}_{zip_id}'
 
-        contained_files = [pkg for pkg in files if store.hash_file(pkg.rel_path) != pkg.description.get('hash', None)]
+        # @TODO: self._ctx.file_system.precache_is_file_with_folders() THIS IS MISSING FOR PROPER PERFORMANCE!
+
+        contained_files = [pkg for pkg in files if store.hash_file(pkg.rel_path) != pkg.description.get('hash', None) or self._ctx.file_system.is_file(pkg.full_path) is False]
 
         if len(contained_files) > 0:
             self._ctx.file_system.unzip_contents(download_path, tmp_path, [pkg.rel_path for pkg in contained_files])
