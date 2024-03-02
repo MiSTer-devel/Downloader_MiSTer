@@ -21,7 +21,6 @@ set -euo pipefail
 
 SCRIPT_PATH="/tmp/downloader.sh"
 LATEST_SCRIPT_PATH="/media/fat/Scripts/.config/downloader/downloader_latest.sh"
-CACERT_NEEDED="/media/fat/Scripts/.config/downloader/cacert_needed"
 CACERT_PEM="/etc/ssl/certs/cacert.pem"
 
 if (( $(date +%Y) < 2000 )) ; then
@@ -37,6 +36,10 @@ if (( $(date +%Y) < 2000 )) ; then
         echo "Please, try again later."
         exit 1
     fi
+fi
+
+if [ -s "${CACERT_PEM}" ] ; then
+    export CURL_CA_BUNDLE="${CACERT_PEM}"
 fi
 
 download_file() {
@@ -62,12 +65,6 @@ download_file() {
                 return
                 ;;
             60|77|35|51|58|59|82|83)
-                if [ -s /etc/ssl/certs/cacert.pem ] ; then
-                    export CURL_SSL="--cacert ${CACERT_PEM}"
-                    touch "${CACERT_NEEDED}"
-                    continue
-                fi
-
                 set +e
                 dialog --keep-window --title "Bad Certificates" --defaultno \
                     --yesno "CA certificates need to be fixed, do you want me to fix them?\n\nNOTE: This operation will delete files at /etc/ssl/certs" \
@@ -142,9 +139,6 @@ rm ${SCRIPT_PATH} 2> /dev/null || true
 if [ -s "${LATEST_SCRIPT_PATH}" ] ; then
     cp "${LATEST_SCRIPT_PATH}" "${SCRIPT_PATH}"
     if [[ "${CURL_SSL:-}" != "--insecure" ]] ; then
-        if [ -f "${CACERT_NEEDED}" ] && [ -s /etc/ssl/certs/cacert.pem ] ; then
-            export CURL_SSL="--cacert ${CACERT_PEM}"
-        fi
         download_file "/dev/null" "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/downloader.sh"
     fi
 else
