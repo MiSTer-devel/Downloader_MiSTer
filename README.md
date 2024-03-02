@@ -113,6 +113,12 @@ More information about *Download Filters* [here](docs/download-filters.md).
 
 NOTE: If you manually add custom databases, you might want to make sure that you also have a [distribution_mister] section. That way you'll still be downloading the content from [MiSTer Distribution](https://github.com/MiSTer-devel/Distribution_MiSTer) together with the content from the custom database/s that you introduced.
 
+### Custom INI file
+
+You can use a different INI file by renaming the launcher `downloader.sh` to your preferred name. After renaming the launcher, it will use an INI file with the same name but with the .ini extension. For instance, if you rename the launcher to `/media/fat/Scripts/my_custom_name.sh`, it will use the INI file `/media/fat/my_custom_name.ini` instead of `/media/fat/downloader.ini`.
+
+This flexibility allows for various use cases, such as running a specific database in isolation.
+
 ### Supporters+ shout-out!
 
 Daniel Tarsky, James D Eberhart, Koala Koa, MiSTerFPGA.co.uk, Tony Escobar, turbochop3300 and Wayne Booker
