@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2024 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -41,8 +41,13 @@ download_file() {
         if [ ${COUNTER} -ge 1 ] ; then
             sleep 1s
         fi
+
         set +e
-        curl ${CURL_SSL:-} --silent --fail --location -o "${DOWNLOAD_PATH}" "${DOWNLOAD_URL}"
+        if [[ "${DOWNLOAD_PATH}" == "/dev/null" ]]; then
+            curl ${CURL_SSL:-} --silent --fail --location -I "${DOWNLOAD_URL}" > /dev/null 2>&1
+        else
+            curl ${CURL_SSL:-} --silent --fail --location -o "${DOWNLOAD_PATH}" "${DOWNLOAD_URL}"
+        fi
         local CMD_RET=$?
         set -e
 
@@ -127,10 +132,18 @@ echo "Running MiSTer Downloader"
 echo
 
 SCRIPT_PATH="/tmp/downloader.sh"
+LATEST_SCRIPT_PATH="/media/fat/Scripts/.config/downloader/downloader_latest.sh"
 
 rm ${SCRIPT_PATH} 2> /dev/null || true
 
-download_file "${SCRIPT_PATH}" "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/dont_download.sh"
+if [ -s "${LATEST_SCRIPT_PATH}" ] ; then
+    cp "${LATEST_SCRIPT_PATH}" "${SCRIPT_PATH}"
+    if [[ "${CURL_SSL:-}" != "--insecure" ]] ; then
+        download_file "/dev/null" "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/downloader.sh"
+    fi
+else
+    download_file "${SCRIPT_PATH}" "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/dont_download.sh"
+fi
 
 chmod +x "${SCRIPT_PATH}"
 
