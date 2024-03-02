@@ -19,6 +19,11 @@
 
 set -euo pipefail
 
+SCRIPT_PATH="/tmp/downloader.sh"
+LATEST_SCRIPT_PATH="/media/fat/Scripts/.config/downloader/downloader_latest.sh"
+CACERT_NEEDED="/media/fat/Scripts/.config/downloader/cacert_needed"
+CACERT_PEM="/etc/ssl/certs/cacert.pem"
+
 if (( $(date +%Y) < 2000 )) ; then
     NTP_SERVER="0.pool.ntp.org"
     echo "Syncing date and time with $NTP_SERVER"
@@ -58,7 +63,8 @@ download_file() {
                 ;;
             60|77|35|51|58|59|82|83)
                 if [ -s /etc/ssl/certs/cacert.pem ] ; then
-                    export CURL_SSL="--cacert /etc/ssl/certs/cacert.pem"
+                    export CURL_SSL="--cacert ${CACERT_PEM}"
+                    touch "${CACERT_NEEDED}"
                     continue
                 fi
 
@@ -131,14 +137,14 @@ download_file() {
 echo "Running MiSTer Downloader"
 echo
 
-SCRIPT_PATH="/tmp/downloader.sh"
-LATEST_SCRIPT_PATH="/media/fat/Scripts/.config/downloader/downloader_latest.sh"
-
 rm ${SCRIPT_PATH} 2> /dev/null || true
 
 if [ -s "${LATEST_SCRIPT_PATH}" ] ; then
     cp "${LATEST_SCRIPT_PATH}" "${SCRIPT_PATH}"
     if [[ "${CURL_SSL:-}" != "--insecure" ]] ; then
+        if [ -f "${CACERT_NEEDED}" ] && [ -s /etc/ssl/certs/cacert.pem ] ; then
+            export CURL_SSL="--cacert ${CACERT_PEM}"
+        fi
         download_file "/dev/null" "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/downloader.sh"
     fi
 else
