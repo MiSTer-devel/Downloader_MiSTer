@@ -20,7 +20,7 @@
 set -euo pipefail
 
 SCRIPT_PATH="/tmp/downloader.sh"
-LATEST_SCRIPT_PATH="/media/fat/Scripts/.config/downloader/downloader_latest.sh"
+LATEST_SCRIPT_PATH="/media/fat/Scripts/.config/downloader/downloader_latest.zip"
 CACERT_PEM="/etc/ssl/certs/cacert.pem"
 
 if (( $(date +%Y) < 2000 )) ; then
