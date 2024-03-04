@@ -131,8 +131,7 @@ download_file() {
     exit 1
 }
 
-echo "Running MiSTer Downloader"
-echo
+echo -n "Running MiSTer Downloader"
 
 rm ${SCRIPT_PATH} 2> /dev/null || true
 
@@ -143,12 +142,13 @@ if [ -s "${LATEST_SCRIPT_PATH}" ] ; then
     fi
 else
     download_file "${SCRIPT_PATH}" "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/dont_download.sh"
+    echo -n "!"
 fi
 
-chmod +x "${SCRIPT_PATH}"
-
+echo ; echo
 export DOWNLOADER_LAUNCHER_PATH="${BASH_SOURCE[0]}"
 
+chmod +x "${SCRIPT_PATH}"
 if ! "${SCRIPT_PATH}" ; then
     echo -e "Downloader failed!\n"
     exit 1
