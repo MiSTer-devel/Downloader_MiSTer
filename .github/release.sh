@@ -21,8 +21,12 @@ if [ ${CHANGES} -ge 1 ] ; then
     sleep 15s
   fi
 
+  md5sum "dont_download.zip" > "dont_download.zip.md5"
+
   gh release upload "latest" "dont_download.zip" --clobber
+  gh release upload "latest" "dont_download.zip.md5" --clobber
   gh release upload "latest" "src/downloader.zip" --clobber
+
   echo
   echo "New dont_download.sh can be used."
   echo "::set-output name=NEW_RELEASE::yes"
