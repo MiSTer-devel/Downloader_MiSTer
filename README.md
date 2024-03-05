@@ -119,7 +119,7 @@ You can use a different INI file by renaming the launcher `downloader.sh` to you
 
 This flexibility allows for various use cases, such as running a specific database in isolation.
 
-### Avoid executing remote code altogether
+### How to avoid executing remote code altogether
 
 If you're concerned about executing a build that the launcher fetches from the web, you can avoid this by manually installing the latest version of Downloader's build. Just get [this file](https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/dont_download.zip) and save it at `/media/fat/Scripts/.config/downloader/downloader_latest.zip` (remember to rename the file as instructed).
 
