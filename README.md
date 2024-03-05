@@ -123,7 +123,7 @@ This flexibility allows for various use cases, such as running a specific databa
 
 If you're concerned about executing a build that the launcher fetches from the web, you can avoid this by manually installing the latest version of Downloader's build. Just get [this file](https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/dont_download.zip) and save it at `/media/fat/Scripts/.config/downloader/downloader_latest.zip` (remember to rename the file as instructed).
 
-This method ensures that the Downloader launcher will only execute programs that are already installed on your system, which is a bit more secure. If not done manually, the launcher will automatically install that build on its first run, but this auto-installation happens only once.
+If not done manually, the launcher will automatically install that build on its first run. This auto-installation occurs only once and is designed to be secure.
 
 ### Supporters+ shout-out!
 
