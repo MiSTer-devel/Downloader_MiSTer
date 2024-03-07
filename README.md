@@ -121,7 +121,7 @@ This flexibility allows for various use cases, such as running a specific databa
 
 ### How to avoid executing remote code altogether
 
-If you're concerned about executing a build that the launcher fetches from the web, you can avoid this by manually installing the latest version of Downloader's build. Just get [this file](https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/dont_download.zip) and save it at `/media/fat/Scripts/.config/downloader/downloader_latest.zip` (remember to rename the file as instructed).
+If you're concerned about executing a build that the launcher fetches from the web, you can avoid this by manually installing the latest version of Downloader's build. Just get [this file](https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/dont_download.zip) and save it at `/media/fat/Scripts/.config/downloader/downloader_latest.zip` (remember to rename the file as instructed). You can verify the file's integrity using the provided MD5 checksum [here](https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/dont_download.zip.md5).
 
 If not done manually, the launcher will automatically install that build on its first run. This auto-installation occurs only once and is designed to be secure.
 
