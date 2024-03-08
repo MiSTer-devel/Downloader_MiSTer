@@ -15,7 +15,7 @@ lines = diff_output.split('\n')
 changes = [line for line in lines if line.startswith('+') or line.startswith('-')]
 changes = [line for line in changes if not line.startswith('+++') and not line.startswith('---') and 'export COMMIT' not in line]
 
-if int(changes) >= 1:
+if len(changes) >= 1:
     print("There are changes to push:\n")
     print(diff_output)
     print('...\n')
