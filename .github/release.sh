@@ -17,7 +17,7 @@ changes = subprocess.getoutput(f"{diff_cmd} | {filter_cmd} | wc -l")
 if int(changes) >= 1:
     print("There are changes to push:\n")
     print(changes)
-    print()
+    print('...\n')
     subprocess.run(['git', 'push', 'origin', 'main'], check=True)
 
     has_latest = subprocess.run(['gh', 'release', 'list'], capture_output=True, text=True)
