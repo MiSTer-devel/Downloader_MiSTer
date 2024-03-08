@@ -26,7 +26,9 @@ if int(changes) >= 1:
 
     time.sleep(15)
 
-    subprocess.run(['md5sum', 'dont_download.zip', '>', 'dont_download.zip.md5'], shell=True)
+    result = subprocess.run(['md5sum', 'dont_download.zip'], capture_output=True, check=True, text=True)
+    with open('dont_download.zip.md5', 'w') as f:
+        f.write(result.stdout)
 
     subprocess.run(['gh', 'release', 'upload', 'latest', 'dont_download.zip', '--clobber'], check=True)
     subprocess.run(['gh', 'release', 'upload', 'latest', 'dont_download.zip.md5', '--clobber'], check=True)
