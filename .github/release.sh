@@ -10,12 +10,15 @@ subprocess.run(['git', 'commit', '-m', 'BOT: New dont_download.sh'], stdout=subp
 
 subprocess.run(['git', 'fetch', 'origin', 'main'], check=True)
 
-diff_cmd = "git diff main:dont_download.sh origin/main:dont_download.sh"
-filter_cmd = "grep '^[+-]' | grep -v 'export COMMIT' | grep -v '^\+\+\+' | grep -v '^---'"
-changes = subprocess.getoutput(f"{diff_cmd} | {filter_cmd} | wc -l")
+diff_output = subprocess.run(['git', 'diff', 'main:dont_download.sh', 'origin/main:dont_download.sh'], capture_output=True, text=True, check=True).stdout
+lines = diff_output.split('\n')
+changes = [line for line in lines if line.startswith('+') or line.startswith('-')]
+changes = [line for line in changes if not line.startswith('+++') and not line.startswith('---') and 'export COMMIT' not in line]
 
 if int(changes) >= 1:
     print("There are changes to push:\n")
+    print(diff_output)
+    print('...\n')
     print(changes)
     print('...\n')
     subprocess.run(['git', 'push', 'origin', 'main'], check=True)
