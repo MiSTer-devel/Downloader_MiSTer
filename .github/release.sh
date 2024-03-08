@@ -3,6 +3,7 @@
 
 import subprocess
 import os
+import time
 
 subprocess.run(['git', 'add', 'dont_download.sh'], check=True)
 subprocess.run(['git', 'commit', '-m', 'BOT: New dont_download.sh'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
