@@ -16,9 +16,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import distutils
-import distutils.util
-
 
 class IniParser:
     def __init__(self, ini_args):
@@ -31,7 +28,7 @@ class IniParser:
         return self._ini_args.get(key, default).strip('"\' ')
 
     def get_bool(self, key, default):
-        return bool(distutils.util.strtobool(self.get_string(key, 'true' if default else 'false')))
+        return bool(strtobool(self.get_string(key, 'true' if default else 'false')))
 
     def get_int(self, key, default):
         result = self.get_string(key, None)
@@ -65,3 +62,13 @@ def to_int(n, default):
         if isinstance(default, Exception):
             raise default
         return default
+
+
+def strtobool(val: str):
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return 1
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return 0
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
