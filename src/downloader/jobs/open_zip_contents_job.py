@@ -44,5 +44,7 @@ class OpenZipContentsJob(Job):
     get_file_job: GetFileJob
     downloaded_files: List[str] = field(default_factory=list)
     failed_files: List[str] = field(default_factory=list)
+    filtered_files: Dict[str, Any] = field(default_factory=dict)
+    filtered_folders: Dict[str, Any] = field(default_factory=dict)
 
     def retry_job(self): return self.get_file_job

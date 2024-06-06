@@ -93,6 +93,7 @@ class InstallationReport(abc.ABC):
     def wrong_db_options(self) -> List[WrongDatabaseOptions]: """Databases that have been unprocessed because of their database."""
     def installed_zip_indexes(self) -> Iterable[Tuple[str, str, Index, Dict[str, Any]]]: """Zip indexes that have been installed and need to be updated in the store."""
     def skipped_updated_files(self) -> List[str]: """File with an available update that didn't get updated because it has override false in its file description."""
+    def filtered_zip_data(self) -> Dict[str, Any]: """Filtered zip data that has been processed."""
 
 
 class InstallationReportImpl(InstallationReport):
@@ -107,12 +108,18 @@ class InstallationReportImpl(InstallationReport):
         self._processed_files: Dict[str, ProcessedFile] = {}
         self._installed_zip_indexes: List[Tuple[str, str, Index, Dict[str, Any]]] = []
         self._installed_folders: Set[str] = set()
+        self._filtered_zip_data: List[Tuple[str, str, Dict[str, Any], Dict[str, Any]]] = []
 
     def add_downloaded_file(self, path: str): self._downloaded_files.append(path)
     def add_installed_zip_index(self, db_id: str, zip_id: str, index: Index, description: Dict[str, Any]): self._installed_zip_indexes.append((db_id, zip_id, index, description))
     def add_already_present_file(self, path: str): self._already_present_files.append(path)
     def add_file_fetch_started(self, path: str): self._fetch_started_files.append(path)
     def add_failed_file(self, path: str): self._failed_files.append(path)
+
+    def add_filtered_zip_data(self, db_id: str, zip_id: str, files: Dict[str, Any], folders: Dict[str, Any]) -> None:
+        if len(files) == 0 and len(folders) == 0: return
+        self._filtered_zip_data.append((db_id, zip_id, files, folders))
+
     def add_failed_db_options(self, exception: WrongDatabaseOptions): self._failed_db_options.append(exception)
     def add_removed_file(self, path: str): self._removed_files.append(path)
     def add_installed_folder(self, path: str): self._installed_folders.add(path)
@@ -132,6 +139,7 @@ class InstallationReportImpl(InstallationReport):
     def wrong_db_options(self): return self._failed_db_options
     def installed_zip_indexes(self): return self._installed_zip_indexes
     def skipped_updated_files(self): return self._skipped_updated_files
+    def filtered_zip_data(self): return self._filtered_zip_data
 
 
 class FileDownloadProgressReporter(ProgressReporter):
@@ -205,6 +213,8 @@ class FileDownloadProgressReporter(ProgressReporter):
                 self._report.add_downloaded_file(file)
             for file in job.failed_files:
                 self._report.add_failed_file(file)
+
+            self._report.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_files, job.filtered_folders)
 
         self._remove_in_progress(job)
 

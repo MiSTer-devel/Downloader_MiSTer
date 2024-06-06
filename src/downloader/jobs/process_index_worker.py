@@ -113,7 +113,7 @@ class ProcessIndexWorker(DownloaderWorker):
 
         logger.bench('Filtering Database...')
         filtered_summary, _ = FileFilterFactory(self._ctx.logger)\
-            .create(db, config)\
+            .create(db, summary, config)\
             .select_filtered_files(summary)
 
         logger.bench('Translating paths...')
