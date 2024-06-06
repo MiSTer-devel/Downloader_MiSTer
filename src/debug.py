@@ -23,6 +23,7 @@ def run_build(**kwargs): send_build(**kwargs), exec_ssh(f'/media/fat/downloader.
 def run_launcher(**kwargs): send_build(**kwargs), exec_ssh(f'/media/fat/Scripts/downloader.sh', **kwargs)
 def store_push(**kwargs): scp_file('downloader.json', '/media/fat/Scripts/.config/downloader/downloader.json', **kwargs)
 def store_pull(**kwargs): scp_file('/media/fat/Scripts/.config/downloader/downloader.json', 'downloader.json', **kwargs)
+def log_pull(**kwargs): scp_file('/media/fat/Scripts/.config/downloader/downloader.log', 'downloader.log', **kwargs)
 
 
 def send_build(env=None, **kwargs):
@@ -42,6 +43,7 @@ def run_operation(op, env=None, retries=False):
     {
         'store_push': lambda: store_push(retries=retries),
         'store_pull': lambda: store_pull(retries=retries),
+        'log_pull': lambda: log_pull(retries=retries),
         'run': lambda: run_build(env=env, retries=retries),
         'launcher': lambda: run_launcher(env=env, retries=retries)
     }.get(op, lambda: [send_build(env=env, retries=retries), print('OK')])()
@@ -58,7 +60,7 @@ def _ssh_pass(cmd, args, out=None, retries=True):
 
 def _main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', choices=['store_push', 'store_pull', 'run', 'launcher'], nargs='?', default=None)
+    parser.add_argument('command', choices=['store_push', 'store_pull', 'log_pull', 'run', 'launcher'], nargs='?', default=None)
     parser.add_argument('parameter', nargs='?', default='')
     run_operation(parser.parse_args().command)
 
