@@ -278,6 +278,22 @@ class _WriteOnlyStoreAdapter:
 
             self._top_wrapper.mark_force_save()
 
+    def add_filtered_zip_data(self, zip_id: str, files: Dict[str, Any], folders: Dict[str, Any]):
+        if 'filtered_zip_data' not in self._store:
+            self._store['filtered_zip_data'] = {}
+
+        filtered_zip_data = {zip_id: {'files': files, 'folders': folders}}
+        if 'filtered_zip_data' in self._store and equal_dicts(self._store['filtered_zip_data'], filtered_zip_data):
+            return
+
+        if zip_id not in self._store['filtered_zip_data']:
+            self._store['filtered_zip_data'][zip_id] = {'files': {}, 'folders': {}}
+
+        self._store['filtered_zip_data'][zip_id]['files'].update(files)
+        self._store['filtered_zip_data'][zip_id]['folders'].update(folders)
+
+        self._top_wrapper.mark_force_save()
+
     def add_zip_index(self, zip_id: str, index: Index, description: Dict[str, Any]):
         if zip_id in self._store['zips']:
             if not are_zip_descriptions_equal(self._store['zips'][zip_id], description):
