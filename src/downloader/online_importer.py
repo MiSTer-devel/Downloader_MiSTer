@@ -24,6 +24,7 @@ from downloader.constants import K_BASE_PATH, K_ZIP_FILE_COUNT_THRESHOLD,\
 from downloader.file_filter import BadFileFilterPartException
 from downloader.file_system import FolderCreationError, ReadOnlyFileSystem, UnlinkTemporaryException, FileCopyError
 from downloader.free_space_reservation import FreeSpaceReservation
+from downloader.jobs.index import Index
 from downloader.other import UnreachableException, calculate_url
 
 
@@ -468,7 +469,7 @@ class OnlineImporter:
 
     def _create_file_filter(self, db, config):
         try:
-            return self._file_filter_factory.create(db, config)
+            return self._file_filter_factory.create(db, Index(db.files, db.folders, db.base_files_url), config)
         except BadFileFilterPartException as e:
             raise WrongDatabaseOptions(
                 "Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e)))
