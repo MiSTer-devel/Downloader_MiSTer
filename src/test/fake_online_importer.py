@@ -170,6 +170,9 @@ class OnlineImporter(ProductionOnlineImporter):
         for db_id, zip_id, zip_index, zip_description in report.installed_zip_indexes():
             stores[db_id].write_only().add_zip_index(zip_id, zip_index, zip_description)
 
+        for db_id, zip_id, files, folders in report.filtered_zip_data():
+            stores[db_id].write_only().add_filtered_zip_data(zip_id, files, folders)
+
         self.needs_save = local_store.needs_save()
 
         for db, store, _ in self.dbs:

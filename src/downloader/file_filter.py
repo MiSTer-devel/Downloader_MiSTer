@@ -77,6 +77,7 @@ class FileFilter:
 
     def select_filtered_files(self, summary: Index) -> Tuple[Index, ZipData]:
         filtered_zip_data: ZipData = {}
+        #return summary, filtered_zip_data
 
         if self._filter_calculator is None:
             return summary, filtered_zip_data
@@ -126,13 +127,13 @@ class FileFilterFactory:
         self._unused: Set[str] = set()
         self._used: Set[str] = set()
 
-    def create(self, db: DbEntity, config: Config) -> FileFilter:
-        return FileFilter(self._create_filter_calculator(db, config))
+    def create(self, db: DbEntity, index: Index, config: Config) -> FileFilter:
+        return FileFilter(self._create_filter_calculator(db, index, config))
 
     def unused_filter_parts(self) -> List[str]:
         return list(self._unused - self._used)
 
-    def _create_filter_calculator(self, db: DbEntity, config: Config) -> Optional[FilterCalculator]:
+    def _create_filter_calculator(self, db: DbEntity, index: Index, config: Config) -> Optional[FilterCalculator]:
         if config[K_FILTER] is None or config[K_FILTER] == '':
             self._logger.debug(f'No filter for db {db.db_id}.')
             return None
@@ -179,7 +180,7 @@ class FileFilterFactory:
             if this_part in db.tag_dictionary:
                 this_part = db.tag_dictionary[this_part]
 
-            part_in_db = _part_in_db(this_part, db)
+            part_in_db = _part_in_db(this_part, index)
             if part_in_db:
                 self._used.add(used_term)
             else:
@@ -200,9 +201,9 @@ class FileFilterFactory:
         return FilterCalculatorImpl([] if positive_all else positive, negative)
 
 
-def _part_in_db(this_part: str, db: DbEntity) -> bool:
-    return _part_in_descriptions(this_part, db.files.values())\
-        or _part_in_descriptions(this_part, db.folders.values())
+def _part_in_db(this_part: str, index: Index) -> bool:
+    return _part_in_descriptions(this_part, index.files.values())\
+        or _part_in_descriptions(this_part, index.folders.values())
 
 
 def _part_in_descriptions(this_part: str, descriptions: Iterable[Dict[str, Any]]) -> bool:

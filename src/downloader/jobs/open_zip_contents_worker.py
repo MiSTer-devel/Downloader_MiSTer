@@ -74,11 +74,18 @@ class OpenZipContentsWorker(DownloaderWorker):
         # @TODO: This filtering looks like should be done in a previous step, but the removal of the files should be here. There should be a job.files_to_remove for that
         #        The filtering should be in a previous step because it should be accounted for when determining whether we need to download the contents file or not
         #        which currently happens in ProcessZipWorker.
-        _, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(db, config).select_filtered_files(index)
+        _, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(db, index, config).select_filtered_files(index)
 
-        filtered_files = filtered_zip_data[zip_id]['files'] if zip_id in filtered_zip_data else []
+        if zip_id in filtered_zip_data:
+            for file_path, file_description in filtered_zip_data[zip_id]['files'].items():
+                job.filtered_files[file_path] = file_description
+
+            for folder_path, folder_description in filtered_zip_data[zip_id]['folders'].items():
+                job.filtered_folders[folder_path] = folder_description
+                self._ctx.file_system.remove_non_empty_folder(folder_path)
+
         for pkg in contained_files:
-            if pkg.rel_path in filtered_files:
+            if pkg.rel_path in job.filtered_files:
                 self._ctx.file_system.unlink(pkg.full_path)
             else:
                 job.downloaded_files.append(pkg.rel_path)
