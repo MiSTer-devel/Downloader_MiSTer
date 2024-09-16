@@ -18,6 +18,7 @@
 
 from typing import List
 
+from downloader.job_system import JobSystem
 from downloader.jobs.copy_file_worker import CopyFileWorker
 from downloader.jobs.db_header_job import DbHeaderWorker
 from downloader.jobs.download_db_worker import DownloadDbWorker
@@ -38,7 +39,7 @@ class DownloaderWorkersFactory:
     def __init__(self, ctx: DownloaderWorkerContext):
         self._ctx = ctx
 
-    def prepare_workers(self):
+    def add_workers(self, job_system: JobSystem):
         workers: List[DownloaderWorker] = [
             CopyFileWorker(self._ctx),
             FetchFileWorker(self._ctx),
@@ -54,5 +55,4 @@ class DownloaderWorkersFactory:
             OpenZipIndexWorker(self._ctx),
             OpenZipContentsWorker(self._ctx)
         ]
-        for w in workers:
-            w.initialize()
+        job_system.register_workers((w.job_type_id(), w) for w in workers)

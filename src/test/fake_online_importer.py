@@ -23,7 +23,7 @@ from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.job_system import JobSystem
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
-from downloader.jobs.worker_context import DownloaderWorkerContext, make_downloader_worker_context
+from downloader.jobs.worker_context import make_downloader_worker_context
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
@@ -74,7 +74,7 @@ class OnlineImporter(ProductionOnlineImporter):
         self._job_system = JobSystem(self._report_tracker, logger=logger, max_threads=1, retry_unexpected_exceptions=False)
         external_drives_repository = ExternalDrivesRepository(file_system=self.file_system)
         self._worker_ctx = make_downloader_worker_context(
-            job_system=self._job_system,
+            job_ctx=self._job_system,
             waiter=waiter,
             logger=logger,
             http_gateway=FakeHttpGateway(self._config, network_state or NetworkState()),
@@ -121,14 +121,14 @@ class OnlineImporter(ProductionOnlineImporter):
 
         local_store = LocalStoreWrapper({'dbs': {db.db_id: store for db, store, _ in self.dbs}})
 
-        self._workers_factory.prepare_workers()
+        self._workers_factory.add_workers(self._job_system)
 
         stores = {}
         for db, store, ini_description in self.dbs:
             stores[db.db_id] = local_store.store_by_id(db.db_id)
             self._job_system.push_job(ProcessDbJob(db=db, ini_description=ini_description, store=stores[db.db_id], full_resync=full_resync))
 
-        self._job_system.accomplish_pending_jobs()
+        self._job_system.execute_jobs()
 
         report = self._worker_ctx.file_download_session_logger.report()
         for pkg, dbs in self._worker_ctx.pending_removals.consume_files():

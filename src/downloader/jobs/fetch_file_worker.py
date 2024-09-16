@@ -29,7 +29,7 @@ from http.client import HTTPException
 
 
 class FetchFileWorker(DownloaderWorker):
-    def initialize(self): self._ctx.job_system.register_worker(FetchFileJob.type_id, self)
+    def job_type_id(self) -> int: return FetchFileJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: FetchFileJob) -> Optional[Exception]:
@@ -38,7 +38,7 @@ class FetchFileWorker(DownloaderWorker):
         if error is not None:
             return error
 
-        self._ctx.job_system.push_job(ValidateFileJob(fetch_job=job), priority=1)
+        self._ctx.job_ctx.push_job(ValidateFileJob(fetch_job=job), priority=1)
 
     def _fetch_file(self, file_path: str, description: Dict[str, Any]) -> Optional[FileDownloadError]:
         target_path = self._ctx.file_system.download_target_path(self._ctx.target_path_repository.create_target(file_path, description))
