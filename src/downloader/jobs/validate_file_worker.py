@@ -18,28 +18,35 @@
 
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorker
-from downloader.jobs.errors import FileDownloadException
+from downloader.jobs.errors import FileDownloadError
+from typing import Optional
 
 
 class ValidateFileWorker(DownloaderWorker):
     def initialize(self): self._ctx.job_system.register_worker(ValidateFileJob.type_id, self)
-    def reporter(self): return self._ctx.file_download_reporter
+    def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ValidateFileJob):
+    def operate_on(self, job: ValidateFileJob) -> Optional[Exception]:
         file_path, file_hash, hash_check = job.fetch_job.path, job.fetch_job.description['hash'], job.fetch_job.hash_check
-        self._validate_file(file_path, file_hash, hash_check)
+        error = self._validate_file(file_path, file_hash, hash_check)
+        if error is not None:
+            return error
+
         if job.fetch_job.after_validation is not None:
             self._ctx.job_system.push_job(job.fetch_job.after_validation)
 
-    def _validate_file(self, file_path: str, file_hash: str, hash_check: bool):
-        target_path = self._ctx.target_path_repository.access_target(file_path)
-        if not self._ctx.file_system.is_file(target_path, use_cache=False):
-            self._ctx.target_path_repository.clean_target(file_path)
-            raise FileDownloadException(f'Missing {file_path}')
+    def _validate_file(self, file_path: str, file_hash: str, hash_check: bool) -> Optional[Exception]:
+        try:
+            target_path = self._ctx.target_path_repository.access_target(file_path)
+            if not self._ctx.file_system.is_file(target_path, use_cache=False):
+                self._ctx.target_path_repository.clean_target(file_path)
+                return FileDownloadError(f'Missing {file_path}')
 
-        path_hash = self._ctx.file_system.hash(target_path)
-        if hash_check and path_hash != file_hash:
-            self._ctx.target_path_repository.clean_target(file_path)
-            raise FileDownloadException(f'Bad hash on {file_path} ({file_hash} != {path_hash})')
+            path_hash = self._ctx.file_system.hash(target_path)
+            if hash_check and path_hash != file_hash:
+                self._ctx.target_path_repository.clean_target(file_path)
+                return FileDownloadError(f'Bad hash on {file_path} ({file_hash} != {path_hash})')
 
-        self._ctx.target_path_repository.finish_target(file_path)
+            self._ctx.target_path_repository.finish_target(file_path)
+        except BaseException as e:
+            return FileDownloadError(f'Exception during validation! {file_path}: {str(e)}')

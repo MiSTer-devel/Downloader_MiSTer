@@ -17,23 +17,31 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.jobs.copy_file_job import CopyFileJob
-from downloader.jobs.errors import FileCopyException
+from downloader.jobs.errors import FileCopyError
 from downloader.jobs.worker_context import DownloaderWorker
+from typing import Optional
 
 
 class CopyFileWorker(DownloaderWorker):
     def initialize(self): self._ctx.job_system.register_worker(CopyFileJob.type_id, self)
-    def reporter(self): return self._ctx.file_download_reporter
+    def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: CopyFileJob):
-        self._copy_file(source=job.source, temp_path=job.temp_path, info=job.info)
-        if job.after_job is not None: self._ctx.job_system.push_job(job.after_job)
+    def operate_on(self, job: CopyFileJob) -> Optional[FileCopyError]:
+        error = self._copy_file(source=job.source, temp_path=job.temp_path, info=job.info)
+        if error is not None:
+            return error
 
-    def _copy_file(self, source: str, temp_path: str, info: str):
-        if not source.startswith("/"):
-            source = self._ctx.file_system.resolve(source)
+        if job.after_job is not None:
+            self._ctx.job_system.push_job(job.after_job)
 
-        self._ctx.file_system.copy(source, temp_path)
+    def _copy_file(self, source: str, temp_path: str, info: str) -> Optional[FileCopyError]:
+        try:
+            if not source.startswith("/"):
+                source = self._ctx.file_system.resolve(source)
 
-        if not self._ctx.file_system.is_file(temp_path, use_cache=False):
-            raise FileCopyException(f'Missing {info}')
+            self._ctx.file_system.copy(source, temp_path)
+
+            if not self._ctx.file_system.is_file(temp_path, use_cache=False):
+                return FileCopyError(f'Missing {info}')
+        except BaseException as e:
+            return FileCopyError(f'Exception during copy! {info}: {str(e)}')
