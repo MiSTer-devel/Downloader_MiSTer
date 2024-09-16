@@ -27,7 +27,7 @@ from downloader.jobs.worker_context import DownloaderWorker
 
 
 class DownloadDbWorker(DownloaderWorker):
-    def initialize(self): self._ctx.job_system.register_worker(DownloadDbJob.type_id, self)
+    def job_type_id(self) -> int: return DownloadDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: DownloadDbJob):
@@ -41,7 +41,7 @@ class DownloadDbWorker(DownloaderWorker):
             full_resync=job.full_resync,
             get_file_job=get_file_job
         )
-        self._ctx.job_system.push_job(get_file_job)
+        self._ctx.job_ctx.push_job(get_file_job)
 
     def _get_db_description_from_ini_section(self, ini_section: str, ini_description: Dict[str, str]) -> tuple[str, str]:
         db_url = ini_description[K_DB_URL]

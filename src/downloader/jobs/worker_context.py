@@ -24,7 +24,7 @@ from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
 from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
-from downloader.job_system import JobSystem, Worker, ProgressReporter
+from downloader.job_system import Worker, ProgressReporter, JobContext
 from downloader.jobs.path_package import PathPackage
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
 from downloader.logger import Logger
@@ -35,7 +35,7 @@ from downloader.waiter import Waiter
 
 @dataclass
 class DownloaderWorkerContext:
-    job_system: JobSystem
+    job_ctx: JobContext
     http_gateway: HttpGateway
     logger: Logger
     target_path_repository: TargetPathRepository
@@ -51,9 +51,9 @@ class DownloaderWorkerContext:
     pending_removals: 'PendingRemovals'
 
 
-def make_downloader_worker_context(job_system: JobSystem, http_gateway: HttpGateway, logger: Logger, target_path_repository: TargetPathRepository, file_system: FileSystem, waiter: Waiter, progress_reporter: ProgressReporter, file_download_session_logger: FileDownloadSessionLogger, installation_report: InstallationReportImpl, free_space_reservation: FreeSpaceReservation, external_drives_repository: ExternalDrivesRepository, target_paths_calculator_factory: TargetPathsCalculatorFactory, config: Dict[str, Any]) -> DownloaderWorkerContext:
+def make_downloader_worker_context(job_ctx: JobContext, http_gateway: HttpGateway, logger: Logger, target_path_repository: TargetPathRepository, file_system: FileSystem, waiter: Waiter, progress_reporter: ProgressReporter, file_download_session_logger: FileDownloadSessionLogger, installation_report: InstallationReportImpl, free_space_reservation: FreeSpaceReservation, external_drives_repository: ExternalDrivesRepository, target_paths_calculator_factory: TargetPathsCalculatorFactory, config: Dict[str, Any]) -> DownloaderWorkerContext:
     return DownloaderWorkerContext(
-        job_system=job_system,
+        job_ctx=job_ctx,
         http_gateway=http_gateway,
         logger=logger,
         target_path_repository=target_path_repository,
@@ -75,8 +75,8 @@ class DownloaderWorker(Worker):
         self._ctx = ctx
 
     @abstractmethod
-    def initialize(self):
-        """Initialize the worker"""
+    def job_type_id(self) -> int:
+        """Returns the type id of the job this worker operates on."""
 
 
 class PendingRemovals:
