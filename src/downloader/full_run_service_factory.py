@@ -96,7 +96,7 @@ class FullRunServiceFactory:
         linux_updater = LinuxUpdater(config, system_file_system, file_downloader_factory, self._logger)
 
         workers_factory = DownloaderWorkersFactory(make_downloader_worker_context(
-            job_system=job_system,
+            job_ctx=job_system,
             waiter=waiter,
             logger=self._logger,
             http_gateway=http_gateway,

@@ -38,7 +38,7 @@ class ProcessDbWorker(DownloaderWorker):
         self._lock = threading.Lock()
         self._full_partitions: Set[str] = set()
 
-    def initialize(self): self._ctx.job_system.register_worker(ProcessDbJob.type_id, self)
+    def job_type_id(self) -> int: return ProcessDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: ProcessDbJob):
@@ -57,14 +57,14 @@ class ProcessDbWorker(DownloaderWorker):
 
             job.store.write_only().remove_zip_id(zip_id)
 
-        self._ctx.job_system.wait_for_jobs_with_tags(job_tags)
+        self._ctx.job_ctx.wait_for_jobs_with_tags(job_tags)
 
         for file_info in self._ctx.file_download_session_logger.report().failed_files():
             zip_dispatcher.try_push_summary_job_if_recovery_is_needed(file_info)
 
-        self._ctx.job_system.wait_for_jobs_with_tags(job_tags)
+        self._ctx.job_ctx.wait_for_jobs_with_tags(job_tags)
 
-        self._ctx.job_system.push_job(ProcessIndexJob(
+        self._ctx.job_ctx.push_job(ProcessIndexJob(
             db=job.db,
             ini_description=job.ini_description,
             config=config,
@@ -130,7 +130,7 @@ class _ZipJobDispatcher:
         self.push_process_zip_job(z, zip_index=index, has_new_zip_index=False)
 
     def push_process_zip_job(self, z: ZipJobContext, zip_index: Dict[str, Any], has_new_zip_index: bool):
-        self._ctx.job_system.push_job(make_process_zip_job(
+        self._ctx.job_ctx.push_job(make_process_zip_job(
             zip_id=z.zip_id,
             zip_description=z.zip_description,
             zip_index=zip_index,
@@ -144,5 +144,5 @@ class _ZipJobDispatcher:
 
     def push_get_zip_index_and_open_jobs(self, z: ZipJobContext, file_description: Dict[str, Any]) -> str:
         job, info = make_open_zip_index_job(z, file_description)
-        self._ctx.job_system.push_job(job)
+        self._ctx.job_ctx.push_job(job)
         return info

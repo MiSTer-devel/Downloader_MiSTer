@@ -117,7 +117,7 @@ class FullRunService:
         #     ))
         #
         # self._logger.print()
-        # self._job_system.accomplish_pending_jobs()
+        # self._job_system.execute_jobs()
         # failed_dbs = []
 
         databases, failed_dbs = self._db_gateway.fetch_all(self._config[K_DATABASES])

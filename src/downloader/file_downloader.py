@@ -29,7 +29,7 @@ from downloader.job_system import JobSystem
 from downloader.jobs.db_header_job import DbHeaderJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
-from downloader.jobs.worker_context import DownloaderWorkerContext, make_downloader_worker_context
+from downloader.jobs.worker_context import make_downloader_worker_context
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.logger import DebugOnlyLoggerDecorator
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
@@ -53,7 +53,7 @@ class FileDownloaderFactory:
         file_system = self._file_system_factory.create_for_config(config)
         target_path_repository = TargetPathRepository(config, file_system)
         workers_factory = DownloaderWorkersFactory(make_downloader_worker_context(
-            job_system=self._job_system,
+            job_ctx=self._job_system,
             waiter=self._waiter,
             logger=self._logger,
             http_gateway=self._http_gateway,
@@ -150,7 +150,7 @@ class FileDownloader:
                 skip_files.append(file_path)
 
         self._check_downloaded_files(skip_files)
-        self._workers_factory.prepare_workers()
+        self._workers_factory.add_workers(self._job_system)
         for path in files_to_download:
             description = self._queued_files[path]
 
@@ -166,7 +166,7 @@ class FileDownloader:
                     hash_check=self._hash_check
                 ))
         self._file_session_logger.start_session()
-        self._job_system.accomplish_pending_jobs()
+        self._job_system.execute_jobs()
 
         self._check_downloaded_files(self._file_session_logger.report().downloaded_files())
         self._file_session_logger.print_pending()

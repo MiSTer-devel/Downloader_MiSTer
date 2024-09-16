@@ -89,7 +89,7 @@ class FullRunService(ProductionFullRunService):
                          importer_command_factory or ImporterCommandFactory(config),
                          job_system,
                          DownloaderWorkersFactory(make_downloader_worker_context(
-                             job_system=job_system,
+                             job_ctx=job_system,
                              waiter=NoWaiter(),
                              logger=NoLogger(),
                              http_gateway=FakeHttpGateway(config=config, network_state=NetworkState()),
