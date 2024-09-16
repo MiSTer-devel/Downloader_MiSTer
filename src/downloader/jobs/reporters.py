@@ -16,13 +16,10 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import socket
 import abc
 import dataclasses
 import time
-from http.client import HTTPException
 from typing import Dict, Optional, Tuple, List, Any, Iterable, Set
-from urllib.error import URLError
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import BadFileFilterPartException
@@ -34,7 +31,6 @@ from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.errors import GetFileException
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.online_importer import WrongDatabaseOptions
@@ -142,7 +138,29 @@ class InstallationReportImpl(InstallationReport):
     def filtered_zip_data(self): return self._filtered_zip_data
 
 
-class FileDownloadProgressReporter(ProgressReporter):
+class FileDownloadSessionLogger:
+    @abc.abstractmethod
+    def start_session(self):
+        '''Starts a new session.'''
+
+    @abc.abstractmethod
+    def print_progress_line(self, line):
+        '''Prints a progress line.'''
+
+    @abc.abstractmethod
+    def print_pending(self):
+        '''Prints pending progress.'''
+
+    @abc.abstractmethod
+    def print_header(self, db: DbEntity, nothing_to_download: bool = False):
+        '''Prints a header.'''
+
+    @abc.abstractmethod
+    def report(self) -> InstallationReport:
+        '''Returns the report.'''
+
+
+class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
 
     def __init__(self, logger: Logger, waiter: Waiter, report: InstallationReportImpl):
         self._logger = logger
@@ -160,9 +178,6 @@ class FileDownloadProgressReporter(ProgressReporter):
 
     def _deactivate(self):
         self._deactivated = True
-
-    def is_active(self) -> bool:
-        return len(self._active_jobs) > 0 and not self._deactivated
 
     def report(self) -> InstallationReport:
         return self._report
@@ -292,55 +307,28 @@ class FileDownloadProgressReporter(ProgressReporter):
             self._report.add_failed_db_options(
                 WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(exception)}' is invalid.")
             )
-        result = self._file_source_from_job(job)
-        if result is not None:
-            _, path = result
+        path = self._file_path_from_job(job)
+        if path is not None:
             self._report.add_failed_file(path)
         self.notify_job_retried(job, exception)
 
     def notify_job_retried(self, job: Job, exception: BaseException):
-        self._logger.debug(self._message_from_exception(job, exception))
         self._logger.debug(exception)
         self._symbols.append('~')
         self._print_symbols()
         self._remove_in_progress(job)
 
-    def _file_source_from_job(self, job: Job) -> Optional[Tuple[str, str]]:
+    def _file_path_from_job(self, job: Job) -> Optional[str]:
         if isinstance(job, ValidateFileJob):
             job = job.fetch_job
         elif isinstance(job, ValidateFileJob2):
             job = job.get_file_job
         if isinstance(job, FetchFileJob):
-            source, path = job.description.get('url', None) or '', job.path
+            return job.path
         elif isinstance(job, GetFileJob):
-            source, path = job.source, job.info
+            return job.info
         else:
             return None
-        return source, path
-
-    def _message_from_exception(self, job: Job, exception: BaseException):
-        result = self._file_source_from_job(job)
-        if result is None:
-            return str(exception)
-
-        source, path = result
-
-        try:
-            raise exception
-        except socket.gaierror as e:
-            return f'Socket Address Error! {source}: {str(e)}'
-        except URLError as e:
-            return f'URL Error! {source}: {e.reason}'
-        except HTTPException as e:
-            return f'HTTP Error {type(e).__name__}! {source}: {str(e)}'
-        except ConnectionResetError as e:
-            return f'Connection reset error! {source}: {str(e)}'
-        except OSError as e:
-            return f'OS Error! {source}: {e.errno} {str(e)}'
-        except GetFileException as e:
-            return str(e)
-        except BaseException as e:
-            return f'Exception during download! {source}: {str(e)}'
 
     def _remove_in_progress(self, job: Job):
         self._active_jobs[job.type_id] = self._active_jobs.get(job.type_id, 0) - 1

@@ -16,29 +16,49 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from downloader.constants import K_DOWNLOADER_TIMEOUT
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorker
-from downloader.jobs.errors import FileDownloadException
+from downloader.jobs.errors import FileDownloadError
+import socket
+from urllib.error import URLError
+from http.client import HTTPException
 
 
 class FetchFileWorker(DownloaderWorker):
     def initialize(self): self._ctx.job_system.register_worker(FetchFileJob.type_id, self)
-    def reporter(self): return self._ctx.file_download_reporter
+    def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: FetchFileJob):
+    def operate_on(self, job: FetchFileJob) -> Optional[Exception]:
         file_path, description = job.path, job.description
-        self._fetch_file(file_path, description)
+        error = self._fetch_file(file_path, description)
+        if error is not None:
+            return error
+
         self._ctx.job_system.push_job(ValidateFileJob(fetch_job=job), priority=1)
 
-    def _fetch_file(self, file_path: str, description: Dict[str, Any]):
+    def _fetch_file(self, file_path: str, description: Dict[str, Any]) -> Optional[FileDownloadError]:
         target_path = self._ctx.file_system.download_target_path(self._ctx.target_path_repository.create_target(file_path, description))
-        with self._ctx.http_gateway.open(description['url']) as (final_url, in_stream):
-            description['url'] = final_url
-            if in_stream.status != 200:
-                raise FileDownloadException(f'Bad http status! {file_path}: {in_stream.status}')
+        try:
+            with self._ctx.http_gateway.open(description['url']) as (final_url, in_stream):
+                description['url'] = final_url
+                if in_stream.status != 200:
+                    return FileDownloadError(f'Bad http status! {file_path}: {in_stream.status}')
 
-            self._ctx.file_system.write_incoming_stream(in_stream, target_path, timeout=self._ctx.config[K_DOWNLOADER_TIMEOUT])
+                self._ctx.file_system.write_incoming_stream(in_stream, target_path, timeout=self._ctx.config[K_DOWNLOADER_TIMEOUT])
+
+        except socket.gaierror as e:
+            return FileDownloadError(f'Socket Address Error! {description["url"]}: {str(e)}')
+        except URLError as e:
+            return FileDownloadError(f'URL Error! {description["url"]}: {e.reason}')
+        except HTTPException as e:
+            return FileDownloadError(f'HTTP Error {type(e).__name__}! {description["url"]}: {str(e)}')
+        except ConnectionResetError as e:
+            return FileDownloadError(f'Connection reset error! {description["url"]}: {str(e)}')
+        except OSError as e:
+            return FileDownloadError(f'OS Error! {description["url"]}: {e.errno} {str(e)}')
+        except BaseException as e:
+            return FileDownloadError(f'Exception during download! {description["url"]}: {str(e)}')

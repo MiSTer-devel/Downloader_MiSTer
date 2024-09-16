@@ -16,12 +16,12 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, List, Set, Tuple
+from typing import Dict, Any, List, Set, Tuple, Optional
 from pathlib import Path
 import threading
 
 from downloader.db_entity import DbEntity
-from downloader.file_filter import FileFilterFactory
+from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
 from downloader.file_system import ReadOnlyFileSystem
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.path_package import PathPackage
@@ -32,6 +32,7 @@ from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerCon
 from downloader.constants import K_BASE_PATH, PathType, FILE_MiSTer, FILE_MiSTer_old
 from downloader.local_store_wrapper import StoreWrapper, NO_HASH_IN_STORE_CODE
 from downloader.other import calculate_url
+from downloader.storage_priority_resolver import StoragePriorityError
 
 _CheckFilePackage = PathPackage
 _FetchFilePackage = PathPackage
@@ -48,15 +49,20 @@ class ProcessIndexWorker(DownloaderWorker):
         self._full_partitions: Set[str] = set()
 
     def initialize(self): self._ctx.job_system.register_worker(ProcessIndexJob.type_id, self)
-    def reporter(self): return self._ctx.file_download_reporter
+    def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ProcessIndexJob):
+    def operate_on(self, job: ProcessIndexJob) -> Optional[Exception]:
         logger = self._ctx.logger
         db, config, summary, store, full_resync = job.db, job.config, job.index, job.store, job.full_resync
         base_files_url = job.db.base_files_url
 
         logger.debug(f"Processing db '{db.db_id}'...")
-        check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs = self._process_index(config, summary, db, store)
+        try:
+            check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs = self._process_index(config, summary, db, store)
+        except BadFileFilterPartException as e:
+            return e
+        except StoragePriorityError as e:
+            return e
 
         logger.debug(f"Processing check file packages '{db.db_id}'...")
         fetch_pkgs, validate_pkgs = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
@@ -64,7 +70,7 @@ class ProcessIndexWorker(DownloaderWorker):
         logger.debug(f"Processing validate file packages '{db.db_id}'...")
         fetch_pkgs.extend(self._process_validate_packages(validate_pkgs, store))
 
-        self._ctx.file_download_reporter.print_header(db, nothing_to_download=len(fetch_pkgs) == 0)
+        self._ctx.file_download_session_logger.print_header(db, nothing_to_download=len(fetch_pkgs) == 0)
 
         logger.debug(f"Reserving space '{db.db_id}'...")
         if not self._try_reserve_space(fetch_pkgs):
@@ -170,7 +176,7 @@ class ProcessIndexWorker(DownloaderWorker):
                     non_duplicated_pkgs.append(pkg)
 
         for file_path in duplicated_files:
-            self._ctx.file_download_reporter.print_progress_line(f'DUPLICATED: {file_path} [using {self._ctx.installation_report.processed_file(file_path).db_id} instead]')
+            self._ctx.file_download_session_logger.print_progress_line(f'DUPLICATED: {file_path} [using {self._ctx.installation_report.processed_file(file_path).db_id} instead]')
 
         fetch_pkgs: List[_FetchFilePackage] = []
         validate_pkgs: List[_ValidateFilePackage] = []
@@ -195,7 +201,7 @@ class ProcessIndexWorker(DownloaderWorker):
             # @TODO: Parallelize the slow hash calculations
             if read_only_store.hash_file(pkg.rel_path) == NO_HASH_IN_STORE_CODE and file_system.hash(pkg.full_path) == pkg.description['hash']:
                 with self._lock:
-                    self._ctx.file_download_reporter.print_progress_line(f'No changes: {pkg.rel_path}')
+                    self._ctx.file_download_session_logger.print_progress_line(f'No changes: {pkg.rel_path}')
                     self._ctx.installation_report.add_already_present_file(pkg.rel_path)
                 continue
 
@@ -224,7 +230,7 @@ class ProcessIndexWorker(DownloaderWorker):
             full_partitions = self._ctx.free_space_reservation.get_full_partitions()
             if len(full_partitions) > 0:
                 for partition in full_partitions:
-                    self._ctx.file_download_reporter.print_progress_line(f"Partition {partition.partition_path} would get full!")
+                    self._ctx.file_download_session_logger.print_progress_line(f"Partition {partition.partition_path} would get full!")
                     self._full_partitions.add(partition.partition_path)
 
                 for pkg in fetch_pkgs:

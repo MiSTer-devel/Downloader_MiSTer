@@ -116,6 +116,14 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         self.system.accomplish_pending_jobs()
         self.assertReports(started={1: 4}, retried={1: 3}, failed={1: 1})
 
+    def test_failed___when_job_raises_exception___reports_bubbles_up_the_exception(self):
+        self.system.register_worker(1, TestWorker(self.system))
+        self.system.push_job(TestJob(1, raises=1))
+        with self.assertRaises(Exception) as context:
+            self.system.accomplish_pending_jobs()
+
+        self.assertIsInstance(context.exception, Exception)
+
     def test_retries___when_job_retries_previous_job___reports_completed_jobs_and_retries(self):
         self.system.register_worker(1, TestWorker(self.system))
         self.system.register_worker(2, TestWorker(self.system))
@@ -210,11 +218,12 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
 class TestJob(Job):
     def __init__(self, type_id: int, next_job: Optional['TestJob'] = None, retry_job: Optional['TestJob'] = None, fails: int = 0, register_worker: Optional[Worker] = None,
-                 cancel_pending_jobs: bool = False):
+                 cancel_pending_jobs: bool = False, raises: bool = False):
         self._type_id = type_id
         self._retry_job = retry_job
         self.next_job = next_job
         self.fails = fails
+        self.raises = raises
         self.register_worker = register_worker
         self.cancel_pending_jobs = cancel_pending_jobs
 
@@ -233,10 +242,13 @@ class TestWorker(Worker):
     def __init__(self, system: JobSystem):
         self.system = system
 
-    def operate_on(self, job: TestJob) -> None:
+    def operate_on(self, job: TestJob) -> Optional[Exception]:
         if job.fails > 0:
             job.fails -= 1
-            raise Exception('Fails!')
+            return Exception('Fails!')
+
+        if job.raises:
+            raise Exception('Raises!')
 
         if job.next_job is not None:
             self.system.push_job(job.next_job)

@@ -28,6 +28,7 @@ from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from test.fake_http_gateway import FakeHttpGateway
+from test.fake_job_system import ProgressReporterTracker
 from test.fake_local_store_wrapper import StoreWrapper, LocalStoreWrapper
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_local_repository import LocalRepository
@@ -69,7 +70,8 @@ class OnlineImporter(ProductionOnlineImporter):
         self.dbs = []
         installation_report = InstallationReportImpl()
         self._file_download_reporter = FileDownloadProgressReporter(logger, waiter, installation_report)
-        self._job_system = JobSystem(self._file_download_reporter, logger=logger, max_threads=1)
+        self._report_tracker = ProgressReporterTracker(self._file_download_reporter)
+        self._job_system = JobSystem(self._report_tracker, logger=logger, max_threads=1, retry_unexpected_exceptions=False)
         external_drives_repository = ExternalDrivesRepository(file_system=self.file_system)
         self._worker_ctx = make_downloader_worker_context(
             job_system=self._job_system,
@@ -78,7 +80,8 @@ class OnlineImporter(ProductionOnlineImporter):
             http_gateway=FakeHttpGateway(self._config, network_state or NetworkState()),
             file_system=self.file_system,
             target_path_repository=None,
-            file_download_reporter=self._file_download_reporter,
+            progress_reporter=self._report_tracker,
+            file_download_session_logger=self._file_download_reporter,
             installation_report=installation_report,
             free_space_reservation=UnlimitedFreeSpaceReservation(),
             external_drives_repository=ExternalDrivesRepository(file_system=self.file_system),
@@ -110,6 +113,10 @@ class OnlineImporter(ProductionOnlineImporter):
     def fs_records(self):
         return self._file_system_factory.records
 
+    @property
+    def jobs_tracks(self):
+        return self._report_tracker.tracks
+
     def download(self, full_resync):
 
         local_store = LocalStoreWrapper({'dbs': {db.db_id: store for db, store, _ in self.dbs}})
@@ -123,7 +130,7 @@ class OnlineImporter(ProductionOnlineImporter):
 
         self._job_system.accomplish_pending_jobs()
 
-        report = self._worker_ctx.file_download_reporter.report()
+        report = self._worker_ctx.file_download_session_logger.report()
         for pkg, dbs in self._worker_ctx.pending_removals.consume_files():
             for db_id in dbs:
                 stores[db_id].write_only().remove_file(pkg.rel_path)
@@ -170,8 +177,19 @@ class OnlineImporter(ProductionOnlineImporter):
         for db_id, zip_id, zip_index, zip_description in report.installed_zip_indexes():
             stores[db_id].write_only().add_zip_index(zip_id, zip_index, zip_description)
 
+        filtered_zip_data = {}
         for db_id, zip_id, files, folders in report.filtered_zip_data():
-            stores[db_id].write_only().add_filtered_zip_data(zip_id, files, folders)
+            if db_id not in filtered_zip_data:
+                filtered_zip_data[db_id] = {}
+
+            if zip_id not in filtered_zip_data[db_id]:
+                filtered_zip_data[db_id][zip_id] = {'files': {}, 'folders': {}}
+
+            filtered_zip_data[db_id][zip_id]['files'].update(files)
+            filtered_zip_data[db_id][zip_id]['folders'].update(folders)
+
+        for db_id, filtered_zip_data_by_db in filtered_zip_data.items():
+            stores[db_id].write_only().save_filtered_zip_data(filtered_zip_data_by_db)
 
         self.needs_save = local_store.needs_save()
 
@@ -200,10 +218,10 @@ class OnlineImporter(ProductionOnlineImporter):
         return store
 
     def correctly_installed_files(self):
-        return self._worker_ctx.file_download_reporter.report().installed_files()
+        return self._worker_ctx.file_download_session_logger.report().installed_files()
 
     def files_that_failed(self):
-        return self._worker_ctx.file_download_reporter.report().failed_files()
+        return self._worker_ctx.file_download_session_logger.report().failed_files()
 
     @staticmethod
     def _clean_store(store):

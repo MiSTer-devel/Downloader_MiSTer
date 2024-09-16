@@ -43,7 +43,8 @@ class FileDownloaderFactory(ProductionFileDownloaderFactory):
             waiter=NoWaiter(),
             logger=NoLogger(),
             job_system=job_system,
-            file_download_reporter=file_download_reporter,
+            file_download_session_logger=file_download_reporter,
+            progress_reporter=file_download_reporter,
             http_gateway=http_gateway,
             free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation(),
             external_drives_repository=external_drives_repository or ExternalDrivesRepository(file_system_factory.create_for_system_scope())

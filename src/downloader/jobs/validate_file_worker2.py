@@ -20,15 +20,15 @@ from pathlib import Path
 from typing import Optional
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.jobs.worker_context import DownloaderWorker
-from downloader.jobs.errors import FileDownloadException
+from downloader.jobs.errors import FileDownloadError
 
 
 class ValidateFileWorker2(DownloaderWorker):
     def initialize(self): self._ctx.job_system.register_worker(ValidateFileJob2.type_id, self)
-    def reporter(self): return self._ctx.file_download_reporter
+    def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ValidateFileJob2):
-        self._validate_file(
+    def operate_on(self, job: ValidateFileJob2) -> Optional[Exception]:
+        error = self._validate_file(
             temp_path=job.temp_path,
             target_file_path=job.target_file_path,
             info=job.info,
@@ -36,16 +36,23 @@ class ValidateFileWorker2(DownloaderWorker):
             backup=job.description.get('backup', None)
         )
 
+        if error is not None:
+            return error
+
         if job.after_job is not None:
             self._ctx.job_system.push_job(job.after_job)
 
-    def _validate_file(self, temp_path: str, target_file_path: str, info: str, file_hash: str, backup: Optional[str]):
-        fs_hash = self._ctx.file_system.hash(temp_path)
-        if fs_hash != file_hash:
-            self._ctx.file_system.unlink(temp_path)
-            raise FileDownloadException(f'Bad hash on {info} ({file_hash} != {fs_hash})')
+    def _validate_file(self, temp_path: str, target_file_path: str, info: str, file_hash: str, backup: Optional[str]) -> Optional[FileDownloadError]:
+        try:
+            fs_hash = self._ctx.file_system.hash(temp_path)
+            if fs_hash != file_hash:
+                self._ctx.file_system.unlink(temp_path)
+                return FileDownloadError(f'Bad hash on {info} ({file_hash} != {fs_hash})')
 
-        if temp_path != target_file_path:
-            if backup is not None and self._ctx.file_system.is_file(target_file_path, use_cache=False):
-                self._ctx.file_system.move(target_file_path, str(Path(target_file_path).parent / backup))
-            self._ctx.file_system.move(temp_path, target_file_path)
+            if temp_path != target_file_path:
+                if backup is not None and self._ctx.file_system.is_file(target_file_path, use_cache=False):
+                    self._ctx.file_system.move(target_file_path, str(Path(target_file_path).parent / backup))
+                self._ctx.file_system.move(temp_path, target_file_path)
+
+        except BaseException as e:
+            return FileDownloadError(f'Exception during validation! {info}: {str(e)}')

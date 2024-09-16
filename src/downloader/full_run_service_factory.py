@@ -89,7 +89,7 @@ class FullRunServiceFactory:
 
         file_filter_factory = FileFilterFactory(self._logger)
         free_space_reservation = LinuxFreeSpaceReservation(logger=self._logger, config=config) if system_file_system.is_file(FILE_MiSTer_version) else UnlimitedFreeSpaceReservation()
-        file_downloader_factory = FileDownloaderFactory(file_system_factory, waiter, self._logger, job_system, file_download_reporter, http_gateway, free_space_reservation, external_drives_repository)
+        file_downloader_factory = FileDownloaderFactory(file_system_factory, waiter, self._logger, job_system, file_download_reporter, file_download_reporter, http_gateway, free_space_reservation, external_drives_repository)
         db_gateway = DbGateway(config, system_file_system, file_downloader_factory, self._logger)
         offline_importer = OfflineImporter(file_system_factory, file_downloader_factory, self._logger)
         online_importer = OnlineImporter(file_filter_factory, file_system_factory, file_downloader_factory, path_resolver_factory, local_repository, external_drives_repository, free_space_reservation, waiter, self._logger)
@@ -103,7 +103,8 @@ class FullRunServiceFactory:
             file_system=system_file_system,
             target_path_repository=None,
             installation_report=installation_report,
-            file_download_reporter=file_download_reporter,
+            progress_reporter=file_download_reporter,
+            file_download_session_logger=file_download_reporter,
             free_space_reservation=free_space_reservation,
             external_drives_repository=external_drives_repository,
             target_paths_calculator_factory=TargetPathsCalculatorFactory(system_file_system, external_drives_repository),
