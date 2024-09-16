@@ -34,7 +34,7 @@ class ProcessZipWorker(DownloaderWorker):
         super().__init__(ctx)
         self._lock = Lock()
 
-    def initialize(self): self._ctx.job_system.register_worker(ProcessZipJob.type_id, self)
+    def job_type_id(self) -> int: return ProcessZipJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: ProcessZipJob):
@@ -47,7 +47,7 @@ class ProcessZipWorker(DownloaderWorker):
         less_accumulated_mbs = total_files_size < (1000 * 1000 * job.config[K_ZIP_ACCUMULATED_MB_THRESHOLD])
 
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
-            self._ctx.job_system.push_job(ProcessIndexJob(
+            self._ctx.job_ctx.push_job(ProcessIndexJob(
                 db=job.db,
                 ini_description=job.ini_description,
                 config=job.config,
@@ -76,4 +76,4 @@ class ProcessZipWorker(DownloaderWorker):
                 return
 
             get_file_job, info = make_open_zip_contents_job(job=job, file_packs=file_packs)
-            self._ctx.job_system.push_job(get_file_job)
+            self._ctx.job_ctx.push_job(get_file_job)

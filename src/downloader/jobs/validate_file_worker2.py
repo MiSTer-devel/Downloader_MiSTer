@@ -24,7 +24,7 @@ from downloader.jobs.errors import FileDownloadError
 
 
 class ValidateFileWorker2(DownloaderWorker):
-    def initialize(self): self._ctx.job_system.register_worker(ValidateFileJob2.type_id, self)
+    def job_type_id(self) -> int: return ValidateFileJob2.type_id
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: ValidateFileJob2) -> Optional[Exception]:
@@ -40,7 +40,7 @@ class ValidateFileWorker2(DownloaderWorker):
             return error
 
         if job.after_job is not None:
-            self._ctx.job_system.push_job(job.after_job)
+            self._ctx.job_ctx.push_job(job.after_job)
 
     def _validate_file(self, temp_path: str, target_file_path: str, info: str, file_hash: str, backup: Optional[str]) -> Optional[FileDownloadError]:
         try:

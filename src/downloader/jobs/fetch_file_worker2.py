@@ -27,7 +27,7 @@ from typing import Optional
 
 
 class FetchFileWorker2(DownloaderWorker):
-    def initialize(self): self._ctx.job_system.register_worker(FetchFileJob2.type_id, self)
+    def job_type_id(self) -> int: return FetchFileJob2.type_id
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: FetchFileJob2) -> Optional[Exception]:
@@ -36,7 +36,7 @@ class FetchFileWorker2(DownloaderWorker):
             return error
 
         if job.after_job is not None:
-            self._ctx.job_system.push_job(job.after_job)
+            self._ctx.job_ctx.push_job(job.after_job)
 
     def _fetch_file(self, url: str, download_path: str, info: str) -> Optional[FileDownloadError]:
         try:

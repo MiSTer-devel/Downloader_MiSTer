@@ -20,19 +20,39 @@ from abc import abstractmethod, ABC
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
+from typing import Dict, Optional, Callable, List, Tuple, Any, Iterable, Protocol
 import sys
 import time
-from typing import Dict, Optional, Callable, List, Tuple, Any, Iterable
 import queue
 import threading
 import signal
 
-from downloader.logger import Logger
 
-_thread_local_storage = threading.local()
+class JobContext(Protocol):
+    """A context for workers to interact with the job system in a thread-safe manner."""
+
+    def push_job(self, job: 'Job', priority: Optional[int] = None) -> None:
+        """Allows a worker to push a new job into the job system."""
+
+    def pending_jobs_amount(self) -> int:
+        """Returns the amount of pending jobs."""
+
+    def cancel_pending_jobs(self) -> None:
+        """Allows a worker to cancel all pending jobs."""
+
+    def wait_for_other_jobs(self) -> None:
+        """Allows a worker to wait for other jobs to progress."""
+
+    def any_tag_active(self, tags: Iterable[str]) -> bool:
+        """Checks if any jobs with the specified tags are currently active."""
+
+    def wait_for_jobs_with_tags(self, tags: Iterable[str]) -> None:
+        """Waits until all jobs with the specified tags have completed."""
 
 
-class JobSystem:
+class JobSystem(JobContext):
+    """Processes jobs through workers concurrently. Workers must use the JobContext interface. Other methods are not thread-safe."""
+
     _next_job_type_id: int = 0
 
     @staticmethod
@@ -40,9 +60,9 @@ class JobSystem:
         JobSystem._next_job_type_id += 1
         return JobSystem._next_job_type_id
 
-    def __init__(self, reporter: 'ProgressReporter', logger: Logger, max_threads: int = 6, max_tries: int = 3, wait_timeout: float = 0.1, max_cycle: int = 3, max_timeout: int = 300, retry_unexpected_exceptions: bool = True):
+    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', max_threads: int = 6, max_tries: int = 3, wait_timeout: float = 0.1, max_cycle: int = 3, max_timeout: int = 300, retry_unexpected_exceptions: bool = True):
         self._reporter: ProgressReporter = reporter
-        self._logger: Logger = logger
+        self._logger: JobSystemLogger = logger
         self._max_threads: int = max_threads
         self._max_tries: int = max_tries
         self._wait_timeout: float = wait_timeout
@@ -55,18 +75,39 @@ class JobSystem:
         self._lock = threading.Lock()
         self._pending_jobs_amount: int = 0
         self._pending_jobs_cancelled: bool = False
-        self._is_accomplishing_jobs: bool = False
+        self._is_executing_jobs: bool = False
         self._tag_dict: Dict[str, int] = defaultdict(int)
         self._jobs_pushed: int = 0
         self._timeout_clock: int = 0
 
-    def pending_jobs_amount(self) -> int:
-        return self._pending_jobs_amount
-
     def register_worker(self, job_id: int, worker: 'Worker') -> None:
-        if self._is_accomplishing_jobs:
-            raise CantRegisterWorkerException('Can not register workers while accomplishing jobs')
-        self._workers[job_id] = worker
+        self.register_workers([(job_id, worker)])
+
+    def register_workers(self, workers: Iterable[Tuple[int, 'Worker']]) -> None:
+        with self._lock:
+            if self._is_executing_jobs:
+                raise CantRegisterWorkerException('Can not register workers while executing jobs')
+
+            for job_id, worker in workers:
+                self._workers[job_id] = worker
+
+    def execute_jobs(self) -> None:
+        with self._lock:
+            if self._is_executing_jobs:
+                raise CantExecuteJobs('Can not call to execute jobs when its already running.')
+
+            self._is_executing_jobs = True
+            self._pending_jobs_cancelled = False
+
+        self._update_timeout_clock()
+        try:
+            if self._max_threads > 1:
+                self._execute_with_threads(self._max_threads)
+            else:
+                self._execute_without_threads()
+        finally:
+            with self._lock:
+                self._is_executing_jobs = False
 
     def push_job(self, job: 'Job', priority: Optional[int] = None) -> None:
         worker = self._get_worker(job)
@@ -81,35 +122,21 @@ class JobSystem:
         ))
         self._increase_jobs_amount(job)
 
+    def pending_jobs_amount(self) -> int:
+        return self._pending_jobs_amount
+
     def cancel_pending_jobs(self) -> None:
         with self._lock: self._pending_jobs_cancelled = True
 
-    def accomplish_pending_jobs(self) -> None:
-        if self._is_accomplishing_jobs:
-            raise CantAccomplishJobs('Can not call to accomplish jobs when its already running.')
-
-        self._is_accomplishing_jobs = True
-        with self._lock: self._pending_jobs_cancelled = False
-        self._update_timeout_clock()
-        try:
-            if self._max_threads > 1:
-                self._accomplish_with_threads(self._max_threads)
-            else:
-                self._accomplish_without_threads()
-        finally:
-            self._is_accomplishing_jobs = False
-
     def wait_for_other_jobs(self):
-        if not self._is_accomplishing_jobs:
-            raise CantWaitWhenNotAccomplishingJobs('Can not wait when not accomplishing jobs')
-
-        if self._job_queue.empty():
-            raise CantAccomplishJobs('Can not wait when there are no pending jobs')
+        with self._lock:
+            if not self._is_executing_jobs:
+                raise CantWaitWhenNotExecutingJobs('Can not wait when not executing jobs')
 
         if self._max_threads > 1:
             time.sleep(self._wait_timeout)
         else:
-            self._no_threads_accomplish_tick()
+            self._no_threads_execute_tick()
 
     def any_tag_active(self, tags: Iterable[str]) -> bool:
         with self._lock:
@@ -131,7 +158,7 @@ class JobSystem:
                 self._tag_dict[tag] += 1
             self._pending_jobs_amount += 1
 
-    def _accomplish_with_threads(self, max_threads: int) -> None:
+    def _execute_with_threads(self, max_threads: int) -> None:
         previous_handler = signal.getsignal(signal.SIGINT)
         try:
             signal.signal(signal.SIGINT, lambda sig, frame: self._sigint_handler(previous_handler, sig, frame))
@@ -162,14 +189,14 @@ class JobSystem:
         finally:
             signal.signal(signal.SIGINT, previous_handler)
 
-    def _accomplish_without_threads(self) -> None:
+    def _execute_without_threads(self) -> None:
         notifications: queue.Queue[Tuple[bool, '_JobPackage']] = queue.Queue()
         while self._pending_jobs_amount > 0 and self._pending_jobs_cancelled is False and self._job_queue.empty() is False:
-            self._no_threads_accomplish_tick()
+            self._no_threads_execute_tick()
 
         self._handle_notifications(notifications)
 
-    def _no_threads_accomplish_tick(self) -> None:
+    def _no_threads_execute_tick(self) -> None:
         package = self._job_queue.get(block=False)
         self._job_queue.task_done()
         if package is not None:
@@ -226,7 +253,7 @@ class JobSystem:
     def _get_worker(self, job: 'Job') -> 'Worker':
         worker = self._workers.get(job.type_id, None)
         if worker is None:
-            raise NoWorkerException(f'No worker registered for job type id {job.type_id}')
+            raise NoWorkerException(f'No worker registered for job type id "{job.type_id}" and name "{job.__class__.__name__}"')
         return worker
 
     def _handle_notifications(self, notification_queue: queue.Queue[Tuple[bool, '_JobPackage']]) -> None:
@@ -256,13 +283,13 @@ class JobSystem:
         if isinstance(e, _JobError):
             self._retry_package(package, e.child)
         elif isinstance(e, JobSystemAbortException):
-            self._logger.print(f'Unexpected system abort while operating on job {package.job.__class__.__name__}: {e}')
+            self._logger.print(f'Unexpected system abort while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
             raise e
         elif isinstance(e, Exception) and self._retry_unexpected_exceptions:
-            self._logger.print(f'Unexpected exception while operating on job {package.job.__class__.__name__}: {e}')
+            self._logger.print(f'Unexpected exception while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
             self._retry_package(package, e)
         else:
-            self._logger.print(f'CRITICAL! Unexpected exception while operating on job {package.job.__class__.__name__}: {e}')
+            self._logger.print(f'CRITICAL! Unexpected exception while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
             raise e
 
     def _cancel_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> None:
@@ -288,7 +315,7 @@ class JobSystem:
         while current is not None:
             seen_value = seen.get(current.job.type_id, 0)
             if seen_value >= self._max_cycle:
-                raise CycleDetectedException(f'Can not push Job {package.job.type_id} because it introduced a cycle of length {seen_value}')
+                raise CycleDetectedException(f'Can not push Job {package.job.type_id}|{package.job.__class__.__name__} because it introduced a cycle of length {seen_value}')
 
             seen[current.job.type_id] = seen_value + 1
             current = current.parent
@@ -329,16 +356,8 @@ class JobSystem:
         return package.worker.reporter() or self._reporter
 
 
-class JobSystemAbortException(Exception): pass
-class CycleDetectedException(JobSystemAbortException): pass
-class NoWorkerException(JobSystemAbortException): pass
-class CantRegisterWorkerException(JobSystemAbortException): pass
-class CantAccomplishJobs(JobSystemAbortException): pass
-class CantWaitWhenNotAccomplishingJobs(JobSystemAbortException): pass
-class ReportException(Exception): pass
-
-
 class Job(ABC):
+    """Base class for defining jobs."""
 
     @property
     @abstractmethod
@@ -353,9 +372,9 @@ class Job(ABC):
         if tags is None:
             tags = list()
             setattr(self, '_tags', tags)
-        elif len(tags) != len(set(tags)):
-            raise CantAccomplishJobs(f'Tag {tag} already added to job {self.type_id}')
         tags.append(tag)
+        if len(tags) != len(set(tags)):
+            raise CantExecuteJobs(f'Tag {tag} already added to job {self.type_id}')
 
     @property
     def tags(self) -> Iterable[str]:
@@ -363,6 +382,8 @@ class Job(ABC):
 
 
 class Worker(ABC):
+    """Abstract base class for defining workers that process jobs."""
+
     @abstractmethod
     def operate_on(self, job: Job) -> Optional[Exception]:
         """Handles the job."""
@@ -373,6 +394,8 @@ class Worker(ABC):
 
 
 class ProgressReporter(ABC):
+    """Abstract base class for reporting progress of jobs."""
+
     @abstractmethod
     def notify_job_started(self, job: Job) -> None:
         """Called when a job is started. Must not throw exceptions."""
@@ -394,6 +417,20 @@ class ProgressReporter(ABC):
         """Called when a job is retried. Must not throw exceptions."""
 
 
+class JobSystemAbortException(Exception): pass
+class CycleDetectedException(JobSystemAbortException): pass
+class NoWorkerException(JobSystemAbortException): pass
+class CantRegisterWorkerException(JobSystemAbortException): pass
+class CantExecuteJobs(JobSystemAbortException): pass
+class CantWaitWhenNotExecutingJobs(JobSystemAbortException): pass
+class ReportException(Exception): pass
+
+
+class JobSystemLogger(Protocol):
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
+        """Prints a message to the logger."""
+
+
 @dataclass
 class _JobPackage:
     job: Job
@@ -403,10 +440,13 @@ class _JobPackage:
     parent: Optional['_JobPackage'] = None
 
     def __lt__(self, other: '_JobPackage') -> bool: return self.priority < other.priority
-    def __str__(self): return f'JobPackage(job_type_id={self.job.type_id}, tries={self.tries}, priority={self.priority})'
+    def __str__(self): return f'JobPackage(job_type_id={self.job.type_id}, job_class={self.job.__class__.__name__}, tries={self.tries}, priority={self.priority})'
 
 
 class _JobError(Exception):
     def __init__(self, child: Exception):
         super().__init__(child)
         self.child = child
+
+
+_thread_local_storage = threading.local()

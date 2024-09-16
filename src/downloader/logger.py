@@ -20,7 +20,7 @@ import tempfile
 import sys
 import time
 import traceback
-from abc import ABC, abstractmethod
+from abc import abstractmethod, ABC
 
 from downloader.constants import K_VERBOSE, K_START_TIME
 

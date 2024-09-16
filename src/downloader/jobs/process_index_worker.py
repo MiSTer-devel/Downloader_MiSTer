@@ -48,7 +48,7 @@ class ProcessIndexWorker(DownloaderWorker):
         self._lock = threading.Lock()
         self._full_partitions: Set[str] = set()
 
-    def initialize(self): self._ctx.job_system.register_worker(ProcessIndexJob.type_id, self)
+    def job_type_id(self) -> int: return ProcessIndexJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: ProcessIndexJob) -> Optional[Exception]:
@@ -103,7 +103,7 @@ class ProcessIndexWorker(DownloaderWorker):
                 info=pkg.rel_path,
                 get_file_job=fetch_job
             )
-            self._ctx.job_system.push_job(fetch_job)
+            self._ctx.job_ctx.push_job(fetch_job)
 
     def _process_index(self, config: Dict[str, Any], summary: Index, db: DbEntity, store: StoreWrapper) -> Tuple[
         List[_CheckFilePackage],

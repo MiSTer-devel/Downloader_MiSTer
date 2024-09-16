@@ -23,7 +23,7 @@ from typing import Optional
 
 
 class ValidateFileWorker(DownloaderWorker):
-    def initialize(self): self._ctx.job_system.register_worker(ValidateFileJob.type_id, self)
+    def job_type_id(self) -> int: return ValidateFileJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: ValidateFileJob) -> Optional[Exception]:
@@ -33,7 +33,7 @@ class ValidateFileWorker(DownloaderWorker):
             return error
 
         if job.fetch_job.after_validation is not None:
-            self._ctx.job_system.push_job(job.fetch_job.after_validation)
+            self._ctx.job_ctx.push_job(job.fetch_job.after_validation)
 
     def _validate_file(self, file_path: str, file_hash: str, hash_check: bool) -> Optional[Exception]:
         try:

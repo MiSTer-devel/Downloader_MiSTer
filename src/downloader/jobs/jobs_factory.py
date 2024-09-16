@@ -53,11 +53,10 @@ def make_get_file_job(source: str, target: str, info: str, silent: bool, logger:
         return FetchFileJob2(source=source, temp_path=target, info=info, silent=silent)
 
 
-def make_get_zip_file_jobs(db: DbEntity, zip_id: str, description: Dict[str, Any]) -> Tuple[GetFileJob, ValidateFileJob2, str]:
+def make_get_zip_file_jobs(db: DbEntity, zip_id: str, description: Dict[str, Any], zip_tag: str) -> Tuple[GetFileJob, ValidateFileJob2, str]:
     url = description['url']
     download_path = '/tmp/' + db.db_id + '_._' + zip_id + '_._' + Path(url).name
     info = f'temp zip file {db.db_id}:{zip_id}:{Path(url).name}'
-    zip_tag = f'{db.db_id}:{zip_id}'
     get_file_job = make_get_file_job(source=url, info=info, target=download_path, silent=False)
     get_file_job.add_tag(zip_tag)
     validate_job = ValidateFileJob2(temp_path=download_path, target_file_path=download_path, description=description, info=info, get_file_job=get_file_job)
@@ -67,7 +66,8 @@ def make_get_zip_file_jobs(db: DbEntity, zip_id: str, description: Dict[str, Any
 
 
 def make_open_zip_index_job(z: ZipJobContext, file_description: Dict[str, Any]) -> Tuple[GetFileJob, str]:
-    get_file_job, validate_job, info = make_get_zip_file_jobs(db=z.job.db, zip_id=z.zip_id, description=file_description)
+    zip_tag = f'{z.job.db.db_id}:{z.zip_id}'
+    get_file_job, validate_job, info = make_get_zip_file_jobs(db=z.job.db, zip_id=z.zip_id, description=file_description, zip_tag=zip_tag)
     open_zip_index_job = OpenZipIndexJob(
         zip_id=z.zip_id,
         zip_description=z.zip_description,
@@ -79,13 +79,14 @@ def make_open_zip_index_job(z: ZipJobContext, file_description: Dict[str, Any]) 
         config=z.config,
         get_file_job=get_file_job,
     )
-    open_zip_index_job.add_tag(f'{z.job.db.db_id}:{z.zip_id}')
+    open_zip_index_job.add_tag(zip_tag)
     validate_job.after_job = open_zip_index_job
     return get_file_job, info
 
 
 def make_open_zip_contents_job(job: ProcessZipJob, file_packs: List[PathPackage]) -> Tuple[GetFileJob, str]:
-    get_file_job, validate_job, info = make_get_zip_file_jobs(db=job.db, zip_id=job.zip_id, description=job.zip_description['contents_file'])
+    zip_tag = f'{job.db.db_id}:{job.zip_id}'
+    get_file_job, validate_job, info = make_get_zip_file_jobs(db=job.db, zip_id=job.zip_id, description=job.zip_description['contents_file'], zip_tag=zip_tag)
     open_zip_contents_job = OpenZipContentsJob(
         zip_id=job.zip_id,
         zip_description=job.zip_description,
@@ -99,7 +100,7 @@ def make_open_zip_contents_job(job: ProcessZipJob, file_packs: List[PathPackage]
         index=job.zip_index,
         get_file_job=get_file_job
     )
-    open_zip_contents_job.add_tag(f'{job.db.db_id}:{job.zip_id}')
+    open_zip_contents_job.add_tag(zip_tag)
     validate_job.after_job = open_zip_contents_job
     return get_file_job, info
 
