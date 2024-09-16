@@ -40,7 +40,7 @@ class JobSystem:
         JobSystem._next_job_type_id += 1
         return JobSystem._next_job_type_id
 
-    def __init__(self, reporter: 'ProgressReporter', logger: Logger, max_threads: int = 6, max_tries: int = 3, wait_timeout: float = 0.1, max_cycle: int = 3, max_timeout: int = 300):
+    def __init__(self, reporter: 'ProgressReporter', logger: Logger, max_threads: int = 6, max_tries: int = 3, wait_timeout: float = 0.1, max_cycle: int = 3, max_timeout: int = 300, retry_unexpected_exceptions: bool = True):
         self._reporter: ProgressReporter = reporter
         self._logger: Logger = logger
         self._max_threads: int = max_threads
@@ -48,6 +48,7 @@ class JobSystem:
         self._wait_timeout: float = wait_timeout
         self._max_cycle: int = max_cycle
         self._max_timeout: int = max_timeout
+        self._retry_unexpected_exceptions: bool = retry_unexpected_exceptions
         self._job_queue: queue.PriorityQueue['_JobPackage'] = queue.PriorityQueue()
         self._notifications: queue.Queue[Tuple[bool, '_JobPackage']] = queue.Queue()
         self._workers: Dict[int, 'Worker'] = {}
@@ -175,8 +176,8 @@ class JobSystem:
             self._assert_there_are_no_cycles(package)
             try:
                 self._operate_on_next_job(package, self._notifications)
-            except Exception as e:
-                self._retry_package(package, e)
+            except BaseException as e:
+                self._handle_exception(package, e)
 
         self._handle_notifications(self._notifications)
         self._report_work_in_progress()
@@ -189,7 +190,9 @@ class JobSystem:
             job, worker = package.job, package.worker
             notifications.put((False, package))
 
-            worker.operate_on(job)
+            error = worker.operate_on(job)
+            if error is not None:
+                raise _JobError(error)
 
             notifications.put((True, package))
         finally:
@@ -199,8 +202,6 @@ class JobSystem:
                 pass
 
     def _retry_package(self, package: '_JobPackage', e: Exception) -> None:
-        if isinstance(e, JobSystemAbortException):
-            raise e
         retry_job = package.job.retry_job()
         should_retry = package.tries < self._max_tries and retry_job is not None
         if should_retry:
@@ -246,13 +247,23 @@ class JobSystem:
             if future.done():
                 future_exception = future.exception()
                 if future_exception is not None:
-                    if isinstance(future_exception, Exception):
-                        self._retry_package(package, future_exception)
-                    else:
-                        raise future_exception
+                    self._handle_exception(package, future_exception)
             else:
                 still_pending.append((package, future))
         return still_pending
+
+    def _handle_exception(self, package: '_JobPackage', e: BaseException):
+        if isinstance(e, _JobError):
+            self._retry_package(package, e.child)
+        elif isinstance(e, JobSystemAbortException):
+            self._logger.print(f'Unexpected system abort while operating on job {package.job.__class__.__name__}: {e}')
+            raise e
+        elif isinstance(e, Exception) and self._retry_unexpected_exceptions:
+            self._logger.print(f'Unexpected exception while operating on job {package.job.__class__.__name__}: {e}')
+            self._retry_package(package, e)
+        else:
+            self._logger.print(f'CRITICAL! Unexpected exception while operating on job {package.job.__class__.__name__}: {e}')
+            raise e
 
     def _cancel_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> None:
         for package, future in futures:
@@ -271,7 +282,7 @@ class JobSystem:
         if parent_package is None:
             return
 
-        seen: Dict[int] = dict()
+        seen: Dict[int, int] = dict()
         current = parent_package
 
         while current is not None:
@@ -353,7 +364,7 @@ class Job(ABC):
 
 class Worker(ABC):
     @abstractmethod
-    def operate_on(self, job: Job) -> None:
+    def operate_on(self, job: Job) -> Optional[Exception]:
         """Handles the job."""
 
     def reporter(self) -> Optional['ProgressReporter']:
@@ -393,3 +404,9 @@ class _JobPackage:
 
     def __lt__(self, other: '_JobPackage') -> bool: return self.priority < other.priority
     def __str__(self): return f'JobPackage(job_type_id={self.job.type_id}, tries={self.tries}, priority={self.priority})'
+
+
+class _JobError(Exception):
+    def __init__(self, child: Exception):
+        super().__init__(child)
+        self.child = child

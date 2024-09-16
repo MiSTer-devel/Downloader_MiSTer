@@ -278,22 +278,6 @@ class _WriteOnlyStoreAdapter:
 
             self._top_wrapper.mark_force_save()
 
-    def add_filtered_zip_data(self, zip_id: str, files: Dict[str, Any], folders: Dict[str, Any]):
-        if 'filtered_zip_data' not in self._store:
-            self._store['filtered_zip_data'] = {}
-
-        filtered_zip_data = {zip_id: {'files': files, 'folders': folders}}
-        if 'filtered_zip_data' in self._store and equal_dicts(self._store['filtered_zip_data'], filtered_zip_data):
-            return
-
-        if zip_id not in self._store['filtered_zip_data']:
-            self._store['filtered_zip_data'][zip_id] = {'files': {}, 'folders': {}}
-
-        self._store['filtered_zip_data'][zip_id]['files'].update(files)
-        self._store['filtered_zip_data'][zip_id]['folders'].update(folders)
-
-        self._top_wrapper.mark_force_save()
-
     def add_zip_index(self, zip_id: str, index: Index, description: Dict[str, Any]):
         if zip_id in self._store['zips']:
             if not are_zip_descriptions_equal(self._store['zips'][zip_id], description):
@@ -352,6 +336,18 @@ class _ReadOnlyStoreAdapter:
         for folder_path, folder_description in self._store['folders'].items():
             if 'zip_id' in folder_description and folder_description['zip_id'] == zip_id:
                 folders[folder_path] = folder_description
+
+        for zip_id, zip_description in self._store.get('filtered_zip_data', {}).items():
+            if zip_id != zip_id:
+                continue
+
+            for file_path, file_description in zip_description['files'].items():
+                if 'zip_id' in file_description and file_description['zip_id'] == zip_id:
+                    files[file_path] = file_description
+
+            for folder_path, folder_description in zip_description['folders'].items():
+                if 'zip_id' in folder_description and folder_description['zip_id'] == zip_id:
+                    folders[folder_path] = folder_description
 
         if len(files) == 0 and len(folders) == 0:
             return None

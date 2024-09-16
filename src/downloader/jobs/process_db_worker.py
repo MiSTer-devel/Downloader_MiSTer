@@ -39,7 +39,7 @@ class ProcessDbWorker(DownloaderWorker):
         self._full_partitions: Set[str] = set()
 
     def initialize(self): self._ctx.job_system.register_worker(ProcessDbJob.type_id, self)
-    def reporter(self): return self._ctx.file_download_reporter
+    def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: ProcessDbJob):
         config = self._build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
@@ -59,7 +59,7 @@ class ProcessDbWorker(DownloaderWorker):
 
         self._ctx.job_system.wait_for_jobs_with_tags(job_tags)
 
-        for file_info in self._ctx.file_download_reporter.report().failed_files():
+        for file_info in self._ctx.file_download_session_logger.report().failed_files():
             zip_dispatcher.try_push_summary_job_if_recovery_is_needed(file_info)
 
         self._ctx.job_system.wait_for_jobs_with_tags(job_tags)
@@ -101,6 +101,10 @@ class _ZipJobDispatcher:
     def push_zip_jobs(self, z: ZipJobContext):
         if 'summary_file' in z.zip_description:
             index = z.job.store.read_only().zip_index(z.zip_id)
+
+
+            #@TODO ZIP_INDEX method does not pull data from filtered_zip_data so and that makes the current test to not pass
+
             there_is_a_recent_store_index = index is not None and index['hash'] == z.zip_description['summary_file']['hash'] and index['hash'] != NO_HASH_IN_STORE_CODE
             if there_is_a_recent_store_index:
                 self.push_process_zip_job(z, zip_index=index, has_new_zip_index=False)
@@ -112,7 +116,7 @@ class _ZipJobDispatcher:
             self.push_process_zip_job(z, zip_index=z.zip_description['internal_summary'], has_new_zip_index=True)
         else:
             raise Exception(f"Unknown zip description for zip '{z.zip_id}' in db '{z.job.db.db_id}'")
-            # @TODO: Handle this case
+            # @TODO: Handle this case, it should never raise in any case
 
     def try_push_summary_job_if_recovery_is_needed(self, summary_info: str):
         if summary_info not in self._summaries_requested:

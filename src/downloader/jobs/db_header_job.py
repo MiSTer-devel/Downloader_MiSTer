@@ -31,4 +31,4 @@ class DbHeaderJob(Job):
 
 class DbHeaderWorker(DownloaderWorker):
     def initialize(self): self._ctx.job_system.register_worker(DbHeaderJob.type_id, self)
-    def operate_on(self, job: DbHeaderJob): self._ctx.file_download_reporter.print_header(job.db)
+    def operate_on(self, job: DbHeaderJob): self._ctx.file_download_session_logger.print_header(job.db)

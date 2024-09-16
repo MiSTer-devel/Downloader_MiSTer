@@ -24,7 +24,7 @@ from downloader.jobs.worker_context import DownloaderWorker
 
 class OpenDbWorker(DownloaderWorker):
     def initialize(self): self._ctx.job_system.register_worker(OpenDbJob.type_id, self)
-    def reporter(self): return self._ctx.file_download_reporter
+    def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: OpenDbJob):
         db = self._open_db(section=job.section, temp_path=job.temp_path)

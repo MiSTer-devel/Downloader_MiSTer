@@ -23,7 +23,7 @@ from downloader.jobs.jobs_factory import make_process_zip_job
 
 class OpenZipIndexWorker(DownloaderWorker):
     def initialize(self): self._ctx.job_system.register_worker(OpenZipIndexJob.type_id, self)
-    def reporter(self): return self._ctx.file_download_reporter
+    def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: OpenZipIndexJob):
         index = self._ctx.file_system.load_dict_from_file(job.download_path)

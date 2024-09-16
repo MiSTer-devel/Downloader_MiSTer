@@ -28,7 +28,7 @@ from downloader.http_gateway import HttpGateway
 from downloader.job_system import JobSystem
 from downloader.jobs.db_header_job import DbHeaderJob
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
+from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
 from downloader.jobs.worker_context import DownloaderWorkerContext, make_downloader_worker_context
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.logger import DebugOnlyLoggerDecorator
@@ -37,12 +37,13 @@ from downloader.target_path_repository import TargetPathRepository
 
 
 class FileDownloaderFactory:
-    def __init__(self, file_system_factory, waiter, logger, job_system, file_download_reporter, http_gateway, free_space_reservation: FreeSpaceReservation, external_drives_repository: ExternalDrivesRepository):
+    def __init__(self, file_system_factory, waiter, logger, job_system, file_download_session_logger, progress_reporter, http_gateway, free_space_reservation: FreeSpaceReservation, external_drives_repository: ExternalDrivesRepository):
         self._file_system_factory = file_system_factory
         self._waiter = waiter
         self._logger = logger
         self._job_system = job_system
-        self._file_download_reporter = file_download_reporter
+        self._file_download_session_logger = file_download_session_logger
+        self._progress_reporter = progress_reporter
         self._http_gateway = http_gateway
         self._free_space_reservation = free_space_reservation
         self._external_drives_repository = external_drives_repository
@@ -59,7 +60,8 @@ class FileDownloaderFactory:
             file_system=file_system,
             target_path_repository=target_path_repository,
             installation_report=InstallationReportImpl(),
-            file_download_reporter=self._file_download_reporter,
+            progress_reporter=self._progress_reporter,
+            file_download_session_logger=self._file_download_session_logger,
             free_space_reservation=self._free_space_reservation,
             external_drives_repository=self._external_drives_repository,
             target_paths_calculator_factory=TargetPathsCalculatorFactory(file_system, self._external_drives_repository),
@@ -73,14 +75,14 @@ class FileDownloaderFactory:
             target_path_repository,
             logger,
             workers_factory,
-            self._file_download_reporter,
+            self._file_download_session_logger,
             self._http_gateway,
             self._job_system
         )
 
 
 class FileDownloader:
-    def __init__(self, parallel_update, hash_check, config, file_system, target_path_repository, logger, workers_factory: 'DownloaderWorkersFactory', file_reporter: 'FileDownloadProgressReporter', http_gateway: HttpGateway, job_system: JobSystem):
+    def __init__(self, parallel_update, hash_check, config, file_system, target_path_repository, logger, workers_factory: 'DownloaderWorkersFactory', file_session_logger: 'FileDownloadSessionLogger', http_gateway: HttpGateway, job_system: JobSystem):
         self._parallel_update = parallel_update
         self._hash_check = hash_check
         self._file_system = file_system
@@ -92,7 +94,7 @@ class FileDownloader:
         self._correct_files = []
         self._failed_folders = []
         self._no_url_files = []
-        self._file_reporter = file_reporter
+        self._file_session_logger = file_session_logger
         self._workers_factory = workers_factory
         self._http_gateway = http_gateway
         self._job_system = job_system
@@ -163,11 +165,11 @@ class FileDownloader:
                     description=description,
                     hash_check=self._hash_check
                 ))
-        self._file_reporter.start_session()
+        self._file_session_logger.start_session()
         self._job_system.accomplish_pending_jobs()
 
-        self._check_downloaded_files(self._file_reporter.report().downloaded_files())
-        self._file_reporter.print_pending()
+        self._check_downloaded_files(self._file_session_logger.report().downloaded_files())
+        self._file_session_logger.print_pending()
 
     def _do_we_have_to_download_the_file(self, file_path: str, file_description: Dict[str, Any]) -> bool:
         if self._hash_check and self._file_system.is_file(file_path):
@@ -192,13 +194,13 @@ class FileDownloader:
             self._queued_files.pop(path)
 
     def errors(self):
-        return self._file_reporter.report().failed_files() + self._no_url_files
+        return self._file_session_logger.report().failed_files() + self._no_url_files
 
     def correctly_downloaded_files(self):
         return self._correct_files
 
     def run_files(self):
-        return self._file_reporter.report().fetch_started_files()
+        return self._file_session_logger.report().fetch_started_files()
 
 
 def context_from_curl_ssl(curl_ssl):

@@ -35,7 +35,7 @@ class ProcessZipWorker(DownloaderWorker):
         self._lock = Lock()
 
     def initialize(self): self._ctx.job_system.register_worker(ProcessZipJob.type_id, self)
-    def reporter(self): return self._ctx.file_download_reporter
+    def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: ProcessZipJob):
         total_files_size = 0
