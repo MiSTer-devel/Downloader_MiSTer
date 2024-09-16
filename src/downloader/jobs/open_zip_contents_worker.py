@@ -35,7 +35,7 @@ class OpenZipContentsWorker(DownloaderWorker):
         super().__init__(ctx)
 
     def initialize(self): self._ctx.job_system.register_worker(OpenZipContentsJob.type_id, self)
-    def reporter(self): return self._ctx.file_download_reporter
+    def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: OpenZipContentsJob):
         kind = job.zip_description.get('kind', None)
@@ -44,7 +44,7 @@ class OpenZipContentsWorker(DownloaderWorker):
         elif kind == 'extract_single_files':
             self._extract_single_files(job)
         else:
-            # @TODO: Handle this case
+            # @TODO: Handle this case, it should never raise in any case
             raise Exception(f"Unknown kind '{kind}' for zip '{job.zip_id}' in db '{job.db.db_id}'")
 
     def _extract_all_contents(self, job: OpenZipContentsJob):
@@ -63,18 +63,29 @@ class OpenZipContentsWorker(DownloaderWorker):
             .target_paths_calculator(config)\
             .deduce_target_path(zip_description['target_folder_path'], {}, PathType.FOLDER)
 
+        # @TODO: This filtering looks like should be done in a previous step, but the removal of the files should be here. There should be a job.files_to_remove for that
+        #        The filtering should be in a previous step because it should be accounted for when determining whether we need to download the contents file or not
+        #        which currently happens in ProcessZipWorker.
+        _, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(db, index, config).select_filtered_files(index)
+
         # @TODO: self._ctx.file_system.precache_is_file_with_folders() THIS IS MISSING FOR PROPER PERFORMANCE!
-        contained_files = [pkg for pkg in files if store.hash_file(pkg.rel_path) != pkg.description.get('hash', None) or self._ctx.file_system.is_file(pkg.full_path) is False]
+        contained_files = []
+        for pkg in files:
+            file_hash = store.hash_file(pkg.rel_path)
+            pkg_hash = pkg.description.get('hash', None)
+            is_file_present = self._ctx.file_system.is_file(pkg.full_path)
+            if 'zip_id' in pkg.description and zip_id == pkg.description['zip_id'] and zip_id in filtered_zip_data:
+                is_file_filtered = pkg.rel_path in filtered_zip_data[zip_id]['files']
+            else:
+                is_file_filtered = False
+
+            if file_hash != pkg_hash or not is_file_present or is_file_filtered:
+                contained_files.append(pkg)
 
         if len(contained_files) > 0:
             self._ctx.file_system.unzip_contents(download_path, target_folder_path, [pkg.full_path for pkg in contained_files])
 
         self._ctx.file_system.unlink(download_path)
-
-        # @TODO: This filtering looks like should be done in a previous step, but the removal of the files should be here. There should be a job.files_to_remove for that
-        #        The filtering should be in a previous step because it should be accounted for when determining whether we need to download the contents file or not
-        #        which currently happens in ProcessZipWorker.
-        _, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(db, index, config).select_filtered_files(index)
 
         if zip_id in filtered_zip_data:
             for file_path, file_description in filtered_zip_data[zip_id]['files'].items():
@@ -82,11 +93,15 @@ class OpenZipContentsWorker(DownloaderWorker):
 
             for folder_path, folder_description in filtered_zip_data[zip_id]['folders'].items():
                 job.filtered_folders[folder_path] = folder_description
+                # @TODO Should I do the following line about removing filtered folders in some other place?
+                # Maybe it's not even needed to remove the empty folder somehow
                 self._ctx.file_system.remove_non_empty_folder(folder_path)
+                self._ctx.pending_removals.queue_directory_removal(PathPackage(full_path=folder_path, rel_path=folder_path, description=folder_description), db.db_id)
 
         for pkg in contained_files:
             if pkg.rel_path in job.filtered_files:
                 self._ctx.file_system.unlink(pkg.full_path)
+                self._ctx.pending_removals.queue_file_removal(pkg, db.db_id)
             else:
                 job.downloaded_files.append(pkg.rel_path)
 

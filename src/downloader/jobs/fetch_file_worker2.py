@@ -19,23 +19,45 @@
 from downloader.constants import K_DOWNLOADER_TIMEOUT
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.worker_context import DownloaderWorker
-from downloader.jobs.errors import FileDownloadException
+from downloader.jobs.errors import FileDownloadError
+import socket
+from urllib.error import URLError
+from http.client import HTTPException
+from typing import Optional
 
 
 class FetchFileWorker2(DownloaderWorker):
     def initialize(self): self._ctx.job_system.register_worker(FetchFileJob2.type_id, self)
-    def reporter(self): return self._ctx.file_download_reporter
+    def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: FetchFileJob2):
-        self._fetch_file(url=job.source, download_path=job.temp_path, info=job.info)
-        if job.after_job is not None: self._ctx.job_system.push_job(job.after_job)
+    def operate_on(self, job: FetchFileJob2) -> Optional[Exception]:
+        error = self._fetch_file(url=job.source, download_path=job.temp_path, info=job.info)
+        if error is not None:
+            return error
 
-    def _fetch_file(self, url: str, download_path: str, info: str):
-        with self._ctx.http_gateway.open(url) as (final_url, in_stream):
-            if in_stream.status != 200:
-                raise FileDownloadException(f'Bad http status! {info}: {in_stream.status}')
+        if job.after_job is not None:
+            self._ctx.job_system.push_job(job.after_job)
 
-            self._ctx.file_system.write_incoming_stream(in_stream, download_path, timeout=self._ctx.config[K_DOWNLOADER_TIMEOUT])
+    def _fetch_file(self, url: str, download_path: str, info: str) -> Optional[FileDownloadError]:
+        try:
+            with self._ctx.http_gateway.open(url) as (final_url, in_stream):
+                if in_stream.status != 200:
+                    return FileDownloadError(f'Bad http status! {info}: {in_stream.status}')
+
+                self._ctx.file_system.write_incoming_stream(in_stream, download_path, timeout=self._ctx.config[K_DOWNLOADER_TIMEOUT])
+
+        except socket.gaierror as e:
+            return FileDownloadError(f'Socket Address Error! {url}: {str(e)}')
+        except URLError as e:
+            return FileDownloadError(f'URL Error! {url}: {e.reason}')
+        except HTTPException as e:
+            return FileDownloadError(f'HTTP Error {type(e).__name__}! {url}: {str(e)}')
+        except ConnectionResetError as e:
+            return FileDownloadError(f'Connection reset error! {url}: {str(e)}')
+        except OSError as e:
+            return FileDownloadError(f'OS Error! {url}: {e.errno} {str(e)}')
+        except BaseException as e:
+            return FileDownloadError(f'Exception during download! {url}: {str(e)}')
 
         if not self._ctx.file_system.is_file(download_path, use_cache=False):
-            raise FileDownloadException(f'Missing {info}')
+            return FileDownloadError(f'Missing {info}')

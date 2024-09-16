@@ -24,9 +24,9 @@ from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
 from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
-from downloader.job_system import JobSystem, Worker
+from downloader.job_system import JobSystem, Worker, ProgressReporter
 from downloader.jobs.path_package import PathPackage
-from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
+from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
 from downloader.logger import Logger
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.target_path_repository import TargetPathRepository
@@ -41,7 +41,8 @@ class DownloaderWorkerContext:
     target_path_repository: TargetPathRepository
     file_system: FileSystem
     waiter: Waiter
-    file_download_reporter: FileDownloadProgressReporter
+    file_download_session_logger: FileDownloadSessionLogger
+    progress_reporter: ProgressReporter
     installation_report: InstallationReportImpl
     free_space_reservation: FreeSpaceReservation
     external_drives_repository: ExternalDrivesRepository
@@ -50,7 +51,7 @@ class DownloaderWorkerContext:
     pending_removals: 'PendingRemovals'
 
 
-def make_downloader_worker_context(job_system: JobSystem, http_gateway: HttpGateway, logger: Logger, target_path_repository: TargetPathRepository, file_system: FileSystem, waiter: Waiter, file_download_reporter: FileDownloadProgressReporter, installation_report: InstallationReportImpl, free_space_reservation: FreeSpaceReservation, external_drives_repository: ExternalDrivesRepository, target_paths_calculator_factory: TargetPathsCalculatorFactory, config: Dict[str, Any]) -> DownloaderWorkerContext:
+def make_downloader_worker_context(job_system: JobSystem, http_gateway: HttpGateway, logger: Logger, target_path_repository: TargetPathRepository, file_system: FileSystem, waiter: Waiter, progress_reporter: ProgressReporter, file_download_session_logger: FileDownloadSessionLogger, installation_report: InstallationReportImpl, free_space_reservation: FreeSpaceReservation, external_drives_repository: ExternalDrivesRepository, target_paths_calculator_factory: TargetPathsCalculatorFactory, config: Dict[str, Any]) -> DownloaderWorkerContext:
     return DownloaderWorkerContext(
         job_system=job_system,
         http_gateway=http_gateway,
@@ -58,7 +59,8 @@ def make_downloader_worker_context(job_system: JobSystem, http_gateway: HttpGate
         target_path_repository=target_path_repository,
         file_system=file_system,
         waiter=waiter,
-        file_download_reporter=file_download_reporter,
+        progress_reporter=progress_reporter,
+        file_download_session_logger=file_download_session_logger,
         installation_report=installation_report,
         free_space_reservation=free_space_reservation,
         external_drives_repository=external_drives_repository,
