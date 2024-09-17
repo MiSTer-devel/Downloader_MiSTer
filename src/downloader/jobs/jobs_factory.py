@@ -22,6 +22,8 @@ from dataclasses import dataclass
 
 from downloader.db_entity import DbEntity
 from pathlib import Path
+
+from downloader.file_filter import FileFoldersHolder
 from downloader.jobs.copy_file_job import CopyFileJob
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.get_file_job import GetFileJob
@@ -84,7 +86,7 @@ def make_open_zip_index_job(z: ZipJobContext, file_description: Dict[str, Any]) 
     return get_file_job, info
 
 
-def make_open_zip_contents_job(job: ProcessZipJob, file_packs: List[PathPackage]) -> Tuple[GetFileJob, str]:
+def make_open_zip_contents_job(job: ProcessZipJob, zip_index: Index, file_packs: List[PathPackage], folder_packs: List[PathPackage], filtered_data: FileFoldersHolder) -> Tuple[GetFileJob, str]:
     zip_tag = f'{job.db.db_id}:{job.zip_id}'
     get_file_job, validate_job, info = make_get_zip_file_jobs(db=job.db, zip_id=job.zip_id, description=job.zip_description['contents_file'], zip_tag=zip_tag)
     open_zip_contents_job = OpenZipContentsJob(
@@ -96,9 +98,12 @@ def make_open_zip_contents_job(job: ProcessZipJob, file_packs: List[PathPackage]
         full_resync=job.full_resync,
         download_path=validate_job.target_file_path,
         files=file_packs,
+        folders=folder_packs,
         config=job.config,
-        index=job.zip_index,
-        get_file_job=get_file_job
+        index=zip_index,
+        get_file_job=get_file_job,
+        filtered_files=filtered_data['files'],
+        filtered_folders=filtered_data['folders'],
     )
     open_zip_contents_job.add_tag(zip_tag)
     validate_job.after_job = open_zip_contents_job
