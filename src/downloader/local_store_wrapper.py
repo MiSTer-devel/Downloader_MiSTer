@@ -144,8 +144,14 @@ class _WriteOnlyStoreAdapter:
     def remove_file(self, file_path):
         self._remove_entry('files', file_path)
 
+    def remove_file_from_zips(self, file_path):
+        self._remove_entry_from_zips('files', file_path)
+
     def remove_folder(self, folder_path):
         self._remove_entry('folders', folder_path)
+
+    def remove_folder_from_zips(self, folder_path):
+        self._remove_entry_from_zips('folders', folder_path)
 
     def _clean_external_additions(self, kind, path):
         if path in self._external_additions[kind]:
@@ -159,6 +165,16 @@ class _WriteOnlyStoreAdapter:
 
         self._store[kind].pop(path)
         self._top_wrapper.mark_force_save()
+
+    def _remove_entry_from_zips(self, kind, path):
+        if 'zips' not in self._store:
+            return
+
+        self._clean_external_additions(kind, path)
+        for zip_id, zip_description in self._store['zips'].items():
+            if kind in zip_description and path in zip_description[kind]:
+                zip_description[kind].pop(path)
+                self._top_wrapper.mark_force_save()
 
     def add_zip(self, zip_id, description, _summary: Dict[str, Any]):
         if 'zipped_files' in description.get('contents_file', {}): del description['contents_file']['zipped_files']
