@@ -19,6 +19,7 @@
 from threading import Lock
 from typing import List, Tuple, Optional
 
+from downloader.file_filter import FileFilterFactory
 from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_open_zip_contents_job
 from downloader.jobs.path_package import PathPackage
 from downloader.jobs.process_zip_job import ProcessZipJob
@@ -37,7 +38,7 @@ class ProcessZipWorker(DownloaderWorker):
     def job_type_id(self) -> int: return ProcessZipJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ProcessZipJob):
+    def operate_on2(self, job: ProcessZipJob):
         total_files_size = 0
         for file_path, file_description in job.zip_index.files.items():
             total_files_size += file_description['size']
@@ -76,4 +77,58 @@ class ProcessZipWorker(DownloaderWorker):
                 return
 
             get_file_job, info = make_open_zip_contents_job(job=job, file_packs=file_packs)
+            self._ctx.job_ctx.push_job(get_file_job)
+
+    def operate_on(self, job: ProcessZipJob):
+        total_files_size = 0
+        for file_path, file_description in job.zip_index.files.items():
+            total_files_size += file_description['size']
+
+        needs_extracting_single_files = 'kind' in job.zip_description and job.zip_description['kind'] == 'extract_single_files'
+        less_file_count = len(job.zip_index.files) < job.config[K_ZIP_FILE_COUNT_THRESHOLD]
+        less_accumulated_mbs = total_files_size < (1000 * 1000 * job.config[K_ZIP_ACCUMULATED_MB_THRESHOLD])
+
+        if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
+            self._ctx.job_ctx.push_job(ProcessIndexJob(
+                db=job.db,
+                ini_description=job.ini_description,
+                config=job.config,
+                index=job.zip_index,
+                store=job.store,
+                full_resync=job.full_resync
+            ))
+        else:
+            index, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(job.db, job.zip_index, job.config).select_filtered_files(job.zip_index)
+
+            file_packs: List[PathPackage] = []
+            target_paths_calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(job.config)
+            for file_path, file_description in index.files.items():
+                target_file_path = target_paths_calculator.deduce_target_path(file_path, file_description, PathType.FILE)
+                file_packs.append(PathPackage(full_path=target_file_path, rel_path=file_path, description=file_description))
+
+            folder_packs: List[PathPackage] = []
+            for folder_path, folder_description in index.folders.items():
+                target_folder_path = target_paths_calculator.deduce_target_path(folder_path, folder_description, PathType.FOLDER)
+                folder_packs.append(PathPackage(full_path=target_folder_path, rel_path=folder_path, description=folder_description))
+
+            already_processed: Optional[Tuple[str, str]] = None
+            with self._lock:
+                for pkg in file_packs:
+                    if self._ctx.installation_report.is_file_processed(pkg.rel_path):
+                        already_processed = (pkg.rel_path, self._ctx.installation_report.processed_file(pkg.rel_path).db_id)
+                        break
+                    else:
+                        self._ctx.installation_report.add_processed_file(pkg, job.db.db_id)
+
+            if already_processed is not None:
+                self._ctx.logger.print(f'Skipping zip "{job.zip_id}" because file "{already_processed[0]}" was already processed by db "{already_processed[1]}"')
+                return
+
+            get_file_job, info = make_open_zip_contents_job(
+                job=job,
+                zip_index=index,
+                file_packs=file_packs,
+                folder_packs=folder_packs,
+                filtered_data=filtered_zip_data[job.zip_id] if job.zip_id in filtered_zip_data else {'files': {}, 'folders': {}}
+            )
             self._ctx.job_ctx.push_job(get_file_job)
