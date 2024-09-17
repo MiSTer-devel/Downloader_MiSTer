@@ -38,6 +38,7 @@ class OpenZipContentsJob(Job):
     zip_description: Dict[str, Any]
     index: Index
     files: List[PathPackage]
+    folders: List[PathPackage]
     full_resync: bool
     download_path: str
     config: Dict[str, Any]

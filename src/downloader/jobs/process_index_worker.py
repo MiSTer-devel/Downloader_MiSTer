@@ -52,58 +52,58 @@ class ProcessIndexWorker(DownloaderWorker):
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: ProcessIndexJob) -> Optional[Exception]:
-        logger = self._ctx.logger
-        db, config, summary, store, full_resync = job.db, job.config, job.index, job.store, job.full_resync
-        base_files_url = job.db.base_files_url
-
-        logger.debug(f"Processing db '{db.db_id}'...")
         try:
+            logger = self._ctx.logger
+            db, config, summary, store, full_resync = job.db, job.config, job.index, job.store, job.full_resync
+            base_files_url = job.db.base_files_url
+
+            logger.debug(f"Processing db '{db.db_id}'...")
             check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs = self._process_index(config, summary, db, store)
+
+            logger.debug(f"Processing check file packages '{db.db_id}'...")
+            fetch_pkgs, validate_pkgs = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
+
+            logger.debug(f"Processing validate file packages '{db.db_id}'...")
+            fetch_pkgs.extend(self._process_validate_packages(validate_pkgs, store))
+
+            self._ctx.file_download_session_logger.print_header(db, nothing_to_download=len(fetch_pkgs) == 0)
+
+            logger.debug(f"Reserving space '{db.db_id}'...")
+            if not self._try_reserve_space(fetch_pkgs):
+                logger.debug(f"Not enough space '{db.db_id}'!")
+                return
+
+            logger.debug(f"Processing create folder packages '{db.db_id}'...")
+            self._process_create_folder_packages(create_folder_pkgs, store)
+
+            logger.debug(f"Postponing remove packages '{db.db_id}'...")
+            with self._lock:
+                for pkg in remove_files_pkgs:
+                    self._ctx.pending_removals.queue_file_removal(pkg, db.db_id)
+                for pkg in delete_folder_pkgs:
+                    self._ctx.pending_removals.queue_directory_removal(pkg, db.db_id)
+
+            logger.debug(f"Launching fetch jobs '{db.db_id}'...")
+            for pkg in fetch_pkgs:
+                download_path = pkg.full_path + '.new'
+                fetch_job = FetchFileJob2(
+                    source=_url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url),
+                    info=pkg.rel_path,
+                    temp_path=download_path,
+                    silent=False
+                )
+                fetch_job.after_job = ValidateFileJob2(
+                    temp_path=download_path,
+                    target_file_path=pkg.full_path,
+                    description=pkg.description,
+                    info=pkg.rel_path,
+                    get_file_job=fetch_job
+                )
+                self._ctx.job_ctx.push_job(fetch_job)
         except BadFileFilterPartException as e:
             return e
         except StoragePriorityError as e:
             return e
-
-        logger.debug(f"Processing check file packages '{db.db_id}'...")
-        fetch_pkgs, validate_pkgs = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
-
-        logger.debug(f"Processing validate file packages '{db.db_id}'...")
-        fetch_pkgs.extend(self._process_validate_packages(validate_pkgs, store))
-
-        self._ctx.file_download_session_logger.print_header(db, nothing_to_download=len(fetch_pkgs) == 0)
-
-        logger.debug(f"Reserving space '{db.db_id}'...")
-        if not self._try_reserve_space(fetch_pkgs):
-            logger.debug(f"Not enough space '{db.db_id}'!")
-            return
-
-        logger.debug(f"Processing create folder packages '{db.db_id}'...")
-        self._process_create_folder_packages(create_folder_pkgs, store)
-
-        logger.debug(f"Postponing remove packages '{db.db_id}'...")
-        with self._lock:
-            for pkg in remove_files_pkgs:
-                self._ctx.pending_removals.queue_file_removal(pkg, db.db_id)
-            for pkg in delete_folder_pkgs:
-                self._ctx.pending_removals.queue_directory_removal(pkg, db.db_id)
-
-        logger.debug(f"Launching fetch jobs '{db.db_id}'...")
-        for pkg in fetch_pkgs:
-            download_path = pkg.full_path + '.new'
-            fetch_job = FetchFileJob2(
-                source=_url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url),
-                info=pkg.rel_path,
-                temp_path=download_path,
-                silent=False
-            )
-            fetch_job.after_job = ValidateFileJob2(
-                temp_path=download_path,
-                target_file_path=pkg.full_path,
-                description=pkg.description,
-                info=pkg.rel_path,
-                get_file_job=fetch_job
-            )
-            self._ctx.job_ctx.push_job(fetch_job)
 
     def _process_index(self, config: Dict[str, Any], summary: Index, db: DbEntity, store: StoreWrapper) -> Tuple[
         List[_CheckFilePackage],
@@ -134,7 +134,7 @@ class ProcessIndexWorker(DownloaderWorker):
         check_file_pkgs: List[_CheckFilePackage] = translate_items(filtered_summary.files, PathType.FILE, {})
         remove_files_pkgs: List[_RemoveFilePackage] = translate_items(read_only_store.files, PathType.FILE, filtered_summary.files)
 
-        # @REFACTOR: This looks wrong
+        # @TODO REFACTOR: This looks wrong
         remove_files_pkgs = [pkg for pkg in remove_files_pkgs if 'zip_id' not in pkg.description]
 
         existing_folders = filtered_summary.folders.copy()

@@ -134,6 +134,7 @@ class OnlineImporter(ProductionOnlineImporter):
         for pkg, dbs in self._worker_ctx.pending_removals.consume_files():
             for db_id in dbs:
                 stores[db_id].write_only().remove_file(pkg.rel_path)
+                stores[db_id].write_only().remove_file_from_zips(pkg.rel_path)
 
             if report.is_file_processed(pkg.rel_path):
                continue
@@ -145,6 +146,7 @@ class OnlineImporter(ProductionOnlineImporter):
         for pkg, dbs in self._worker_ctx.pending_removals.consume_directories():
             for db_id in dbs:
                 stores[db_id].write_only().remove_folder(pkg.rel_path)
+                stores[db_id].write_only().remove_folder_from_zips(pkg.rel_path)
 
             if report.is_folder_installed(pkg.rel_path):
                continue
