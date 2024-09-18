@@ -20,6 +20,7 @@ from dataclasses import field, dataclass
 from typing import Dict, Any, List
 
 from downloader.db_entity import DbEntity
+from downloader.file_filter import FileFoldersHolder
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.path_package import PathPackage
@@ -45,7 +46,6 @@ class OpenZipContentsJob(Job):
     get_file_job: GetFileJob
     downloaded_files: List[str] = field(default_factory=list)
     failed_files: List[str] = field(default_factory=list)
-    filtered_files: Dict[str, Any] = field(default_factory=dict)
-    filtered_folders: Dict[str, Any] = field(default_factory=dict)
+    filtered_data: FileFoldersHolder = field(default_factory=dict)
 
     def retry_job(self): return self.get_file_job

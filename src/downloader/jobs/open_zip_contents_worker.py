@@ -89,10 +89,10 @@ class OpenZipContentsWorker(DownloaderWorker):
 
         self._ctx.file_system.unlink(download_path)
 
-        for file_path, file_description in job.filtered_files.items():
+        for file_path, file_description in job.filtered_data['files'].items():
             self._ctx.pending_removals.queue_file_removal(PathPackage(full_path=file_path, rel_path=file_path, description=file_description), db.db_id)
 
-        for folder_path, folder_description in job.filtered_folders.items():
+        for folder_path, folder_description in job.filtered_data['folders'].items():
             self._ctx.pending_removals.queue_directory_removal(PathPackage(full_path=folder_path, rel_path=folder_path, description=folder_description), db.db_id)
 
         for pkg in contained_files:
