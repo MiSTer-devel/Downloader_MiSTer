@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from downloader.db_entity import DbEntity
 from pathlib import Path
 
-from downloader.file_filter import FileFoldersHolder
+from downloader.file_filter import FileFoldersHolder, ZipData
 from downloader.jobs.copy_file_job import CopyFileJob
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.get_file_job import GetFileJob
@@ -102,8 +102,7 @@ def make_open_zip_contents_job(job: ProcessZipJob, zip_index: Index, file_packs:
         config=job.config,
         index=zip_index,
         get_file_job=get_file_job,
-        filtered_files=filtered_data['files'],
-        filtered_folders=filtered_data['folders'],
+        filtered_data=filtered_data
     )
     open_zip_contents_job.add_tag(zip_tag)
     validate_job.after_job = open_zip_contents_job

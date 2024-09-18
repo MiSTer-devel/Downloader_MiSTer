@@ -22,7 +22,7 @@ import time
 from typing import Dict, Optional, Tuple, List, Any, Iterable, Set
 
 from downloader.db_entity import DbEntity
-from downloader.file_filter import BadFileFilterPartException
+from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.index import Index
 from downloader.jobs.open_zip_index_job import OpenZipIndexJob
@@ -112,8 +112,9 @@ class InstallationReportImpl(InstallationReport):
     def add_file_fetch_started(self, path: str): self._fetch_started_files.append(path)
     def add_failed_file(self, path: str): self._failed_files.append(path)
 
-    def add_filtered_zip_data(self, db_id: str, zip_id: str, files: Dict[str, Any], folders: Dict[str, Any]) -> None:
-        if len(files) == 0 and len(folders) == 0: return
+    def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
+        files, folders = filtered_data['files'], filtered_data['folders']
+        #if len(files) == 0 and len(folders) == 0: return
         self._filtered_zip_data.append((db_id, zip_id, files, folders))
 
     def add_failed_db_options(self, exception: WrongDatabaseOptions): self._failed_db_options.append(exception)
@@ -167,7 +168,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         self._waiter = waiter
         self._report = report
         self._check_time: float = 0
-        self._active_jobs: Dict[int] = {}
+        self._active_jobs: Dict[int, int] = {}
         self._deactivated: bool = False
         self._needs_newline: bool = False
         self._need_clear_header: bool = False
@@ -229,7 +230,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             for file in job.failed_files:
                 self._report.add_failed_file(file)
 
-            self._report.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_files, job.filtered_folders)
+            self._report.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_data)
 
         self._remove_in_progress(job)
 

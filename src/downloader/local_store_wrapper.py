@@ -213,6 +213,15 @@ class _WriteOnlyStoreAdapter:
 
         self._remove_non_zip_fields(self._store['files'].values(), removed_zip_ids)
         self._remove_non_zip_fields(self._store['folders'].values(), removed_zip_ids)
+
+        if 'filtered_zip_data' in self._store:
+            for zip_id in removed_zip_ids:
+                if zip_id in self._store['filtered_zip_data']:
+                    self._store['filtered_zip_data'].pop(zip_id)
+
+            if len(self._store['filtered_zip_data']) == 0:
+                self._store.pop('filtered_zip_data')
+
         self._top_wrapper.mark_force_save()
 
     def try_cleanup_drive(self, drive):

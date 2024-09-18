@@ -231,6 +231,10 @@ class FakeFileSystem(ProductionFileSystem):
     def remove_folder(self, path):
         folder = self._path(path)
         if folder in self.state.folders:
+            for other_folder in self.state.folders:
+                if other_folder.startswith(folder) and other_folder != folder:
+                    raise Exception(f'Cannot remove non-empty folder {folder} because {other_folder} exists!')
+
             self.state.folders.pop(folder)
         self._write_records.append(_Record('make_dirs', folder))
 

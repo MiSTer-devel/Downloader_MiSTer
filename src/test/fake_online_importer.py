@@ -143,16 +143,24 @@ class OnlineImporter(ProductionOnlineImporter):
             self._worker_ctx.installation_report.add_processed_file(pkg, list(dbs)[0])
             self._worker_ctx.installation_report.add_removed_file(pkg.rel_path)
 
-        for pkg, dbs in self._worker_ctx.pending_removals.consume_directories():
+        for pkg, dbs in sorted(self._worker_ctx.pending_removals.consume_directories(), key=lambda x: len(x[0].full_path), reverse=True):
+            if report.is_folder_installed(pkg.rel_path):
+                # If a folder got installed by any db...
+                # assert len(dbs) >=1
+                # The for-loop is for when two+ dbs used to have the same folder but one of them has removed it, it should be kept because
+                # one db still uses it. But it should be removed from the store in the other dbs.
+                for db_id in dbs:
+                    stores[db_id].write_only().remove_folder(pkg.rel_path)
+                    stores[db_id].write_only().remove_folder_from_zips(pkg.rel_path)
+                continue
+
+            if self._worker_ctx.file_system.folder_has_items(pkg.full_path):
+                continue
+
+            self._worker_ctx.file_system.remove_folder(pkg.full_path)
             for db_id in dbs:
                 stores[db_id].write_only().remove_folder(pkg.rel_path)
                 stores[db_id].write_only().remove_folder_from_zips(pkg.rel_path)
-
-            if report.is_folder_installed(pkg.rel_path):
-               continue
-
-            self._worker_ctx.installation_report.add_installed_folder(pkg.rel_path)
-            self._worker_ctx.file_system.remove_folder(pkg.full_path)
 
         for file_path in report.installed_files():
             file = report.processed_file(file_path)
@@ -183,6 +191,9 @@ class OnlineImporter(ProductionOnlineImporter):
         for db_id, zip_id, files, folders in report.filtered_zip_data():
             if db_id not in filtered_zip_data:
                 filtered_zip_data[db_id] = {}
+
+            if len(files) == 0 and len(folders) == 0:
+                continue
 
             if zip_id not in filtered_zip_data[db_id]:
                 filtered_zip_data[db_id][zip_id] = {'files': {}, 'folders': {}}
