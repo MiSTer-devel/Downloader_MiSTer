@@ -41,6 +41,7 @@ file_test_json_zip = 'test.json.zip'
 file_a = 'a/A'
 file_b = 'b/B'
 file_c = 'c/C'
+file_d = 'd/D'
 file_abc = 'a/b/C'
 file_nes_smb1 = '|games/NES/smb.nes'
 file_nes_contra = '|games/NES/contra.nes'
@@ -61,6 +62,7 @@ hash_real_test_file = '3de8f8b0dc94b8c2230fab9ec0ba0506'
 folder_a = 'a'
 folder_b = 'b'
 folder_c = 'c'
+folder_d = 'd'
 folder_ab = 'a/b'
 folder_games = '|games'
 folder_games_nes = '|games/NES'
@@ -89,6 +91,7 @@ binary_content = b'This is a test file.'
 file_size_a = 2915040
 file_size_b = 1915040
 file_size_c = 3915440
+file_size_d = 4115440
 file_size_sonic = 2915020
 file_size_smb1 = 2915020
 
@@ -533,6 +536,15 @@ def file_c_descr(delete=None, size=None):
     }
 
 
+def file_d_descr(delete=None, size=None):
+    return {
+        "delete": delete if delete is not None else [],
+        "hash": file_d,
+        "size": file_size_d if size is None else size,
+        "url": "https://four.rbf"
+    }
+
+
 def path_system(): return {'path': 'system'}
 
 
@@ -738,6 +750,10 @@ def db_test_with_file_b(db_id=None, descr=None):
 
 def db_test_with_file_c(db_id=None, descr=None):
     return db_entity(db_id=db_id, files={file_c: file_c_descr() if descr is None else descr}, folders={folder_c: {}})
+
+
+def db_test_with_file_d(db_id=None, descr=None):
+    return db_entity(db_id=db_id, files={file_d: file_d_descr() if descr is None else descr}, folders={folder_d: {}})
 
 
 def store_test_with_file_a_descr(descr=None): return db_to_store(db_test_with_file_a(descr=descr))

@@ -83,7 +83,7 @@ class OnlineImporter(ProductionOnlineImporter):
             progress_reporter=self._report_tracker,
             file_download_session_logger=self._file_download_reporter,
             installation_report=installation_report,
-            free_space_reservation=UnlimitedFreeSpaceReservation(),
+            free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation(),
             external_drives_repository=ExternalDrivesRepository(file_system=self.file_system),
             target_paths_calculator_factory=TargetPathsCalculatorFactory(self.file_system, external_drives_repository),
             config=self._config
