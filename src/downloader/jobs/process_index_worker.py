@@ -46,7 +46,6 @@ class ProcessIndexWorker(DownloaderWorker):
     def __init__(self, ctx: DownloaderWorkerContext):
         super().__init__(ctx)
         self._lock = threading.Lock()
-        self._full_partitions: Set[str] = set()
 
     def job_type_id(self) -> int: return ProcessIndexJob.type_id
     def reporter(self): return self._ctx.progress_reporter
@@ -71,10 +70,12 @@ class ProcessIndexWorker(DownloaderWorker):
             logger.debug(f"Reserving space '{db.db_id}'...")
             if not self._try_reserve_space(fetch_pkgs):
                 logger.debug(f"Not enough space '{db.db_id}'!")
+                for pkg in fetch_pkgs:
+                    self._ctx.installation_report.add_failed_file(pkg.rel_path)
                 return
 
             logger.debug(f"Processing create folder packages '{db.db_id}'...")
-            self._process_create_folder_packages(create_folder_pkgs, store)
+            self._process_create_folder_packages(create_folder_pkgs, store) # @TODO maybe move this one after reserve space
 
             logger.debug(f"Postponing remove packages '{db.db_id}'...")
             with self._lock:
@@ -231,10 +232,9 @@ class ProcessIndexWorker(DownloaderWorker):
             if len(full_partitions) > 0:
                 for partition in full_partitions:
                     self._ctx.file_download_session_logger.print_progress_line(f"Partition {partition.partition_path} would get full!")
-                    self._full_partitions.add(partition.partition_path)
 
-                for pkg in fetch_pkgs:
-                    self._ctx.free_space_reservation.release_space_for_file(pkg.full_path, pkg.description)
+                #for pkg in fetch_pkgs:
+                #    self._ctx.free_space_reservation.release_space_for_file(pkg.full_path, pkg.description)
 
                 return False
 
