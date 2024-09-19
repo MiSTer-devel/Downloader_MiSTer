@@ -27,7 +27,7 @@ from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.objects import file_a, folder_a, db_test_with_file_a, empty_test_store, store_with_folders, store_test_with_file_a_descr, file_a_descr, config_with, file_size_a, \
     db_test_with_file_b, db_test_with_file_c, file_c, file_b, files_a, files_b, files_c, folder_c, folder_b, store_test_with_file_b_descr, store_test_with_file_c_descr, \
     file_size_b, file_size_c, db_smb1, db_sonic, folder_games_nes, folder_games, folder_games_md, file_nes_smb1, file_md_sonic, file_size_sonic, file_size_smb1, \
-    media_usb1, media_fat, db_test_descr
+    media_usb1, media_fat, db_test_descr, db_test_with_file_d, file_d, file_size_d
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 from test.unit.online_importer.online_importer_with_priority_storage_test_base import fs_files_smb1_on_usb1, fs_files_sonic_on_usb1, store_smb1_on_usb1, store_sonic_on_usb1, \
@@ -42,6 +42,7 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
         self.size_a = file_size_on_disk(file_size_a, 32)
         self.size_b = file_size_on_disk(file_size_b, 32)
         self.size_c = file_size_on_disk(file_size_c, 32)
+        self.size_d = file_size_on_disk(file_size_d, 32)
         self.size_smb1 = file_size_on_disk(file_size_smb1, 32)
         self.size_sonic = file_size_on_disk(file_size_sonic, 32)
         self.size_nes_cheat = file_size_on_disk(cheats_folder_nes_file_size, 32)
@@ -59,11 +60,12 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
     def test_download_db_file_a___without_enough_space___reports_error_and_full_partition(self):
         sut, free, stores = self.download_db_file_a({MEDIA_FAT: Partition(1000, min_space=0, block_size=32)})
         self.assertSystem({
-            "fs": fs_data(files={}, folders=[folder_a]),
-            "stores": [store_with_folders([folder_a])],
+            "fs": fs_data(files={}, folders=[]),
+            "stores": [empty_test_store()],
             "errors": [file_a],
             "full_partitions": [MEDIA_FAT],
-            "free": {MEDIA_FAT: 1000 - self.size_a}
+            "free": {MEDIA_FAT: 1000 - self.size_a},
+            "save": False
         }, sut, stores, free=free)
 
     def test_download_db_file_a___on_a_second_run_without_enough_space___reports_error_and_full_partition_and_doesnt_save(self):
@@ -91,11 +93,12 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
     def test_download_db_file_a___with_too_high_free_space___reports_error_and_full_partition(self):
         sut, free, stores = self.download_db_file_a({MEDIA_FAT: Partition(self.mb600, min_space=598, block_size=32)})
         self.assertSystem({
-            "fs": fs_data(files={}, folders=[folder_a]),
-            "stores": [store_with_folders([folder_a])],
+            "fs": fs_data(files={}, folders=[]),
+            "stores": [empty_test_store()],
             "errors": [file_a],
             "full_partitions": [MEDIA_FAT],
-            "free": {MEDIA_FAT: self.mb600 - self.size_a}
+            "free": {MEDIA_FAT: self.mb600 - self.size_a},
+            "save": False
         }, sut, stores, free=free)
 
     def download_db_file_a(self, partitions: Dict[str, Any], input_stores=None, with_fs=None):
@@ -114,12 +117,13 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
             "free": {MEDIA_FAT: self.mb600 - self.size_a - self.size_b - self.size_c}
         }, sut, stores, free=free)
 
-    def test_download_three_dbs___with_enough_free_space_for_two_out_of_tree_files___reports_error_for_all_and_full_partition(self):
+    def test_download_three_dbs___with_enough_free_space_for_two_out_of_tree_dbs___reports_error_for_last_one_and_full_partition(self):
         sut, free, stores = self.download_three_dbs({MEDIA_FAT: Partition(self.mb600, min_space=592, block_size=32)})
         self.assertSystem({
-            "fs": fs_data(files={}, folders=[folder_a, folder_b, folder_c]),
-            "stores": [store_with_folders([folder_a]), store_with_folders([folder_b]), store_with_folders([folder_c])],
-            "errors": [file_a, file_b, file_c],
+            "fs": fs_data(files={**files_a(), **files_b()}, folders=[folder_a, folder_b]),
+            "stores": [store_test_with_file_a_descr(), store_test_with_file_b_descr(), empty_test_store()],
+            "ok": [file_a, file_b],
+            "errors": [file_c],
             "full_partitions": [MEDIA_FAT],
             "free": {MEDIA_FAT: self.mb600 - self.size_a - self.size_b - self.size_c}
         }, sut, stores, free=free)
@@ -128,6 +132,24 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
         return self._download_dbs(
             fs(),
             [db_test_with_file_a(db_id='1'), db_test_with_file_b(db_id='2'), db_test_with_file_c(db_id='3')],
+            partitions
+        )
+
+    def test_download_four_dbs___with_enough_free_space_for_two_out_of_four_dbs___reports_error_for_last_two_and_full_partition(self):
+        sut, free, stores = self.download_four_dbs({MEDIA_FAT: Partition(self.mb600, min_space=592, block_size=32)})
+        self.assertSystem({
+            "fs": fs_data(files={**files_a(), **files_b()}, folders=[folder_a, folder_b]),
+            "stores": [store_test_with_file_a_descr(), store_test_with_file_b_descr(), empty_test_store(), empty_test_store()],
+            "ok": [file_a, file_b],
+            "errors": [file_c, file_d],
+            "full_partitions": [MEDIA_FAT],
+            "free": {MEDIA_FAT: self.mb600 - self.size_a - self.size_b - self.size_c - self.size_d}
+        }, sut, stores, free=free)
+
+    def download_four_dbs(self, partitions: Dict[str, Any]):
+        return self._download_dbs(
+            fs(),
+            [db_test_with_file_a(db_id='1'), db_test_with_file_b(db_id='2'), db_test_with_file_c(db_id='3'), db_test_with_file_d(db_id='4')],
             partitions
         )
 
@@ -222,7 +244,7 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
     def test_download_db_with_zipped_file___without_enough_space___reports_error_and_full_partition(self):
         sut, free, stores = self.download_db_with_zipped_file({MEDIA_FAT: Partition(1000, min_space=0, block_size=32)})
         self.assertSystem({
-            "fs": fs_data(files={}, folders=cheats_folder_folders()),
+            "fs": fs_data(files={}, folders=[]),
             "stores": [store_with_unzipped_cheats(url=False)],
             "errors": [cheats_folder_nes_file_path, cheats_folder_sms_file_path],
             "full_partitions": [MEDIA_FAT],
