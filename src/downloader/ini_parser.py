@@ -1,5 +1,6 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -64,11 +65,12 @@ def to_int(n, default):
         return default
 
 
-def strtobool(val: str):
+def strtobool(val):
     val = val.lower()
     if val in ('y', 'yes', 't', 'true', 'on', '1'):
-        return 1
+        return True
     elif val in ('n', 'no', 'f', 'false', 'off', '0'):
-        return 0
+        return False
     else:
-        raise ValueError("invalid truth value %r" % (val,))
+        raise ValueError(f"Invalid truth value: {val}")
+

@@ -18,6 +18,7 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass
+import threading
 from typing import Dict, Any, Tuple, Set, List
 
 from downloader.external_drives_repository import ExternalDrivesRepository
@@ -49,6 +50,7 @@ class DownloaderWorkerContext:
     target_paths_calculator_factory: TargetPathsCalculatorFactory
     config: Dict[str, Any]
     pending_removals: 'PendingRemovals'
+    top_lock: threading.Lock
 
 
 def make_downloader_worker_context(job_ctx: JobContext, http_gateway: HttpGateway, logger: Logger, target_path_repository: TargetPathRepository, file_system: FileSystem, waiter: Waiter, progress_reporter: ProgressReporter, file_download_session_logger: FileDownloadSessionLogger, installation_report: InstallationReportImpl, free_space_reservation: FreeSpaceReservation, external_drives_repository: ExternalDrivesRepository, target_paths_calculator_factory: TargetPathsCalculatorFactory, config: Dict[str, Any]) -> DownloaderWorkerContext:
@@ -66,7 +68,8 @@ def make_downloader_worker_context(job_ctx: JobContext, http_gateway: HttpGatewa
         external_drives_repository=external_drives_repository,
         target_paths_calculator_factory=target_paths_calculator_factory,
         config=config,
-        pending_removals=PendingRemovals()
+        pending_removals=PendingRemovals(),
+        top_lock=threading.Lock(),
     )
 
 

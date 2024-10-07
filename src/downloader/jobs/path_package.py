@@ -17,7 +17,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+from downloader.target_path_calculator import TargetPathType, PathExtra
 
 
 @dataclass
@@ -25,3 +27,9 @@ class PathPackage:
     full_path: str
     rel_path: str
     description: Dict[str, Any]
+    ty: TargetPathType = TargetPathType.STANDARD
+    extra: Optional[PathExtra] = None
+
+    @property
+    def drive(self) -> str:
+        return self.full_path[0: len(self.full_path) - len(self.rel_path) - 1]
