@@ -62,7 +62,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         self.assertEqual(store_smb1_on_usb1(), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_usb1(), folders=fs_folders_nes_on_usb1_and_usb2()), sut.fs_data)
-        self.assertReports(sut, [])
+        self.assertReports(sut, [], save=False)
 
     def test_download_empty_db___after_previous_run___removes_files_from_usb1_but_keeps_usb1_and_usb2_folders(self):
         store = store_smb1_on_usb1()

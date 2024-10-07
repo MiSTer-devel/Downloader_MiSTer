@@ -1,5 +1,6 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -16,9 +17,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import distutils
-import distutils.util
-
 
 class IniParser:
     def __init__(self, ini_args):
@@ -31,7 +29,7 @@ class IniParser:
         return self._ini_args.get(key, default).strip('"\' ')
 
     def get_bool(self, key, default):
-        return bool(distutils.util.strtobool(self.get_string(key, 'true' if default else 'false')))
+        return bool(strtobool(self.get_string(key, 'true' if default else 'false')))
 
     def get_int(self, key, default):
         result = self.get_string(key, None)
@@ -65,3 +63,14 @@ def to_int(n, default):
         if isinstance(default, Exception):
             raise default
         return default
+
+
+def strtobool(val):
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return True
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return False
+    else:
+        raise ValueError(f"Invalid truth value: {val}")
+

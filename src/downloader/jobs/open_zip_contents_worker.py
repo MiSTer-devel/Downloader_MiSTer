@@ -62,7 +62,7 @@ class OpenZipContentsWorker(DownloaderWorker):
 
         self._ctx.logger.print(zip_description['description'])
 
-        target_folder_path = self._ctx.target_paths_calculator_factory\
+        target_folder_path, *_ = self._ctx.target_paths_calculator_factory\
             .target_paths_calculator(config)\
             .deduce_target_path(zip_description['target_folder_path'], {}, PathType.FOLDER)
 
@@ -71,7 +71,7 @@ class OpenZipContentsWorker(DownloaderWorker):
                 continue
 
             self._ctx.file_system.make_dirs(pkg.full_path)
-            job.store.write_only().add_folder(pkg.rel_path, pkg.description)
+            self._ctx.installation_report.add_processed_folder(pkg, job.db.db_id)
             self._ctx.installation_report.add_installed_folder(pkg.rel_path)
 
         # @TODO: self._ctx.file_system.precache_is_file_with_folders() THIS IS MISSING FOR PROPER PERFORMANCE!
