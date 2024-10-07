@@ -16,7 +16,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from threading import Lock
 from typing import List, Tuple, Optional
 
 from downloader.file_filter import FileFilterFactory
@@ -31,10 +30,6 @@ from downloader.target_path_calculator import TargetPathsCalculator
 
 
 class ProcessZipWorker(DownloaderWorker):
-    def __init__(self, ctx: DownloaderWorkerContext):
-        super().__init__(ctx)
-        self._lock = Lock()
-
     def job_type_id(self) -> int: return ProcessZipJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
@@ -62,7 +57,7 @@ class ProcessZipWorker(DownloaderWorker):
             file_packs: List[PathPackage] = []
             target_paths_calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(job.config)
             for file_path, file_description in index.files.items():
-                target_file_path = target_paths_calculator.deduce_target_path(file_path, file_description, PathType.FILE)
+                target_file_path, *_ = target_paths_calculator.deduce_target_path(file_path, file_description, PathType.FILE)
                 file_packs.append(PathPackage(full_path=target_file_path, rel_path=file_path, description=file_description))
 
             self._ctx.logger.debug(f"Reserving space '{job.db.db_id}'...")
@@ -70,15 +65,15 @@ class ProcessZipWorker(DownloaderWorker):
                 self._ctx.logger.debug(f"Not enough space '{job.db.db_id} zip:{job.zip_id}'!")
                 for pkg in file_packs:
                     self._ctx.installation_report.add_failed_file(pkg.rel_path)
-                return
+                return  # @TODO return error instead to retry later?
 
             folder_packs: List[PathPackage] = []
             for folder_path, folder_description in index.folders.items():
-                target_folder_path = target_paths_calculator.deduce_target_path(folder_path, folder_description, PathType.FOLDER)
+                target_folder_path, *_ = target_paths_calculator.deduce_target_path(folder_path, folder_description, PathType.FOLDER)
                 folder_packs.append(PathPackage(full_path=target_folder_path, rel_path=folder_path, description=folder_description))
 
             already_processed: Optional[Tuple[str, str]] = None
-            with self._lock:
+            with self._ctx.top_lock:
                 for pkg in file_packs:
                     if self._ctx.installation_report.is_file_processed(pkg.rel_path):
                         already_processed = (pkg.rel_path, self._ctx.installation_report.processed_file(pkg.rel_path).db_id)
@@ -100,7 +95,7 @@ class ProcessZipWorker(DownloaderWorker):
             self._ctx.job_ctx.push_job(get_file_job)
 
     def _try_reserve_space(self, file_packs: List[PathPackage]) -> bool:
-        with self._lock:
+        with self._ctx.top_lock:
             for pkg in file_packs:
                 self._ctx.free_space_reservation.reserve_space_for_file(pkg.full_path,  pkg.description)
 

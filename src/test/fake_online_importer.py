@@ -26,7 +26,7 @@ from downloader.jobs.reporters import FileDownloadProgressReporter, Installation
 from downloader.jobs.worker_context import make_downloader_worker_context
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
-from downloader.target_path_calculator import TargetPathsCalculatorFactory
+from downloader.target_path_calculator import TargetPathsCalculatorFactory, TargetPathType
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_job_system import ProgressReporterTracker
 from test.fake_local_store_wrapper import StoreWrapper, LocalStoreWrapper
@@ -34,6 +34,7 @@ from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_local_repository import LocalRepository
 from test.fake_path_resolver import PathResolverFactory
 from test.objects import config_with
+from typing import Dict, Set
 from test.fake_waiter import NoWaiter
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs, FileSystemState, NetworkState
 from test.fake_file_system_factory import FileSystemFactory
@@ -162,11 +163,50 @@ class OnlineImporter(ProductionOnlineImporter):
                 stores[db_id].write_only().remove_folder(pkg.rel_path)
                 stores[db_id].write_only().remove_folder_from_zips(pkg.rel_path)
 
+        external_parents_by_db: Dict[str, Dict[str, Set[str]]] = dict()
+        parents_by_db: Dict[str, Set[str]] = dict()
+
         for file_path in report.installed_files():
             file = report.processed_file(file_path)
             if 'reboot' in file.pkg.description and file.pkg.description['reboot']:
                 self._needs_reboot = True
-            stores[file.db_id].write_only().add_file(file.pkg.rel_path, file.pkg.description)
+            if file.pkg.ty == TargetPathType.RELATIVE_EXTERNAL:
+                stores[file.db_id].write_only().add_external_file(file.pkg.drive, file.pkg.rel_path, file.pkg.description)
+            else:
+                stores[file.db_id].write_only().add_file(file.pkg.rel_path, file.pkg.description)
+
+            if file.pkg.extra is not None:
+                if file.pkg.ty == TargetPathType.RELATIVE_STANDARD:
+                    parents_by_db.setdefault(file.db_id, set()).add(file.pkg.extra['parent'])
+                else:
+                    external_parents_by_db.setdefault(file.db_id, dict()).setdefault(file.pkg.extra['parent'], set()).add(file.pkg.extra['drive'])
+
+        for folder_path in sorted(report.installed_folders(), key=lambda x: len(x), reverse=True):
+            for db_id, folder_pkg in report.processed_folder(folder_path).items():
+                if folder_pkg.ty == TargetPathType.RELATIVE_PARENT:
+                    continue
+
+                if folder_pkg.ty == TargetPathType.RELATIVE_EXTERNAL:
+                    stores[db_id].write_only().add_external_folder(folder_pkg.drive, folder_pkg.rel_path, folder_pkg.description)
+                else:
+                    stores[db_id].write_only().add_folder(folder_pkg.rel_path, folder_pkg.description)
+
+                if folder_pkg.extra is not None:
+                    if folder_pkg.ty == TargetPathType.RELATIVE_STANDARD:
+                        parents_by_db.setdefault(db_id, set()).add(folder_pkg.extra['parent'])
+                    else:
+                        external_parents_by_db.setdefault(db_id, dict()).setdefault(folder_pkg.extra['parent'], set()).add(folder_pkg.extra['drive'])
+
+        for folder_path in sorted(report.installed_folders(), key=lambda x: len(x), reverse=True):
+            for db_id, folder_pkg in report.processed_folder(folder_path).items():
+                if folder_pkg.ty != TargetPathType.RELATIVE_PARENT:
+                    continue
+
+                if folder_pkg.extra['parent'] in parents_by_db.get(db_id, set()):
+                    stores[db_id].write_only().add_folder(folder_pkg.rel_path, folder_pkg.description)
+                elif folder_pkg.extra['parent'] in external_parents_by_db.get(db_id, dict()):
+                    for drive in external_parents_by_db[db_id][folder_pkg.extra['parent']]:
+                        stores[db_id].write_only().add_external_folder(drive, folder_pkg.rel_path, folder_pkg.description)
 
         for file_path in report.removed_files():
             file = report.processed_file(file_path)

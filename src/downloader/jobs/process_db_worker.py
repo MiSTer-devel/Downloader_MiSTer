@@ -16,33 +16,29 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, Set, List
-from dataclasses import dataclass
-import threading
-from pathlib import Path
+from typing import Dict, Any
 
 from downloader.db_entity import DbEntity
-from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_process_zip_job, make_open_zip_index_job, ZipJobContext
+from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_index_job, ZipJobContext
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
-from downloader.constants import K_USER_DEFINED_OPTIONS, K_FILTER, K_OPTIONS
+from downloader.constants import K_USER_DEFINED_OPTIONS, K_FILTER, K_OPTIONS, K_BASE_PATH
 from downloader.jobs.process_db_job import ProcessDbJob
-from downloader.jobs.open_zip_index_job import OpenZipIndexJob
-from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE
+from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE, ReadOnlyStoreAdapter
 
 
 class ProcessDbWorker(DownloaderWorker):
-    def __init__(self, ctx: DownloaderWorkerContext):
-        super().__init__(ctx)
-        self._lock = threading.Lock()
-        self._full_partitions: Set[str] = set()
-
     def job_type_id(self) -> int: return ProcessDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: ProcessDbJob):
+        read_only_store = job.store.read_only()
+        write_only_store = job.store.write_only()
+
         config = self._build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
+        if not read_only_store.has_base_path():
+            write_only_store.set_base_path(config[K_BASE_PATH])
 
         zip_dispatcher = _ZipJobDispatcher(self._ctx)
 
@@ -51,11 +47,11 @@ class ProcessDbWorker(DownloaderWorker):
             zip_dispatcher.push_zip_jobs(ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
             job_tags.append(f'{job.db.db_id}:{zip_id}')
 
-        for zip_id in list(job.store.read_only().zips):
+        for zip_id in list(read_only_store.zips):
             if zip_id in job.db.zips:
                 continue
 
-            job.store.write_only().remove_zip_id(zip_id)
+            write_only_store.remove_zip_id(zip_id)
 
         self._ctx.job_ctx.wait_for_jobs_with_tags(job_tags)
 

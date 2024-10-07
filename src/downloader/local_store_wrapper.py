@@ -48,6 +48,14 @@ class LocalStoreWrapper:
 
 class StoreWrapper:
     def __init__(self, store, local_store_wrapper):
+        self._aggregated_summary = {'files': dict(), 'folders': dict()}
+        if 'files' in store:
+            for file_path, file_description in store['files'].items():
+                self._aggregated_summary['files'][file_path] = file_description
+        if 'folders' in store:
+            for folder_path, folder_description in store['folders'].items():
+                self._aggregated_summary['folders'][folder_path] = folder_description
+
         self._external_additions = {'files': defaultdict(list), 'folders': defaultdict(list)}
         if 'external' in store:
             for drive, external in store['external'].items():
@@ -55,20 +63,22 @@ class StoreWrapper:
                     for file_path in external['files']:
                         if file_path in store['files']:
                             continue
-                        store['files'][file_path] = external['files'][file_path]
+                        #store['files'][file_path] = external['files'][file_path]
+                        self._aggregated_summary['files'][file_path] = external['files'][file_path]
                         self._external_additions['files'][file_path].append(drive)
 
                 if 'folders' in external:
                     for folder_path in external['folders']:
                         if folder_path in store['folders']:
                             continue
-                        store['folders'][folder_path] = external['folders'][folder_path]
+                        #store['folders'][folder_path] = external['folders'][folder_path]
+                        self._aggregated_summary['folders'][folder_path] = external['folders'][folder_path]
                         self._external_additions['folders'][folder_path].append(drive)
 
         self._store = store
         self._local_store_wrapper = local_store_wrapper
-        self._read_only = _ReadOnlyStoreAdapter(self._store)
-        self._write_only = _WriteOnlyStoreAdapter(self._store, self._local_store_wrapper, self._external_additions)
+        self._read_only = ReadOnlyStoreAdapter(self._store, self._aggregated_summary)
+        self._write_only = WriteOnlyStoreAdapter(self._store, self._local_store_wrapper, self._external_additions, self._aggregated_summary)
 
     def unwrap_store(self):
         return self._store
@@ -80,11 +90,12 @@ class StoreWrapper:
         return self._read_only
 
 
-class _WriteOnlyStoreAdapter:
-    def __init__(self, store, top_wrapper, external_additions):
+class WriteOnlyStoreAdapter:
+    def __init__(self, store, top_wrapper, external_additions, aggregated_summary):
         self._store = store
         self._top_wrapper = top_wrapper
         self._external_additions = external_additions
+        self._aggregated_summary = aggregated_summary
 
     def add_file(self, file, description):
         self._add_entry('files', file, description)
@@ -156,6 +167,8 @@ class _WriteOnlyStoreAdapter:
     def _clean_external_additions(self, kind, path):
         if path in self._external_additions[kind]:
             self._external_additions[kind].pop(path)
+        if path in self._aggregated_summary[kind]:
+            self._aggregated_summary[kind].pop(path)
 
     def _remove_entry(self, kind, path):
         self._clean_external_additions(kind, path)
@@ -248,6 +261,7 @@ class _WriteOnlyStoreAdapter:
         for file_path in self._external_additions['files']:
             if file_path in self._store['files']:
                 self._store['files'].pop(file_path)
+                self._aggregated_summary['files'].pop(file_path)
                 for drive in self._external_additions['files'][file_path]:
                     if 'external' not in self._store \
                             or drive not in self._store['external'] \
@@ -258,6 +272,7 @@ class _WriteOnlyStoreAdapter:
         for folder_path in self._external_additions['folders']:
             if folder_path in self._store['folders']:
                 self._store['folders'].pop(folder_path)
+                self._aggregated_summary['folders'].pop(folder_path)
                 for drive in self._external_additions['files'][folder_path]:
                     if 'external' not in self._store \
                             or drive not in self._store['external'] \
@@ -332,15 +347,16 @@ class _WriteOnlyStoreAdapter:
             self.add_folder(folder_path, folder_description)
 
 
-class _ReadOnlyStoreAdapter:
-    def __init__(self, store):
+class ReadOnlyStoreAdapter:
+    def __init__(self, store, aggregated_summary):
         self._store = store
+        self._aggregated_summary = aggregated_summary
 
     def hash_file(self, file):
-        if file not in self._store['files']:
+        if file not in self._aggregated_summary['files']:
             return NO_HASH_IN_STORE_CODE
 
-        return self._store['files'][file]['hash']
+        return self._aggregated_summary['files'][file]['hash']
 
     def list_missing_files(self, db_files):
         files = {}
@@ -354,11 +370,11 @@ class _ReadOnlyStoreAdapter:
     def zip_index(self, zip_id) -> Optional[Dict[str, Any]]:
         files = {}
         folders = {}
-        for file_path, file_description in self._store['files'].items():
+        for file_path, file_description in self._aggregated_summary['files'].items():
             if 'zip_id' in file_description and file_description['zip_id'] == zip_id:
                 files[file_path] = file_description
 
-        for folder_path, folder_description in self._store['folders'].items():
+        for folder_path, folder_description in self._aggregated_summary['folders'].items():
             if 'zip_id' in folder_description and folder_description['zip_id'] == zip_id:
                 folders[folder_path] = folder_description
 
@@ -393,11 +409,11 @@ class _ReadOnlyStoreAdapter:
 
     @property
     def files(self):
-        return self._store['files']
+        return self._aggregated_summary['files']
 
     @property
     def folders(self):
-        return self._store['folders']
+        return self._aggregated_summary['folders']
 
     @property
     def has_externals(self):
