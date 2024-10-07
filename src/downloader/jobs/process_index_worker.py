@@ -16,9 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, List, Set, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional
 from pathlib import Path
-import threading
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
@@ -28,39 +27,40 @@ from downloader.jobs.path_package import PathPackage
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
-from downloader.constants import K_BASE_PATH, PathType, FILE_MiSTer, FILE_MiSTer_old
-from downloader.local_store_wrapper import StoreWrapper, NO_HASH_IN_STORE_CODE
+from downloader.jobs.worker_context import DownloaderWorker
+from downloader.constants import PathType, FILE_MiSTer, FILE_MiSTer_old
+from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE, ReadOnlyStoreAdapter
 from downloader.other import calculate_url
 from downloader.storage_priority_resolver import StoragePriorityError
+from downloader.target_path_calculator import TargetPathsCalculator, TargetPathType
 
 _CheckFilePackage = PathPackage
 _FetchFilePackage = PathPackage
 _ValidateFilePackage = PathPackage
+_AlreadyInstalledFilePackage = PathPackage
 _RemoveFilePackage = PathPackage
 _CreateFolderPackage = PathPackage
 _DeleteFolderPackage = PathPackage
 
 
 class ProcessIndexWorker(DownloaderWorker):
-    def __init__(self, ctx: DownloaderWorkerContext):
-        super().__init__(ctx)
-        self._lock = threading.Lock()
-
     def job_type_id(self) -> int: return ProcessIndexJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: ProcessIndexJob) -> Optional[Exception]:
-        try:
-            logger = self._ctx.logger
-            db, config, summary, store, full_resync = job.db, job.config, job.index, job.store, job.full_resync
-            base_files_url = job.db.base_files_url
+        logger = self._ctx.logger
+        db, config, summary, full_resync = job.db, job.config, job.index, job.full_resync
+        store = job.store.read_only()
 
+        try:
             logger.debug(f"Processing db '{db.db_id}'...")
-            check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs = self._process_index(config, summary, db, store)
+            check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs = self._create_packages_from_index(config, summary, db, store)
 
             logger.debug(f"Processing check file packages '{db.db_id}'...")
-            fetch_pkgs, validate_pkgs = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
+            fetch_pkgs, validate_pkgs, already_installed_pkgs = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
+
+            logger.debug(f"Processing already installed file packages '{db.db_id}'...")
+            self._process_already_installed_packages(already_installed_pkgs)
 
             logger.debug(f"Processing validate file packages '{db.db_id}'...")
             fetch_pkgs.extend(self._process_validate_packages(validate_pkgs, store))
@@ -70,53 +70,31 @@ class ProcessIndexWorker(DownloaderWorker):
             logger.debug(f"Reserving space '{db.db_id}'...")
             if not self._try_reserve_space(fetch_pkgs):
                 logger.debug(f"Not enough space '{db.db_id}'!")
-                for pkg in fetch_pkgs:
-                    self._ctx.installation_report.add_failed_file(pkg.rel_path)
-                return
+                return  # @TODO return error instead to retry later?
 
             logger.debug(f"Processing create folder packages '{db.db_id}'...")
-            self._process_create_folder_packages(create_folder_pkgs, store) # @TODO maybe move this one after reserve space
+            self._process_create_folder_packages(create_folder_pkgs, db.db_id)  # @TODO maybe move this one after reserve space
 
-            logger.debug(f"Postponing remove packages '{db.db_id}'...")
-            with self._lock:
-                for pkg in remove_files_pkgs:
-                    self._ctx.pending_removals.queue_file_removal(pkg, db.db_id)
-                for pkg in delete_folder_pkgs:
-                    self._ctx.pending_removals.queue_directory_removal(pkg, db.db_id)
+            logger.debug(f"Processing remove file packages '{db.db_id}'...")
+            self._process_remove_file_packages(remove_files_pkgs, db.db_id)
 
-            logger.debug(f"Launching fetch jobs '{db.db_id}'...")
-            for pkg in fetch_pkgs:
-                download_path = pkg.full_path + '.new'
-                fetch_job = FetchFileJob2(
-                    source=_url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url),
-                    info=pkg.rel_path,
-                    temp_path=download_path,
-                    silent=False
-                )
-                fetch_job.after_job = ValidateFileJob2(
-                    temp_path=download_path,
-                    target_file_path=pkg.full_path,
-                    description=pkg.description,
-                    info=pkg.rel_path,
-                    get_file_job=fetch_job
-                )
-                self._ctx.job_ctx.push_job(fetch_job)
+            logger.debug(f"Processing delete folder packages '{db.db_id}'...")
+            self._process_delete_folder_packages(delete_folder_pkgs, db.db_id)
+
+            logger.debug(f"Process fetch packages and launch fetch jobs '{db.db_id}'...")
+            self._process_fetch_packages_and_launch_jobs(fetch_pkgs, db.base_files_url)
         except BadFileFilterPartException as e:
             return e
         except StoragePriorityError as e:
             return e
 
-    def _process_index(self, config: Dict[str, Any], summary: Index, db: DbEntity, store: StoreWrapper) -> Tuple[
+    def _create_packages_from_index(self, config: Dict[str, Any], summary: Index, db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[
         List[_CheckFilePackage],
         List[_RemoveFilePackage],
         List[_CreateFolderPackage],
         List[_DeleteFolderPackage]
     ]:
-        read_only_store = store.read_only()
         logger = self._ctx.logger
-
-        if not read_only_store.has_base_path():
-            store.write_only().set_base_path(config[K_BASE_PATH])
 
         logger.bench('Filtering Database...')
         filtered_summary, _ = FileFilterFactory(self._ctx.logger)\
@@ -124,16 +102,10 @@ class ProcessIndexWorker(DownloaderWorker):
             .select_filtered_files(summary)
 
         logger.bench('Translating paths...')
-        target_paths_calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(config)
+        calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(config)
 
-        def translate_items(items: Dict[str, Dict[str, Any]], path_type: PathType, exclude_items: Dict[str, Any]) -> List[PathPackage]: return [PathPackage(
-            full_path=target_paths_calculator.deduce_target_path(path, description, path_type),
-            rel_path=path,
-            description=description
-        ) for path, description in items.items() if path not in exclude_items]
-
-        check_file_pkgs: List[_CheckFilePackage] = translate_items(filtered_summary.files, PathType.FILE, {})
-        remove_files_pkgs: List[_RemoveFilePackage] = translate_items(read_only_store.files, PathType.FILE, filtered_summary.files)
+        check_file_pkgs: List[_CheckFilePackage] = self._translate_items(calculator, filtered_summary.files, PathType.FILE, {})
+        remove_files_pkgs: List[_RemoveFilePackage] = self._translate_items(calculator, store.files, PathType.FILE, filtered_summary.files)
 
         # @TODO REFACTOR: This looks wrong
         remove_files_pkgs = [pkg for pkg in remove_files_pkgs if 'zip_id' not in pkg.description]
@@ -147,11 +119,11 @@ class ProcessIndexWorker(DownloaderWorker):
                 target_path_obj = target_path_obj.parent
                 path_str = str(path_obj)
                 if path_str not in existing_folders:
-                    existing_folders[path_str] = read_only_store.folders.get(path_str, {})
+                    existing_folders[path_str] = store.folders.get(path_str, {})
                     self._ctx.file_system.make_dirs(str(target_path_obj))
 
-        create_folder_pkgs: List[_CreateFolderPackage] = translate_items(filtered_summary.folders, PathType.FOLDER, {})
-        delete_folder_pkgs: List[_DeleteFolderPackage] = translate_items(read_only_store.folders, PathType.FOLDER, existing_folders)
+        create_folder_pkgs: List[_CreateFolderPackage] = self._translate_items(calculator, filtered_summary.folders, PathType.FOLDER, {})
+        delete_folder_pkgs: List[_DeleteFolderPackage] = self._translate_items(calculator, store.folders, PathType.FOLDER, existing_folders)
 
         # @REFACTOR: This looks wrong
         delete_folder_pkgs = [pkg for pkg in delete_folder_pkgs if 'zip_id' not in pkg.description]
@@ -162,17 +134,45 @@ class ProcessIndexWorker(DownloaderWorker):
 
         return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs
 
-    def _process_check_file_packages(self, check_file_pkgs: List[_CheckFilePackage], db_id: str, store: StoreWrapper, full_resync: bool) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage]]:
-        read_only_store = store.read_only()
+    @staticmethod
+    def _translate_items(calculator: TargetPathsCalculator, items: Dict[str, Dict[str, Any]], path_type: PathType, exclude_items: Dict[str, Any]) -> List[PathPackage]:
+        # @TODO: This should be optimized, calling deduce target path twice should be unnecessary.
+        exclude = set()
+        for path, description in exclude_items.items():
+            full_path, rel_path, ty, extra = calculator.deduce_target_path(path, description, path_type)
+            exclude.add(rel_path)
+
+        translated = []
+        for path, description in items.items():
+            if path in exclude:
+                continue
+
+            full_path, rel_path, ty, extra = calculator.deduce_target_path(path, description, path_type)
+            translated.append(PathPackage(
+                full_path=full_path,
+                rel_path=rel_path,
+                description=description,
+                ty=ty,
+                extra=extra
+            ))
+
+        return translated
+
+    def _process_check_file_packages(self, check_file_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
+        if len(check_file_pkgs) == 0:
+            return [], [], []
+
         file_system = ReadOnlyFileSystem(self._ctx.file_system)
 
         non_duplicated_pkgs: List[_CheckFilePackage] = []
         duplicated_files = []
-        with self._lock:
+        with self._ctx.top_lock:
             for pkg in check_file_pkgs:
+                # @TODO Should check a collection instead of a single file to minimize lock time
                 if self._ctx.installation_report.is_file_processed(pkg.rel_path):
                     duplicated_files.append(pkg.rel_path)
                 else:
+                    # @TODO Should add a collection instead of a single file to minimize lock time
                     self._ctx.installation_report.add_processed_file(pkg, db_id)
                     non_duplicated_pkgs.append(pkg)
 
@@ -181,64 +181,140 @@ class ProcessIndexWorker(DownloaderWorker):
 
         fetch_pkgs: List[_FetchFilePackage] = []
         validate_pkgs: List[_ValidateFilePackage] = []
+        already_installed_pkgs: List[_ValidateFilePackage] = []
         for pkg in non_duplicated_pkgs:
             if file_system.is_file(pkg.full_path):
-                if not full_resync and read_only_store.hash_file(pkg.rel_path) == pkg.description['hash']:
-                    continue
-
-                validate_pkgs.append(pkg)
+                if not full_resync and store.hash_file(pkg.rel_path) == pkg.description['hash']:
+                    already_installed_pkgs.append(pkg)
+                else:
+                    validate_pkgs.append(pkg)
             else:
                 fetch_pkgs.append(pkg)
 
-        return fetch_pkgs, validate_pkgs
+        return fetch_pkgs, validate_pkgs, already_installed_pkgs
 
-    def _process_validate_packages(self, validate_pkgs: List[_ValidateFilePackage], store: StoreWrapper) -> List[_FetchFilePackage]:
-        read_only_store = store.read_only()
+    def _process_already_installed_packages(self, already_installed_pkgs: List[_AlreadyInstalledFilePackage]) -> None:
+        if len(already_installed_pkgs) == 0:
+            return
+
+        already_installed_files: List[str] = [pkg.rel_path for pkg in already_installed_pkgs]
+        with self._ctx.top_lock:
+            self._ctx.installation_report.add_present_not_validated_files(already_installed_files)
+
+    def _process_validate_packages(self, validate_pkgs: List[_ValidateFilePackage], store: ReadOnlyStoreAdapter) -> List[_FetchFilePackage]:
+        if len(validate_pkgs) == 0:
+            return []
+
         file_system = ReadOnlyFileSystem(self._ctx.file_system)
 
         more_fetch_pkgs: List[_FetchFilePackage] = []
+        present_validated_files: List[str] = []
+        skipped_updated_files: List[str] = []
 
         for pkg in validate_pkgs:
             # @TODO: Parallelize the slow hash calculations
-            if read_only_store.hash_file(pkg.rel_path) == NO_HASH_IN_STORE_CODE and file_system.hash(pkg.full_path) == pkg.description['hash']:
-                with self._lock:
-                    self._ctx.file_download_session_logger.print_progress_line(f'No changes: {pkg.rel_path}')
-                    self._ctx.installation_report.add_already_present_file(pkg.rel_path)
+            if store.hash_file(pkg.rel_path) == NO_HASH_IN_STORE_CODE and file_system.hash(pkg.full_path) == pkg.description['hash']:
+                self._ctx.file_download_session_logger.print_progress_line(f'No changes: {pkg.rel_path}')
+                present_validated_files.append(pkg.rel_path)
                 continue
 
             if 'overwrite' in pkg.description and not pkg.description['overwrite']:
                 if file_system.hash(pkg.full_path) != pkg.description['hash']:
-                    with self._lock:
-                        self._ctx.installation_report.add_skipped_updated_file(pkg.rel_path)
+                    skipped_updated_files.append(pkg.rel_path)
+                else:
+                    present_validated_files.append(pkg.rel_path)
+
                 continue
 
             more_fetch_pkgs.append(pkg)
 
+        if len(present_validated_files) > 0:
+            with self._ctx.top_lock:
+                self._ctx.installation_report.add_present_validated_files(present_validated_files)
+
+        if len(skipped_updated_files) > 0:
+            with self._ctx.top_lock:
+                self._ctx.installation_report.add_skipped_updated_files(skipped_updated_files)
+
         return more_fetch_pkgs
 
-    def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], store: StoreWrapper):
-        for pkg in create_folder_pkgs:
-            self._ctx.file_system.make_dirs(pkg.full_path)
-            store.write_only().add_folder(pkg.rel_path, pkg.description)
-            self._ctx.installation_report.add_installed_folder(pkg.rel_path)
-
     def _try_reserve_space(self, fetch_pkgs: List[_FetchFilePackage]) -> bool:
-        with self._lock:
+        if len(fetch_pkgs) == 0:
+            return True
+
+        with self._ctx.top_lock:
             for pkg in fetch_pkgs:
+                # @TODO Should reserve a collection instead of a single file to minimize lock time
                 self._ctx.free_space_reservation.reserve_space_for_file(pkg.full_path,  pkg.description)
 
             self._ctx.logger.debug(f"Free space: {self._ctx.free_space_reservation.free_space()}")
             full_partitions = self._ctx.free_space_reservation.get_full_partitions()
             if len(full_partitions) > 0:
                 for partition in full_partitions:
+                    # @TODO No need to be within the lock
                     self._ctx.file_download_session_logger.print_progress_line(f"Partition {partition.partition_path} would get full!")
 
-                #for pkg in fetch_pkgs:
+                for pkg in fetch_pkgs:
+                    # @TODO Should add a collection instead of a single file to minimize lock time
+                    self._ctx.installation_report.add_failed_file(pkg.rel_path)
                 #    self._ctx.free_space_reservation.release_space_for_file(pkg.full_path, pkg.description)
 
                 return False
 
         return True
+
+    def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], db_id: str):
+        if len(create_folder_pkgs) == 0:
+            return
+
+        for pkg in create_folder_pkgs:
+            if pkg.ty == TargetPathType.RELATIVE_PARENT:
+                continue
+
+            self._ctx.file_system.make_dirs(pkg.full_path)
+
+        with self._ctx.top_lock:
+            for pkg in create_folder_pkgs:
+                # @TODO Why two adds?
+                # @TODO Should add a collection instead of a single file to minimize lock time
+                self._ctx.installation_report.add_processed_folder(pkg, db_id)
+                self._ctx.installation_report.add_installed_folder(pkg.rel_path)
+
+    def _process_remove_file_packages(self, remove_files_pkgs: List[_RemoveFilePackage], db_id: str):
+        if len(remove_files_pkgs) == 0:
+            return
+
+        with self._ctx.top_lock:
+            for pkg in remove_files_pkgs:
+                # @TODO Should queue a collection instead of a single file to minimize lock time
+                self._ctx.pending_removals.queue_file_removal(pkg, db_id)
+
+    def _process_delete_folder_packages(self, delete_folder_pkgs: List[_DeleteFolderPackage], db_id: str):
+        if len(delete_folder_pkgs) == 0:
+            return
+
+        with self._ctx.top_lock:
+            for pkg in delete_folder_pkgs:
+                # @TODO Should queue a collection instead of a single file to minimize lock time
+                self._ctx.pending_removals.queue_directory_removal(pkg, db_id)
+
+    def _process_fetch_packages_and_launch_jobs(self, fetch_pkgs: List[_FetchFilePackage], base_files_url: str):
+        for pkg in fetch_pkgs:
+            download_path = pkg.full_path + '.new'
+            fetch_job = FetchFileJob2(
+                source=_url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url),
+                info=pkg.rel_path,
+                temp_path=download_path,
+                silent=False
+            )
+            fetch_job.after_job = ValidateFileJob2(
+                temp_path=download_path,
+                target_file_path=pkg.full_path,
+                description=pkg.description,
+                info=pkg.rel_path,
+                get_file_job=fetch_job
+            )
+            self._ctx.job_ctx.push_job(fetch_job)
 
 
 def _url(file_path: str, file_description: Dict[str, Any], base_files_url: str):

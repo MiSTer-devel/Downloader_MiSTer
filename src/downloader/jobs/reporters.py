@@ -74,12 +74,20 @@ class ProcessedFile:
     db_id: str
 
 
+@dataclasses.dataclass
+class ProcessedFolder:
+    pkg: PathPackage
+    dbs: Set[str]
+
+
 class InstallationReport(abc.ABC):
     def is_file_processed(self, path: str) -> bool: """Returns True if the file has been processed."""
     def is_folder_installed(self, path: str) -> bool: """Returns True if the file has been processed."""
     def processed_file(self, path: str) -> ProcessedFile: """File that a database is currently processing."""
+    def processed_folder(self, path: str) -> Dict[str, PathPackage]: """File that a database is currently processing."""
     def downloaded_files(self) -> List[str]: """Files that has just been downloaded and validated."""
-    def already_present_files(self) -> List[str]: """File previously in the system, that were not in the store, and now have been validated."""
+    def present_not_validated_files(self) -> List[str]: """File previously in the system, that were in the store, and have NOT been validated."""
+    def present_validated_files(self) -> List[str]: """File previously in the system, that were NOT in the store, and now have been validated."""
     def fetch_started_files(self) -> List[str]: """Files that have been queued for download."""
     def failed_files(self) -> List[str]: """Files that couldn't be downloaded properly or didn't pass validation."""
     def removed_files(self) -> List[str]: """Files that have just been removed."""
@@ -95,20 +103,24 @@ class InstallationReport(abc.ABC):
 class InstallationReportImpl(InstallationReport):
     def __init__(self):
         self._downloaded_files = []
-        self._already_present_files = []
+        self._present_validated_files = []
+        self._present_not_validated_files = []
         self._fetch_started_files = []
         self._failed_files = []
         self._failed_db_options: List[WrongDatabaseOptions] = []
         self._removed_files = []
         self._skipped_updated_files = []
         self._processed_files: Dict[str, ProcessedFile] = {}
+        self._processed_folders: Dict[str, Dict[str, PathPackage]] = {}
         self._installed_zip_indexes: List[Tuple[str, str, Index, Dict[str, Any]]] = []
         self._installed_folders: Set[str] = set()
         self._filtered_zip_data: List[Tuple[str, str, Dict[str, Any], Dict[str, Any]]] = []
 
     def add_downloaded_file(self, path: str): self._downloaded_files.append(path)
     def add_installed_zip_index(self, db_id: str, zip_id: str, index: Index, description: Dict[str, Any]): self._installed_zip_indexes.append((db_id, zip_id, index, description))
-    def add_already_present_file(self, path: str): self._already_present_files.append(path)
+    def add_present_validated_files(self, paths: List[str]): self._present_validated_files.extend(paths)
+    def add_present_not_validated_files(self, paths: List[str]): self._present_not_validated_files.extend(paths)
+    def add_skipped_updated_files(self, paths: List[str]): self._skipped_updated_files.extend(paths)
     def add_file_fetch_started(self, path: str): self._fetch_started_files.append(path)
     def add_failed_file(self, path: str): self._failed_files.append(path)
 
@@ -123,14 +135,16 @@ class InstallationReportImpl(InstallationReport):
     def is_file_processed(self, path: str) -> bool: return path in self._processed_files
     def is_folder_installed(self, path: str) -> bool: return path in self._installed_folders
     def add_processed_file(self, pkg: PathPackage, db_id: str): self._processed_files[pkg.rel_path] = ProcessedFile(pkg, db_id)
-    def add_skipped_updated_file(self, path: str): self._skipped_updated_files.append(path)
+    def add_processed_folder(self, pkg: PathPackage, db_id: str): self._processed_folders.setdefault(pkg.rel_path, dict())[db_id] = pkg
     def processed_file(self, path: str) -> ProcessedFile: return self._processed_files[path]
+    def processed_folder(self, path: str) -> Dict[str, PathPackage]: return self._processed_folders[path]
     def downloaded_files(self): return self._downloaded_files
-    def already_present_files(self): return self._already_present_files
+    def present_validated_files(self): return self._present_validated_files
+    def present_not_validated_files(self): return self._present_not_validated_files
     def fetch_started_files(self): return self._fetch_started_files
     def failed_files(self): return self._failed_files
     def removed_files(self): return self._removed_files
-    def installed_files(self): return self._downloaded_files + self._already_present_files
+    def installed_files(self): return self._downloaded_files + self._present_validated_files
     def installed_folders(self): return list(self._installed_folders)
     def uninstalled_files(self): return self._removed_files + self._failed_files
     def wrong_db_options(self): return self._failed_db_options
