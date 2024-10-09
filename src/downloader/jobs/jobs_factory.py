@@ -30,7 +30,7 @@ from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.index import Index
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.jobs.open_zip_index_job import OpenZipIndexJob
-from downloader.jobs.path_package import PathPackage
+from downloader.path_package import PathPackage
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.validate_file_job2 import ValidateFileJob2

@@ -26,7 +26,7 @@ from downloader.jobs.reporters import FileDownloadProgressReporter, Installation
 from downloader.jobs.worker_context import make_downloader_worker_context
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
-from downloader.target_path_calculator import TargetPathsCalculatorFactory, TargetPathType
+from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_job_system import ProgressReporterTracker
 from test.fake_local_store_wrapper import StoreWrapper, LocalStoreWrapper
@@ -40,6 +40,7 @@ from test.fake_importer_implicit_inputs import ImporterImplicitInputs, FileSyste
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
 from downloader.logger import NoLogger
+import os
 
 
 class OnlineImporter(ProductionOnlineImporter):
@@ -137,8 +138,16 @@ class OnlineImporter(ProductionOnlineImporter):
                 stores[db_id].write_only().remove_file(pkg.rel_path)
                 stores[db_id].write_only().remove_file_from_zips(pkg.rel_path)
 
-            if report.is_file_processed(pkg.rel_path):
-               continue
+            if report.is_file_processed(pkg.rel_path): continue
+
+            for db_id in dbs:
+                if not stores[db_id].read_only().has_externals:
+                    continue
+
+                for drive in stores[db_id].read_only().external_drives:
+                    file_path = os.path.join(drive, pkg.rel_path)
+                    if self._worker_ctx.file_system.is_file(file_path):
+                        self._worker_ctx.file_system.unlink(file_path)
 
             self._worker_ctx.file_system.unlink(pkg.full_path)
             self._worker_ctx.installation_report.add_processed_file(pkg, list(dbs)[0])
@@ -170,43 +179,60 @@ class OnlineImporter(ProductionOnlineImporter):
             file = report.processed_file(file_path)
             if 'reboot' in file.pkg.description and file.pkg.description['reboot']:
                 self._needs_reboot = True
-            if file.pkg.ty == TargetPathType.RELATIVE_EXTERNAL:
-                stores[file.db_id].write_only().add_external_file(file.pkg.drive, file.pkg.rel_path, file.pkg.description)
+            if file.pkg.is_pext_external:
+                stores[file.db_id].write_only().add_external_file(file.pkg.pext_props.drive, file.pkg.rel_path, file.pkg.description)
             else:
                 stores[file.db_id].write_only().add_file(file.pkg.rel_path, file.pkg.description)
 
-            if file.pkg.extra is not None:
-                if file.pkg.ty == TargetPathType.RELATIVE_STANDARD:
-                    parents_by_db.setdefault(file.db_id, set()).add(file.pkg.extra['parent'])
+            if file.pkg.pext_props is not None:
+                if file.pkg.is_pext_standard:
+                    parents_by_db.setdefault(file.db_id, set()).add(file.pkg.pext_props.parent)
                 else:
-                    external_parents_by_db.setdefault(file.db_id, dict()).setdefault(file.pkg.extra['parent'], set()).add(file.pkg.extra['drive'])
+                    external_parents_by_db.setdefault(file.db_id, dict()).setdefault(file.pkg.pext_props.parent, set()).add(file.pkg.pext_props.drive)
+
+                for other in file.pkg.pext_props.other_drives:
+                    if self._worker_ctx.file_system.is_file(os.path.join(other, file.pkg.rel_path)):
+                        stores[file.db_id].write_only().add_external_file(other, file.pkg.rel_path, file.pkg.description)
+
+        for file_path in report.present_not_validated_files():
+            file = report.processed_file(file_path)
+            if file.pkg.is_pext_external:
+                stores[file.db_id].write_only().add_external_file(file.pkg.pext_props.drive, file.pkg.rel_path, file.pkg.description)
+            else:
+                stores[file.db_id].write_only().add_file(file.pkg.rel_path, file.pkg.description)
+
+            if file.pkg.pext_props is not None:
+                for other in file.pkg.pext_props.other_drives:
+                    if self._worker_ctx.file_system.is_file(os.path.join(other, file.pkg.rel_path)):
+                        stores[file.db_id].write_only().add_external_file(other, file.pkg.rel_path, file.pkg.description)
 
         for folder_path in sorted(report.installed_folders(), key=lambda x: len(x), reverse=True):
             for db_id, folder_pkg in report.processed_folder(folder_path).items():
-                if folder_pkg.ty == TargetPathType.RELATIVE_PARENT:
+                if folder_pkg.is_pext_parent:
                     continue
 
-                if folder_pkg.ty == TargetPathType.RELATIVE_EXTERNAL:
-                    stores[db_id].write_only().add_external_folder(folder_pkg.drive, folder_pkg.rel_path, folder_pkg.description)
+                if folder_pkg.is_pext_external:
+                    stores[db_id].write_only().add_external_folder(folder_pkg.pext_props.drive, folder_pkg.rel_path, folder_pkg.description)
                 else:
                     stores[db_id].write_only().add_folder(folder_pkg.rel_path, folder_pkg.description)
 
-                if folder_pkg.extra is not None:
-                    if folder_pkg.ty == TargetPathType.RELATIVE_STANDARD:
-                        parents_by_db.setdefault(db_id, set()).add(folder_pkg.extra['parent'])
+                if folder_pkg.pext_props is not None:
+                    if folder_pkg.is_pext_standard:
+                        parents_by_db.setdefault(db_id, set()).add(folder_pkg.pext_props.parent)
                     else:
-                        external_parents_by_db.setdefault(db_id, dict()).setdefault(folder_pkg.extra['parent'], set()).add(folder_pkg.extra['drive'])
+                        external_parents_by_db.setdefault(db_id, dict()).setdefault(folder_pkg.pext_props.parent, set()).add(folder_pkg.pext_props.drive)
 
         for folder_path in sorted(report.installed_folders(), key=lambda x: len(x), reverse=True):
             for db_id, folder_pkg in report.processed_folder(folder_path).items():
-                if folder_pkg.ty != TargetPathType.RELATIVE_PARENT:
+                if not folder_pkg.is_pext_parent:
                     continue
 
-                if folder_pkg.extra['parent'] in parents_by_db.get(db_id, set()):
+                if folder_pkg.pext_props.parent in parents_by_db.get(db_id, set()):
                     stores[db_id].write_only().add_folder(folder_pkg.rel_path, folder_pkg.description)
-                elif folder_pkg.extra['parent'] in external_parents_by_db.get(db_id, dict()):
-                    for drive in external_parents_by_db[db_id][folder_pkg.extra['parent']]:
+                if folder_pkg.pext_props.parent in external_parents_by_db.get(db_id, dict()):
+                    for drive in external_parents_by_db[db_id][folder_pkg.pext_props.parent]:
                         stores[db_id].write_only().add_external_folder(drive, folder_pkg.rel_path, folder_pkg.description)
+
 
         for file_path in report.removed_files():
             file = report.processed_file(file_path)
@@ -243,6 +269,9 @@ class OnlineImporter(ProductionOnlineImporter):
 
         for db_id, filtered_zip_data_by_db in filtered_zip_data.items():
             stores[db_id].write_only().save_filtered_zip_data(filtered_zip_data_by_db)
+
+        for store in stores.values():
+            store.write_only().cleanup_externals()
 
         self.needs_save = local_store.needs_save()
 

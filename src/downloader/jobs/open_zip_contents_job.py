@@ -23,7 +23,7 @@ from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFoldersHolder
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.get_file_job import GetFileJob
-from downloader.jobs.path_package import PathPackage
+from downloader.path_package import PathPackage
 from downloader.jobs.index import Index
 from downloader.local_store_wrapper import StoreWrapper
 

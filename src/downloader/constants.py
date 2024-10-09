@@ -17,7 +17,6 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 # Default SSL option
-from enum import unique, Enum
 
 DEFAULT_CACERT_FILE = '/etc/ssl/certs/cacert.pem'
 DEFAULT_CURL_SSL_OPTIONS = '--cacert %s' % DEFAULT_CACERT_FILE
@@ -162,7 +161,3 @@ KENV_FAIL_ON_FILE_ERROR = 'FAIL_ON_FILE_ERROR'
 KENV_LOGFILE = 'LOGFILE'
 
 
-@unique
-class PathType(Enum):
-    FILE = 0
-    FOLDER = 1

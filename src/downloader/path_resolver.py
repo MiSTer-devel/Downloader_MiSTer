@@ -17,7 +17,8 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import os
 
-from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, PathType
+from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH
+from downloader.path_package import PathType
 
 
 class PathResolverFactory:

@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import unittest
 
-from downloader.constants import PathType
+from downloader.path_package import PathType
 from test.objects import config_with
 from test.fake_path_resolver import PathResolverFactory
 
