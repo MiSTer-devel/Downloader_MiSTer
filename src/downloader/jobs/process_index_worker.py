@@ -266,7 +266,7 @@ class ProcessIndexWorker(DownloaderWorker):
 
         folders_to_create: Set[str] = set()
         for pkg in create_folder_pkgs:
-            if PathPackage.pext_props and PathPackage.pext_props.kind.PEXT_PARENT:
+            if pkg.is_pext_parent:
                 continue
 
             if pkg.pext_props:
