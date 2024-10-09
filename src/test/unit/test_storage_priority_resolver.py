@@ -19,9 +19,10 @@ import unittest
 from pathlib import Path
 
 from downloader.config import default_config
-from downloader.constants import K_BASE_PATH, K_STORAGE_PRIORITY, PathType, MEDIA_FAT_CIFS, MEDIA_FAT, MEDIA_USB2, \
+from downloader.constants import K_BASE_PATH, K_STORAGE_PRIORITY, MEDIA_FAT_CIFS, MEDIA_FAT, MEDIA_USB2, \
     MEDIA_USB5, MEDIA_USB0, MEDIA_USB4, MEDIA_USB1, MEDIA_USB3, STORAGE_PRIORITY_PREFER_SD, \
     STORAGE_PRIORITY_PREFER_EXTERNAL
+from downloader.path_package import PathType
 from downloader.storage_priority_resolver import StoragePriorityError
 from test.objects import path_with
 from test.fake_importer_implicit_inputs import FileSystemState

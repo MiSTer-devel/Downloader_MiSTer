@@ -20,11 +20,11 @@ from typing import List, Tuple, Optional
 
 from downloader.file_filter import FileFilterFactory
 from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_open_zip_contents_job
-from downloader.jobs.path_package import PathPackage
+from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 from downloader.jobs.process_index_job import ProcessIndexJob
-from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, PathType
+from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.target_path_calculator import TargetPathsCalculator
 
@@ -57,8 +57,7 @@ class ProcessZipWorker(DownloaderWorker):
             file_packs: List[PathPackage] = []
             target_paths_calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(job.config)
             for file_path, file_description in index.files.items():
-                target_file_path, *_ = target_paths_calculator.deduce_target_path(file_path, file_description, PathType.FILE)
-                file_packs.append(PathPackage(full_path=target_file_path, rel_path=file_path, description=file_description))
+                file_packs.append(target_paths_calculator.deduce_target_path(file_path, file_description, PathType.FILE))
 
             self._ctx.logger.debug(f"Reserving space '{job.db.db_id}'...")
             if not self._try_reserve_space(file_packs):
@@ -69,8 +68,7 @@ class ProcessZipWorker(DownloaderWorker):
 
             folder_packs: List[PathPackage] = []
             for folder_path, folder_description in index.folders.items():
-                target_folder_path, *_ = target_paths_calculator.deduce_target_path(folder_path, folder_description, PathType.FOLDER)
-                folder_packs.append(PathPackage(full_path=target_folder_path, rel_path=folder_path, description=folder_description))
+                folder_packs.append(target_paths_calculator.deduce_target_path(folder_path, folder_description, PathType.FOLDER))
 
             already_processed: Optional[Tuple[str, str]] = None
             with self._ctx.top_lock:

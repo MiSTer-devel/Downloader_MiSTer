@@ -17,8 +17,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from pathlib import Path
 
-from downloader.constants import K_STORAGE_PRIORITY, K_BASE_PATH, PathType, STORAGE_PRIORITY_PREFER_SD, \
+from downloader.constants import K_STORAGE_PRIORITY, K_BASE_PATH, STORAGE_PRIORITY_PREFER_SD, \
     STORAGE_PRIORITY_PREFER_EXTERNAL, STORAGE_PRIORITY_OFF
+from downloader.path_package import PathType
 from downloader.other import UnreachableException
 
 

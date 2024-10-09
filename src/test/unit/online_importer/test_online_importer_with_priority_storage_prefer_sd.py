@@ -41,7 +41,7 @@ from test.unit.online_importer.online_importer_with_priority_storage_test_base i
     fs_folders_nes_on_delme, hidden_drive, store_pdfviewer_on_base_system_path_hidden, fs_folders_pdfviewers_on_hidden, \
     fs_files_pdfviewers_on_hidden, _store_files_foo, _store_files_s32x_md, _store_files_smb1, _store_folders_nes, \
     _store_folders_docs_s32x, _store_folders_docs_neogeo, _store_files_neogeo_md, _store_files_contra, \
-    OnlineImporterWithPriorityStorageTestBase, store_nes_folder, store_just_nes_palettes_on_usb1, fs_files_nes_palettes_on_usb1, store_smb1_and_contra_on_fat, \
+    OnlineImporterWithPriorityStorageTestBase, store_nes_folder, store_just_nes_palettes_on_usb1, fs_files_nes_palettes_on_usb1, \
     store_smb1_on_fat, fs_files_sonic_on_usb1, store_sonic_on_usb1
 
 
