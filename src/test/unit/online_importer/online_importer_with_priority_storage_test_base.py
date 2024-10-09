@@ -138,7 +138,7 @@ def store_smb1_on_delme(): return store_descr(files=_store_files_smb1(), folders
 def store_smb1(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes())
 def store_smb1_and_nes_palettes(): return store_descr(files=_store_files_smb1_and_nes_palettes(), folders=_store_folders_nes_palettes())
 def store_smb1_and_nes_palettes_on_usb1(): return store_descr(files_usb1=_store_files_smb1_and_nes_palettes(), folders_usb1=_store_folders_nes_palettes())
-def store_just_nes_palettes_on_usb1(): return store_descr(files_usb1=_store_files_nes_palettes(), folders_usb1={})
+def store_just_nes_palettes_on_usb1(): return store_descr(files_usb1=_store_files_nes_palettes(), folders_usb1=_store_folders_nes_palettes())
 def store_smb1_on_usb2(): return store_descr(files_usb2=_store_files_smb1(), folders_usb2=_store_folders_nes())
 def store_smb1_on_usb1_and_usb2(): return store_descr(files_usb1=_store_files_smb1(), folders_usb1=_store_folders_nes(), files_usb2=_store_files_smb1(), folders_usb2=_store_folders_nes())
 def store_games_on_usb1_and_usb2(): return store_descr(folders_usb1=_store_folders_games(), folders_usb2=_store_folders_games())

@@ -348,13 +348,14 @@ def remove_priority_path(path):
 
 def db_to_store(db, base_path=None):
     raw_db = db.testable
-    return {
+    store = {
         K_BASE_PATH: "/media/fat" if base_path is None else base_path,
         "zips": raw_db["zips"],
         "folders": raw_db["folders"],
         "files": raw_db["files"],
         "offline_databases_imported": []
     }
+    return store
 
 
 def db_description(db_url: str = None, section: str = None, options: DbOptions = None):

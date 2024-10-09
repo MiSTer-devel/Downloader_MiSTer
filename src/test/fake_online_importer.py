@@ -22,10 +22,11 @@ from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.job_system import JobSystem
 from downloader.jobs.process_db_job import ProcessDbJob
-from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
+from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
 from downloader.jobs.worker_context import make_downloader_worker_context
 from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
+from downloader.path_package import PathType
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_job_system import ProgressReporterTracker
@@ -238,6 +239,21 @@ class OnlineImporter(ProductionOnlineImporter):
             file = report.processed_file(file_path)
             stores[file.db_id].write_only().remove_file(file.pkg.rel_path)
 
+        for is_external, el_path, drive, ty in report.removed_copies():
+            if ty == PathType.FILE:
+                file = report.processed_file(el_path)
+                if is_external:
+                    stores[file.db_id].write_only().remove_external_file(el_path)
+                else:
+                    stores[file.db_id].write_only().remove_local_file(el_path)
+
+            elif ty == PathType.FOLDER:
+                for db_id, folder_pkg in report.processed_folder(el_path).items():
+                    if is_external:
+                        stores[db_id].write_only().remove_external_folder(drive, el_path)
+                    else:
+                        stores[db_id].write_only().remove_local_folder(el_path)
+
         for file_path in report.failed_files():
             if not report.is_file_processed(file_path):
                 continue
@@ -304,6 +320,9 @@ class OnlineImporter(ProductionOnlineImporter):
 
     def files_that_failed(self):
         return self._worker_ctx.file_download_session_logger.report().failed_files()
+
+    def report(self) -> InstallationReport:
+        return self._worker_ctx.file_download_session_logger.report()
 
     @staticmethod
     def _clean_store(store):
