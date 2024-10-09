@@ -168,7 +168,9 @@ class OnlineImporter(ProductionOnlineImporter):
             if self._worker_ctx.file_system.folder_has_items(pkg.full_path):
                 continue
 
-            self._worker_ctx.file_system.remove_folder(pkg.full_path)
+            if not pkg.is_pext_external_subfolder:
+                self._worker_ctx.file_system.remove_folder(pkg.full_path)
+
             for db_id in dbs:
                 stores[db_id].write_only().remove_folder(pkg.rel_path)
                 stores[db_id].write_only().remove_folder_from_zips(pkg.rel_path)

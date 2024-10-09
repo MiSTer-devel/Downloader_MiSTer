@@ -48,13 +48,15 @@ class LocalStoreWrapper:
 
 class StoreWrapper:
     def __init__(self, store, local_store_wrapper):
-        self._aggregated_summary = {'files': dict(), 'folders': dict()}
+        self._aggregated_summary = {'files': dict(), 'folders': dict(), 'files_no_pext': dict(), 'folders_no_pext': dict()}
         if 'files' in store:
             for file_path, file_description in store['files'].items():
                 self._aggregated_summary['files'][file_path] = file_description
+                self._aggregated_summary['files_no_pext'][file_path] = file_description
         if 'folders' in store:
             for folder_path, folder_description in store['folders'].items():
                 self._aggregated_summary['folders'][folder_path] = folder_description
+                self._aggregated_summary['folders_no_pext'][folder_path] = folder_description
 
         self._external_additions = {'files': defaultdict(list), 'folders': defaultdict(list)}
         if 'external' in store:
@@ -64,7 +66,8 @@ class StoreWrapper:
                         if file_path in store['files']:
                             continue
                         #store['files'][file_path] = external['files'][file_path]
-                        self._aggregated_summary['files'][file_path] = external['files'][file_path]
+                        self._aggregated_summary['files']['|' + file_path] = external['files'][file_path]
+                        self._aggregated_summary['files_no_pext'][file_path] = external['files'][file_path]
                         self._external_additions['files'][file_path].append(drive)
 
                 if 'folders' in external:
@@ -72,7 +75,8 @@ class StoreWrapper:
                         if folder_path in store['folders']:
                             continue
                         #store['folders'][folder_path] = external['folders'][folder_path]
-                        self._aggregated_summary['folders'][folder_path] = external['folders'][folder_path]
+                        self._aggregated_summary['folders']['|' + folder_path] = external['folders'][folder_path]
+                        self._aggregated_summary['folders_no_pext'][folder_path] = external['folders'][folder_path]
                         self._external_additions['folders'][folder_path].append(drive)
 
         self._store = store
@@ -271,8 +275,11 @@ class WriteOnlyStoreAdapter:
             external['files'] = {}
             self._top_wrapper.mark_force_save()
 
-        if 'files' in external and 'folders' in external and not external['files'] and not external['folders']:
+        if 'files' in external and not external['files']:
             del external['files']
+            self._top_wrapper.mark_force_save()
+
+        if 'folders' in external and not external['folders']:
             del external['folders']
             self._top_wrapper.mark_force_save()
 
@@ -376,10 +383,10 @@ class ReadOnlyStoreAdapter:
         self._aggregated_summary = aggregated_summary
 
     def hash_file(self, file):
-        if file not in self._aggregated_summary['files']:
+        if file not in self._aggregated_summary['files_no_pext']:
             return NO_HASH_IN_STORE_CODE
 
-        return self._aggregated_summary['files'][file]['hash']
+        return self._aggregated_summary['files_no_pext'][file]['hash']
 
     def file_drive(self, file: str):
         if file in self._store['files']:
