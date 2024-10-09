@@ -62,16 +62,17 @@ class TargetPathsCalculator:
             return PathPackage(os.path.join(self._config[K_BASE_PATH], path), path, description, path_type, PathPackageKind.STANDARD, None)
 
     def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> Tuple[str, PextPathProps]:
-        parts_len = len(Path(path).parts)
+        path_obj = Path(path)
+        parts_len = len(path_obj.parts)
         if path_type == PathType.FOLDER and parts_len <= 1:
             return os.path.join(self._config[K_BASE_PATH], path), PextPathProps(kind=PextKind.PEXT_PARENT, parent=path, drive=self._config[K_BASE_PATH], other_drives=())
         elif path_type == PathType.FILE and parts_len <= 2:
             raise StoragePriorityError(f"File Path '|{path}' is incorrect, please contact the database maintainer.")
         else:
-            return self._deduce_external_target_path_from_priority(source_path=path)
+            return self._deduce_external_target_path_from_priority(source_path=path, path_obj=path_obj)
 
-    def _deduce_external_target_path_from_priority(self, source_path: str) -> Tuple[str, PextPathProps]:
-        first_folder, second_folder, *_ = Path(source_path).parts
+    def _deduce_external_target_path_from_priority(self, source_path: str, path_obj: Path) -> Tuple[str, PextPathProps]:
+        first_folder, second_folder, *_ = path_obj.parts
         first_two_folders = '%s/%s' % (first_folder, second_folder)
 
         with self._lock:
@@ -86,7 +87,7 @@ class TargetPathsCalculator:
                 registry.drives.add(drive)
 
         drive, external, others = registry.folders[first_two_folders]
-        return os.path.join(drive, source_path), PextPathProps(kind=external, parent=first_folder, drive=drive, other_drives=others)
+        return os.path.join(drive, source_path), PextPathProps(kind=external, parent=first_folder, drive=drive, other_drives=others, is_subfolder=len(path_obj.parts) == 2)
 
     def _search_drive_for_directory(self, directory: str) -> Tuple[str, PextKind, Tuple[str, ...]]:
         base_path, priority = self._config[K_BASE_PATH], self._config[K_STORAGE_PRIORITY]

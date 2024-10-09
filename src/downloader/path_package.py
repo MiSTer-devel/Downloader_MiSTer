@@ -80,6 +80,10 @@ class PathPackage:
         return self.pext_props and self.pext_props.kind == PextKind.PEXT_STANDARD
 
     @property
+    def is_pext_external_subfolder(self) -> bool:
+        return self.ty == PathType.FOLDER and self.pext_props and self.pext_props.kind == PextKind.PEXT_EXTERNAL and self.pext_props.is_subfolder
+
+    @property
     def is_pext_parent(self) -> bool:
         return self.pext_props and self.pext_props.kind == PextKind.PEXT_PARENT
 
@@ -102,6 +106,7 @@ class PextPathProps:
     parent: str
     drive: str
     other_drives: Tuple[str, ...]
+    is_subfolder: bool = False
 
     def parent_full_path(self):
         return os.path.join(self.drive, self.parent)

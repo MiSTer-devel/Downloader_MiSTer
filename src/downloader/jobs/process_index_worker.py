@@ -135,7 +135,7 @@ class ProcessIndexWorker(DownloaderWorker):
         create_folder_pkgs: List[_CreateFolderPackage] = self._translate_items(calculator, existing_folders, PathType.FOLDER, {})
         delete_folder_pkgs: List[_DeleteFolderPackage] = self._translate_items(calculator, store.folders, PathType.FOLDER, existing_folders)
 
-        # @REFACTOR: This looks wrong
+        # @TODO REFACTOR: This looks wrong
         delete_folder_pkgs = [pkg for pkg in delete_folder_pkgs if 'zip_id' not in pkg.description]
 
         # @TODO commenting these 2 lines make the test still pass, why?
@@ -153,10 +153,11 @@ class ProcessIndexWorker(DownloaderWorker):
 
         translated = []
         for path, description in items.items():
-            if path in exclude:
+            pkg = calculator.deduce_target_path(path, description, path_type)
+            if pkg.rel_path in exclude:
                 continue
 
-            translated.append(calculator.deduce_target_path(path, description, path_type))
+            translated.append(pkg)
 
         return translated
 
