@@ -26,7 +26,7 @@ from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.index import Index
 from downloader.jobs.open_zip_index_job import OpenZipIndexJob
-from downloader.path_package import PathPackage
+from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.validate_file_job import ValidateFileJob
@@ -91,6 +91,7 @@ class InstallationReport(abc.ABC):
     def fetch_started_files(self) -> List[str]: """Files that have been queued for download."""
     def failed_files(self) -> List[str]: """Files that couldn't be downloaded properly or didn't pass validation."""
     def removed_files(self) -> List[str]: """Files that have just been removed."""
+    def removed_copies(self) -> List[Tuple[bool, str, str]]: """Files that were copies and were removed."""
     def installed_files(self) -> List[str]: """Files that have just been installed and need to be updated in the store."""
     def installed_folders(self) -> List[str]: """Folders that have just been installed and need to be updated in the store."""
     def uninstalled_files(self) -> List[str]: """Files that have just been uninstalled for various reasons and need to be removed from the store."""
@@ -103,12 +104,14 @@ class InstallationReport(abc.ABC):
 class InstallationReportImpl(InstallationReport):
     def __init__(self):
         self._downloaded_files = []
+        self._validated_files = []
         self._present_validated_files = []
         self._present_not_validated_files = []
         self._fetch_started_files = []
         self._failed_files = []
         self._failed_db_options: List[WrongDatabaseOptions] = []
         self._removed_files = []
+        self._removed_copies: List[Tuple[bool, str, str, PathType]] = []
         self._skipped_updated_files = []
         self._processed_files: Dict[str, ProcessedFile] = {}
         self._processed_folders: Dict[str, Dict[str, PathPackage]] = {}
@@ -117,6 +120,7 @@ class InstallationReportImpl(InstallationReport):
         self._filtered_zip_data: List[Tuple[str, str, Dict[str, Any], Dict[str, Any]]] = []
 
     def add_downloaded_file(self, path: str): self._downloaded_files.append(path)
+    def add_validated_file(self, path: str): self._validated_files.append(path)
     def add_installed_zip_index(self, db_id: str, zip_id: str, index: Index, description: Dict[str, Any]): self._installed_zip_indexes.append((db_id, zip_id, index, description))
     def add_present_validated_files(self, paths: List[str]): self._present_validated_files.extend(paths)
     def add_present_not_validated_files(self, paths: List[str]): self._present_not_validated_files.extend(paths)
@@ -131,6 +135,7 @@ class InstallationReportImpl(InstallationReport):
 
     def add_failed_db_options(self, exception: WrongDatabaseOptions): self._failed_db_options.append(exception)
     def add_removed_file(self, path: str): self._removed_files.append(path)
+    def add_removed_copies(self, copies: List[Tuple[bool, str, str, PathType]]): self._removed_copies.extend(copies)
     def add_installed_folder(self, path: str): self._installed_folders.add(path)
     def is_file_processed(self, path: str) -> bool: return path in self._processed_files
     def is_folder_installed(self, path: str) -> bool: return path in self._installed_folders
@@ -144,7 +149,8 @@ class InstallationReportImpl(InstallationReport):
     def fetch_started_files(self): return self._fetch_started_files
     def failed_files(self): return self._failed_files
     def removed_files(self): return self._removed_files
-    def installed_files(self): return self._downloaded_files + self._present_validated_files
+    def removed_copies(self): return self._removed_copies
+    def installed_files(self): return list(set(self._present_validated_files) | set(self._validated_files))
     def installed_folders(self): return list(self._installed_folders)
     def uninstalled_files(self): return self._removed_files + self._failed_files
     def wrong_db_options(self): return self._failed_db_options
@@ -222,6 +228,9 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
+            if isinstance(job, GetFileJob) and not job.silent:
+                self._report.add_downloaded_file(job.info)
+
         elif isinstance(job, ValidateFileJob):
             self._symbols.append('+')
             if self._needs_newline or self._check_time < time.time():
@@ -233,7 +242,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
-            self._report.add_downloaded_file(job.info)
+            self._report.add_validated_file(job.info)
 
         elif isinstance(job, ProcessZipJob) and job.has_new_zip_index:
             self._report.add_installed_zip_index(job.db.db_id, job.zip_id, job.zip_index, job.zip_description)
@@ -241,6 +250,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         elif isinstance(job, OpenZipContentsJob):
             for file in job.downloaded_files:
                 self._report.add_downloaded_file(file)
+                self._report.add_validated_file(file)
             for file in job.failed_files:
                 self._report.add_failed_file(file)
 

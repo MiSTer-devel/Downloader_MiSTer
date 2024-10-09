@@ -27,7 +27,10 @@ class OnlineImporterTestBase(unittest.TestCase):
     def assertReportsNothing(self, sut, save=False, failed_folders=None, failed_zips=None):
         self.assertReports(sut, [], save=save, failed_folders=failed_folders, failed_zips=failed_zips)
 
-    def assertReports(self, sut, installed, errors=None, needs_reboot=False, save=True, failed_folders=None, failed_zips=None, full_partitions=None):
+    def assertReports(self, sut, installed=None, errors=None, needs_reboot=False, save=True, failed_folders=None, failed_zips=None, full_partitions=None, validated=None, downloaded=None):
+        report = sut.report()
+        if installed is None and validated is None and downloaded is None:
+            installed = []
         if errors is None:
             errors = []
         if failed_folders is None:
@@ -36,13 +39,18 @@ class OnlineImporterTestBase(unittest.TestCase):
             failed_zips = []
         if full_partitions is None:
             full_partitions = []
-        self.assertEqual(sorted(remove_all_priority_paths(installed)), sorted(sut.correctly_installed_files()))
-        self.assertEqual(sorted(remove_all_priority_paths(errors)), sorted(sut.files_that_failed()))
-        self.assertEqual(needs_reboot, sut.needs_reboot())
-        self.assertEqual(sorted(remove_all_priority_paths(failed_folders)), sorted(sut.folders_that_failed()))
-        self.assertEqual(sorted(remove_all_priority_paths(failed_zips)), sorted(sut.zips_that_failed()))
-        self.assertEqual(sorted(full_partitions), sorted(sut.full_partitions()))
-        self.assertEqual(save, sut.needs_save)
+        if downloaded is not None:
+            self.assertEqual(sorted(remove_all_priority_paths(downloaded)), sorted(report.downloaded_files()), 'downloaded')
+        if validated is not None:
+            self.assertEqual(sorted(remove_all_priority_paths(validated)), sorted(report.present_validated_files()), 'validated')
+        if installed is not None:
+            self.assertEqual(sorted(remove_all_priority_paths(installed)), sorted(report.installed_files()), 'installed')
+        self.assertEqual(sorted(remove_all_priority_paths(errors)), sorted(report.failed_files()), 'errors')
+        self.assertEqual(needs_reboot, sut.needs_reboot(), 'needs reboot')
+        self.assertEqual(sorted(remove_all_priority_paths(failed_folders)), sorted(sut.folders_that_failed()), 'failed folders')
+        self.assertEqual(sorted(remove_all_priority_paths(failed_zips)), sorted(sut.zips_that_failed()), 'failed zips')
+        self.assertEqual(sorted(full_partitions), sorted(sut.full_partitions()), 'full partitions')
+        self.assertEqual(save, sut.needs_save, 'needs save')
 
     def assertEverythingIsClean(self, sut, store, save=False):
         self.assertEqual(empty_test_store(), store)
