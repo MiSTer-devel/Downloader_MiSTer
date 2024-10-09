@@ -1,5 +1,6 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-
+import os
+from collections import defaultdict
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -38,6 +39,7 @@ from downloader.target_path_calculator import TargetPathsCalculator
 _CheckFilePackage = PathPackage
 _FetchFilePackage = PathPackage
 _ValidateFilePackage = PathPackage
+_MovedFilePackage = PathPackage
 _AlreadyInstalledFilePackage = PathPackage
 _RemoveFilePackage = PathPackage
 _CreateFolderPackage = PathPackage
@@ -63,13 +65,16 @@ class ProcessIndexWorker(DownloaderWorker):
             check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs = self._create_packages_from_index(config, summary, db, store)
 
             logger.debug(f"Processing check file packages '{db.db_id}'...")
-            fetch_pkgs, validate_pkgs, already_installed_pkgs = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
+            fetch_pkgs, validate_pkgs, moved_pkgs, already_installed_pkgs = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
 
             logger.debug(f"Processing already installed file packages '{db.db_id}'...")
             self._process_already_installed_packages(already_installed_pkgs)
 
             logger.debug(f"Processing validate file packages '{db.db_id}'...")
-            fetch_pkgs.extend(self._process_validate_packages(validate_pkgs, store))
+            fetch_pkgs.extend(self._process_validate_packages(validate_pkgs))
+
+            logger.debug(f"Processing moved file packages '{db.db_id}'...")
+            self._process_moved_packages(moved_pkgs, store)
 
             self._ctx.file_download_session_logger.print_header(db, nothing_to_download=len(fetch_pkgs) == 0)
 
@@ -79,7 +84,7 @@ class ProcessIndexWorker(DownloaderWorker):
                 return  # @TODO return error instead to retry later?
 
             logger.debug(f"Processing create folder packages '{db.db_id}'...")
-            self._process_create_folder_packages(create_folder_pkgs, db)  # @TODO maybe move this one after reserve space
+            self._process_create_folder_packages(create_folder_pkgs, db, store)  # @TODO maybe move this one after reserve space
 
             logger.debug(f"Processing remove file packages '{db.db_id}'...")
             self._process_remove_file_packages(remove_files_pkgs, db.db_id)
@@ -155,9 +160,9 @@ class ProcessIndexWorker(DownloaderWorker):
 
         return translated
 
-    def _process_check_file_packages(self, check_file_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
+    def _process_check_file_packages(self, check_file_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_MovedFilePackage], List[_AlreadyInstalledFilePackage]]:
         if len(check_file_pkgs) == 0:
-            return [], [], []
+            return [], [], [], []
 
         file_system = ReadOnlyFileSystem(self._ctx.file_system)
 
@@ -178,17 +183,22 @@ class ProcessIndexWorker(DownloaderWorker):
 
         fetch_pkgs: List[_FetchFilePackage] = []
         validate_pkgs: List[_ValidateFilePackage] = []
+        moved_pkgs: List[_ValidateFilePackage] = []
         already_installed_pkgs: List[_ValidateFilePackage] = []
         for pkg in non_duplicated_pkgs:
             if file_system.is_file(pkg.full_path):
-                if not full_resync and store.hash_file(pkg.rel_path) == pkg.description['hash'] and (pkg.pext_props is None or (pkg.pext_props.drive == store.file_drive(pkg.rel_path))):
-                    already_installed_pkgs.append(pkg)
+                if not full_resync and store.hash_file(pkg.rel_path) == pkg.description['hash']:
+                    if store.is_file_in_drive(pkg.rel_path, pkg.drive()):
+                        already_installed_pkgs.append(pkg)
+                    else:
+                        validate_pkgs.append(pkg)
+                        moved_pkgs.append(pkg)
                 else:
                     validate_pkgs.append(pkg)
             else:
                 fetch_pkgs.append(pkg)
 
-        return fetch_pkgs, validate_pkgs, already_installed_pkgs
+        return fetch_pkgs, validate_pkgs, moved_pkgs, already_installed_pkgs
 
     def _process_already_installed_packages(self, already_installed_pkgs: List[_AlreadyInstalledFilePackage]) -> None:
         if len(already_installed_pkgs) == 0:
@@ -198,7 +208,7 @@ class ProcessIndexWorker(DownloaderWorker):
         with self._ctx.top_lock:
             self._ctx.installation_report.add_present_not_validated_files(already_installed_files)
 
-    def _process_validate_packages(self, validate_pkgs: List[_ValidateFilePackage], store: ReadOnlyStoreAdapter) -> List[_FetchFilePackage]:
+    def _process_validate_packages(self, validate_pkgs: List[_ValidateFilePackage]) -> List[_FetchFilePackage]:
         if len(validate_pkgs) == 0:
             return []
 
@@ -210,7 +220,7 @@ class ProcessIndexWorker(DownloaderWorker):
 
         for pkg in validate_pkgs:
             # @TODO: Parallelize the slow hash calculations
-            if store.hash_file(pkg.rel_path) == NO_HASH_IN_STORE_CODE and file_system.hash(pkg.full_path) == pkg.description['hash']:
+            if file_system.hash(pkg.full_path) == pkg.description['hash']:
                 self._ctx.file_download_session_logger.print_progress_line(f'No changes: {pkg.rel_path}')
                 present_validated_files.append(pkg.rel_path)
                 continue
@@ -234,6 +244,23 @@ class ProcessIndexWorker(DownloaderWorker):
                 self._ctx.installation_report.add_skipped_updated_files(skipped_updated_files)
 
         return more_fetch_pkgs
+
+    def _process_moved_packages(self, moved_pkgs: List[_MovedFilePackage], store: ReadOnlyStoreAdapter) -> None:
+        if len(moved_pkgs) == 0:
+            return
+
+        moved_files: List[Tuple[bool, str, str, PathType]] = []
+        for pkg in moved_pkgs:
+            for is_external, other_drive in store.list_other_drives_for_file(pkg.rel_path, pkg.drive()):
+                other_file = os.path.join(other_drive, pkg.rel_path)
+                if not self._ctx.file_system.is_file(other_file):
+                    moved_files.append((is_external, pkg.rel_path, other_drive, PathType.FILE))
+
+        if len(moved_files) == 0:
+            return
+
+        with self._ctx.top_lock:
+            self._ctx.installation_report.add_removed_copies(moved_files)
 
     def _try_reserve_space(self, fetch_pkgs: List[_FetchFilePackage]) -> bool:
         if len(fetch_pkgs) == 0:
@@ -260,19 +287,28 @@ class ProcessIndexWorker(DownloaderWorker):
 
         return True
 
-    def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], db: DbEntity):
+    def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], db: DbEntity, store: ReadOnlyStoreAdapter):
         if len(create_folder_pkgs) == 0:
             return
 
         folders_to_create: Set[str] = set()
+        folder_copies_to_be_removed: List[Tuple[bool, str, str, PathType]] = []
+        parents: Dict[str, Set[str]] = defaultdict(set)
+
         for pkg in create_folder_pkgs:
             if pkg.is_pext_parent:
                 continue
 
             if pkg.pext_props:
+                parents[pkg.pext_props.parent].add(pkg.pext_props.drive)
                 folders_to_create.add(pkg.pext_props.parent_full_path())
 
             folders_to_create.add(pkg.full_path)
+            self._maybe_add_copies_to_remove(folder_copies_to_be_removed, store, pkg.rel_path, pkg.drive())
+
+        for parent_path, drives in parents.items():
+            for d in drives:
+                self._maybe_add_copies_to_remove(folder_copies_to_be_removed, store, parent_path, d)
 
         with self._lock:
             folders_to_create = folders_to_create - self._folders_created
@@ -283,6 +319,7 @@ class ProcessIndexWorker(DownloaderWorker):
             self._ctx.file_system.make_dirs(full_folder_path)
 
         with self._ctx.top_lock:
+            self._ctx.installation_report.add_removed_copies(folder_copies_to_be_removed)
             for pkg in create_folder_pkgs:
                 if pkg.db_path() not in db.folders: continue
 
@@ -290,6 +327,14 @@ class ProcessIndexWorker(DownloaderWorker):
                 # @TODO Should add a collection instead of a single file to minimize lock time
                 self._ctx.installation_report.add_processed_folder(pkg, db.db_id)
                 self._ctx.installation_report.add_installed_folder(pkg.rel_path)
+
+    def _maybe_add_copies_to_remove(self, copies: List[Tuple[bool, str, str, PathType]], store: ReadOnlyStoreAdapter, folder_path: str, drive: Optional[str]):
+        if store.folder_drive(folder_path) == drive: return
+        copies.extend([
+            (is_external, folder_path, other_drive, PathType.FOLDER)
+            for is_external, other_drive in store.list_other_drives_for_folder(folder_path, drive)
+            if not self._ctx.file_system.is_folder(os.path.join(other_drive, folder_path))
+        ])
 
     def _process_remove_file_packages(self, remove_files_pkgs: List[_RemoveFilePackage], db_id: str):
         if len(remove_files_pkgs) == 0:

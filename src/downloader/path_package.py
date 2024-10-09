@@ -89,6 +89,12 @@ class PathPackage:
         else:
             return self.rel_path
 
+    def drive(self) -> Optional[str]:
+        if self.kind == PathPackageKind.PEXT:
+            return self.pext_props.drive
+        else:
+            return None
+
 
 @dataclass
 class PextPathProps:

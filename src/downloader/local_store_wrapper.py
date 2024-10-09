@@ -19,7 +19,7 @@
 from downloader.constants import K_BASE_PATH
 from downloader.jobs.index import Index
 from downloader.other import empty_store_without_base_path
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Optional, Set, Tuple, List
 from collections import defaultdict
 
 NO_HASH_IN_STORE_CODE = 'file_does_not_exist_so_cant_get_hash'
@@ -140,12 +140,16 @@ class WriteOnlyStoreAdapter:
     def remove_external_file(self, drive, file_path):
         self._remove_external_entry('files', drive, file_path)
 
+    def remove_local_file(self, file_path):
+        self._remove_local_entry('files', file_path)
+
+    def remove_local_folder(self, folder_path):
+        self._remove_local_entry('folders', folder_path)
+
     def remove_external_folder(self, drive, folder_path):
         self._remove_external_entry('folders', drive, folder_path)
 
     def _remove_external_entry(self, kind, drive, path):
-        self._clean_external_additions(kind, path)
-
         if 'external' not in self._store or drive not in self._store['external'] or path not in self._store['external'][drive][kind]:
             return
 
@@ -172,13 +176,19 @@ class WriteOnlyStoreAdapter:
         if 'external' not in self._store:
             return
 
+        changed = False
         for drive, summary in self._store['external'].items():
             if path in summary[kind]:
                 summary[kind].pop(path)
+                changed = True
+
+        if changed: self._top_wrapper.mark_force_save()
 
     def _remove_entry(self, kind, path):
         self._clean_external_additions(kind, path)
+        self._remove_local_entry(kind, path)
 
+    def _remove_local_entry(self, kind, path):
         if path not in self._store[kind]:
             return
 
@@ -382,6 +392,23 @@ class ReadOnlyStoreAdapter:
 
         return None
 
+    def is_file_in_drive(self, file: str, drive: Optional[str]) -> bool:
+        if drive is None or drive == self.base_path:
+            return file in self._store['files']
+        else:
+            return 'external' in self._store and drive in self._store['external'] and file in self._store['external'][drive]['files']
+
+    def folder_drive(self, folder: str):
+        if folder in self._store['folders']:
+            return self.base_path
+        elif folder not in self._store['folders']:
+            if 'external' in self._store:
+                for drive, summary in self._store['external'].items():
+                    if folder in summary['folders']:
+                        return drive
+
+        return None
+
     def list_missing_files(self, db_files):
         files = {}
         files.update(self._store['files'])
@@ -482,9 +509,37 @@ class ReadOnlyStoreAdapter:
     def entries_in_zip(self, entry_kind, zip_ids):
         return {path: fd for path, fd in self._store[entry_kind].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids}
 
-    @property
-    def base_path(self):
-        return self._store[K_BASE_PATH]
+    def list_other_drives_for_file(self, file_path: str, drive: Optional[str]) -> List[Tuple[bool, str]]:
+        if drive is None: drive = self.base_path
+        if 'external' in self._store:
+            result = [
+                (True, external_drive)
+                for external_drive, external in self._store['external'].items()
+                if external_drive != drive and 'files' in external and file_path in external['files']
+            ]
+        else:
+            result = []
+
+        if drive != self.base_path and file_path in self._store['files']:
+            result.append((False, self.base_path))
+
+        return result
+
+    def list_other_drives_for_folder(self, folder_path: str, drive: Optional[str]) -> List[Tuple[bool, str]]:
+        if drive is None: drive = self.base_path
+        if 'external' in self._store:
+            result = [
+                (True, external_drive)
+                for external_drive, external in self._store['external'].items()
+                if external_drive != drive and 'folders' in external and folder_path in external['folders']
+            ]
+        else:
+            result = []
+
+        if drive != self.base_path and folder_path in self._store['folders']:
+            result.append((False, self.base_path))
+
+        return result
 
     @property
     def has_no_files(self):
