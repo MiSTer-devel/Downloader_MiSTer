@@ -16,23 +16,24 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Set
 from pathlib import Path
+import threading
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
 from downloader.file_system import ReadOnlyFileSystem
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
-from downloader.jobs.path_package import PathPackage
+from downloader.path_package import PathPackage, PathPackageKind, PathType
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
-from downloader.jobs.worker_context import DownloaderWorker
-from downloader.constants import PathType, FILE_MiSTer, FILE_MiSTer_old
+from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
+from downloader.constants import FILE_MiSTer, FILE_MiSTer_old, K_BASE_PATH
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE, ReadOnlyStoreAdapter
 from downloader.other import calculate_url
 from downloader.storage_priority_resolver import StoragePriorityError
-from downloader.target_path_calculator import TargetPathsCalculator, TargetPathType
+from downloader.target_path_calculator import TargetPathsCalculator
 
 _CheckFilePackage = PathPackage
 _FetchFilePackage = PathPackage
@@ -44,6 +45,11 @@ _DeleteFolderPackage = PathPackage
 
 
 class ProcessIndexWorker(DownloaderWorker):
+    def __init__(self, ctx: DownloaderWorkerContext):
+        super().__init__(ctx)
+        self._folders_created: Set[str] = set()
+        self._lock = threading.Lock()
+
     def job_type_id(self) -> int: return ProcessIndexJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
@@ -73,7 +79,7 @@ class ProcessIndexWorker(DownloaderWorker):
                 return  # @TODO return error instead to retry later?
 
             logger.debug(f"Processing create folder packages '{db.db_id}'...")
-            self._process_create_folder_packages(create_folder_pkgs, db.db_id)  # @TODO maybe move this one after reserve space
+            self._process_create_folder_packages(create_folder_pkgs, db)  # @TODO maybe move this one after reserve space
 
             logger.debug(f"Processing remove file packages '{db.db_id}'...")
             self._process_remove_file_packages(remove_files_pkgs, db.db_id)
@@ -110,19 +116,18 @@ class ProcessIndexWorker(DownloaderWorker):
         # @TODO REFACTOR: This looks wrong
         remove_files_pkgs = [pkg for pkg in remove_files_pkgs if 'zip_id' not in pkg.description]
 
-        existing_folders = filtered_summary.folders.copy()
+        existing_folders: Dict[str, Any] = filtered_summary.folders.copy()
         for pkg in check_file_pkgs:
             path_obj = Path(pkg.rel_path)
             target_path_obj = Path(pkg.full_path)
             while len(path_obj.parts) > 1:
                 path_obj = path_obj.parent
                 target_path_obj = target_path_obj.parent
-                path_str = str(path_obj)
+                path_str = ('|' if pkg.is_potentially_external else '') + str(path_obj)
                 if path_str not in existing_folders:
                     existing_folders[path_str] = store.folders.get(path_str, {})
-                    self._ctx.file_system.make_dirs(str(target_path_obj))
 
-        create_folder_pkgs: List[_CreateFolderPackage] = self._translate_items(calculator, filtered_summary.folders, PathType.FOLDER, {})
+        create_folder_pkgs: List[_CreateFolderPackage] = self._translate_items(calculator, existing_folders, PathType.FOLDER, {})
         delete_folder_pkgs: List[_DeleteFolderPackage] = self._translate_items(calculator, store.folders, PathType.FOLDER, existing_folders)
 
         # @REFACTOR: This looks wrong
@@ -139,22 +144,14 @@ class ProcessIndexWorker(DownloaderWorker):
         # @TODO: This should be optimized, calling deduce target path twice should be unnecessary.
         exclude = set()
         for path, description in exclude_items.items():
-            full_path, rel_path, ty, extra = calculator.deduce_target_path(path, description, path_type)
-            exclude.add(rel_path)
+            exclude.add(calculator.deduce_target_path(path, description, path_type).rel_path)
 
         translated = []
         for path, description in items.items():
             if path in exclude:
                 continue
 
-            full_path, rel_path, ty, extra = calculator.deduce_target_path(path, description, path_type)
-            translated.append(PathPackage(
-                full_path=full_path,
-                rel_path=rel_path,
-                description=description,
-                ty=ty,
-                extra=extra
-            ))
+            translated.append(calculator.deduce_target_path(path, description, path_type))
 
         return translated
 
@@ -184,7 +181,7 @@ class ProcessIndexWorker(DownloaderWorker):
         already_installed_pkgs: List[_ValidateFilePackage] = []
         for pkg in non_duplicated_pkgs:
             if file_system.is_file(pkg.full_path):
-                if not full_resync and store.hash_file(pkg.rel_path) == pkg.description['hash']:
+                if not full_resync and store.hash_file(pkg.rel_path) == pkg.description['hash'] and (pkg.pext_props is None or (pkg.pext_props.drive == store.file_drive(pkg.rel_path))):
                     already_installed_pkgs.append(pkg)
                 else:
                     validate_pkgs.append(pkg)
@@ -263,21 +260,35 @@ class ProcessIndexWorker(DownloaderWorker):
 
         return True
 
-    def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], db_id: str):
+    def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], db: DbEntity):
         if len(create_folder_pkgs) == 0:
             return
 
+        folders_to_create: Set[str] = set()
         for pkg in create_folder_pkgs:
-            if pkg.ty == TargetPathType.RELATIVE_PARENT:
+            if PathPackage.pext_props and PathPackage.pext_props.kind.PEXT_PARENT:
                 continue
 
-            self._ctx.file_system.make_dirs(pkg.full_path)
+            if pkg.pext_props:
+                folders_to_create.add(pkg.pext_props.parent_full_path())
+
+            folders_to_create.add(pkg.full_path)
+
+        with self._lock:
+            folders_to_create = folders_to_create - self._folders_created
+            if len(folders_to_create) > 0:
+                self._folders_created.update(folders_to_create)
+
+        for full_folder_path in sorted(folders_to_create, key=lambda x: len(x), reverse=True):
+            self._ctx.file_system.make_dirs(full_folder_path)
 
         with self._ctx.top_lock:
             for pkg in create_folder_pkgs:
+                if pkg.db_path() not in db.folders: continue
+
                 # @TODO Why two adds?
                 # @TODO Should add a collection instead of a single file to minimize lock time
-                self._ctx.installation_report.add_processed_folder(pkg, db_id)
+                self._ctx.installation_report.add_processed_folder(pkg, db.db_id)
                 self._ctx.installation_report.add_installed_folder(pkg.rel_path)
 
     def _process_remove_file_packages(self, remove_files_pkgs: List[_RemoveFilePackage], db_id: str):

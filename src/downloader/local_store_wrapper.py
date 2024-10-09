@@ -169,6 +169,12 @@ class WriteOnlyStoreAdapter:
             self._external_additions[kind].pop(path)
         if path in self._aggregated_summary[kind]:
             self._aggregated_summary[kind].pop(path)
+        if 'external' not in self._store:
+            return
+
+        for drive, summary in self._store['external'].items():
+            if path in summary[kind]:
+                summary[kind].pop(path)
 
     def _remove_entry(self, kind, path):
         self._clean_external_additions(kind, path)
@@ -236,6 +242,13 @@ class WriteOnlyStoreAdapter:
                 self._store.pop('filtered_zip_data')
 
         self._top_wrapper.mark_force_save()
+
+    def cleanup_externals(self):
+        if 'external' in self._store:
+            for drive in list(self._store['external']):
+                self.try_cleanup_drive(drive)
+
+            self.try_cleanup_externals()
 
     def try_cleanup_drive(self, drive):
         external = self._external_by_drive(drive)
@@ -357,6 +370,17 @@ class ReadOnlyStoreAdapter:
             return NO_HASH_IN_STORE_CODE
 
         return self._aggregated_summary['files'][file]['hash']
+
+    def file_drive(self, file: str):
+        if file in self._store['files']:
+            return self.base_path
+        elif file not in self._store['files']:
+            if 'external' in self._store:
+                for drive, summary in self._store['external'].items():
+                    if file in summary['files']:
+                        return drive
+
+        return None
 
     def list_missing_files(self, db_files):
         files = {}
