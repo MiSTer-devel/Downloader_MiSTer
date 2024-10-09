@@ -26,7 +26,7 @@ from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.index import Index
 from downloader.jobs.open_zip_index_job import OpenZipIndexJob
-from downloader.jobs.path_package import PathPackage
+from downloader.path_package import PathPackage
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.validate_file_job import ValidateFileJob

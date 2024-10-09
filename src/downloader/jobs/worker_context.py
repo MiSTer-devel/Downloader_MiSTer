@@ -26,7 +26,7 @@ from downloader.file_system import FileSystem
 from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import Worker, ProgressReporter, JobContext
-from downloader.jobs.path_package import PathPackage
+from downloader.path_package import PathPackage
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
 from downloader.logger import Logger
 from downloader.target_path_calculator import TargetPathsCalculatorFactory

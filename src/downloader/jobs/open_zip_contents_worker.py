@@ -19,11 +19,10 @@
 from typing import Dict, Any, List
 from pathlib import Path
 
-from downloader.constants import PathType
 from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
 from downloader.jobs.index import Index
-from downloader.jobs.path_package import PathPackage
+from downloader.path_package import PathPackage, PathType
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.file_system import FileCopyError
@@ -62,9 +61,10 @@ class OpenZipContentsWorker(DownloaderWorker):
 
         self._ctx.logger.print(zip_description['description'])
 
-        target_folder_path, *_ = self._ctx.target_paths_calculator_factory\
+        target_folder_path = self._ctx.target_paths_calculator_factory\
             .target_paths_calculator(config)\
-            .deduce_target_path(zip_description['target_folder_path'], {}, PathType.FOLDER)
+            .deduce_target_path(zip_description['target_folder_path'], {}, PathType.FOLDER)\
+            .full_path
 
         for pkg in job.folders:
             if self._ctx.file_system.is_folder(pkg.full_path):
