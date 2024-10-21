@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from downloader.db_entity import DbEntity
 from pathlib import Path
 
-from downloader.file_filter import FileFoldersHolder, ZipData
+from downloader.file_filter import FileFoldersHolder
 from downloader.jobs.copy_file_job import CopyFileJob
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.get_file_job import GetFileJob
@@ -34,7 +34,7 @@ from downloader.path_package import PathPackage
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.local_store_wrapper import StoreWrapper, new_store_fragment_drive_paths
 from downloader.logger import Logger
 
 
@@ -123,7 +123,8 @@ def make_process_zip_job(zip_id: str, zip_description: Dict[str, Any], zip_index
         ini_description=ini_description,
         store=store,
         full_resync=full_resync,
-        has_new_zip_index=has_new_zip_index
+        has_new_zip_index=has_new_zip_index,
+        result_zip_index = new_store_fragment_drive_paths()
     )
     job.add_tag(f'{db.db_id}:{zip_id}')
 

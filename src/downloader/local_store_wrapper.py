@@ -19,10 +19,24 @@
 from downloader.constants import K_BASE_PATH
 from downloader.jobs.index import Index
 from downloader.other import empty_store_without_base_path
-from typing import Any, Dict, Optional, Set, Tuple, List
+from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict
 from collections import defaultdict
 
 NO_HASH_IN_STORE_CODE = 'file_does_not_exist_so_cant_get_hash'
+
+
+class StoreFragmentPaths(TypedDict):
+    files: Dict[str, Any]
+    folders: Dict[str, Any]
+
+def new_store_fragment_paths() -> StoreFragmentPaths: return {"files": dict(), "folders": dict()}
+
+
+class StoreFragmentDrivePaths(TypedDict):
+    base_paths: StoreFragmentPaths
+    external_paths: Dict[str, StoreFragmentPaths]
+
+def new_store_fragment_drive_paths(): return {"base_paths": new_store_fragment_paths(), "external_paths": dict()}
 
 
 class LocalStoreWrapper:
@@ -348,7 +362,7 @@ class WriteOnlyStoreAdapter:
 
             self._top_wrapper.mark_force_save()
 
-    def add_zip_index(self, zip_id: str, index: Index, description: Dict[str, Any]):
+    def add_zip_index(self, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]):
         if zip_id in self._store['zips']:
             if not are_zip_descriptions_equal(self._store['zips'][zip_id], description):
                 self._store['zips'][zip_id] = description
@@ -358,11 +372,18 @@ class WriteOnlyStoreAdapter:
 
         self._store['zips'][zip_id] = description
 
-        for file_path, file_description in index.files.items():
+        for file_path, file_description in fragment['base_paths']['files'].items():
             self.add_file(file_path, file_description)
 
-        for folder_path, folder_description in index.folders.items():
+        for folder_path, folder_description in fragment['base_paths']['folders'].items():
             self.add_folder(folder_path, folder_description)
+
+        for drive, paths in fragment['external_paths'].items():
+            for file_path, file_description in paths['files'].items():
+                self.add_external_file(drive, file_path, file_description)
+
+            for folder_path, folder_description in paths['folders'].items():
+                self.add_external_folder(drive, folder_path, folder_description)
 
         #self._store['zips'][zip_id]['internal_summary'] = {
         #    'files': index.files,

@@ -296,7 +296,14 @@ class FakeFileSystem(ProductionFileSystem):
     def unzip_contents(self, file_path, zip_target_path, contained_files):
         contents = self.state.files[self._path(file_path)]['zipped_files']
         for file, description in contents['files'].items():
-            self.state.files[self._path(file)] = {'hash': description['hash'], 'size': description['size']}
+            full_path = None
+            for contained_file in contained_files:  # @TODO Maybe contained files should not be a list but a dict, but since is only used in tests...
+                if contained_file.endswith(file):
+                    full_path = contained_file.lower()
+                    break
+            if full_path is None:
+                full_path = self._path(file)
+            self.state.files[full_path] = {'hash': description['hash'], 'size': description['size']}
         for folder in contents['folders']:
             if not self._is_folder_unziped(contained_files, folder):
                 continue
