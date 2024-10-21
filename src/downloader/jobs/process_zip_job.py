@@ -22,7 +22,7 @@ from typing import Any, Dict
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.index import Index
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.local_store_wrapper import StoreWrapper, StoreFragmentDrivePaths
 
 
 @dataclass
@@ -38,5 +38,8 @@ class ProcessZipJob(Job):
     zip_index: Index
     has_new_zip_index: bool
     full_resync: bool
+
+    # results
+    result_zip_index: StoreFragmentDrivePaths
 
     def retry_job(self): return None

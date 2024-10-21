@@ -16,10 +16,11 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 
 from downloader.file_filter import FileFilterFactory
 from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_open_zip_contents_job
+from downloader.local_store_wrapper import StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
@@ -27,6 +28,7 @@ from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.target_path_calculator import TargetPathsCalculator
+from downloader.jobs.index import Index
 
 
 class ProcessZipWorker(DownloaderWorker):
@@ -52,11 +54,11 @@ class ProcessZipWorker(DownloaderWorker):
                 full_resync=job.full_resync
             ))
         else:
-            index, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(job.db, job.zip_index, job.config).select_filtered_files(job.zip_index)
+            zip_index, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(job.db, job.zip_index, job.config).select_filtered_files(job.zip_index)
 
             file_packs: List[PathPackage] = []
             target_paths_calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(job.config)
-            for file_path, file_description in index.files.items():
+            for file_path, file_description in zip_index.files.items():
                 file_packs.append(target_paths_calculator.deduce_target_path(file_path, file_description, PathType.FILE))
 
             self._ctx.logger.debug(f"Reserving space '{job.db.db_id}'...")
@@ -67,7 +69,7 @@ class ProcessZipWorker(DownloaderWorker):
                 return  # @TODO return error instead to retry later?
 
             folder_packs: List[PathPackage] = []
-            for folder_path, folder_description in index.folders.items():
+            for folder_path, folder_description in zip_index.folders.items():
                 folder_packs.append(target_paths_calculator.deduce_target_path(folder_path, folder_description, PathType.FOLDER))
 
             already_processed: Optional[Tuple[str, str]] = None
@@ -85,12 +87,14 @@ class ProcessZipWorker(DownloaderWorker):
 
             get_file_job, info = make_open_zip_contents_job(
                 job=job,
-                zip_index=index,
+                zip_index=zip_index,
                 file_packs=file_packs,
                 folder_packs=folder_packs,
                 filtered_data=filtered_zip_data[job.zip_id] if job.zip_id in filtered_zip_data else {'files': {}, 'folders': {}}
             )
             self._ctx.job_ctx.push_job(get_file_job)
+
+        self._fill_fragment_with_zip_index(job.result_zip_index, job)
 
     def _try_reserve_space(self, file_packs: List[PathPackage]) -> bool:
         with self._ctx.top_lock:
@@ -109,3 +113,53 @@ class ProcessZipWorker(DownloaderWorker):
                 return False
 
         return True
+
+    def _fill_fragment_with_zip_index(self, fragment: StoreFragmentDrivePaths, job: ProcessZipJob):
+        path = None
+        if 'target_folder_path' in job.zip_description:
+            path = job.zip_description['target_folder_path']
+        elif 'path' in job.zip_description:
+            path = job.zip_description['path']
+        elif 'internal_summary' in job.zip_description:
+            for file_path in job.zip_description['internal_summary']['files']:
+                path = file_path
+                break
+            for folder_path in job.zip_description['internal_summary']['folders']:
+                path = folder_path
+                break
+        else:
+            for file_path in job.zip_index.files:
+                path = file_path
+                break
+
+            for folder_path in job.zip_index.folders:
+                path = folder_path
+                break
+
+        if path is None:
+            return
+
+        path_pkg = self._ctx.target_paths_calculator_factory.target_paths_calculator(job.config)\
+            .deduce_target_path(path, {}, PathType.FOLDER)
+
+        if path_pkg.pext_props and path_pkg.is_pext_external:
+            drive = path_pkg.pext_props.drive
+            fragment['external_paths'][drive] = {'files': {}, 'folders': {}}
+            for file_path, file_description in job.zip_index.files.items():
+                fragment['external_paths'][drive]['files'][file_path[1:]] = file_description
+
+            for folder_path, folder_description in job.zip_index.folders.items():
+                fragment['external_paths'][drive]['folders'][folder_path[1:]] = folder_description
+        elif path_pkg.is_pext_standard:
+            for file_path, file_description in job.zip_index.files.items():
+                fragment['base_paths']['files'][file_path[1:]] = file_description
+
+            for folder_path, folder_description in job.zip_index.folders.items():
+                fragment['base_paths']['folders'][folder_path[1:]] = folder_description
+
+        else:
+            for file_path, file_description in job.zip_index.files.items():
+                fragment['base_paths']['files'][file_path] = file_description
+
+            for folder_path, folder_description in job.zip_index.folders.items():
+                fragment['base_paths']['folders'][folder_path] = folder_description

@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set
 from pathlib import Path
 
 from downloader.db_entity import DbEntity
@@ -66,13 +66,7 @@ class OpenZipContentsWorker(DownloaderWorker):
             .deduce_target_path(zip_description['target_folder_path'], {}, PathType.FOLDER)\
             .full_path
 
-        for pkg in job.folders:
-            if self._ctx.file_system.is_folder(pkg.full_path):
-                continue
-
-            self._ctx.file_system.make_dirs(pkg.full_path)
-            self._ctx.installation_report.add_processed_folder(pkg, job.db.db_id)
-            self._ctx.installation_report.add_installed_folder(pkg.rel_path)
+        self._process_create_folders_packages(db, job.folders)
 
         # @TODO: self._ctx.file_system.precache_is_file_with_folders() THIS IS MISSING FOR PROPER PERFORMANCE!
         contained_files = []
@@ -97,6 +91,28 @@ class OpenZipContentsWorker(DownloaderWorker):
 
         for pkg in contained_files:
             job.downloaded_files.append(pkg.rel_path)
+
+    def _process_create_folders_packages(self, db, create_folder_pkgs):
+        # @TODO inspired in ProcessIndexWorker._process_create_folders_packages
+        folders_to_create: Set[str] = set()
+        for pkg in create_folder_pkgs:
+            if pkg.is_pext_parent:
+                continue
+
+            if self._ctx.file_system.is_folder(pkg.full_path):
+                continue
+
+            if pkg.pext_props:
+                folders_to_create.add(pkg.pext_props.parent_full_path())
+
+            folders_to_create.add(pkg.full_path)
+        for full_folder_path in sorted(folders_to_create, key=lambda x: len(x), reverse=True):
+            self._ctx.file_system.make_dirs(full_folder_path)
+        with self._ctx.top_lock:
+            for pkg in create_folder_pkgs:
+                #if pkg.db_path() not in db.folders: continue
+                self._ctx.installation_report.add_processed_folder(pkg, db.db_id)
+                self._ctx.installation_report.add_installed_folder(pkg.rel_path)
 
     def _extract_single_files(self, job: OpenZipContentsJob):
         zip_id = job.zip_id
