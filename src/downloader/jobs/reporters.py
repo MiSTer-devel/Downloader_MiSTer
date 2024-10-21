@@ -26,6 +26,7 @@ from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.index import Index
 from downloader.jobs.open_zip_index_job import OpenZipIndexJob
+from downloader.local_store_wrapper import StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.process_zip_job import ProcessZipJob
@@ -96,7 +97,7 @@ class InstallationReport(abc.ABC):
     def installed_folders(self) -> List[str]: """Folders that have just been installed and need to be updated in the store."""
     def uninstalled_files(self) -> List[str]: """Files that have just been uninstalled for various reasons and need to be removed from the store."""
     def wrong_db_options(self) -> List[WrongDatabaseOptions]: """Databases that have been unprocessed because of their database."""
-    def installed_zip_indexes(self) -> Iterable[Tuple[str, str, Index, Dict[str, Any]]]: """Zip indexes that have been installed and need to be updated in the store."""
+    def installed_zip_indexes(self) -> Iterable[Tuple[str, str, StoreFragmentDrivePaths, Dict[str, Any]]]: """Zip indexes that have been installed and need to be updated in the store."""
     def skipped_updated_files(self) -> List[str]: """File with an available update that didn't get updated because it has override false in its file description."""
     def filtered_zip_data(self) -> Dict[str, Any]: """Filtered zip data that has been processed."""
 
@@ -115,13 +116,13 @@ class InstallationReportImpl(InstallationReport):
         self._skipped_updated_files = []
         self._processed_files: Dict[str, ProcessedFile] = {}
         self._processed_folders: Dict[str, Dict[str, PathPackage]] = {}
-        self._installed_zip_indexes: List[Tuple[str, str, Index, Dict[str, Any]]] = []
+        self._installed_zip_indexes: List[Tuple[str, str, StoreFragmentDrivePaths, Dict[str, Any]]] = []
         self._installed_folders: Set[str] = set()
         self._filtered_zip_data: List[Tuple[str, str, Dict[str, Any], Dict[str, Any]]] = []
 
     def add_downloaded_file(self, path: str): self._downloaded_files.append(path)
     def add_validated_file(self, path: str): self._validated_files.append(path)
-    def add_installed_zip_index(self, db_id: str, zip_id: str, index: Index, description: Dict[str, Any]): self._installed_zip_indexes.append((db_id, zip_id, index, description))
+    def add_installed_zip_index(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]): self._installed_zip_indexes.append((db_id, zip_id, fragment, description))
     def add_present_validated_files(self, paths: List[str]): self._present_validated_files.extend(paths)
     def add_present_not_validated_files(self, paths: List[str]): self._present_not_validated_files.extend(paths)
     def add_skipped_updated_files(self, paths: List[str]): self._skipped_updated_files.extend(paths)
@@ -245,7 +246,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             self._report.add_validated_file(job.info)
 
         elif isinstance(job, ProcessZipJob) and job.has_new_zip_index:
-            self._report.add_installed_zip_index(job.db.db_id, job.zip_id, job.zip_index, job.zip_description)
+            self._report.add_installed_zip_index(job.db.db_id, job.zip_id, job.result_zip_index, job.zip_description)
 
         elif isinstance(job, OpenZipContentsJob):
             for file in job.downloaded_files:

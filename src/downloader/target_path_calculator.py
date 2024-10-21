@@ -82,26 +82,26 @@ class TargetPathsCalculator:
             registry = self._priority_top_folders[first_folder]
 
             if first_two_folders not in registry.folders:
-                drive, external, others = self._search_drive_for_directory(directory=os.path.join(first_folder, second_folder))
+                drive, external, others = self._search_drive_for_directory(first_folder, second_folder)
                 registry.folders[first_two_folders] = (drive, external, others)
                 registry.drives.add(drive)
 
         drive, external, others = registry.folders[first_two_folders]
         return os.path.join(drive, source_path), PextPathProps(kind=external, parent=first_folder, drive=drive, other_drives=others, is_subfolder=len(path_obj.parts) == 2)
 
-    def _search_drive_for_directory(self, directory: str) -> Tuple[str, PextKind, Tuple[str, ...]]:
+    def _search_drive_for_directory(self, first_folder: str, second_folder: str) -> Tuple[str, PextKind, Tuple[str, ...]]:
         base_path, priority = self._config[K_BASE_PATH], self._config[K_STORAGE_PRIORITY]
 
         if priority == STORAGE_PRIORITY_OFF:
             return base_path, PextKind.PEXT_STANDARD, ()
         elif priority == STORAGE_PRIORITY_PREFER_SD:
-            result, others = self._first_drive_with_existing_directory(directory)
+            result, others = self._first_drive_with_existing_directory_prefer_sd(os.path.join(first_folder, second_folder))
             if result is not None:
                 return result, PextKind.PEXT_EXTERNAL, others
 
             return base_path, PextKind.PEXT_STANDARD, ()
         elif priority == STORAGE_PRIORITY_PREFER_EXTERNAL:
-            result, others = self._first_drive_with_existing_directory(directory)
+            result, others = self._first_drive_with_existing_directory_prefer_external(first_folder)
             if result is not None:
                 return result, PextKind.PEXT_EXTERNAL, others
 
@@ -112,7 +112,7 @@ class TargetPathsCalculator:
         else:
             raise StoragePriorityError('%s "%s" not valid!' % (K_STORAGE_PRIORITY, priority))
 
-    def _first_drive_with_existing_directory(self, directory: str) -> Tuple[Optional[str], Tuple[str, ...]]:
+    def _first_drive_with_existing_directory_prefer_sd(self, directory: str) -> Tuple[Optional[str], Tuple[str, ...]]:
         result = None
         others = None
         for drive in self._drives:
@@ -124,5 +124,25 @@ class TargetPathsCalculator:
                     others = [drive]
                 else:
                     others.append(drive)
+
+        return result, tuple(others) if others is not None else ()
+
+    def _first_drive_with_existing_directory_prefer_external(self, directory: str) -> Tuple[Optional[str], Tuple[str, ...]]:
+        result = None
+        others = None
+        for drive in self._drives:
+            absolute_directory = os.path.join(drive, directory)
+            if self._file_system.is_folder(absolute_directory):
+                if result is None:
+                    result = drive
+                elif others is None:
+                    others = [drive]
+                else:
+                    others.append(drive)
+
+        if result is None and len(self._drives) > 0:
+            result = self._drives[0]
+            if len(self._drives) > 1:
+                others = self._drives[1:]
 
         return result, tuple(others) if others is not None else ()
