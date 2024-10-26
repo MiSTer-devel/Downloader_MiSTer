@@ -60,8 +60,8 @@ class OnlineImporterWithPriorityStorageTestBase(OnlineImporterTestBase):
             .add_db(db_demo_with_nes_manual(), local_store_dbs[db_demo]) \
             .download(False), local_store_dbs
 
-    def download_external_drives_1_and_2(self, inputs):
-        local_store_dbs = {
+    def download_external_drives_1_and_2(self, inputs, store=None):
+        local_store_dbs = store if store is not None else {
             db_id_external_drives_1: empty_test_store(),
             db_id_external_drives_2: empty_test_store(),
         }

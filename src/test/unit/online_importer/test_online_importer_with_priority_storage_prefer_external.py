@@ -26,14 +26,16 @@ from test.objects import empty_test_store, file_nes_smb1, folder_games_nes, medi
     db_id_external_drives_2, store_descr, db_id_external_drives_1, folder_games, media_usb2, folder_docs, \
     folder_docs_s32x, folder_docs_neogeo, media_usb3, file_nes_palette_a, \
     clean_zip_test_fields, db_palettes
-from test.unit.online_importer.online_importer_with_priority_storage_test_base import fs_files_smb1_on_usb1, store_smb1_on_usb1, \
+from test.unit.online_importer.online_importer_with_priority_storage_test_base import fs_files_smb1_on_usb1, \
+    store_smb1_on_usb1, \
     fs_folders_games_on_usb1_usb2_and_fat, fs_folders_nes_on_fat_and_usb1, fs_folders_nes_on_fat_games_on_fat_usb1, \
     OnlineImporterWithPriorityStorageTestBase, fs_folders_nes_on_usb1_and_usb2, _store_files_foo, \
     _store_folders_nes, _store_files_contra, _store_files_neogeo_md, \
     _store_folders_docs_neogeo, _store_files_smb1, _store_files_s32x_md, _store_folders_docs_s32x, \
     fs_files_smb1_and_contra_on_usb0, fs_files_nes_palettes_on_fat, fs_folders_nes_palettes_on_fat, \
     fs_files_nes_palettes_on_usb1, fs_folders_nes_palettes_on_usb1, db_with_zipped_nes_palettes, \
-    store_nes_zipped_palettes_on_fat, store_nes_zipped_palettes_on_usb1, fs_folders_nes_on_fat, store_smb1, fs_files_smb1_on_fat
+    store_nes_zipped_palettes_on_fat, store_nes_zipped_palettes_on_usb1, fs_folders_nes_on_fat, store_smb1, \
+    fs_files_smb1_on_fat, fs_files_smb1_and_contra_on_usb2
 
 
 class TestOnlineImporterWithPriorityStoragePreferExternal(OnlineImporterWithPriorityStorageTestBase):
@@ -67,7 +69,7 @@ class TestOnlineImporterWithPriorityStoragePreferExternal(OnlineImporterWithPrio
 
         self.assertEqual(store_nes_zipped_palettes_on_usb1(), clean_zip_test_fields(local_store.unwrap_local_store()['dbs'][db_palettes]))
         self.assertEqual(fs_data(files=fs_files_nes_palettes_on_usb1(), folders=fs_folders_nes_palettes_on_usb1()), sut.fs_data)
-        self.assertReports(sut, [file_nes_palette_a], save=False)
+        self.assertReports(sut, [file_nes_palette_a])
 
     def test_download_palettes_db_from_local_store_pov___on_store_with_palettes_on_usb1_but_empty_fs_usb1___installs_all_in_fs_usb1(self):
         local_store = LocalStoreWrapper({'dbs': {db_palettes: store_nes_zipped_palettes_on_usb1()}})
@@ -176,11 +178,72 @@ class TestOnlineImporterWithPriorityStoragePreferExternal(OnlineImporterWithPrio
             db_id_external_drives_1: store_descr(
                 db_id=db_id_external_drives_1,
                 files=_store_files_foo(),
+                files_usb2={**_store_files_smb1()}, folders_usb2={**_store_folders_nes()},
+                files_usb1={**_store_files_s32x_md()}, folders_usb1={**_store_folders_docs_s32x()},
+            ),
+            db_id_external_drives_2: store_descr(
+                db_id=db_id_external_drives_2,
+                files_usb2={**_store_files_contra()}, folders_usb2={**_store_folders_nes()},
+                files_usb1={**_store_files_neogeo_md()}, folders_usb1={**_store_folders_docs_neogeo()},
+            ),
+        }, local_store_dbs)
+        self.assertEqual(fs_data(
+            files={
+                **_store_files_foo(),
+                media_usb1(file_neogeo_md): file_neogeo_md_descr(),
+                media_usb1(file_s32x_md): file_s32x_md_descr(),
+                **fs_files_smb1_and_contra_on_usb2(),
+            },
+            folders=[
+                *external_folders,
+                media_usb2(folder_games),
+                media_usb2(folder_games_nes),
+                media_usb1(folder_docs),
+                media_usb1(folder_docs_neogeo),
+                media_usb1(folder_docs_s32x),
+            ]
+        ), sut.fs_data)
+        self.assertReports(sut, [file_foo, file_neogeo_md, file_s32x_md, file_nes_smb1, file_nes_contra])
+
+
+    def test_download_external_drives_1_and_2___on_store_and_fs____installs_at_expected_locations(self):
+        initial_local_store_dbs = {
+            db_id_external_drives_1: store_descr(
+                db_id=db_id_external_drives_1,
+                files=_store_files_foo(),
                 files_usb0={**_store_files_s32x_md(), **_store_files_smb1()}, folders_usb0={**_store_folders_docs_s32x(), **_store_folders_nes()},
             ),
             db_id_external_drives_2: store_descr(
                 db_id=db_id_external_drives_2,
                 files_usb0={**_store_files_neogeo_md(), **_store_files_contra()}, folders_usb0={**_store_folders_docs_neogeo(), **_store_folders_nes()},
+            ),
+        }
+
+        external_folders = [
+            MEDIA_USB0,
+            MEDIA_USB1,
+            media_usb2(folder_games), media_usb2(folder_games_nes),
+            media_usb3(folder_games),
+
+            media_usb0(folder_docs),
+            media_usb1(folder_docs), media_usb2(folder_docs_neogeo), media_usb2(folder_docs_s32x),
+            media_usb2(folder_docs),
+            media_usb3(folder_docs),
+        ]
+
+        sut, local_store_dbs = self.download_external_drives_1_and_2(fs(folders=external_folders), store=initial_local_store_dbs)
+
+        self.assertEqual({
+            db_id_external_drives_1: store_descr(
+                db_id=db_id_external_drives_1,
+                files=_store_files_foo(),
+                files_usb2={**_store_files_smb1()}, folders_usb2={**_store_folders_nes()},
+                files_usb1={**_store_files_s32x_md()}, folders_usb1={**_store_folders_docs_s32x()},
+            ),
+            db_id_external_drives_2: store_descr(
+                db_id=db_id_external_drives_2,
+                files_usb2={**_store_files_contra()}, folders_usb2={**_store_folders_nes()},
+                files_usb1={**_store_files_neogeo_md()}, folders_usb1={**_store_folders_docs_neogeo()},
             ),
         }, local_store_dbs)
         self.assertEqual(fs_data(
@@ -199,8 +262,7 @@ class TestOnlineImporterWithPriorityStoragePreferExternal(OnlineImporterWithPrio
                 media_usb0(folder_docs_s32x),
             ]
         ), sut.fs_data)
-        self.assertReports(sut, [file_foo, file_neogeo_md, file_s32x_md, file_nes_smb1, file_nes_contra])
-
+        self.assertReports(sut, [file_foo, file_neogeo_md, file_s32x_md, file_nes_smb1, file_nes_contra], save=False)
 
 def fs(files=None, folders=None, base_path=None):
     return ImporterImplicitInputs(

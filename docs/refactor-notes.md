@@ -4,3 +4,4 @@
 - When we store the zip_index in the store, should it contain pext paths or not?
   - This zip index, is gonna be the source of next runs if there_is_a_recent_store_index is False
   - By now, this information can be deduced from zip_description path and target_folder_path but this does not work if there are mixed "pext" and non-pext paths.
+- Need to do a store change after the refactor: Cheats has currently zip_id cheats_folder_snes, it should not have zip_id at all, same with Games, which has zip_id nes_palettes and should not have zip_id either.

@@ -120,6 +120,17 @@ class OnlineImporter(ProductionOnlineImporter):
     def jobs_tracks(self):
         return self._report_tracker.tracks
 
+    def download_dbs_contents(self, importer_command: ImporterCommand, full_resync: bool):
+        #return super().download_dbs_contents(importer_command, full_resync)
+        
+        for k, v in importer_command._config.items():
+            self._config[k] = v
+
+        for db, store, config in importer_command.read_dbs():
+            self.add_db(db, store if isinstance(store, dict) else store.unwrap_store(), {})
+
+        return self.download(full_resync)
+
     def download(self, full_resync):
 
         local_store = LocalStoreWrapper({'dbs': {db.db_id: store for db, store, _ in self.dbs}})
