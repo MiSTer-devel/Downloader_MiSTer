@@ -19,6 +19,7 @@
 import abc
 import dataclasses
 import time
+from collections import defaultdict
 from typing import Dict, Optional, Tuple, List, Any, Iterable, Set
 
 from downloader.db_entity import DbEntity
@@ -82,6 +83,8 @@ class ProcessedFolder:
 
 
 class InstallationReport(abc.ABC):
+    def get_jobs(self, job_id: int) -> List[Job]: """Return all successful jobs with that id"""
+    def get_failed_jobs(self, job_id: int) -> List[Job]: """Return all failed jobs with that id"""
     def is_file_processed(self, path: str) -> bool: """Returns True if the file has been processed."""
     def is_folder_installed(self, path: str) -> bool: """Returns True if the file has been processed."""
     def processed_file(self, path: str) -> ProcessedFile: """File that a database is currently processing."""
@@ -119,7 +122,11 @@ class InstallationReportImpl(InstallationReport):
         self._installed_zip_indexes: List[Tuple[str, str, StoreFragmentDrivePaths, Dict[str, Any]]] = []
         self._installed_folders: Set[str] = set()
         self._filtered_zip_data: List[Tuple[str, str, Dict[str, Any], Dict[str, Any]]] = []
+        self._jobs: Dict[int, List[Job]] = defaultdict(list)
+        self._failed_jobs: Dict[int, List[Tuple[Job, BaseException]]] = defaultdict(list)
 
+    def add_job(self, job: Job): self._jobs[job.type_id].append(job)
+    def add_failed_job(self, job: Job, exception: BaseException): self._failed_jobs[job.type_id].append((job, exception))
     def add_downloaded_file(self, path: str): self._downloaded_files.append(path)
     def add_validated_file(self, path: str): self._validated_files.append(path)
     def add_installed_zip_index(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]): self._installed_zip_indexes.append((db_id, zip_id, fragment, description))
@@ -141,7 +148,11 @@ class InstallationReportImpl(InstallationReport):
     def is_file_processed(self, path: str) -> bool: return path in self._processed_files
     def is_folder_installed(self, path: str) -> bool: return path in self._installed_folders
     def add_processed_file(self, pkg: PathPackage, db_id: str): self._processed_files[pkg.rel_path] = ProcessedFile(pkg, db_id)
-    def add_processed_folder(self, pkg: PathPackage, db_id: str): self._processed_folders.setdefault(pkg.rel_path, dict())[db_id] = pkg
+    def add_processed_folder(self, pkg: PathPackage, db_id: str):
+        if pkg.rel_path in self._processed_folders and db_id in self._processed_folders[pkg.rel_path]:
+            self._processed_folders[pkg.rel_path][db_id].description.update(pkg.description)
+        else:
+            self._processed_folders.setdefault(pkg.rel_path, dict())[db_id] = pkg
     def processed_file(self, path: str) -> ProcessedFile: return self._processed_files[path]
     def processed_folder(self, path: str) -> Dict[str, PathPackage]: return self._processed_folders[path]
     def downloaded_files(self): return self._downloaded_files
@@ -158,6 +169,8 @@ class InstallationReportImpl(InstallationReport):
     def installed_zip_indexes(self): return self._installed_zip_indexes
     def skipped_updated_files(self): return self._skipped_updated_files
     def filtered_zip_data(self): return self._filtered_zip_data
+    def get_jobs(self, job_id: int) -> List[Job]: return self._jobs[job_id]
+    def get_failed_jobs(self, job_id: int) -> List[Tuple[Job, BaseException]]: return self._failed_jobs[job_id]
 
 
 class FileDownloadSessionLogger:
@@ -224,6 +237,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             self._print_symbols()
 
     def notify_job_completed(self, job: Job):
+        self._report.add_job(job)
         if isinstance(job, FetchFileJob) or (isinstance(job, GetFileJob) and not job.silent):
             self._symbols.append('.')
             if self._needs_newline or self._check_time < time.time():
@@ -329,6 +343,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         self._check_time = time.time() + 2.0
 
     def notify_job_failed(self, job: Job, exception: BaseException):
+        self._report.add_failed_job(job, exception)
         if isinstance(job, ProcessIndexJob) and isinstance(exception, BadFileFilterPartException):
             self._report.add_failed_db_options(
                 WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(exception)}' is invalid.")
