@@ -64,6 +64,7 @@ class OnlineImporter:
         self._base_session = _Session()
 
     def download_dbs_contents(self, importer_command, full_resync):
+        raise Exception('nope')
         # @TODO: Move the filter validation to earlier (before downloading dbs).
         self._logger.bench('Online Importer start.')
 
