@@ -17,9 +17,10 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from abc import abstractmethod, ABC
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
-from typing import Dict, Optional, Callable, List, Tuple, Any, Iterable, Protocol
+from typing import Dict, Optional, Callable, List, Tuple, Any, Iterable, Protocol, Union
 import sys
 import time
 import queue
@@ -30,7 +31,7 @@ import signal
 class JobContext(Protocol):
     """A context for workers to interact with the job system in a thread-safe manner."""
 
-    def push_job(self, job: 'Job', priority: Optional[int] = None) -> None:
+    def legacy_push_job(self, job: 'Job') -> None:
         """Allows a worker to push a new job into the job system."""
 
     def pending_jobs_amount(self) -> int:
@@ -69,6 +70,7 @@ class JobSystem(JobContext):
         self._pending_jobs_amount: int = 0
         self._pending_jobs_cancelled: bool = False
         self._is_executing_jobs: bool = False
+        self._tag_dict: Dict[str, int] = defaultdict(int)
         self._jobs_pushed: int = 0
         self._timeout_clock: int = 0
 
@@ -84,6 +86,7 @@ class JobSystem(JobContext):
                 self._workers[job_id] = worker
 
     def execute_jobs(self) -> None:
+        """This function executes all the jobs with the registered workers. It must be used in the MAIN THREAD."""
         with self._lock:
             if self._is_executing_jobs:
                 raise CantExecuteJobs('Can not call to execute jobs when its already running.')
@@ -101,21 +104,33 @@ class JobSystem(JobContext):
             with self._lock:
                 self._is_executing_jobs = False
 
-    def push_job(self, job: 'Job', priority: Optional[int] = None) -> None:
-        # This method is thread-safe, it can be called from any thread.
+    def legacy_push_job(self, job: 'Job') -> None:
+        # Remove this when ProcessDbWorker does not use it anymore.
+        # Then, it's fine to make _internal_push_job not thread-safe to make it more efficient.
+        self._internal_push_job(job, getattr(_thread_local_storage, 'current_package', None))
+
+    def push_job(self, job: 'Job') -> None:
+        with self._lock:
+            if self._is_executing_jobs:
+                raise CantPushJobs('Can not push more jobs while executing jobs')
+
+        self._internal_push_job(job)
+
+    def _internal_push_job(self, job: 'Job', parent_package: Optional['_JobPackage'] = None) -> None:
+        # This method is thread-safe, it can be called from any thread because of legacy_push_job.
         # Therefore, any method being called here should be thread-safe too.
 
         worker = self._get_worker(job)
-        parent_package: Optional[_JobPackage] = getattr(_thread_local_storage, 'current_package', None)
-        self._jobs_pushed += 1  # No need to put a lock, since we don't need the strict value
+        self._jobs_pushed += 1
         self._job_queue.put(_JobPackage(
             job=job,
             worker=worker,
             tries=0 if parent_package is None else parent_package.tries,
-            priority=priority or self._jobs_pushed,
-            parent=parent_package
+            priority=job.priority or self._jobs_pushed,
+            parent=parent_package,
+            next_jobs=None
         ))
-        self._increase_jobs_amount()
+        self._increase_jobs_amount(job)
 
     def pending_jobs_amount(self) -> int:
         # This must be thread-safe, and no need lock since we don't need to return the strict value.
@@ -140,19 +155,23 @@ class JobSystem(JobContext):
             # This branch does not need to be thread-safe, since concurrency is off.
             self._no_threads_execute_tick()
 
-    def _increase_jobs_amount(self) -> None:
+    def _increase_jobs_amount(self, job: 'Job') -> None:
         # This method is thread-safe, it can be called from any thread.
         # Because _increase_jobs_amount is called in push_job function which is thread-safe.
 
         with self._lock:
+            for tag in job.tags:
+                self._tag_dict[tag] += 1
             self._pending_jobs_amount += 1
 
-    def _decrease_jobs_amount(self) -> None:
+    def _decrease_jobs_amount(self, job: 'Job') -> None:
         # This method is thread-safe, it can be called from any thread.
         # Because _increase_jobs_amount is called in push_job function which is thread-safe,
         # and manipulates the same _pending_jobs_amount variable we are changing here.
 
         with self._lock:
+            for tag in job.tags:
+                self._tag_dict[tag] -= 1
             self._pending_jobs_amount -= 1
 
     def _execute_with_threads(self, max_threads: int) -> None:
@@ -195,7 +214,6 @@ class JobSystem(JobContext):
 
     def _no_threads_execute_tick(self) -> None:
         package = self._job_queue.get(block=False)
-        self._job_queue.task_done()
         if package is not None:
             self._assert_there_are_no_cycles(package)
             try:
@@ -214,7 +232,9 @@ class JobSystem(JobContext):
             job, worker = package.job, package.worker
             notifications.put((False, package))
 
-            error = worker.operate_on(job)
+            jobs, error = worker.operate_on(job)
+            package.next_jobs = jobs
+
             if error is not None:
                 raise _JobError(error)
 
@@ -233,10 +253,11 @@ class JobSystem(JobContext):
                 job=retry_job,
                 worker=self._get_worker(retry_job),
                 tries=package.tries + 1,
-                priority=package.priority
+                priority=package.priority,
+                next_jobs=package.next_jobs
             ))
         else:
-            self._decrease_jobs_amount()
+            self._decrease_jobs_amount(package.job)
         try:
             if should_retry:
                 self._report_job_retried(package, e)
@@ -264,7 +285,13 @@ class JobSystem(JobContext):
 
             completed, package = notification
             if completed:
-                self._decrease_jobs_amount()
+                if isinstance(package.next_jobs, list):
+                    for job in package.next_jobs:
+                        self._internal_push_job(job, package)
+                elif isinstance(package.next_jobs, Job):
+                    self._internal_push_job(package.next_jobs, package)
+
+                self._decrease_jobs_amount(package.job)
                 self._report_job_completed(package)
             else:
                 self._report_job_started(package)
@@ -368,7 +395,7 @@ class Job(ABC):
     def retry_job(self) -> Optional['Job']:
         return self
 
-    def add_tag(self, tag: str) -> None:
+    def add_tag(self, tag: str) -> 'Job':
         tags = getattr(self, '_tags', None)
         if tags is None:
             tags = list()
@@ -376,17 +403,29 @@ class Job(ABC):
         tags.append(tag)
         if len(tags) != len(set(tags)):
             raise CantExecuteJobs(f'Tag {tag} already added to job {self.type_id}')
+        return self
 
     @property
     def tags(self) -> Iterable[str]:
         return getattr(self, '_tags', [])
+
+    def set_priority(self, priority: int) -> 'Job':
+        setattr(self, '_priority', priority)
+        return self
+
+    @property
+    def priority(self) -> Optional[int]:
+        return getattr(self, '_priority', None)
+
+
+WorkerResult = Tuple[Union[List[Job], Optional[Job]], Optional[Exception]]
 
 
 class Worker(ABC):
     """Abstract base class for defining workers that process jobs."""
 
     @abstractmethod
-    def operate_on(self, job: Job) -> Optional[Exception]:
+    def operate_on(self, job: Job) -> WorkerResult:
         """Handles the job."""
 
     def reporter(self) -> Optional['ProgressReporter']:
@@ -423,6 +462,7 @@ class CycleDetectedException(JobSystemAbortException): pass
 class NoWorkerException(JobSystemAbortException): pass
 class CantRegisterWorkerException(JobSystemAbortException): pass
 class CantExecuteJobs(JobSystemAbortException): pass
+class CantPushJobs(JobSystemAbortException): pass
 class CantWaitWhenNotExecutingJobs(JobSystemAbortException): pass
 class ReportException(Exception): pass
 
@@ -438,6 +478,7 @@ class _JobPackage:
     worker: Worker
     tries: int
     priority: int
+    next_jobs: Union[Optional[Job], List[Job]]
     parent: Optional['_JobPackage'] = None
 
     def __lt__(self, other: '_JobPackage') -> bool: return self.priority < other.priority

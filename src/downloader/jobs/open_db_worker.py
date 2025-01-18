@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.db_entity import DbEntity, DbEntityValidationException
+from downloader.job_system import WorkerResult
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.worker_context import DownloaderWorker
@@ -26,10 +27,10 @@ class OpenDbWorker(DownloaderWorker):
     def job_type_id(self) -> int: return OpenDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: OpenDbJob):
+    def operate_on(self, job: OpenDbJob) -> WorkerResult:
         db = self._open_db(section=job.section, temp_path=job.temp_path)
         ini_description, store, full_resync = job.ini_description, job.store, job.full_resync
-        self._ctx.job_ctx.push_job(ProcessDbJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync))
+        return ProcessDbJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync), None
 
     def _open_db(self, section: str, temp_path: str) -> DbEntity:
         try:

@@ -19,7 +19,8 @@
 import unittest
 from functools import reduce
 
-from downloader.job_system import Job, JobSystem, Worker, CycleDetectedException, ProgressReporter, NoWorkerException, CantRegisterWorkerException, CantExecuteJobs, CantWaitWhenNotExecutingJobs
+from downloader.job_system import Job, JobSystem, Worker, CycleDetectedException, ProgressReporter, NoWorkerException, \
+    CantRegisterWorkerException, CantExecuteJobs, CantWaitWhenNotExecutingJobs, WorkerResult
 import logging
 from typing import Dict, Optional
 
@@ -233,7 +234,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         job = TestJob(1)
         job.add_tag('a')
         job.add_tag('b')
-        self.assertEqual(['a', 'b'], job.tags)
+        self.assertEqual(['a', 'b'], list(job.tags))
 
     def test_job_add_tag_a_twice___throws(self):
         job = TestJob(1)
@@ -284,16 +285,13 @@ class TestWorker(Worker):
     def __init__(self, system: JobSystem):
         self.system = system
 
-    def operate_on(self, job: TestJob) -> Optional[Exception]:
+    def operate_on(self, job: TestJob) -> WorkerResult:
         if job.fails > 0:
             job.fails -= 1
-            return Exception('Fails!')
+            return None, Exception('Fails!')
 
         if job.raises_unexpected_exception:
             raise Exception('Raises!')
-
-        if job.next_job is not None:
-            self.system.push_job(job.next_job)
 
         if job.cancel_pending_jobs:
             self.system.cancel_pending_jobs()
@@ -306,6 +304,11 @@ class TestWorker(Worker):
 
         if job.wait_for_other_jobs:
             self.system.wait_for_other_jobs()
+
+        if job.next_job is not None:
+            return job.next_job, None
+
+        return None, None
 
 
 class TestProgressReporter(ProgressReporter):

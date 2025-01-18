@@ -19,6 +19,7 @@
 from typing import List, Tuple, Optional, Dict, Any
 
 from downloader.file_filter import FileFilterFactory
+from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_open_zip_contents_job
 from downloader.local_store_wrapper import StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
@@ -35,7 +36,7 @@ class ProcessZipWorker(DownloaderWorker):
     def job_type_id(self) -> int: return ProcessZipJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ProcessZipJob):
+    def operate_on(self, job: ProcessZipJob) -> WorkerResult:
         total_files_size = 0
         for file_path, file_description in job.zip_index.files.items():
             total_files_size += file_description['size']
@@ -44,15 +45,17 @@ class ProcessZipWorker(DownloaderWorker):
         less_file_count = len(job.zip_index.files) < job.config[K_ZIP_FILE_COUNT_THRESHOLD]
         less_accumulated_mbs = total_files_size < (1000 * 1000 * job.config[K_ZIP_ACCUMULATED_MB_THRESHOLD])
 
+        next_job: Job
+
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
-            self._ctx.job_ctx.push_job(ProcessIndexJob(
+            next_job = ProcessIndexJob(
                 db=job.db,
                 ini_description=job.ini_description,
                 config=job.config,
                 index=job.zip_index,
                 store=job.store,
                 full_resync=job.full_resync
-            ))
+            )
         else:
             zip_index, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(job.db, job.zip_index, job.config).select_filtered_files(job.zip_index)
 
@@ -66,7 +69,7 @@ class ProcessZipWorker(DownloaderWorker):
                 self._ctx.logger.debug(f"Not enough space '{job.db.db_id} zip:{job.zip_id}'!")
                 for pkg in file_packs:
                     self._ctx.installation_report.add_failed_file(pkg.rel_path)
-                return  # @TODO return error instead to retry later?
+                return None, None  # @TODO return error instead to retry later?
 
             folder_packs: List[PathPackage] = []
             for folder_path, folder_description in zip_index.folders.items():
@@ -83,7 +86,7 @@ class ProcessZipWorker(DownloaderWorker):
 
             if already_processed is not None:
                 self._ctx.logger.print(f'Skipping zip "{job.zip_id}" because file "{already_processed[0]}" was already processed by db "{already_processed[1]}"')
-                return
+                return None, None
 
             get_file_job, info = make_open_zip_contents_job(
                 job=job,
@@ -92,9 +95,10 @@ class ProcessZipWorker(DownloaderWorker):
                 folder_packs=folder_packs,
                 filtered_data=filtered_zip_data[job.zip_id] if job.zip_id in filtered_zip_data else {'files': {}, 'folders': {}}
             )
-            self._ctx.job_ctx.push_job(get_file_job)
+            next_job = get_file_job
 
         self._fill_fragment_with_zip_index(job.result_zip_index, job)
+        return next_job, None
 
     def _try_reserve_space(self, file_packs: List[PathPackage]) -> bool:
         with self._ctx.top_lock:
