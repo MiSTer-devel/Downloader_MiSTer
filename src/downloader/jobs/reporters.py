@@ -83,7 +83,7 @@ class ProcessedFolder:
 
 
 class InstallationReport(abc.ABC):
-    def get_jobs(self, job_id: int) -> List[Job]: """Return all successful jobs with that id"""
+    def get_completed_jobs(self, job_id: int) -> List[Job]: """Return all successful jobs with that id"""
     def get_failed_jobs(self, job_id: int) -> List[Job]: """Return all failed jobs with that id"""
     def is_file_processed(self, path: str) -> bool: """Returns True if the file has been processed."""
     def is_folder_installed(self, path: str) -> bool: """Returns True if the file has been processed."""
@@ -122,11 +122,38 @@ class InstallationReportImpl(InstallationReport):
         self._installed_zip_indexes: List[Tuple[str, str, StoreFragmentDrivePaths, Dict[str, Any]]] = []
         self._installed_folders: Set[str] = set()
         self._filtered_zip_data: List[Tuple[str, str, Dict[str, Any], Dict[str, Any]]] = []
-        self._jobs: Dict[int, List[Job]] = defaultdict(list)
-        self._failed_jobs: Dict[int, List[Tuple[Job, BaseException]]] = defaultdict(list)
+        self._jobs_started: Dict[int, List[Job]] = defaultdict(list)
+        self._jobs_completed: Dict[int, List[Job]] = defaultdict(list)
+        self._jobs_failed: Dict[int, List[Tuple[Job, BaseException]]] = defaultdict(list)
+        self._jobs_tag_in_progress: Dict[str, Set[Job]] = defaultdict(set)
+        self._jobs_tag_completed: Dict[str, List[Job]] = defaultdict(list)
+        self._jobs_tag_failed: Dict[str, List[Job]] = defaultdict(list)
 
-    def add_job(self, job: Job): self._jobs[job.type_id].append(job)
-    def add_failed_job(self, job: Job, exception: BaseException): self._failed_jobs[job.type_id].append((job, exception))
+    def add_job_started(self, job: Job):
+        self._jobs_started[job.type_id].append(job)
+        for tag in job.tags: self._jobs_tag_in_progress[tag].add(job)
+    def add_job_completed(self, job: Job):
+        self._jobs_completed[job.type_id].append(job)
+        for tag in job.tags:
+            self._jobs_tag_in_progress[tag].remove(job)
+            self._jobs_tag_completed[tag].append(job)
+    def add_job_failed(self, job: Job, exception: BaseException):
+        self._jobs_failed[job.type_id].append((job, exception))
+        for tag in job.tags:
+            self._jobs_tag_in_progress[tag].remove(job)
+            self._jobs_tag_failed[tag].append(job)
+    def any_jobs_in_progress_by_tag(self, tags: List[str]) -> bool:
+        return any(
+            tag in self._jobs_tag_in_progress
+            and len(self._jobs_tag_in_progress[tag]) > 0
+            for tag in tags
+        )
+    def get_jobs_completed_by_tag(self, tag: str) -> List[Job]:
+        if tag in self._jobs_tag_completed: return self._jobs_tag_completed[tag]
+        else: return []
+    def get_jobs_failed_by_tag(self, tag: str) -> List[Job]:
+        if tag in self._jobs_tag_failed: return self._jobs_tag_failed[tag]
+        else: return []
     def add_downloaded_file(self, path: str): self._downloaded_files.append(path)
     def add_validated_file(self, path: str): self._validated_files.append(path)
     def add_installed_zip_index(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]): self._installed_zip_indexes.append((db_id, zip_id, fragment, description))
@@ -169,8 +196,8 @@ class InstallationReportImpl(InstallationReport):
     def installed_zip_indexes(self): return self._installed_zip_indexes
     def skipped_updated_files(self): return self._skipped_updated_files
     def filtered_zip_data(self): return self._filtered_zip_data
-    def get_jobs(self, job_id: int) -> List[Job]: return self._jobs[job_id]
-    def get_failed_jobs(self, job_id: int) -> List[Tuple[Job, BaseException]]: return self._failed_jobs[job_id]
+    def get_completed_jobs(self, job_id: int) -> List[Job]: return self._jobs_completed[job_id]
+    def get_failed_jobs(self, job_id: int) -> List[Tuple[Job, BaseException]]: return self._jobs_failed[job_id]
 
 
 class FileDownloadSessionLogger:
@@ -218,6 +245,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         return self._report
 
     def notify_job_started(self, job: Job):
+        self._report.add_job_started(job)
         if isinstance(job, FetchFileJob):
             self._print_line(job.path)
             self._report.add_file_fetch_started(job.path)
@@ -237,7 +265,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             self._print_symbols()
 
     def notify_job_completed(self, job: Job):
-        self._report.add_job(job)
+        self._report.add_job_completed(job)
         if isinstance(job, FetchFileJob) or (isinstance(job, GetFileJob) and not job.silent):
             self._symbols.append('.')
             if self._needs_newline or self._check_time < time.time():
@@ -343,7 +371,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         self._check_time = time.time() + 2.0
 
     def notify_job_failed(self, job: Job, exception: BaseException):
-        self._report.add_failed_job(job, exception)
+        self._report.add_job_failed(job, exception)
         if isinstance(job, ProcessIndexJob) and isinstance(exception, BadFileFilterPartException):
             self._report.add_failed_db_options(
                 WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(exception)}' is invalid.")

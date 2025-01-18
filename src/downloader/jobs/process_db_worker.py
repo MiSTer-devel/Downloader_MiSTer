@@ -53,12 +53,14 @@ class ProcessDbWorker(DownloaderWorker):
 
             write_only_store.remove_zip_id(zip_id)
 
-        self._ctx.job_ctx.wait_for_jobs_with_tags(job_tags)
+        if self._ctx.installation_report.any_jobs_in_progress_by_tag(job_tags):
+            self._ctx.job_ctx.wait_for_other_jobs()
 
         for file_info in self._ctx.file_download_session_logger.report().failed_files():
             zip_dispatcher.try_push_summary_job_if_recovery_is_needed(file_info)
 
-        self._ctx.job_ctx.wait_for_jobs_with_tags(job_tags)
+        if self._ctx.installation_report.any_jobs_in_progress_by_tag(job_tags):
+            self._ctx.job_ctx.wait_for_other_jobs()
 
         self._ctx.job_ctx.push_job(ProcessIndexJob(
             db=job.db,

@@ -101,9 +101,14 @@ class TargetPathsCalculator:
 
             return base_path, PextKind.PEXT_STANDARD, ()
         elif priority == STORAGE_PRIORITY_PREFER_EXTERNAL:
-            result, others = self._first_drive_with_existing_directory_prefer_external(first_folder)
-            if result is not None:
-                return result, PextKind.PEXT_EXTERNAL, others
+            # Check better_test_download_external_drives_1_and_2___on_empty_stores_with_same_fs_as_system_tests___installs_at_expected_locations
+            #   and better_test_download_external_drives_1_and_2___on_store_and_fs____installs_at_expected_locations
+            #   They should be the actual behavior instead of the legacy behavior we are using right now. We'll need to fix it in a later release
+            #   where the following code would be uncommented and these tests would replace the current passing test.
+            #
+            # result, others = self._first_drive_with_existing_directory_prefer_external(first_folder)
+            # if result is not None:
+            #    return result, PextKind.PEXT_EXTERNAL, others
 
             if len(self._drives):
                 return self._drives[0], PextKind.PEXT_EXTERNAL, ()
