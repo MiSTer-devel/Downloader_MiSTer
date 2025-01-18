@@ -143,6 +143,8 @@ class WriteOnlyStoreAdapter:
         if path in entries and equal_dicts(entries[path], description):
             return
 
+        #if path in self._store[kind]: del self._store[kind][path]
+
         entries[path] = description
         self._top_wrapper.mark_force_save()
 
@@ -451,11 +453,23 @@ class ReadOnlyStoreAdapter:
         folders = {}
         for file_path, file_description in self._aggregated_summary['files'].items():
             if 'zip_id' in file_description and file_description['zip_id'] == zip_id:
-                files[file_path] = file_description
+                # @TODO: This if should not be necessary if we store all the zip information on the store
+                #        Explicit asking for games and cheats is a hack, as this should only be declared in
+                #        the database information. Remove ASAP
+                if file_path.startswith('games') or file_path.startswith('cheats'):
+                    files['|' + file_path] = file_description
+                else:
+                    files[file_path] = file_description
 
         for folder_path, folder_description in self._aggregated_summary['folders'].items():
             if 'zip_id' in folder_description and folder_description['zip_id'] == zip_id:
-                folders[folder_path] = folder_description
+                # @TODO: This if should not be necessary if we store all the zip information on the store
+                #        Explicit asking for games and cheats is a hack, as this should only be declared in
+                #        the database information. Remove ASAP
+                if folder_path.startswith('games') or folder_path.startswith('cheats'):
+                    folders['|' + folder_path] = folder_description
+                else:
+                    folders[folder_path] = folder_description
 
         for zip_id, zip_description in self._store.get('filtered_zip_data', {}).items():
             if zip_id != zip_id:
@@ -463,11 +477,23 @@ class ReadOnlyStoreAdapter:
 
             for file_path, file_description in zip_description['files'].items():
                 if 'zip_id' in file_description and file_description['zip_id'] == zip_id:
-                    files[file_path] = file_description
+                    # @TODO: This if should not be necessary if we store all the zip information on the store
+                    #        Explicit asking for games and cheats is a hack, as this should only be declared in
+                    #        the database information. Remove ASAP
+                    if file_path.startswith('games') or file_path.startswith('cheats'):
+                        files['|' + file_path] = file_description
+                    else:
+                        files[file_path] = file_description
 
             for folder_path, folder_description in zip_description['folders'].items():
                 if 'zip_id' in folder_description and folder_description['zip_id'] == zip_id:
-                    folders[folder_path] = folder_description
+                    # @TODO: This if should not be necessary if we store all the zip information on the store
+                    #        Explicit asking for games and cheats is a hack, as this should only be declared in
+                    #        the database information. Remove ASAP
+                    if folder_path.startswith('games') or folder_path.startswith('cheats'):
+                        folders['|' + folder_path] = folder_description
+                    else:
+                        folders[folder_path] = folder_description
 
         if len(files) == 0 and len(folders) == 0:
             return None

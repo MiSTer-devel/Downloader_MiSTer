@@ -17,7 +17,6 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from abc import abstractmethod, ABC
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
 from typing import Dict, Optional, Callable, List, Tuple, Any, Iterable, Protocol
@@ -42,12 +41,6 @@ class JobContext(Protocol):
 
     def wait_for_other_jobs(self) -> None:
         """Allows a worker to wait for other jobs to progress."""
-
-    def any_tag_active(self, tags: Iterable[str]) -> bool:
-        """Checks if any jobs with the specified tags are currently active."""
-
-    def wait_for_jobs_with_tags(self, tags: Iterable[str]) -> None:
-        """Waits until all jobs with the specified tags have completed."""
 
 
 class JobSystem(JobContext):
@@ -76,7 +69,6 @@ class JobSystem(JobContext):
         self._pending_jobs_amount: int = 0
         self._pending_jobs_cancelled: bool = False
         self._is_executing_jobs: bool = False
-        self._tag_dict: Dict[str, int] = defaultdict(int)
         self._jobs_pushed: int = 0
         self._timeout_clock: int = 0
 
@@ -110,9 +102,12 @@ class JobSystem(JobContext):
                 self._is_executing_jobs = False
 
     def push_job(self, job: 'Job', priority: Optional[int] = None) -> None:
+        # This method is thread-safe, it can be called from any thread.
+        # Therefore, any method being called here should be thread-safe too.
+
         worker = self._get_worker(job)
         parent_package: Optional[_JobPackage] = getattr(_thread_local_storage, 'current_package', None)
-        self._jobs_pushed += 1
+        self._jobs_pushed += 1  # No need to put a lock, since we don't need the strict value
         self._job_queue.put(_JobPackage(
             job=job,
             worker=worker,
@@ -120,43 +115,45 @@ class JobSystem(JobContext):
             priority=priority or self._jobs_pushed,
             parent=parent_package
         ))
-        self._increase_jobs_amount(job)
+        self._increase_jobs_amount()
 
     def pending_jobs_amount(self) -> int:
+        # This must be thread-safe, and no need lock since we don't need to return the strict value.
+        # Eventually the returned value will be correct upon repeating calls.
         return self._pending_jobs_amount
 
     def cancel_pending_jobs(self) -> None:
+        # This must be thread-safe. We lock so that execution can be interrupted asap.
+
         with self._lock: self._pending_jobs_cancelled = True
 
     def wait_for_other_jobs(self):
+        # This must be thread-safe. We lock because we need the strict value of _is_executing_jobs.
+
         with self._lock:
             if not self._is_executing_jobs:
                 raise CantWaitWhenNotExecutingJobs('Can not wait when not executing jobs')
 
-        if self._max_threads > 1:
+        if self._max_threads > 1:  # _max_threads is read only.
             time.sleep(self._wait_timeout)
         else:
+            # This branch does not need to be thread-safe, since concurrency is off.
             self._no_threads_execute_tick()
 
-    def any_tag_active(self, tags: Iterable[str]) -> bool:
-        with self._lock:
-            return any(self._tag_dict[tag] > 0 for tag in tags)
+    def _increase_jobs_amount(self) -> None:
+        # This method is thread-safe, it can be called from any thread.
+        # Because _increase_jobs_amount is called in push_job function which is thread-safe.
 
-    def wait_for_jobs_with_tags(self, tags: Iterable[str]) -> None:
-        while self.any_tag_active(tags):
-            self.wait_for_other_jobs()
-
-    def _decrease_jobs_amount(self, job: 'Job') -> None:
         with self._lock:
-            for tag in job.tags:
-                self._tag_dict[tag] -= 1
-            self._pending_jobs_amount -= 1
-
-    def _increase_jobs_amount(self, job: 'Job') -> None:
-        with self._lock:
-            for tag in job.tags:
-                self._tag_dict[tag] += 1
             self._pending_jobs_amount += 1
+
+    def _decrease_jobs_amount(self) -> None:
+        # This method is thread-safe, it can be called from any thread.
+        # Because _increase_jobs_amount is called in push_job function which is thread-safe,
+        # and manipulates the same _pending_jobs_amount variable we are changing here.
+
+        with self._lock:
+            self._pending_jobs_amount -= 1
 
     def _execute_with_threads(self, max_threads: int) -> None:
         previous_handler = signal.getsignal(signal.SIGINT)
@@ -239,7 +236,7 @@ class JobSystem(JobContext):
                 priority=package.priority
             ))
         else:
-            self._decrease_jobs_amount(package.job)
+            self._decrease_jobs_amount()
         try:
             if should_retry:
                 self._report_job_retried(package, e)
@@ -251,6 +248,10 @@ class JobSystem(JobContext):
             self._logger.print(report_exception)
 
     def _get_worker(self, job: 'Job') -> 'Worker':
+        # This method needs to be thread-safe, so it can be called from any thread.
+        # Because _get_worker is called in push_job function which is thread-safe.
+        # And since we don't let registering workers during job execution, we don't need a lock.
+
         worker = self._workers.get(job.type_id, None)
         if worker is None:
             raise NoWorkerException(f'No worker registered for job type id "{job.type_id}" and name "{job.__class__.__name__}"')
@@ -263,7 +264,7 @@ class JobSystem(JobContext):
 
             completed, package = notification
             if completed:
-                self._decrease_jobs_amount(package.job)
+                self._decrease_jobs_amount()
                 self._report_job_completed(package)
             else:
                 self._report_job_started(package)

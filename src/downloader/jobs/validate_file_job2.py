@@ -23,7 +23,7 @@ from downloader.job_system import Job, JobSystem
 from downloader.jobs.get_file_job import GetFileJob
 
 
-@dataclass
+@dataclass(eq=False)
 class ValidateFileJob2(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
     target_file_path: str

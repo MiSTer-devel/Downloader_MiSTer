@@ -23,7 +23,7 @@ from downloader.job_system import Job, JobSystem
 from downloader.jobs.worker_context import DownloaderWorker
 
 
-@dataclass
+@dataclass(eq=False)
 class DbHeaderJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
     db: DbEntity
