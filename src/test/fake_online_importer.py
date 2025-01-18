@@ -247,7 +247,6 @@ class OnlineImporter(ProductionOnlineImporter):
                     for drive in external_parents_by_db[db_id][folder_pkg.pext_props.parent]:
                         stores[db_id].write_only().add_external_folder(drive, folder_pkg.rel_path, folder_pkg.description)
 
-
         for file_path in report.removed_files():
             file = report.processed_file(file_path)
             stores[file.db_id].write_only().remove_file(file.pkg.rel_path)

@@ -24,7 +24,7 @@ from downloader.job_system import Job, JobSystem
 from downloader.local_store_wrapper import StoreWrapper
 
 
-@dataclass
+@dataclass(eq=False)
 class ProcessDbJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
