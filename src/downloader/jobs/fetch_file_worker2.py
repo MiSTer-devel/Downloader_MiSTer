@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.constants import K_DOWNLOADER_TIMEOUT
+from downloader.job_system import WorkerResult
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.worker_context import DownloaderWorker
 from downloader.jobs.errors import FileDownloadError
@@ -30,13 +31,12 @@ class FetchFileWorker2(DownloaderWorker):
     def job_type_id(self) -> int: return FetchFileJob2.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: FetchFileJob2) -> Optional[Exception]:
+    def operate_on(self, job: FetchFileJob2) -> WorkerResult:
         error = self._fetch_file(url=job.source, download_path=job.temp_path, info=job.info)
         if error is not None:
-            return error
+            return None, error
 
-        if job.after_job is not None:
-            self._ctx.job_ctx.push_job(job.after_job)
+        return job.after_job, None
 
     def _fetch_file(self, url: str, download_path: str, info: str) -> Optional[FileDownloadError]:
         try:

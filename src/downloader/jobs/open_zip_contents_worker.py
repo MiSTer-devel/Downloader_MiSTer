@@ -21,6 +21,7 @@ from pathlib import Path
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
+from downloader.job_system import WorkerResult
 from downloader.jobs.index import Index
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
@@ -37,7 +38,7 @@ class OpenZipContentsWorker(DownloaderWorker):
     def job_type_id(self) -> int: return OpenZipContentsJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: OpenZipContentsJob):
+    def operate_on(self, job: OpenZipContentsJob) -> WorkerResult:
         try:
             kind = job.zip_description.get('kind', None)
             if kind == 'extract_all_contents':
@@ -48,9 +49,11 @@ class OpenZipContentsWorker(DownloaderWorker):
                 # @TODO: Handle this case, it should never raise in any case
                 raise Exception(f"Unknown kind '{kind}' for zip '{job.zip_id}' in db '{job.db.db_id}'")
         except BadFileFilterPartException as e:
-            return e
+            return None, e
         except StoragePriorityError as e:
-            return e
+            return None, e
+
+        return None, None
 
     def _extract_all_contents(self, job: OpenZipContentsJob):
         db = job.db

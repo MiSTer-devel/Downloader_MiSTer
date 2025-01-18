@@ -19,6 +19,7 @@
 from typing import Dict, Any, Optional
 
 from downloader.constants import K_DOWNLOADER_TIMEOUT
+from downloader.job_system import WorkerResult
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorker
@@ -32,13 +33,13 @@ class FetchFileWorker(DownloaderWorker):
     def job_type_id(self) -> int: return FetchFileJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: FetchFileJob) -> Optional[Exception]:
+    def operate_on(self, job: FetchFileJob) -> WorkerResult:
         file_path, description = job.path, job.description
         error = self._fetch_file(file_path, description)
         if error is not None:
-            return error
+            return None, error
 
-        self._ctx.job_ctx.push_job(ValidateFileJob(fetch_job=job), priority=1)
+        return ValidateFileJob(fetch_job=job).set_priority(1), None
 
     def _fetch_file(self, file_path: str, description: Dict[str, Any]) -> Optional[FileDownloadError]:
         target_path = self._ctx.file_system.download_target_path(self._ctx.target_path_repository.create_target(file_path, description))
