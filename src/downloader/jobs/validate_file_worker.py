@@ -19,6 +19,7 @@
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorker
 from downloader.jobs.errors import FileDownloadError
+from downloader.job_system import WorkerResult
 from typing import Optional
 
 
@@ -26,14 +27,13 @@ class ValidateFileWorker(DownloaderWorker):
     def job_type_id(self) -> int: return ValidateFileJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ValidateFileJob) -> Optional[Exception]:
+    def operate_on(self, job: ValidateFileJob) -> WorkerResult:
         file_path, file_hash, hash_check = job.fetch_job.path, job.fetch_job.description['hash'], job.fetch_job.hash_check
         error = self._validate_file(file_path, file_hash, hash_check)
         if error is not None:
-            return error
+            return None, error
 
-        if job.fetch_job.after_validation is not None:
-            self._ctx.job_ctx.push_job(job.fetch_job.after_validation)
+        return job.fetch_job.after_validation, None
 
     def _validate_file(self, file_path: str, file_hash: str, hash_check: bool) -> Optional[Exception]:
         try:

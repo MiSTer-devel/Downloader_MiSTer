@@ -142,7 +142,7 @@ class InstallationReportImpl(InstallationReport):
         for tag in job.tags:
             self._jobs_tag_in_progress[tag].remove(job)
             self._jobs_tag_failed[tag].append(job)
-    def any_jobs_in_progress_by_tag(self, tags: List[str]) -> bool:
+    def any_jobs_in_progress_by_tag(self, tags: Iterable[str]) -> bool:
         return any(
             tag in self._jobs_tag_in_progress
             and len(self._jobs_tag_in_progress[tag]) > 0
