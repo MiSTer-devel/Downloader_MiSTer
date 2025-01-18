@@ -119,7 +119,7 @@ class ProcessIndexWorker(DownloaderWorker):
         remove_files_pkgs: List[_RemoveFilePackage] = self._translate_items(calculator, store.files, PathType.FILE, filtered_summary.files)
 
         # @TODO REFACTOR: This looks wrong
-        remove_files_pkgs = [pkg for pkg in remove_files_pkgs if 'zip_id' not in pkg.description]
+        # remove_files_pkgs = [pkg for pkg in remove_files_pkgs if 'zip_id' not in pkg.description]
 
         existing_folders: Dict[str, Any] = filtered_summary.folders.copy()
         for pkg in check_file_pkgs:
@@ -136,7 +136,7 @@ class ProcessIndexWorker(DownloaderWorker):
         delete_folder_pkgs: List[_DeleteFolderPackage] = self._translate_items(calculator, store.folders, PathType.FOLDER, existing_folders)
 
         # @TODO REFACTOR: This looks wrong
-        delete_folder_pkgs = [pkg for pkg in delete_folder_pkgs if 'zip_id' not in pkg.description]
+        # delete_folder_pkgs = [pkg for pkg in delete_folder_pkgs if 'zip_id' not in pkg.description]
 
         # @TODO commenting these 2 lines make the test still pass, why?
         for pkg in check_file_pkgs:
