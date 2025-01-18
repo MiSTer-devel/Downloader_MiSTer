@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Dict
 
 from downloader.constants import K_DB_URL
+from downloader.job_system import WorkerResult
 from downloader.jobs.download_db_job import DownloadDbJob
 from downloader.jobs.jobs_factory import make_get_file_job
 from downloader.jobs.open_db_job import OpenDbJob
@@ -30,7 +31,7 @@ class DownloadDbWorker(DownloaderWorker):
     def job_type_id(self) -> int: return DownloadDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: DownloadDbJob):
+    def operate_on(self, job: DownloadDbJob) -> WorkerResult:
         db_url, db_target = self._get_db_description_from_ini_section(job.ini_section, job.ini_description)
         get_file_job = make_get_file_job(source=db_url, target=db_target, info=job.ini_section, silent=True, logger=self._ctx.logger)
         get_file_job.after_job = OpenDbJob(
@@ -41,7 +42,7 @@ class DownloadDbWorker(DownloaderWorker):
             full_resync=job.full_resync,
             get_file_job=get_file_job
         )
-        self._ctx.job_ctx.push_job(get_file_job)
+        return get_file_job, None
 
     def _get_db_description_from_ini_section(self, ini_section: str, ini_description: Dict[str, str]) -> tuple[str, str]:
         db_url = ini_description[K_DB_URL]

@@ -1,6 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-import os
-from collections import defaultdict
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -20,10 +19,13 @@ from collections import defaultdict
 from typing import Dict, Any, List, Tuple, Optional, Set
 from pathlib import Path
 import threading
+import os
+from collections import defaultdict
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
 from downloader.file_system import ReadOnlyFileSystem
+from downloader.job_system import Job, WorkerResult
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.path_package import PathPackage, PathPackageKind, PathType
 from downloader.jobs.process_index_job import ProcessIndexJob
@@ -55,7 +57,7 @@ class ProcessIndexWorker(DownloaderWorker):
     def job_type_id(self) -> int: return ProcessIndexJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ProcessIndexJob) -> Optional[Exception]:
+    def operate_on(self, job: ProcessIndexJob) -> WorkerResult:
         logger = self._ctx.logger
         db, config, summary, full_resync = job.db, job.config, job.index, job.full_resync
         store = job.store.read_only()
@@ -81,7 +83,7 @@ class ProcessIndexWorker(DownloaderWorker):
             logger.debug(f"Reserving space '{db.db_id}'...")
             if not self._try_reserve_space(fetch_pkgs):
                 logger.debug(f"Not enough space '{db.db_id}'!")
-                return  # @TODO return error instead to retry later?
+                return None, None # @TODO return error instead to retry later?
 
             logger.debug(f"Processing create folder packages '{db.db_id}'...")
             self._process_create_folder_packages(create_folder_pkgs, db, store)  # @TODO maybe move this one after reserve space
@@ -93,11 +95,12 @@ class ProcessIndexWorker(DownloaderWorker):
             self._process_delete_folder_packages(delete_folder_pkgs, db.db_id)
 
             logger.debug(f"Process fetch packages and launch fetch jobs '{db.db_id}'...")
-            self._process_fetch_packages_and_launch_jobs(fetch_pkgs, db.base_files_url)
+            next_jobs = self._process_fetch_packages_and_launch_jobs(fetch_pkgs, db.base_files_url)
+            return next_jobs, None
         except BadFileFilterPartException as e:
-            return e
+            return None, e
         except StoragePriorityError as e:
-            return e
+            return None, e
 
     def _create_packages_from_index(self, config: Dict[str, Any], summary: Index, db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[
         List[_CheckFilePackage],
@@ -355,7 +358,11 @@ class ProcessIndexWorker(DownloaderWorker):
                 # @TODO Should queue a collection instead of a single file to minimize lock time
                 self._ctx.pending_removals.queue_directory_removal(pkg, db_id)
 
-    def _process_fetch_packages_and_launch_jobs(self, fetch_pkgs: List[_FetchFilePackage], base_files_url: str):
+    def _process_fetch_packages_and_launch_jobs(self, fetch_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
+        if len(fetch_pkgs) == 0:
+            return []
+
+        jobs = []
         for pkg in fetch_pkgs:
             download_path = pkg.full_path + '.new'
             fetch_job = FetchFileJob2(
@@ -371,7 +378,9 @@ class ProcessIndexWorker(DownloaderWorker):
                 info=pkg.rel_path,
                 get_file_job=fetch_job
             )
-            self._ctx.job_ctx.push_job(fetch_job)
+            jobs.append(fetch_job)
+
+        return jobs
 
 
 def _url(file_path: str, file_description: Dict[str, Any], base_files_url: str):

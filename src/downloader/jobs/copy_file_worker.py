@@ -19,6 +19,7 @@
 from downloader.jobs.copy_file_job import CopyFileJob
 from downloader.jobs.errors import FileCopyError
 from downloader.jobs.worker_context import DownloaderWorker
+from downloader.job_system import WorkerResult
 from typing import Optional
 
 
@@ -26,13 +27,12 @@ class CopyFileWorker(DownloaderWorker):
     def job_type_id(self) -> int: return CopyFileJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: CopyFileJob) -> Optional[FileCopyError]:
+    def operate_on(self, job: CopyFileJob) -> WorkerResult:
         error = self._copy_file(source=job.source, temp_path=job.temp_path, info=job.info)
         if error is not None:
-            return error
+            return None, error
 
-        if job.after_job is not None:
-            self._ctx.job_ctx.push_job(job.after_job)
+        return job.after_job, None
 
     def _copy_file(self, source: str, temp_path: str, info: str) -> Optional[FileCopyError]:
         try:

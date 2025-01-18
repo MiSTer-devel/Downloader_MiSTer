@@ -19,17 +19,18 @@
 from downloader.jobs.worker_context import DownloaderWorker
 from downloader.jobs.open_zip_index_job import OpenZipIndexJob
 from downloader.jobs.jobs_factory import make_process_zip_job
+from downloader.job_system import WorkerResult
 
 
 class OpenZipIndexWorker(DownloaderWorker):
     def job_type_id(self) -> int: return OpenZipIndexJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: OpenZipIndexJob):
+    def operate_on(self, job: OpenZipIndexJob) -> WorkerResult:
         index = self._ctx.file_system.load_dict_from_file(job.download_path)
         self._ctx.file_system.unlink(job.download_path)
 
-        self._ctx.job_ctx.push_job(make_process_zip_job(
+        return make_process_zip_job(
             zip_id=job.zip_id,
             zip_description=job.zip_description,
             zip_index=index,
@@ -39,4 +40,4 @@ class OpenZipIndexWorker(DownloaderWorker):
             store=job.store,
             full_resync=job.full_resync,
             has_new_zip_index=True
-        ))
+        ), None

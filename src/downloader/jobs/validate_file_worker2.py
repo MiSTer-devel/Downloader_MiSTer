@@ -1,6 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-import os.path
-from pathlib import Path
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -18,6 +17,9 @@ from pathlib import Path
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from typing import Optional
+from pathlib import Path
+
+from downloader.job_system import WorkerResult
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.jobs.worker_context import DownloaderWorker
 from downloader.jobs.errors import FileDownloadError
@@ -27,7 +29,7 @@ class ValidateFileWorker2(DownloaderWorker):
     def job_type_id(self) -> int: return ValidateFileJob2.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ValidateFileJob2) -> Optional[Exception]:
+    def operate_on(self, job: ValidateFileJob2) -> WorkerResult:
         error = self._validate_file(
             temp_path=job.temp_path,
             target_file_path=job.target_file_path,
@@ -37,10 +39,9 @@ class ValidateFileWorker2(DownloaderWorker):
         )
 
         if error is not None:
-            return error
+            return None, error
 
-        if job.after_job is not None:
-            self._ctx.job_ctx.push_job(job.after_job)
+        return job.after_job, None
 
     def _validate_file(self, temp_path: str, target_file_path: str, info: str, file_hash: str, backup: Optional[str]) -> Optional[FileDownloadError]:
         try:
