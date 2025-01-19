@@ -15,6 +15,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import ssl
+import threading
 import time
 import abc
 from contextlib import contextmanager
@@ -61,7 +62,10 @@ class HttpGateway:
         self._timeout = timeout
         self._logger = logger
         self._connections: Dict[str, _ConnectionQueue] = {}
+        self._connections_lock = threading.Lock()
         self._clean_connections_timer = time.time()
+        self._clean_timeout_connections_lock = threading.Lock()
+        self._connections_on_cleanup_temp: List[Tuple[str, "_ConnectionQueue"]] = []
 
     def __enter__(self): return self
 
@@ -74,33 +78,46 @@ class HttpGateway:
 
     def cleanup(self) -> None:
         total_cleared = 0
-        for queue in self._connections.values():
-            total_cleared += queue.size()
-            queue.clear_all()
-        self._connections = {}
+        with self._connections_lock:
+            for queue in self._connections.values():
+                total_cleared += queue.size()
+                queue.clear_all()
+            self._connections = {}
         if self._logger is not None: self._logger.debug(f'Cleaning up {total_cleared} connections.')
 
-    def _take_connection(self, parsed_url) -> _Connection:
+    def _take_connection(self, parsed_url: ParseResult) -> _Connection:
         queue_id = parsed_url.scheme + parsed_url.netloc
-        if queue_id not in self._connections:
-            self._connections[queue_id] = _ConnectionQueue(
-                lambda: _HttpConnectionAdapter(
-                    http=_create_http_connection(parsed_url, timeout=self._timeout, context=self._ssl_ctx)
-                )
-            )
-        return self._connections[queue_id].pull()
+        with self._connections_lock:
+            if queue_id not in self._connections:
+                self._connections[queue_id] = _ConnectionQueue(parsed_url, self._timeout, self._ssl_ctx)
+            return self._connections[queue_id].pull()
 
     def _clean_timeout_connections(self, now: float) -> None:
         if now - self._clean_connections_timer < 30.0:
             return
-        self._clean_connections_timer = now
 
-        if self._logger is not None: self._logger.debug('Checking keep-alive timeouts...')
+        if not self._clean_timeout_connections_lock.acquire(blocking=False):
+            return
 
-        for queue_id, queue in self._connections.items():
-            cleaned_up_connections = queue.clear_timed_outs(now)
-            if cleaned_up_connections > 0 and self._logger is not None:
-                self._logger.debug(f'Cleaning up {cleaned_up_connections} connections "{queue_id}".')
+        try:
+            if now - self._clean_connections_timer < 30.0:
+                return
+
+            self._clean_connections_timer = now
+
+            if self._logger is not None: self._logger.debug('Checking keep-alive timeouts...')
+
+            self._connections_on_cleanup_temp.clear()
+            with self._connections_lock:
+                self._connections_on_cleanup_temp.extend(self._connections.items())
+
+            for queue_id, queue in self._connections_on_cleanup_temp:
+                cleaned_up_connections = queue.clear_timed_outs(now)
+                if cleaned_up_connections > 0 and self._logger is not None:
+                    self._logger.debug(f'Cleaning up {cleaned_up_connections} connections "{queue_id}".')
+
+        finally:
+            self._clean_timeout_connections_lock.release()
 
     @contextmanager
     def open(self, url: str, method: str = None, body: Any = None, headers: Any = None, job: Any = None) -> Generator[Tuple[str, HTTPResponse], None, None]:
@@ -266,32 +283,55 @@ class _HttpConnectionAdapter(_Connection):
 
 
 class _ConnectionQueue:
-    def __init__(self, factory: Callable[[], _Connection]):
-        self._factory = factory
+    def __init__(self, parsed_url: ParseResult, timeout: int, ctx: ssl.SSLContext):
+        self._parsed_url = parsed_url
+        self._timeout = timeout
+        self._ctx = ctx
         self._queue: List[_Connection] = []
+        self._queue_swap: List[_Connection] = []
+        self._lock = threading.Lock()
 
     def pull(self) -> _Connection:
-        if len(self._queue) == 0:
-            return _ConnectionHandler(self._factory(), self)
-        return _ConnectionHandler(self._queue.pop(), self)
+        with self._lock:
+            if len(self._queue) == 0:
+                return _ConnectionHandler(
+                    _HttpConnectionAdapter(
+                        http=_create_http_connection(self._parsed_url, timeout=self._timeout, context=self._ctx)
+                    ),
+                    self
+                )
+            return _ConnectionHandler(self._queue.pop(), self)
 
     def push(self, connection: _Connection) -> None:
-        self._queue.append(connection)
+        with self._lock:
+            self._queue.append(connection)
 
     def size(self) -> int:
-        return len(self._queue)
+        with self._lock:
+            return len(self._queue)
 
     def clear_all(self) -> None:
-        for connection in self._queue:
-            connection.kill()
-        self._queue = []
+        with self._lock:
+            for connection in self._queue:
+                connection.kill()
+
+            self._queue, self._queue_swap = self._queue_swap, self._queue
+            self._queue.clear()
 
     def clear_timed_outs(self, now: float) -> int:
-        expired_connections = [c for c in self._queue if c.is_expired(now)]
-        for connection in expired_connections:
-            connection.kill()
-            self._queue.remove(connection)
-        return len(expired_connections)
+        with self._lock:
+            expired_count = 0
+            self._queue, self._queue_swap = self._queue_swap, self._queue
+            self._queue.clear()
+
+            for connection in self._queue_swap:
+                if connection.is_expired(now):
+                    connection.kill()
+                    expired_count += 1
+                else:
+                    self._queue.append(connection)
+
+            return expired_count
 
 
 class _ConnectionHandler(_Connection):
