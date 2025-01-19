@@ -142,12 +142,6 @@ class InstallationReportImpl(InstallationReport):
         for tag in job.tags:
             self._jobs_tag_in_progress[tag].remove(job)
             self._jobs_tag_failed[tag].append(job)
-    def any_jobs_in_progress_by_tag(self, tags: Iterable[str]) -> bool:
-        return any(
-            tag in self._jobs_tag_in_progress
-            and len(self._jobs_tag_in_progress[tag]) > 0
-            for tag in tags
-        )
     def get_jobs_completed_by_tag(self, tag: str) -> List[Job]:
         if tag in self._jobs_tag_completed: return self._jobs_tag_completed[tag]
         else: return []
