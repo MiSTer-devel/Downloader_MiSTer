@@ -31,9 +31,6 @@ import signal
 class JobContext(Protocol):
     """A context for workers to interact with the job system in a thread-safe manner."""
 
-    def legacy_push_job(self, job: 'Job') -> None:
-        """Allows a worker to push a new job into the job system."""
-
     def pending_jobs_amount(self) -> int:
         """Returns the amount of pending jobs."""
 
@@ -42,6 +39,9 @@ class JobContext(Protocol):
 
     def wait_for_other_jobs(self) -> None:
         """Allows a worker to wait for other jobs to progress."""
+
+    def any_in_progress_job_with_tags(self, tags: Iterable[str]) -> bool:
+        """Returns true if any of the pending/processing jobs have one of the given tags."""
 
 
 class JobSystem(JobContext):
@@ -104,11 +104,6 @@ class JobSystem(JobContext):
             with self._lock:
                 self._is_executing_jobs = False
 
-    def legacy_push_job(self, job: 'Job') -> None:
-        # Remove this when ProcessDbWorker does not use it anymore.
-        # Then, it's fine to make _internal_push_job not thread-safe to make it more efficient.
-        self._internal_push_job(job, getattr(_thread_local_storage, 'current_package', None))
-
     def push_job(self, job: 'Job') -> None:
         with self._lock:
             if self._is_executing_jobs:
@@ -117,19 +112,17 @@ class JobSystem(JobContext):
         self._internal_push_job(job)
 
     def _internal_push_job(self, job: 'Job', parent_package: Optional['_JobPackage'] = None) -> None:
-        # This method is thread-safe, it can be called from any thread because of legacy_push_job.
-        # Therefore, any method being called here should be thread-safe too.
-
         worker = self._get_worker(job)
         self._jobs_pushed += 1
-        self._job_queue.put(_JobPackage(
+        package = _JobPackage(
             job=job,
             worker=worker,
             tries=0 if parent_package is None else parent_package.tries,
             priority=job.priority or self._jobs_pushed,
             parent=parent_package,
             next_jobs=None
-        ))
+        )
+        self._job_queue.put(package)
         self._increase_jobs_amount(job)
 
     def pending_jobs_amount(self) -> int:
@@ -155,24 +148,26 @@ class JobSystem(JobContext):
             # This branch does not need to be thread-safe, since concurrency is off.
             self._no_threads_execute_tick()
 
-    def _increase_jobs_amount(self, job: 'Job') -> None:
-        # This method is thread-safe, it can be called from any thread.
-        # Because _increase_jobs_amount is called in push_job function which is thread-safe.
+    def any_in_progress_job_with_tags(self, tags: Iterable[str]) -> bool:
+        return any(
+            tag in self._tag_dict
+            and self._tag_dict[tag] > 0
+            for tag in tags
+        )
 
-        with self._lock:
-            for tag in job.tags:
-                self._tag_dict[tag] += 1
-            self._pending_jobs_amount += 1
+    def _increase_jobs_amount(self, job: 'Job') -> None:
+        # This method does not need to be thread-safe, since it should be called only from the main thread.
+
+        for tag in job.tags:
+            self._tag_dict[tag] += 1
+        self._pending_jobs_amount += 1
 
     def _decrease_jobs_amount(self, job: 'Job') -> None:
-        # This method is thread-safe, it can be called from any thread.
-        # Because _increase_jobs_amount is called in push_job function which is thread-safe,
-        # and manipulates the same _pending_jobs_amount variable we are changing here.
+        # This method does not need to be thread-safe, since it should be called only from the main thread.
 
-        with self._lock:
-            for tag in job.tags:
-                self._tag_dict[tag] -= 1
-            self._pending_jobs_amount -= 1
+        for tag in job.tags:
+            self._tag_dict[tag] -= 1
+        self._pending_jobs_amount -= 1
 
     def _execute_with_threads(self, max_threads: int) -> None:
         previous_handler = signal.getsignal(signal.SIGINT)
@@ -269,10 +264,6 @@ class JobSystem(JobContext):
             self._logger.print(report_exception)
 
     def _get_worker(self, job: 'Job') -> 'Worker':
-        # This method needs to be thread-safe, so it can be called from any thread.
-        # Because _get_worker is called in push_job function which is thread-safe.
-        # And since we don't let registering workers during job execution, we don't need a lock.
-
         worker = self._workers.get(job.type_id, None)
         if worker is None:
             raise NoWorkerException(f'No worker registered for job type id "{job.type_id}" and name "{job.__class__.__name__}"')

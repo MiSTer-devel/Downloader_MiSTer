@@ -56,7 +56,7 @@ class FileSystemFactory:
 class FileSystem(ABC):
 
     @abstractmethod
-    def unique_temp_filename(self) -> ClosableValue:
+    def unique_temp_filename(self, register: bool = True) -> ClosableValue:
         """interface"""
 
     @abstractmethod
@@ -204,13 +204,16 @@ class ReadOnlyFileSystem:
             self._fs.unlink(file_path)
             return
 
-        raise Exception(f"Cannot delete file '{file_path}' from read-only filesystem wrapper")
+        raise FileWriteError(f"Cannot delete file '{file_path}' from read-only filesystem wrapper")
 
 
 class UnlinkTemporaryException: pass
-class FolderCreationError(Exception): pass
-class FileCopyError(Exception): pass
-
+class FsError(Exception): pass
+class FolderCreationError(FsError): pass
+class FileCopyError(FsError): pass
+class FileReadError(FsError): pass
+class FileWriteError(FsError): pass
+class FsTimeoutError(FsError): pass
 
 class _FileSystem(FileSystem):
     def __init__(self, config: Dict[str, Any], path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], fs_cache: 'FsCache'):
@@ -222,7 +225,7 @@ class _FileSystem(FileSystem):
         self._quick_hit = 0
         self._slow_hit = 0
 
-    def unique_temp_filename(self) -> ClosableValue:
+    def unique_temp_filename(self, register: bool = True) -> ClosableValue:
         name = None
         while name in self._unique_temp_filenames:
             name = os.path.join(tempfile._get_default_tempdir(), next(tempfile._get_candidate_names()))
@@ -394,7 +397,7 @@ class _FileSystem(FileSystem):
             while True:
                 elapsed_time = time.time() - start_time
                 if elapsed_time > timeout:
-                    raise TimeoutError(f"Copy operation timed out after {timeout} seconds")
+                    raise FsTimeoutError(f"Copy operation timed out after {timeout} seconds")
 
                 buf = in_stream.read(COPY_BUFSIZE)
                 if not buf:
@@ -422,7 +425,7 @@ class _FileSystem(FileSystem):
         elif suffix == '.zip':
             return load_json_from_zip(full_path)
         else:
-            raise Exception('File type "%s" not supported' % suffix)
+            raise FileReadError('File type "%s" not supported' % suffix)
 
     def save_json_on_zip(self, db: Dict[str, Any], path: str) -> None:
         full_path = self._path(path)
@@ -521,7 +524,7 @@ def load_json_from_zip(path: str) -> Dict[str, Any]:
     with zipfile.ZipFile(path) as jsonzipf:
         namelist = jsonzipf.namelist()
         if len(namelist) != 1:
-            raise Exception('Could not load "%s", because it has %s elements!' % (path, len(namelist)))
+            raise FileReadError('Could not load "%s", because it has %s elements!' % (path, len(namelist)))
         with jsonzipf.open(namelist[0]) as store_json_file:
             return json.loads(store_json_file.read())
 

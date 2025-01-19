@@ -27,6 +27,7 @@ from downloader.jobs.open_db_worker import OpenDbWorker
 from downloader.jobs.open_zip_contents_worker import OpenZipContentsWorker
 from downloader.jobs.open_zip_index_worker import OpenZipIndexWorker
 from downloader.jobs.process_db_worker import ProcessDbWorker
+from downloader.jobs.process_db_zips_waiter_worker import ProcessDbZipsWaiterWorker
 from downloader.jobs.process_index_worker import ProcessIndexWorker
 from downloader.jobs.process_zip_worker import ProcessZipWorker
 from downloader.jobs.validate_file_worker import ValidateFileWorker
@@ -50,6 +51,7 @@ class DownloaderWorkersFactory:
             DownloadDbWorker(self._ctx),
             OpenDbWorker(self._ctx),
             ProcessIndexWorker(self._ctx),
+            ProcessDbZipsWaiterWorker(self._ctx),
             ProcessDbWorker(self._ctx),
             ProcessZipWorker(self._ctx),
             OpenZipIndexWorker(self._ctx),
