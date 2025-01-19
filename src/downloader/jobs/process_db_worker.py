@@ -17,10 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from typing import Dict, Any, Optional
+from dataclasses import dataclass
 
 from downloader.db_entity import DbEntity
 from downloader.job_system import WorkerResult, Job
-from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_index_job, ZipJobContext
+from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_index_job, make_zip_tag, ZipJobContext
+from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
@@ -37,22 +39,11 @@ class ProcessDbWorker(DownloaderWorker):
         read_only_store = job.store.read_only()
         write_only_store = job.store.write_only()
 
-        # @TODO: Need to split this worker in 2 and move some logic to OpenDbWorker
-        # 1- We should move the launching of the zip jobs to OpenDbWorker.
-        # 2- New job for waiting for the zip jobs to be done, this way orchestration is only here, and the job can be removed once we make tag-based scheduling in the job system and centralize scheduling there.
-        # 3- Keep this job without previously mentioned logic for processing the rest of the DB
+        self._ctx.logger.debug(f"Building db config '{job.db.db_id}'...")
+        config = build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
 
-        config = self._build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
         if not read_only_store.has_base_path():
             write_only_store.set_base_path(config[K_BASE_PATH])
-
-        zip_dispatcher = _ZipJobDispatcher(self._ctx)
-
-        job_tags = []
-        for zip_id, zip_description in job.db.zips.items():
-            zip_job = zip_dispatcher.make_zip_job(ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
-            job_tags.append(f'{job.db.db_id}:{zip_id}')
-            self._ctx.job_ctx.legacy_push_job(zip_job)
 
         for zip_id in list(read_only_store.zips):
             if zip_id in job.db.zips:
@@ -60,86 +51,76 @@ class ProcessDbWorker(DownloaderWorker):
 
             write_only_store.remove_zip_id(zip_id)
 
-        if self._ctx.installation_report.any_jobs_in_progress_by_tag(job_tags):
-            self._ctx.job_ctx.wait_for_other_jobs()
+        if len(job.db.zips) > 0:
+            zip_jobs = []
+            zip_job_tags = []
 
-        for file_info in self._ctx.file_download_session_logger.report().failed_files():
-            zip_job = zip_dispatcher.try_push_summary_job_if_recovery_is_needed(file_info)
-            if zip_job is not None:
-                self._ctx.job_ctx.legacy_push_job(zip_job)
+            for zip_id, zip_description in job.db.zips.items():
+                zip_job = _make_zip_job(ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
+                zip_job_tags.append(make_zip_tag(job.db, zip_id))
+                zip_jobs.append(zip_job)
 
-        if self._ctx.installation_report.any_jobs_in_progress_by_tag(job_tags):
-            self._ctx.job_ctx.wait_for_other_jobs()
+            zip_jobs.append(ProcessDbZipsWaiterJob(
+                db=job.db,
+                config=config,
+                store=job.store,
+                ini_description=job.ini_description,
+                full_resync=job.full_resync,
+                zip_job_tags=zip_job_tags
+            ))
 
-        return ProcessIndexJob(
-            db=job.db,
-            ini_description=job.ini_description,
-            config=config,
-            index=Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url),
-            store=job.store,
-            full_resync=job.full_resync,
-        ), None
-
-    def _build_db_config(self, input_config: Dict[str, Any], db: DbEntity, ini_description: Dict[str, Any]) -> Dict[str, Any]:
-        self._ctx.logger.debug(f"Building db config '{db.db_id}'...")
-
-        config = input_config.copy()
-        user_defined_options = config[K_USER_DEFINED_OPTIONS]
-
-        for key, option in db.default_options.items():
-            if key not in user_defined_options or (key == K_FILTER and '[mister]' in option.lower()):
-                config[key] = option
-
-        if K_OPTIONS in ini_description:
-            ini_description[K_OPTIONS].apply_to_config(config)
-
-        if config[K_FILTER] is not None and '[mister]' in config[K_FILTER].lower():
-            mister_filter = '' if K_FILTER not in config or config[K_FILTER] is None else config[K_FILTER].lower()
-            config[K_FILTER] = config[K_FILTER].lower().replace('[mister]', mister_filter).strip()
-
-        return config
-
-
-class _ZipJobDispatcher:
-    def __init__(self, ctx: DownloaderWorkerContext):
-        self._ctx = ctx
-        self._summaries_requested: Dict[str, ZipJobContext] = dict()
-
-    def make_zip_job(self, z: ZipJobContext) -> Job:
-        if 'summary_file' in z.zip_description:
-            index = z.job.store.read_only().zip_index(z.zip_id)
-
-
-            #@TODO ZIP_INDEX method does not pull data from filtered_zip_data so and that makes the current test to not pass
-
-            there_is_a_recent_store_index = index is not None and index['hash'] == z.zip_description['summary_file']['hash'] and index['hash'] != NO_HASH_IN_STORE_CODE
-            if there_is_a_recent_store_index:
-                job = make_process_zip_job_from_ctx(z, zip_index=index, has_new_zip_index=False)
-            else:
-                job, summary_info =  make_open_zip_index_job(z, z.zip_description['summary_file'])
-                self._summaries_requested[summary_info] = z
-
-        elif 'internal_summary' in z.zip_description:
-            job = make_process_zip_job_from_ctx(z, zip_index=z.zip_description['internal_summary'], has_new_zip_index=True)
+            return zip_jobs, None
         else:
-            raise Exception(f"Unknown zip description for zip '{z.zip_id}' in db '{z.job.db.db_id}'")
-            # @TODO: Handle this case, it should never raise in any case
+            return ProcessIndexJob(
+                db=job.db,
+                ini_description=job.ini_description,
+                config=config,
+                index=Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url),
+                store=job.store,
+                full_resync=job.full_resync,
+            ), None
 
-        return job
 
-    def try_push_summary_job_if_recovery_is_needed(self, summary_info: str) -> Optional[Job]:
-        if summary_info not in self._summaries_requested:
-            return
+def build_db_config(input_config: Dict[str, Any], db: DbEntity, ini_description: Dict[str, Any]) -> Dict[str, Any]:
+    config = input_config.copy()
+    user_defined_options = config[K_USER_DEFINED_OPTIONS]
 
-        z = self._summaries_requested[summary_info]
+    for key, option in db.default_options.items():
+        if key not in user_defined_options or (key == K_FILTER and '[mister]' in option.lower()):
+            config[key] = option
+
+    if K_OPTIONS in ini_description:
+        ini_description[K_OPTIONS].apply_to_config(config)
+
+    if config[K_FILTER] is not None and '[mister]' in config[K_FILTER].lower():
+        mister_filter = '' if K_FILTER not in config or config[K_FILTER] is None else config[K_FILTER].lower()
+        config[K_FILTER] = config[K_FILTER].lower().replace('[mister]', mister_filter).strip()
+
+    return config
+
+def _make_zip_job(z: ZipJobContext) -> Job:
+    if 'summary_file' in z.zip_description:
         index = z.job.store.read_only().zip_index(z.zip_id)
-        if index is None:
-            return
-
-        return make_process_zip_job_from_ctx(z, zip_index=index, has_new_zip_index=False)
 
 
-def make_process_zip_job_from_ctx(z: ZipJobContext, zip_index: Dict[str, Any], has_new_zip_index: bool):
+        #@TODO ZIP_INDEX method does not pull data from filtered_zip_data so and that makes the current test to not pass
+
+        there_is_a_recent_store_index = index is not None and index['hash'] == z.zip_description['summary_file']['hash'] and index['hash'] != NO_HASH_IN_STORE_CODE
+        if there_is_a_recent_store_index:
+            job = _make_process_zip_job_from_ctx(z, zip_index=index, has_new_zip_index=False)
+        else:
+            job, summary_info =  make_open_zip_index_job(z, z.zip_description['summary_file'])
+
+    elif 'internal_summary' in z.zip_description:
+        job = _make_process_zip_job_from_ctx(z, zip_index=z.zip_description['internal_summary'], has_new_zip_index=True)
+    else:
+        raise Exception(f"Unknown zip description for zip '{z.zip_id}' in db '{z.job.db.db_id}'")
+        # @TODO: Handle this case, it should never raise in any case
+
+    return job
+
+
+def _make_process_zip_job_from_ctx(z: ZipJobContext, zip_index: Dict[str, Any], has_new_zip_index: bool):
     return make_process_zip_job(
         zip_id=z.zip_id,
         zip_description=z.zip_description,
