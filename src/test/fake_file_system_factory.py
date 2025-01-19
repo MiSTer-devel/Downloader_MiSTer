@@ -66,8 +66,11 @@ class FileSystemFactory:
         return fs_state_to_data(self._state)
 
     @property
+    def private_state(self): return self._state
+
+    @property
     def records(self):
-        return [record.__dict__.copy() for record in self._write_records]
+        return [record.__dict__.copy() for record in self._write_records if record.not_ignored()]
 
     @staticmethod
     def from_state(files=None, folders=None, config=None, base_path=None, path_dictionary=None):
@@ -107,10 +110,10 @@ class FakeFileSystem(ProductionFileSystem):
     def _fix_paths(self, paths):
         return [p.replace(self._base_path(p) + '/', '') for p in paths]
 
-    def unique_temp_filename(self):
+    def unique_temp_filename(self, register: bool = True):
         name = '/tmp/unique_temp_filename_%d' % self.unique_temp_filename_index
         self.unique_temp_filename_index += 1
-        self._write_records.append(_Record('unique_temp_filename', name))
+        if register: self._write_records.append(_Record('unique_temp_filename', name))
         return ClosableValue(name, lambda: None)
 
     def persistent_temp_dir(self) -> str:
@@ -344,6 +347,10 @@ class _Record:
     def __init__(self, scope, data):
         self.scope = scope
         self.data = [d for d in data] if isinstance(data, tuple) else data
+
+    def not_ignored(self):
+        if not isinstance(self.data, str): return True
+        return not self.data.endswith('.test_downloader')
 
 
 class _FakeTempFile:

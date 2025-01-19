@@ -21,6 +21,7 @@ from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.job_system import JobSystem
+from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
 from downloader.jobs.worker_context import make_downloader_worker_context
@@ -45,14 +46,18 @@ import os
 
 
 class OnlineImporter(ProductionOnlineImporter):
-    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, path_resolver_factory=None, local_repository=None, free_space_reservation=None, waiter=None, logger=None, path_dictionary=None, network_state=None):
-        self._config = config if config is not None else config_with(base_system_path=MEDIA_USB0)
-        file_system_state = FileSystemState(config=self._config, path_dictionary=path_dictionary)
-        self.fs_factory = FileSystemFactory(state=file_system_state) if file_system_factory is None else file_system_factory
-        file_downloader_factory = FileDownloaderFactory(config=config, file_system_factory=self.fs_factory, state=file_system_state) if file_downloader_factory is None else file_downloader_factory
-        self.file_system = self.fs_factory.create_for_system_scope()
-        path_resolver_factory = PathResolverFactory(path_dictionary=file_system_state.path_dictionary, file_system_factory=self.fs_factory) if path_resolver_factory is None else path_resolver_factory
+    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, path_resolver_factory=None, local_repository=None, free_space_reservation=None, waiter=None, logger=None, path_dictionary=None, network_state=None, file_system_state=None):
+        self._config = config or config_with(base_system_path=MEDIA_USB0)
+        if isinstance(file_system_factory, FileSystemFactory):
+            self.fs_factory = file_system_factory
+            self.file_system_state = file_system_factory.private_state
+        else:
+            self.file_system_state = file_system_state or FileSystemState(config=self._config, path_dictionary=path_dictionary)
+            self.fs_factory = file_system_factory or FileSystemFactory(state=self.file_system_state)
 
+        file_downloader_factory = file_downloader_factory or FileDownloaderFactory(config=self._config, file_system_factory=self.fs_factory, state=self.file_system_state)
+        self.file_system = self.fs_factory.create_for_system_scope()
+        path_resolver_factory = path_resolver_factory or PathResolverFactory(path_dictionary=self.file_system_state.path_dictionary, file_system_factory=self.fs_factory)
         self.needs_save = False
         self._needs_reboot = False
         self._new_files_not_overwritten = {}
@@ -105,7 +110,8 @@ class OnlineImporter(ProductionOnlineImporter):
             file_downloader_factory=file_downloader_factory,
             path_resolver_factory=path_resolver_factory,
             free_space_reservation=free_space_reservation,
-            network_state=implicit_inputs.network_state
+            network_state=implicit_inputs.network_state,
+            file_system_state=implicit_inputs.file_system_state
         )
 
     @property
@@ -138,9 +144,17 @@ class OnlineImporter(ProductionOnlineImporter):
         self._workers_factory.add_workers(self._job_system)
 
         stores = {}
+        jobs = []
+        #db_test_filename = self.file_system.unique_temp_filename(register=False).value
+
         for db, store, ini_description in self.dbs:
             stores[db.db_id] = local_store.store_by_id(db.db_id)
-            self._job_system.push_job(ProcessDbJob(db=db, ini_description=ini_description, store=stores[db.db_id], full_resync=full_resync))
+            jobs.append(ProcessDbJob(db=db, ini_description=ini_description, store=stores[db.db_id], full_resync=full_resync))
+            #db_temp_file_path = db_test_filename + '.db_temp_file_path.' + db.db_id + '.' + str(len(jobs)) + '.test_downloader'
+            #self.file_system.save_json(db.testable, db_temp_file_path)
+            #jobs.append(OpenDbJob(section=db.db_id, temp_path=db_temp_file_path, ini_description=ini_description, store=stores[db.db_id], full_resync=full_resync, get_file_job=None))
+
+        for job in jobs: self._job_system.push_job(job)
 
         self._job_system.execute_jobs()
 

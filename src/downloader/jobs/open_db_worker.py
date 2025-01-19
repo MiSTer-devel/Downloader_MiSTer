@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.db_entity import DbEntity, DbEntityValidationException
+from downloader.file_system import FsError
 from downloader.job_system import WorkerResult
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_job import ProcessDbJob
@@ -28,18 +29,21 @@ class OpenDbWorker(DownloaderWorker):
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: OpenDbJob) -> WorkerResult:
-        db = self._open_db(section=job.section, temp_path=job.temp_path)
+        try:
+            db = self._open_db(section=job.section, temp_path=job.temp_path)
+        except Exception as e:
+            self._ctx.logger.debug(e)
+            if isinstance(e, DbEntityValidationException) or isinstance(e, FsError) or isinstance(e, OSError):
+                return None, e
+            else:
+                raise e
+
         ini_description, store, full_resync = job.ini_description, job.store, job.full_resync
         return ProcessDbJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync), None
 
     def _open_db(self, section: str, temp_path: str) -> DbEntity:
-        try:
-            db_raw = self._ctx.file_system.load_dict_from_file(temp_path)
-            self._ctx.file_system.unlink(temp_path)
-            self._ctx.logger.bench(f'Validating database {section}...')
-            return DbEntity(db_raw, section)
-        except Exception as e:
-            self._ctx.logger.debug(e)
-            if isinstance(e, DbEntityValidationException):
-                self._ctx.logger.print(str(e))
-            self._ctx.logger.print(f'Could not load json from "{temp_path}"')
+        db_raw = self._ctx.file_system.load_dict_from_file(temp_path)
+        self._ctx.file_system.unlink(temp_path)
+        self._ctx.logger.bench(f'Validating database {section}...')
+        return DbEntity(db_raw, section)
+

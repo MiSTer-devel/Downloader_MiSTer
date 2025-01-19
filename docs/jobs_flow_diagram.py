@@ -16,6 +16,7 @@ dot.node('1', 'File System', fillcolor='#ffefd5')
 dot.node('2', 'Network')
 dot.node('C', 'OpenDbJob', fillcolor='#ffefd5')
 dot.node('D', 'ProcessDbJob', fillcolor='#B0E0E6')
+dot.node('O', 'ProcessDbZipsWaiterJob', fillcolor='#B0E0E6')
 dot.node('E', 'ProcessIndexJob', fillcolor='#B0E0E6')
 dot.node('F', 'ProcessZipJob', fillcolor='#B0E0E6')
 dot.node('G', 'FetchFileJob [zip index]')
@@ -31,7 +32,14 @@ dot.node('END', 'END', shape='ellipse', fillcolor='#77DD77')  # Pastel green for
 
 # Adding edges (transitions)
 # The normal workflow without labeled edges
-dot.edges(['AB', 'BC', 'CD', 'DE', 'FJ', 'FE', 'IF', 'GH', 'HI', 'JK', 'KL', 'MN'])
+dot.edges(['AB', 'BC', 'CD', 'DE', 'DO', 'OE', 'FJ', 'FE', 'IF', 'GH', 'HI', 'JK', 'KL', 'MN'])
+
+dot.edge('F', 'O', style='dotted', label='wait')
+dot.edge('G', 'O', style='dotted', label='wait')
+dot.edge('H', 'O', style='dotted', label='wait')
+dot.edge('I', 'O', style='dotted', label='wait')
+#dot.edge('F', 'O', style='dotted', label='N to 1')
+#dot.edge('X', 'F', style='dotted')
 
 # The workflow with labeled edges "1 to N"
 dot.edge('START', 'A', label='1 to N')
