@@ -221,24 +221,16 @@ class JobSystem(JobContext):
 
     @staticmethod
     def _operate_on_next_job(package: '_JobPackage', notifications: queue.Queue[Tuple[bool, '_JobPackage']]) -> None:
-        try:
-            _thread_local_storage.current_package = package
+        job, worker = package.job, package.worker
+        notifications.put((False, package))
 
-            job, worker = package.job, package.worker
-            notifications.put((False, package))
+        jobs, error = worker.operate_on(job)
+        package.next_jobs = jobs
 
-            jobs, error = worker.operate_on(job)
-            package.next_jobs = jobs
+        if error is not None:
+            raise _JobError(error)
 
-            if error is not None:
-                raise _JobError(error)
-
-            notifications.put((True, package))
-        finally:
-            try:
-                del _thread_local_storage.current_package
-            except AttributeError:
-                pass
+        notifications.put((True, package))
 
     def _retry_package(self, package: '_JobPackage', e: Exception) -> None:
         retry_job = package.job.retry_job()
@@ -480,6 +472,3 @@ class _JobError(Exception):
     def __init__(self, child: Exception):
         super().__init__(child)
         self.child = child
-
-
-_thread_local_storage = threading.local()
