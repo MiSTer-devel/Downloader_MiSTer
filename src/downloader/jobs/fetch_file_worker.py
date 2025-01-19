@@ -34,17 +34,17 @@ class FetchFileWorker(DownloaderWorker):
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: FetchFileJob) -> WorkerResult:
-        file_path, description = job.path, job.description
-        error = self._fetch_file(file_path, description)
+        error = self._fetch_file(job)
         if error is not None:
             return None, error
 
         return ValidateFileJob(fetch_job=job).set_priority(1), None
 
-    def _fetch_file(self, file_path: str, description: Dict[str, Any]) -> Optional[FileDownloadError]:
+    def _fetch_file(self, job: FetchFileJob) -> Optional[FileDownloadError]:
+        file_path, description = job.path, job.description
         target_path = self._ctx.file_system.download_target_path(self._ctx.target_path_repository.create_target(file_path, description))
         try:
-            with self._ctx.http_gateway.open(description['url']) as (final_url, in_stream):
+            with self._ctx.http_gateway.open(description['url'], job=job) as (final_url, in_stream):
                 description['url'] = final_url
                 if in_stream.status != 200:
                     return FileDownloadError(f'Bad http status! {file_path}: {in_stream.status}')

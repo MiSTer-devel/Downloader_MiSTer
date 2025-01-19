@@ -103,7 +103,7 @@ class HttpGateway:
                 self._logger.debug(f'Cleaning up {cleaned_up_connections} connections "{queue_id}".')
 
     @contextmanager
-    def open(self, url: str, method: str = None, body: Any = None, headers: Any = None) -> Generator[Tuple[str, HTTPResponse], None, None]:
+    def open(self, url: str, method: str = None, body: Any = None, headers: Any = None, job: Any = None) -> Generator[Tuple[str, HTTPResponse], None, None]:
         if self._logger is not None: self._logger.debug('^^^^')
         final_url, conn = self._open_impl(
             url,

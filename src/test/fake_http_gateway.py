@@ -20,7 +20,6 @@ from typing import Dict, Any, Tuple, Generator, Optional
 from contextlib import contextmanager
 
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.job_system import _thread_local_storage
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.open_zip_index_job import OpenZipIndexJob
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
@@ -33,10 +32,7 @@ class FakeHttpGateway:
         self._network_state = network_state
 
     @contextmanager
-    def open(self, url: str, _method: str = None, _body: Any = None, _headers: Any = None) -> Generator[Tuple[str, 'FakeHTTPResponse'], None, None]:
-        parent_package = getattr(_thread_local_storage, 'current_package', None)
-        job = None if parent_package is None else parent_package.job
-
+    def open(self, url: str, _method: str = None, _body: Any = None, _headers: Any = None, job: Any = None) -> Generator[Tuple[str, 'FakeHTTPResponse'], None, None]:
         description = None
         target_file_path = None
         info_path = None
