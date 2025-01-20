@@ -26,12 +26,11 @@ from downloader.importer_command import ImporterCommandFactory
 from downloader.job_system import JobSystem
 from downloader.jobs.download_db_job import DownloadDbJob
 from downloader.jobs.worker_context import DownloaderWorkerContext
-from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.other import format_files_message, format_folders_message, format_zips_message
 
 
 class FullRunService:
-    def __init__(self, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter, importer_command_factory: ImporterCommandFactory, job_system: JobSystem, workers_factory: DownloaderWorkersFactory):
+    def __init__(self, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter, importer_command_factory: ImporterCommandFactory, job_system: JobSystem, workers_ctx: DownloaderWorkerContext):
         self._importer_command_factory = importer_command_factory
         self._waiter = waiter
         self._os_utils = os_utils
@@ -47,7 +46,7 @@ class FullRunService:
         self._logger = logger
         self._config = config
         self._job_system = job_system
-        self._workers_factory = workers_factory
+        self._workers_ctx = workers_ctx
 
     def print_drives(self):
         self._logger.bench('Print Drives start.')

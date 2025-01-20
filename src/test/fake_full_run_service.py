@@ -26,8 +26,7 @@ from downloader.full_run_service import FullRunService as ProductionFullRunServi
 from downloader.importer_command import ImporterCommandFactory
 from downloader.job_system import JobSystem
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
-from downloader.jobs.worker_context import DownloaderWorkerContext, make_downloader_worker_context
-from downloader.jobs.workers_factory import DownloaderWorkersFactory
+from downloader.jobs.worker_context import make_downloader_worker_context
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_os_utils import SpyOsUtils
@@ -88,7 +87,7 @@ class FullRunService(ProductionFullRunService):
                          NoWaiter(),
                          importer_command_factory or ImporterCommandFactory(config),
                          job_system,
-                         DownloaderWorkersFactory(make_downloader_worker_context(
+                         make_downloader_worker_context(
                              job_ctx=job_system,
                              waiter=NoWaiter(),
                              logger=NoLogger(),
@@ -102,8 +101,8 @@ class FullRunService(ProductionFullRunService):
                              external_drives_repository=external_drives_repository,
                              target_paths_calculator_factory=TargetPathsCalculatorFactory(system_file_system, external_drives_repository),
                              config=config
-                         ))
                          )
+                )
 
     @staticmethod
     def with_single_empty_db() -> ProductionFullRunService:

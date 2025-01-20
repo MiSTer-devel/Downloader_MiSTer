@@ -21,11 +21,12 @@ from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.job_system import JobSystem
+from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
 from downloader.jobs.worker_context import make_downloader_worker_context
-from downloader.jobs.workers_factory import DownloaderWorkersFactory
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
 from downloader.path_package import PathType
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
@@ -35,6 +36,7 @@ from test.fake_local_store_wrapper import StoreWrapper, LocalStoreWrapper
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_local_repository import LocalRepository
 from test.fake_path_resolver import PathResolverFactory
+from test.fake_workers_factory import make_workers
 from test.objects import config_with
 from typing import Dict, Set
 from test.fake_waiter import NoWaiter
@@ -96,7 +98,6 @@ class OnlineImporter(ProductionOnlineImporter):
             target_paths_calculator_factory=TargetPathsCalculatorFactory(self.file_system, external_drives_repository),
             config=self._config
         )
-        self._workers_factory = DownloaderWorkersFactory(self._worker_ctx)
 
     @staticmethod
     def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs, free_space_reservation=None):
@@ -141,7 +142,7 @@ class OnlineImporter(ProductionOnlineImporter):
 
         local_store = LocalStoreWrapper({'dbs': {db.db_id: store for db, store, _ in self.dbs}})
 
-        self._workers_factory.add_workers(self._job_system)
+        self._job_system.register_workers((w.job_type_id(), w) for w in make_workers(self._worker_ctx))
 
         stores = {}
         jobs = []
