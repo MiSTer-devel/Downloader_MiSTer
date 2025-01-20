@@ -56,8 +56,7 @@ class HttpGateway:
         total_cleared = 0
         with self._connections_lock:
             for queue in self._connections.values():
-                total_cleared += queue.size()
-                queue.clear_all()
+                total_cleared += queue.clear_all()
             self._connections = {}
         if self._logger is not None: self._logger.debug(f'Cleaning up {total_cleared} connections.')
 
@@ -273,17 +272,15 @@ class _ConnectionQueue:
         with self._lock:
             self._queue.append(connection)
 
-    def size(self) -> int:
+    def clear_all(self) -> int:
         with self._lock:
-            return len(self._queue)
-
-    def clear_all(self) -> None:
-        with self._lock:
+            size = len(self._queue)
             for connection in self._queue:
                 connection.kill()
 
             self._queue, self._queue_swap = self._queue_swap, self._queue
             self._queue.clear()
+            return size
 
     def clear_timed_outs(self, now: float) -> int:
         with self._lock:
