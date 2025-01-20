@@ -32,15 +32,15 @@ class FetchFileWorker2(DownloaderWorker):
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: FetchFileJob2) -> WorkerResult:
-        error = self._fetch_file(url=job.source, download_path=job.temp_path, info=job.info, job=job)
+        error = self._fetch_file(url=job.source, download_path=job.temp_path, info=job.info)
         if error is not None:
             return None, error
 
         return job.after_job, None
 
-    def _fetch_file(self, url: str, download_path: str, info: str, job: FetchFileJob2) -> Optional[FileDownloadError]:
+    def _fetch_file(self, url: str, download_path: str, info: str) -> Optional[FileDownloadError]:
         try:
-            with self._ctx.http_gateway.open(url, job=job) as (final_url, in_stream):
+            with self._ctx.http_gateway.open(url) as (final_url, in_stream):
                 if in_stream.status != 200:
                     return FileDownloadError(f'Bad http status! {info}: {in_stream.status}')
 
