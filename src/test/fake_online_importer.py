@@ -21,9 +21,6 @@ from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.job_system import JobSystem
-from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
-from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
 from downloader.jobs.worker_context import make_downloader_worker_context
