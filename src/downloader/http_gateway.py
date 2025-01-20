@@ -119,7 +119,7 @@ class HttpGateway:
         if 300 <= conn.response.status < 400 and retry < 10:
             location = conn.response_location_header()
             if location is not None:
-                if self._logger is not None: self._logger.debug(f'HTTP 3XX! Resource moved ({retry}): {url}')
+                if self._logger is not None: self._logger.debug(f'HTTP 3XX! Resource moved ({retry}): {url} -> {location}')
                 conn.finish_response()
                 return self._open_impl(location, method, body, headers, retry + 1)
 
@@ -183,30 +183,16 @@ class HttpGateway:
 _default_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=120'}
 
 
-class _Connection(Protocol):
-    @property
-    def response(self) -> HTTPResponse: pass
-    def do_request(self, method: str, url: str, body: Any, headers: Any) -> None: pass
-    def kill(self) -> None: pass
-    def set_timeout(self, timeout: float) -> None: pass
-    def is_expired(self, now_time: float) -> bool: pass
-    def set_last_use_time(self, t: float) -> None: pass
-    def finish_response(self) -> None: pass
-    def response_connection_header(self) -> str: pass
-    def response_keep_alive(self) -> str: pass
-    def response_location_header(self) -> Optional[str]: pass
-    def response_version_text(self) -> str: pass
-
-
-class _HttpConnectionAdapter(_Connection):
+class _Connection:
     _http: HTTPConnection
     _last_use_time: float = 0.0
     _timeout: float = 120.0
     _response: Optional[Union[HTTPResponse, '_FinishedResponse']] = None
     _connection_header: Optional[str] = None
 
-    def __init__(self, http: HTTPConnection):
+    def __init__(self, http: HTTPConnection, connection_queue: '_ConnectionQueue'):
         self._http = http
+        self._connection_queue = connection_queue
         if http.timeout is not None:
             self._timeout = http.timeout
 
@@ -223,7 +209,7 @@ class _HttpConnectionAdapter(_Connection):
         self._connection_header = self.response.headers.get('Connection', '').lower()
 
     def kill(self) -> None:
-        self.finish_response()
+        self._close_response()
         self._http.close()
         self._last_use_time = 0
         self._timeout = 0
@@ -247,10 +233,16 @@ class _HttpConnectionAdapter(_Connection):
         return self.response.headers.get('location', None)
 
     def finish_response(self):
-        if isinstance(self._response, _FinishedResponse): return
+        if self._close_response():
+            self._connection_queue.push(self)
+
+    def _close_response(self) -> bool:
+        if isinstance(self._response, _FinishedResponse):
+            return False
         if self._response is not None:
             self._response.close()
         self._response = _FinishedResponse()
+        return True
 
     def set_timeout(self, timeout: float) -> None:
         self._timeout = timeout
@@ -271,13 +263,11 @@ class _ConnectionQueue:
     def pull(self) -> _Connection:
         with self._lock:
             if len(self._queue) == 0:
-                return _ConnectionHandler(
-                    _HttpConnectionAdapter(
-                        http=_create_http_connection(self._parsed_url, timeout=self._timeout, context=self._ctx)
-                    ),
-                    self
+                return _Connection(
+                    http=_create_http_connection(self._parsed_url, timeout=self._timeout, context=self._ctx),
+                    connection_queue=self
                 )
-            return _ConnectionHandler(self._queue.pop(), self)
+            return self._queue.pop()
 
     def push(self, connection: _Connection) -> None:
         with self._lock:
@@ -309,29 +299,6 @@ class _ConnectionQueue:
                     self._queue.append(connection)
 
             return expired_count
-
-
-class _ConnectionHandler(_Connection):
-    def __init__(self, connection: _Connection, connection_queue: _ConnectionQueue):
-        self._connection: _Connection = connection
-        self._connection_queue: _ConnectionQueue = connection_queue
-
-    @property
-    def response(self) -> HTTPResponse: return self._connection.response
-
-    def finish_response(self) -> None:
-        self._connection.finish_response()
-        self._connection_queue.push(self._connection)
-
-    def is_expired(self, now_time: float) -> bool: return self._connection.is_expired(now_time)
-    def kill(self) -> None: return self._connection.kill()
-    def do_request(self, method: str, url: str, body: Any, headers: Any) -> None: return self._connection.do_request(method, url, body, headers)
-    def set_timeout(self, timeout: float) -> None: return self._connection.set_timeout(timeout)
-    def set_last_use_time(self, t: float) -> None: return self._connection.set_last_use_time(t)
-    def response_version_text(self) -> str: return self._connection.response_version_text()
-    def response_location_header(self) -> Optional[str]: return self._connection.response_location_header()
-    def response_connection_header(self): return self._connection.response_connection_header()
-    def response_keep_alive(self) -> str: return self._connection.response_keep_alive()
 
 
 def _create_http_connection(parsed_url: ParseResult, timeout: int, context: ssl.SSLContext) -> HTTPConnection:
