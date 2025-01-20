@@ -44,7 +44,7 @@ class FetchFileWorker(DownloaderWorker):
         file_path, description = job.path, job.description
         target_path = self._ctx.file_system.download_target_path(self._ctx.target_path_repository.create_target(file_path, description))
         try:
-            with self._ctx.http_gateway.open(description['url'], job=job) as (final_url, in_stream):
+            with self._ctx.http_gateway.open(description['url']) as (final_url, in_stream):
                 description['url'] = final_url
                 if in_stream.status != 200:
                     return FileDownloadError(f'Bad http status! {file_path}: {in_stream.status}')

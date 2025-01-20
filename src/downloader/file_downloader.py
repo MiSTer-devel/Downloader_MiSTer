@@ -29,11 +29,11 @@ from downloader.job_system import JobSystem
 from downloader.jobs.db_header_job import DbHeaderJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
-from downloader.jobs.worker_context import make_downloader_worker_context
-from downloader.jobs.workers_factory import DownloaderWorkersFactory
+from downloader.jobs.worker_context import make_downloader_worker_context, DownloaderWorkerContext
 from downloader.logger import DebugOnlyLoggerDecorator
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.target_path_repository import TargetPathRepository
+from test.fake_workers_factory import make_workers
 
 
 class FileDownloaderFactory:
@@ -52,7 +52,7 @@ class FileDownloaderFactory:
         logger = DebugOnlyLoggerDecorator(self._logger) if silent else self._logger
         file_system = self._file_system_factory.create_for_config(config)
         target_path_repository = TargetPathRepository(config, file_system)
-        workers_factory = DownloaderWorkersFactory(make_downloader_worker_context(
+        worker_ctx = make_downloader_worker_context(
             job_ctx=self._job_system,
             waiter=self._waiter,
             logger=self._logger,
@@ -66,7 +66,7 @@ class FileDownloaderFactory:
             external_drives_repository=self._external_drives_repository,
             target_paths_calculator_factory=TargetPathsCalculatorFactory(file_system, self._external_drives_repository),
             config=config
-        ))
+        )
         return FileDownloader(
             parallel_update,
             hash_check,
@@ -74,7 +74,7 @@ class FileDownloaderFactory:
             file_system,
             target_path_repository,
             logger,
-            workers_factory,
+            worker_ctx,
             self._file_download_session_logger,
             self._http_gateway,
             self._job_system
@@ -82,7 +82,7 @@ class FileDownloaderFactory:
 
 
 class FileDownloader:
-    def __init__(self, parallel_update, hash_check, config, file_system, target_path_repository, logger, workers_factory: 'DownloaderWorkersFactory', file_session_logger: 'FileDownloadSessionLogger', http_gateway: HttpGateway, job_system: JobSystem):
+    def __init__(self, parallel_update, hash_check, config, file_system, target_path_repository, logger, worker_ctx: 'DownloaderWorkerContext', file_session_logger: 'FileDownloadSessionLogger', http_gateway: HttpGateway, job_system: JobSystem):
         self._parallel_update = parallel_update
         self._hash_check = hash_check
         self._file_system = file_system
@@ -95,7 +95,7 @@ class FileDownloader:
         self._failed_folders = []
         self._no_url_files = []
         self._file_session_logger = file_session_logger
-        self._workers_factory = workers_factory
+        self._worker_ctx = worker_ctx
         self._http_gateway = http_gateway
         self._job_system = job_system
 
@@ -150,7 +150,7 @@ class FileDownloader:
                 skip_files.append(file_path)
 
         self._check_downloaded_files(skip_files)
-        self._workers_factory.add_workers(self._job_system)
+        self._job_system.register_workers((w.job_type_id(), w) for w in make_workers(self._worker_ctx))
         for path in files_to_download:
             description = self._queued_files[path]
 

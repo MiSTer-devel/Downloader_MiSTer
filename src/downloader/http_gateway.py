@@ -1,4 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -14,46 +15,19 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+
 import ssl
 import threading
 import time
-import abc
 from contextlib import contextmanager
-from typing import Tuple, Any, Optional, Generator, List, Dict, Callable, Union
+from typing import Tuple, Any, Optional, Generator, List, Dict, Union, Protocol
 from urllib.parse import urlparse, ParseResult
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
 
 from downloader.logger import Logger
 
 
-class HttpGatewayException(Exception):
-    pass
-
-
-class _Connection(abc.ABC):
-    @abc.abstractmethod
-    def do_request(self, method: str, url: str, body: Any, headers: Any) -> None: pass
-    @abc.abstractmethod
-    def kill(self) -> None: pass
-    @abc.abstractmethod
-    def set_timeout(self, timeout: float) -> None: pass
-    @abc.abstractmethod
-    def is_expired(self, now_time: float) -> bool: pass
-    @abc.abstractmethod
-    def set_last_use_time(self, t: float) -> None: pass
-    @property
-    @abc.abstractmethod
-    def response(self) -> HTTPResponse: pass
-    @abc.abstractmethod
-    def finish_response(self) -> None: pass
-    @abc.abstractmethod
-    def response_connection_header(self) -> str: pass
-    @abc.abstractmethod
-    def response_keep_alive(self) -> str: pass
-    @abc.abstractmethod
-    def response_location_header(self) -> Optional[str]: pass
-    @abc.abstractmethod
-    def response_version_text(self) -> str: pass
+class HttpGatewayException(Exception): pass
 
 
 class HttpGateway:
@@ -65,7 +39,7 @@ class HttpGateway:
         self._connections_lock = threading.Lock()
         self._clean_connections_timer = time.time()
         self._clean_timeout_connections_lock = threading.Lock()
-        self._connections_on_cleanup_temp: List[Tuple[str, "_ConnectionQueue"]] = []
+        self._connections_on_cleanup_temp: List[Tuple[str, _ConnectionQueue]] = []
 
     def __enter__(self): return self
 
@@ -85,7 +59,7 @@ class HttpGateway:
             self._connections = {}
         if self._logger is not None: self._logger.debug(f'Cleaning up {total_cleared} connections.')
 
-    def _take_connection(self, parsed_url: ParseResult) -> _Connection:
+    def _take_connection(self, parsed_url: ParseResult) -> '_Connection':
         queue_id = parsed_url.scheme + parsed_url.netloc
         with self._connections_lock:
             if queue_id not in self._connections:
@@ -120,7 +94,7 @@ class HttpGateway:
             self._clean_timeout_connections_lock.release()
 
     @contextmanager
-    def open(self, url: str, method: str = None, body: Any = None, headers: Any = None, job: Any = None) -> Generator[Tuple[str, HTTPResponse], None, None]:
+    def open(self, url: str, method: str = None, body: Any = None, headers: Any = None) -> Generator[Tuple[str, HTTPResponse], None, None]:
         if self._logger is not None: self._logger.debug('^^^^')
         final_url, conn = self._open_impl(
             url,
@@ -135,7 +109,7 @@ class HttpGateway:
         finally:
             conn.finish_response()
 
-    def _open_impl(self, url: str, method: str, body: Any, headers: Any, retry: int) -> Tuple[str, _Connection]:
+    def _open_impl(self, url: str, method: str, body: Any, headers: Any, retry: int) -> Tuple[str, '_Connection']:
         self._clean_timeout_connections(time.time())
         retry, conn = self._request(url, method, body, headers, retry)
 
@@ -149,7 +123,7 @@ class HttpGateway:
 
         return url, conn
 
-    def _request(self, url: str, method: str, body: Any, headers: Any, retry: int) -> Tuple[int, _Connection]:
+    def _request(self, url: str, method: str, body: Any, headers: Any, retry: int) -> Tuple[int, '_Connection']:
         parsed_url = urlparse(url)
         conn = self._take_connection(parsed_url)
         try:
@@ -175,14 +149,14 @@ class HttpGateway:
             url_path = url_path.lstrip('/')
         return f'/{url_path}?{parsed_url.query}'.rstrip('?')
 
-    def _handle_keep_alive(self, connection: _Connection) -> None:
+    def _handle_keep_alive(self, connection: '_Connection') -> None:
         connection_header = connection.response_connection_header()
         connection.set_last_use_time(time.time())
         keep_alive_timeout = self._get_keep_alive_timeout(connection_header, connection.response_keep_alive())
         if keep_alive_timeout is not None:
             connection.set_timeout(keep_alive_timeout)
 
-    def _is_a_keep_alive_connection(self, conn: _Connection) -> bool:
+    def _is_a_keep_alive_connection(self, conn: '_Connection') -> bool:
         version = conn.response.version
         connection_header = conn.response_connection_header()
         is_keep_alive = (version == 10 and connection_header == 'keep-alive') or (version >= 11 and connection_header != 'close')
@@ -205,27 +179,29 @@ class HttpGateway:
         return None
 
 
-def _create_http_connection(parsed_url: ParseResult, timeout: int, context: ssl.SSLContext) -> HTTPConnection:
-    if parsed_url.scheme == 'http':
-        return HTTPConnection(parsed_url.netloc, timeout=timeout)
-    elif parsed_url.scheme == 'https':
-        return HTTPSConnection(parsed_url.netloc, timeout=timeout, context=context)
-    else:
-        raise ValueError(f'Unsupported scheme "{parsed_url.scheme}" for url: {parsed_url.geturl()}')
-
-
 _default_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=120'}
 
 
-class _FinishedResponse:
-    pass
+class _Connection(Protocol):
+    @property
+    def response(self) -> HTTPResponse: pass
+    def do_request(self, method: str, url: str, body: Any, headers: Any) -> None: pass
+    def kill(self) -> None: pass
+    def set_timeout(self, timeout: float) -> None: pass
+    def is_expired(self, now_time: float) -> bool: pass
+    def set_last_use_time(self, t: float) -> None: pass
+    def finish_response(self) -> None: pass
+    def response_connection_header(self) -> str: pass
+    def response_keep_alive(self) -> str: pass
+    def response_location_header(self) -> Optional[str]: pass
+    def response_version_text(self) -> str: pass
 
 
 class _HttpConnectionAdapter(_Connection):
     _http: HTTPConnection
     _last_use_time: float = 0.0
     _timeout: float = 120.0
-    _response: Optional[Union[HTTPResponse, _FinishedResponse]] = None
+    _response: Optional[Union[HTTPResponse, '_FinishedResponse']] = None
     _connection_header: Optional[str] = None
 
     def __init__(self, http: HTTPConnection):
@@ -335,42 +311,35 @@ class _ConnectionQueue:
 
 
 class _ConnectionHandler(_Connection):
-
-    def __init__(self, connection, connection_queue):
+    def __init__(self, connection: _Connection, connection_queue: _ConnectionQueue):
         self._connection: _Connection = connection
         self._connection_queue: _ConnectionQueue = connection_queue
 
-    def is_expired(self, now_time: float) -> bool:
-        return self._connection.is_expired(now_time)
+    @property
+    def response(self) -> HTTPResponse: return self._connection.response
 
     def finish_response(self) -> None:
         self._connection.finish_response()
         self._connection_queue.push(self._connection)
 
-    def kill(self) -> None:
-        self._connection.kill()
+    def is_expired(self, now_time: float) -> bool: return self._connection.is_expired(now_time)
+    def kill(self) -> None: return self._connection.kill()
+    def do_request(self, method: str, url: str, body: Any, headers: Any) -> None: return self._connection.do_request(method, url, body, headers)
+    def set_timeout(self, timeout: float) -> None: return self._connection.set_timeout(timeout)
+    def set_last_use_time(self, t: float) -> None: return self._connection.set_last_use_time(t)
+    def response_version_text(self) -> str: return self._connection.response_version_text()
+    def response_location_header(self) -> Optional[str]: return self._connection.response_location_header()
+    def response_connection_header(self): return self._connection.response_connection_header()
+    def response_keep_alive(self) -> str: return self._connection.response_keep_alive()
 
-    def do_request(self, method: str, url: str, body: Any, headers: Any) -> None:
-        self._connection.do_request(method, url, body, headers)
 
-    def set_timeout(self, timeout: float) -> None:
-        self._connection.set_timeout(timeout)
+def _create_http_connection(parsed_url: ParseResult, timeout: int, context: ssl.SSLContext) -> HTTPConnection:
+    if parsed_url.scheme == 'http':
+        return HTTPConnection(parsed_url.netloc, timeout=timeout)
+    elif parsed_url.scheme == 'https':
+        return HTTPSConnection(parsed_url.netloc, timeout=timeout, context=context)
+    else:
+        raise HttpGatewayException(f'Unsupported scheme "{parsed_url.scheme}" for url: {parsed_url.geturl()}')
 
-    def set_last_use_time(self, t: float) -> None:
-        self._connection.set_last_use_time(t)
 
-    @property
-    def response(self) -> HTTPResponse:
-        return self._connection.response
-
-    def response_version_text(self) -> str:
-        return self._connection.response_version_text()
-
-    def response_location_header(self) -> Optional[str]:
-        return self._connection.response_location_header()
-
-    def response_connection_header(self):
-        return self._connection.response_connection_header()
-
-    def response_keep_alive(self) -> str:
-        return self._connection.response_keep_alive()
+class _FinishedResponse: pass

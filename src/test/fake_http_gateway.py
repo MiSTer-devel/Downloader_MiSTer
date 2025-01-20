@@ -19,11 +19,18 @@
 from typing import Dict, Any, Tuple, Generator, Optional
 from contextlib import contextmanager
 
+from downloader.job_system import Job
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.open_zip_index_job import OpenZipIndexJob
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from test.objects import binary_content
+
+
+job: Optional[Job]
+def set_current_job(current_job: Optional[Job]) -> None:
+    global job
+    job = current_job
 
 
 class FakeHttpGateway:
@@ -32,10 +39,11 @@ class FakeHttpGateway:
         self._network_state = network_state
 
     @contextmanager
-    def open(self, url: str, _method: str = None, _body: Any = None, _headers: Any = None, job: Any = None) -> Generator[Tuple[str, 'FakeHTTPResponse'], None, None]:
+    def open(self, url: str, _method: str = None, _body: Any = None, _headers: Any = None) -> Generator[Tuple[str, 'FakeHTTPResponse'], None, None]:
         description = None
         target_file_path = None
         info_path = None
+        global job
         if isinstance(job, FetchFileJob):
             description = {**job.description}
             target_file_path = job.path
