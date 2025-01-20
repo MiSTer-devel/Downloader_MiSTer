@@ -24,10 +24,12 @@ from typing import Tuple, Any, Optional, Generator, List, Dict, Union, Protocol
 from urllib.parse import urlparse, ParseResult
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
 
-from downloader.logger import Logger
-
 
 class HttpGatewayException(Exception): pass
+
+class Logger[Protocol]:
+    def print(self, msg: str) -> None: ...
+    def debug(self, msg: str, e: Exception = None) -> None: ...
 
 
 class HttpGateway:
@@ -177,7 +179,6 @@ class HttpGateway:
                     return None
 
         return None
-
 
 _default_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=120'}
 
