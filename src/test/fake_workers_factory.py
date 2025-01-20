@@ -49,6 +49,7 @@ class FakeWorkerDecorator(DownloaderWorker):
     def job_type_id(self) -> int: return self._worker.job_type_id()
     def operate_on(self, job: Job) -> WorkerResult:
         self._fake_http.set_job(job)
-        result = self._worker.operate_on(job)
-        self._fake_http.set_job(None)
-        return result
+        try:
+            return self._worker.operate_on(job)
+        finally:
+            self._fake_http.set_job(None)
