@@ -27,7 +27,7 @@ from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPExcep
 
 class HttpGatewayException(Exception): pass
 
-class Logger[Protocol]:
+class Logger(Protocol):
     def print(self, msg: str) -> None: ...
     def debug(self, msg: str, e: Exception = None) -> None: ...
 
