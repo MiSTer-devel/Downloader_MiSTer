@@ -18,7 +18,6 @@
 
 from typing import List
 
-from downloader.job_system import JobSystem
 from downloader.jobs.copy_file_worker import CopyFileWorker
 from downloader.jobs.db_header_job import DbHeaderWorker
 from downloader.jobs.download_db_worker import DownloadDbWorker
@@ -33,28 +32,23 @@ from downloader.jobs.process_zip_worker import ProcessZipWorker
 from downloader.jobs.validate_file_worker import ValidateFileWorker
 from downloader.jobs.fetch_file_worker import FetchFileWorker
 from downloader.jobs.validate_file_worker2 import ValidateFileWorker2
-from downloader.jobs.worker_context import DownloaderWorkerContext, DownloaderWorker
+from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 
 
-class DownloaderWorkersFactory:
-    def __init__(self, ctx: DownloaderWorkerContext):
-        self._ctx = ctx
-
-    def add_workers(self, job_system: JobSystem):
-        workers: List[DownloaderWorker] = [
-            CopyFileWorker(self._ctx),
-            FetchFileWorker(self._ctx),
-            FetchFileWorker2(self._ctx),
-            ValidateFileWorker(self._ctx),
-            ValidateFileWorker2(self._ctx),
-            DbHeaderWorker(self._ctx),
-            DownloadDbWorker(self._ctx),
-            OpenDbWorker(self._ctx),
-            ProcessIndexWorker(self._ctx),
-            ProcessDbZipsWaiterWorker(self._ctx),
-            ProcessDbWorker(self._ctx),
-            ProcessZipWorker(self._ctx),
-            OpenZipIndexWorker(self._ctx),
-            OpenZipContentsWorker(self._ctx)
-        ]
-        job_system.register_workers((w.job_type_id(), w) for w in workers)
+def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
+    return [
+        CopyFileWorker(ctx),
+        FetchFileWorker(ctx),
+        FetchFileWorker2(ctx),
+        ValidateFileWorker(ctx),
+        ValidateFileWorker2(ctx),
+        DbHeaderWorker(ctx),
+        DownloadDbWorker(ctx),
+        OpenDbWorker(ctx),
+        ProcessIndexWorker(ctx),
+        ProcessDbZipsWaiterWorker(ctx),
+        ProcessDbWorker(ctx),
+        ProcessZipWorker(ctx),
+        OpenZipIndexWorker(ctx),
+        OpenZipContentsWorker(ctx)
+    ]
