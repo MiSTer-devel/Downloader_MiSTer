@@ -18,34 +18,37 @@
 
 from typing import List
 
-from downloader.job_system import WorkerResult
-from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.job_system import WorkerResult, Job
 from downloader.jobs.worker_context import DownloaderWorkerContext, DownloaderWorker
 from downloader.jobs.workers_factory import make_workers as production_make_workers
-from downloader.jobs.fetch_file_worker2 import FetchFileWorker2 as ProductionFetchFileWorker2
-from downloader.jobs.fetch_file_worker import FetchFileWorker as ProductionFetchFileWorker
-from test.fake_http_gateway import set_current_job
+from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
+from downloader.jobs.fetch_file_worker import FetchFileWorker
+from test.fake_http_gateway import FakeHttpGateway
 
 
 def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
-    replacement_workers = [FetchFileWorker2(ctx), FetchFileWorker(ctx)]
+    replacement_workers = []
+    if isinstance(ctx.http_gateway, FakeHttpGateway):
+        fake_http: FakeHttpGateway = ctx.http_gateway
+        replacement_workers.extend([
+            FakeWorkerDecorator(FetchFileWorker2(ctx), fake_http),
+            FakeWorkerDecorator(FetchFileWorker(ctx), fake_http)
+        ])
+
     replacement_type_ids = {r.job_type_id() for r in replacement_workers}
     workers = [w for w in production_make_workers(ctx) if w.job_type_id() not in replacement_type_ids]
     return [*workers, *replacement_workers]
 
 
-class FetchFileWorker2(ProductionFetchFileWorker2):
-    def operate_on(self, job: FetchFileJob2) -> WorkerResult:
-        set_current_job(job)
-        result = super().operate_on(job)
-        set_current_job(None)
-        return result
+class FakeWorkerDecorator(DownloaderWorker):
+    def __init__(self, worker: DownloaderWorker, fake_http: FakeHttpGateway):
+        self._worker = worker
+        self._fake_http = fake_http
+        super().__init__(worker._ctx)
 
-
-class FetchFileWorker(ProductionFetchFileWorker):
-    def operate_on(self, job: FetchFileJob) -> WorkerResult:
-        set_current_job(job)
-        result = super().operate_on(job)
-        set_current_job(None)
+    def job_type_id(self) -> int: return self._worker.job_type_id()
+    def operate_on(self, job: Job) -> WorkerResult:
+        self._fake_http.set_job(job)
+        result = self._worker.operate_on(job)
+        self._fake_http.set_job(None)
         return result
