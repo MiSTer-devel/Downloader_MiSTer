@@ -76,7 +76,7 @@ class HttpGateway:
             headers or _default_headers,
             0
         )
-        if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}: {final_url}\nvvvv\n')
+        if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}: {final_url} {time.time() - now:.3f}s\nvvvv\n')
         try:
             yield final_url, conn.response
         finally:
@@ -270,11 +270,7 @@ class _Connection:
         return now_time > expire_time
 
     def do_request(self, method: str, url: str, body: Any, headers: Any) -> None:
-        try:
-            self._http.request(method, url, headers=headers, body=body)
-        except BrokenPipeError:
-            pass
-
+        self._http.request(method, url, headers=headers, body=body)
         self._uses += 1
         self._response = self._http.getresponse()
         self._response_headers.set_headers(self._response.headers, self._response.version)
