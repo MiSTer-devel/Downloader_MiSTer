@@ -28,7 +28,7 @@ from shutil import copyfileobj
 from typing import List
 
 from downloader.logger import PrintLogger
-from downloader.http_gateway import HttpGateway
+from downloader.http_gateway import HttpGateway, describe_time
 
 urls = [
     'https://google.com',
@@ -67,7 +67,7 @@ def main() -> None:
             if fut.done():
                 e = fut.exception()
                 if e is not None:
-                    print(e)
+                    print(f'>>>>>>>>>>>>> TASK FAILED!! {describe_time(time.time())}', e)
             elif not fut.running():
                 if fut.cancel():
                     cancelled += 1
@@ -98,7 +98,7 @@ def main() -> None:
                         if f.done():
                             future_exception = f.exception()
                             if future_exception is not None:
-                                print(future_exception)
+                                print(f'>>>>>>>>>>>>> TASK FAILED!! {describe_time(time.time())}', future_exception)
                         else:
                             next_futures.append(f)
 
