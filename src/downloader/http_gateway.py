@@ -476,13 +476,13 @@ class _ParamsParser:
             kv = p.split('=')
             if len(kv) == 1: self._data[kv[0]] = True
             elif len(kv) == 2: self._data[kv[0]] =  kv[1]
-            else: continue
+            elif self._logger is not None: self._logger.debug(f"ERROR! Could not parse param '{p}' from: {source}")
         return self
 
     def bool(self, key: str) -> bool:
         if key not in self._data: return False
         if self._data[key] is True: return True
-        if self._logger is not None: self._logger.debug(f"ERROR! Could not parse {key} from: {self._data[key]}")
+        if self._logger is not None: self._logger.debug(f"ERROR! Could not parse bool '{key}' from: {self._data[key]}")
         return False
 
     def int(self, key: str) -> Optional[int]:
@@ -490,7 +490,7 @@ class _ParamsParser:
         try:
             return int(self._data[key])
         except Exception as e:
-            if self._logger is not None: self._logger.debug(f"Could not parse {key} from: {self._data[key]}", e)
+            if self._logger is not None: self._logger.debug(f"ERROR! Could not parse int '{key}' from: {self._data[key]}", e)
             return None
 
     def str(self, key: str) -> Optional[str]:
