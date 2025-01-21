@@ -68,10 +68,14 @@ class HttpGateway:
         self._clean_timeout_connections(now)
         self._clean_timeout_redirects(now)
 
-        if self._logger is not None: self._logger.debug('^^^^')
+        method = 'GET' if method is None else method.upper()
+        if self._logger is not None: self._logger.debug(f'^^^^ {method} {url}')
+        url = self._process_url(url)
+        parsed_url = urlparse(url)
         final_url, conn, _ = self._request(
-            self._process_url(url),
-            'GET' if method is None else method.upper(),
+            url,
+            parsed_url,
+            method,
             body,
             headers or _default_headers,
             0
@@ -92,8 +96,7 @@ class HttpGateway:
         with self._queue_redirects_lock: self._queue_redirects.clear()
         with self._url_redirects_lock: self._url_redirects.clear()
 
-    def _request(self, url: str, method: str, body: Any, headers: Any, retry: int) -> Tuple[str, '_Connection', int]:
-        parsed_url = urlparse(url)
+    def _request(self, url: str, parsed_url: ParseResult, method: str, body: Any, headers: Any, retry: int) -> Tuple[str, '_Connection', int]:
         queue_id: _QueueId = self._process_queue_id((parsed_url.scheme, parsed_url.netloc))
         conn = self._take_connection(queue_id)
         try:
@@ -103,47 +106,50 @@ class HttpGateway:
             if retry < 10:
                 if self._logger is not None: self._logger.debug(f'HTTP Exception! {type(e).__name__} ({retry}): {url} {str(e)}\n'
                                                                 f'Killed "{parsed_url.scheme}://{parsed_url.netloc}" connection {conn.id}.\n')
-                return self._request(url, method, body, headers, retry + 1)
+                return self._request(url, parsed_url, method, body, headers, retry + 1)
             else:
                 raise e
 
         if self._logger is not None: self._logger.debug(conn.describe())
 
         if 300 <= conn.response.status < 400 and retry < 10:
-            return self._request(self._follow_move(conn, queue_id, url, parsed_url), method, body, headers, retry + 1)
+            location, parsed_location = self._follow_move(conn, queue_id, url, parsed_url)
+            return self._request(location, parsed_location, method, body, headers, retry + 1)
 
         return url, conn, retry
 
-    def _follow_move(self, conn: '_Connection', current_queue_id: '_QueueId', current_url: str, parsed_url: ParseResult) -> str:
+    def _follow_move(self, conn: '_Connection', queue_id: '_QueueId', url: str, parsed_url: ParseResult) -> Tuple[str, ParseResult]:
         location, redirect_timeout = conn.response_headers.redirect_params(conn.response.status)
         if location is None:
-            raise HttpGatewayException('Invalid header response during Resource moved response at ' + current_url)
+            raise HttpGatewayException('Invalid header response during Resource moved response at ' + url)
 
-        if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}! Resource moved: {current_url} -> {location}\n\n')
+        if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}! Resource moved: {url} -> {location}\n\n')
         conn.finish_response()
 
         if location[0] == '/':
             location = f'{parsed_url.scheme}://{parsed_url.netloc}{location}'
 
+        location = self._process_url(location)
+        parsed_location = urlparse(location)
+
         if redirect_timeout is not None:
-            parsed_location = urlparse(location)
             if (parsed_location.path == parsed_url.path and
                 parsed_location.query == parsed_url.query and
                 parsed_location.params == parsed_url.params and
                 parsed_location.fragment == parsed_url.fragment
             ):
                 target_queue_id: _QueueId = (parsed_location.scheme, parsed_location.netloc)
-                if target_queue_id != current_queue_id:
+                if target_queue_id != queue_id:
                     redirect = _Redirect(target_queue_id, redirect_timeout)
                     with self._queue_redirects_lock:
-                        self._queue_redirects[current_queue_id] = redirect
+                        self._queue_redirects[queue_id] = redirect
 
-            elif current_url != location:
+            elif url != location:
                 redirect = _Redirect(location, redirect_timeout)
                 with self._url_redirects_lock:
-                    self._url_redirects[current_url] = redirect
+                    self._url_redirects[url] = redirect
 
-        return location
+        return location, parsed_location
 
     def _process_url(self, url: str) -> str: return _redirect(url, self._url_redirects, self._url_redirects_lock)
     def _process_queue_id(self, queue_id: '_QueueId') -> '_QueueId': return _redirect(queue_id, self._queue_redirects, self._queue_redirects_lock)
@@ -166,7 +172,6 @@ class HttpGateway:
                 return
 
             self._clean_timeout_connections_timer = now
-
             if self._logger is not None: self._logger.debug('Checking keep-alive timeouts...')
 
             connection_items: List[Tuple[Tuple[str, str], _ConnectionQueue]]
@@ -193,7 +198,6 @@ class HttpGateway:
                 return
 
             self._clean_timeout_redirects_timer = now
-
             if self._logger is not None: self._logger.debug('Checking redirect timeouts...')
 
             if self._fill_redirects_swap(now, self._queue_redirects_lock, self._queue_redirects):
@@ -263,7 +267,7 @@ class _Connection:
         self._uses: int = 0
         self._max_uses: int = sys.maxsize
         self._response: Optional[Union[HTTPResponse, '_FinishedResponse']] = None
-        self._response_headers = _ResponseHeaders(self._logger)
+        self._response_headers = _ResponseHeaders(logger)
 
     def is_expired(self, now_time: float) -> bool:
         expire_time = self._last_use_time + self._timeout
@@ -307,8 +311,7 @@ class _Connection:
     def describe(self) -> str:
         return (
             f'Version: {self.response.version}\n'
-            f'[conn obj '
-                f'id={self._connection_queue.id[0]}://{self._connection_queue.id[1]}/{self.id}, '
+            f'[conn obj id={self._connection_queue.id[0]}://{self._connection_queue.id[1]}/{self.id}, '
                 f'uses={self._uses}, max_uses={self._max_uses}, timeout={self._timeout}, last_use_time={self._last_use_time}'
             f']\n'
             f'{self.response.headers}'
@@ -316,6 +319,7 @@ class _Connection:
 
     def _handle_keep_alive(self):
         if not self._response_headers.is_keep_alive_connection():
+            self._logger.debug(f'Keep-Alive off')
             self._max_uses = 0
             return
 
@@ -447,10 +451,8 @@ class _ResponseHeaders:
         return new_url, None  # Temporary redirects, no cache by default
 
     def is_keep_alive_connection(self):
-        connection_header = self.headers.get('connection', '').lower()
-        version = self._version
-        is_keep_alive = (version == 10 and connection_header == 'keep-alive') or (version >= 11 and connection_header != 'close')
-        if not is_keep_alive and self._logger is not None: self._logger.debug(f'Version: {version}, Connection: {connection_header}')
+        connection = self.headers.get('connection', '').lower()
+        is_keep_alive = (self._version == 10 and connection == 'keep-alive') or (self._version >= 11 and connection != 'close')
         return is_keep_alive
 
     def keep_alive_params(self) -> Tuple[Optional[float], Optional[float]]:
