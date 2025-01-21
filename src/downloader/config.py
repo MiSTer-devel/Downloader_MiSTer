@@ -178,7 +178,7 @@ class ConfigReader:
         result[K_FAIL_ON_FILE_ERROR] = self._env[KENV_FAIL_ON_FILE_ERROR] == 'true'
         result[K_COMMIT] = self._valid_max_length(KENV_COMMIT, self._env[KENV_COMMIT], 50)
         result[K_DEFAULT_DB_ID] = self._valid_db_id(K_DEFAULT_DB_ID, self._env[KENV_DEFAULT_DB_ID])
-        result[K_START_TIME] = time.monotonic()
+        result[K_START_TIME] = time.time()
         result[K_CONFIG_PATH] = config_path
         result[K_LOGFILE] = self._env[KENV_LOGFILE]
 

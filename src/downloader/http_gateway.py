@@ -37,7 +37,7 @@ class Logger(Protocol):
 
 class HttpGateway:
     def __init__(self, ssl_ctx: ssl.SSLContext, timeout: int, logger: Logger = None):
-        now = time.monotonic()
+        now = time.time()
         self._ssl_ctx = ssl_ctx
         self._timeout = timeout
         self._logger = logger
@@ -64,7 +64,7 @@ class HttpGateway:
 
     @contextmanager
     def open(self, url: str, method: str = None, body: Any = None, headers: Any = None) -> Generator[Tuple[str, HTTPResponse], None, None]:
-        now = time.monotonic()
+        now = time.time()
         self._clean_timeout_connections(now)
         self._clean_timeout_redirects(now)
 
@@ -81,12 +81,12 @@ class HttpGateway:
             0
         )
         if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}: {final_url}\n'
-                                                        f'1st byte @ {describe_time(t := time.monotonic())} ({t - now:.3f}s)\nvvvv\n')
+                                                        f'1st byte @ {describe_time(t := time.time())} ({t - now:.3f}s)\nvvvv\n')
         try:
             yield final_url, conn.response
         finally:
             conn.finish_response()
-            if self._logger is not None: self._logger.debug(f'|||| Done {describe_time(t := time.monotonic())}: {final_url} ({t - now:.3f}s)')
+            if self._logger is not None: self._logger.debug(f'|||| Done {describe_time(t := time.time())}: {final_url} ({t - now:.3f}s)')
 
     def cleanup(self) -> None:
         total_cleared = 0
@@ -107,7 +107,7 @@ class HttpGateway:
         except (HTTPException, OSError) as e:
             conn.kill()
             if retry < 10:
-                if self._logger is not None: self._logger.debug(f'HTTP Exception! {type(e).__name__} ({retry}) {describe_time(time.monotonic())} [{url}] {str(e)}\n'
+                if self._logger is not None: self._logger.debug(f'HTTP Exception! {type(e).__name__} ({retry}) {describe_time(time.time())} [{url}] {str(e)}\n'
                                                                 f'Killed "{parsed_url.scheme}://{parsed_url.netloc}" connection {conn.id}.\n')
                 return self._request(url, parsed_url, method, body, headers, retry + 1)
             else:
@@ -126,7 +126,7 @@ class HttpGateway:
         if location is None:
             raise HttpGatewayException('Invalid header response during Resource moved response at ' + url)
 
-        if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}! Resource moved: {url} -> {location} [{describe_time(time.monotonic())}]\n\n')
+        if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}! Resource moved: {url} -> {location} [{describe_time(time.time())}]\n\n')
         conn.finish_response()
 
         if location[0] == '/':
@@ -325,7 +325,7 @@ class _Connection:
             self._max_uses = 0
             return
 
-        self._last_use_time = time.monotonic()
+        self._last_use_time = time.time()
         keep_alive_timeout, keep_alive_max = self.response_headers.keep_alive_params()
         if keep_alive_timeout is not None: self._timeout = keep_alive_timeout
         if keep_alive_max is not None: self._max_uses = keep_alive_max
@@ -436,7 +436,7 @@ class _ResponseHeaders:
                     if self._logger is not None: self._logger.debug(f"Could not parse Age from {age}", e)
                     age = 0
 
-                return new_url, time.monotonic() + max_age - age
+                return new_url, time.time() + max_age - age
 
             pass
 
@@ -448,7 +448,7 @@ class _ResponseHeaders:
                 if self._logger is not None: self._logger.debug(f"Could not parse Expires from {expires}", e)
 
         if status == 300 or status == 301:
-            return new_url, time.monotonic() + 60 * 60 * 24  # Permanent redirects, caching 1 day by default
+            return new_url, time.time() + 60 * 60 * 24  # Permanent redirects, caching 1 day by default
 
         return new_url, None  # Temporary redirects, no cache by default
 
