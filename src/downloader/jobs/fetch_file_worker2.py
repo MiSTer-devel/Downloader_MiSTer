@@ -17,19 +17,27 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.constants import K_DOWNLOADER_TIMEOUT
-from downloader.job_system import WorkerResult
+from downloader.file_system import FileSystem
+from downloader.http_gateway import HttpGateway
+from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.worker_context import DownloaderWorker
 from downloader.jobs.errors import FileDownloadError
 import socket
 from urllib.error import URLError
 from http.client import HTTPException
-from typing import Optional
+from typing import Optional, Any, Dict
 
 
 class FetchFileWorker2(DownloaderWorker):
+    def __init__(self, progress_reporter: ProgressReporter, http_gateway: HttpGateway, file_system: FileSystem, config: Dict[str, Any]):
+        self._progress_reporter = progress_reporter
+        self._http_gateway = http_gateway
+        self._file_system = file_system
+        self._timeout = config[K_DOWNLOADER_TIMEOUT]
+
     def job_type_id(self) -> int: return FetchFileJob2.type_id
-    def reporter(self): return self._ctx.progress_reporter
+    def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: FetchFileJob2) -> WorkerResult:
         error = self._fetch_file(url=job.source, download_path=job.temp_path, info=job.info)
@@ -40,11 +48,11 @@ class FetchFileWorker2(DownloaderWorker):
 
     def _fetch_file(self, url: str, download_path: str, info: str) -> Optional[FileDownloadError]:
         try:
-            with self._ctx.http_gateway.open(url) as (final_url, in_stream):
+            with self._http_gateway.open(url) as (final_url, in_stream):
                 if in_stream.status != 200:
                     return FileDownloadError(f'Bad http status! {info}: {in_stream.status}')
 
-                self._ctx.file_system.write_incoming_stream(in_stream, download_path, timeout=self._ctx.config[K_DOWNLOADER_TIMEOUT])
+                self._file_system.write_incoming_stream(in_stream, download_path, timeout=self._timeout)
 
         except socket.gaierror as e:
             return FileDownloadError(f'Socket Address Error! {url}: {str(e)}')
@@ -59,5 +67,5 @@ class FetchFileWorker2(DownloaderWorker):
         except BaseException as e:
             return FileDownloadError(f'Exception during download! {url}: {str(e)}')
 
-        if not self._ctx.file_system.is_file(download_path, use_cache=False):
+        if not self._file_system.is_file(download_path, use_cache=False):
             return FileDownloadError(f'Missing {info}')
