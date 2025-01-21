@@ -47,14 +47,14 @@ def iterate(op, target, results):
     cur_i = len(results) + 1
     log_file = f'/media/fat/time_test_downloader_{cur_i:0>2}_{op}.log'
 
-    before = time.time()
+    before = time.monotonic()
     try:
         run_operation(op, env={
             'DEBUG': 'false', 'FAIL_ON_FILE_ERROR': 'true', 'LOGFILE': log_file,
             'ALLOW_REBOOT': '0', 'UPDATE_LINUX': 'false',
         }, retries=False)
     except CalledProcessError: log(f'[{cur_i:0>2} {op:>8}] ERRORED! See {log_file} for details.')
-    duration = time.time() - before
+    duration = time.monotonic() - before
 
     results.append(duration)
     log(f'[{cur_i:0>2} {op:>8}] {duration:.3f} seconds ({files_in(target)} files)')
