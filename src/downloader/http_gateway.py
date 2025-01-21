@@ -69,7 +69,7 @@ class HttpGateway:
         self._clean_timeout_redirects(now)
 
         method = 'GET' if method is None else method.upper()
-        if self._logger is not None: self._logger.debug(f'^^^^ {method} {url}')
+        if self._logger is not None: self._logger.debug(f'^^^^\n{describe_time(now)}: {method} {url}')
         url = self._process_url(url)
         parsed_url = urlparse(url)
         final_url, conn, _ = self._request(
@@ -80,12 +80,13 @@ class HttpGateway:
             headers or _default_headers,
             0
         )
-        if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}: {final_url} {time.time() - now:.3f}s\nvvvv\n')
+        if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}: {final_url}\n'
+                                                        f'First byte {describe_time(t := time.time())} ({t - now:.3f}s)\nvvvv\n')
         try:
             yield final_url, conn.response
         finally:
             conn.finish_response()
-            if self._logger is not None: self._logger.debug(f'|||| {final_url} response finished {time.time() - now:.3f}s')
+            if self._logger is not None: self._logger.debug(f'|||| Done {describe_time(t := time.time())}: {final_url} ({t - now:.3f}s)')
 
     def cleanup(self) -> None:
         total_cleared = 0
@@ -105,7 +106,7 @@ class HttpGateway:
         except (HTTPException, OSError) as e:
             conn.kill()
             if retry < 10:
-                if self._logger is not None: self._logger.debug(f'HTTP Exception! {type(e).__name__} ({retry}): {url} {str(e)}\n'
+                if self._logger is not None: self._logger.debug(f'HTTP Exception! {type(e).__name__} ({retry}) {describe_time(time.time())} [{url}] {str(e)}\n'
                                                                 f'Killed "{parsed_url.scheme}://{parsed_url.netloc}" connection {conn.id}.\n')
                 return self._request(url, parsed_url, method, body, headers, retry + 1)
             else:
@@ -124,7 +125,7 @@ class HttpGateway:
         if location is None:
             raise HttpGatewayException('Invalid header response during Resource moved response at ' + url)
 
-        if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}! Resource moved: {url} -> {location}\n\n')
+        if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}! Resource moved: {url} -> {location} [{describe_time(time.time())}]\n\n')
         conn.finish_response()
 
         if location[0] == '/':
@@ -311,10 +312,9 @@ class _Connection:
 
     def describe(self) -> str:
         return (
-            f'Version: {self.response.version}\n'
             f'[conn obj id={self._connection_queue.id[0]}://{self._connection_queue.id[1]}/{self.id}, '
-                f'uses={self._uses}, max_uses={self._max_uses}, timeout={self._timeout}, last_use_time={self._last_use_time}'
-            f']\n'
+                f'uses={self._uses}, max_uses={self._max_uses}, timeout={self._timeout}, last_use_time={self._last_use_time}]\n'
+            f'Response HTTP Ver.{self.response.version}| Headers below...\n'
             f'{self.response.headers}'
         )
 
@@ -495,3 +495,5 @@ class _ParamsParser:
     def str(self, key: str) -> Optional[str]:
         if key not in self._data: return None
         return self._data[key]
+
+def describe_time(t: float) -> str: return time.strftime(f'%Y-%m-%d %H:%M:%S.{t % 1 * 1000:03.0f}', time.localtime(t))
