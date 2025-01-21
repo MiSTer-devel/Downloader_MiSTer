@@ -69,7 +69,7 @@ class HttpGateway:
         self._clean_timeout_redirects(now)
 
         method = 'GET' if method is None else method.upper()
-        if self._logger is not None: self._logger.debug(f'^^^^\n{describe_time(now)}: {method} {url}')
+        if self._logger is not None: self._logger.debug(f'^^^^ {method} {url}\n{describe_time(now)}')
         url = self._process_url(url)
         parsed_url = urlparse(url)
         final_url, conn, _ = self._request(
