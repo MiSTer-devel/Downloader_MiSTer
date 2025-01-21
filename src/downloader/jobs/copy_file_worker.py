@@ -18,12 +18,12 @@
 
 from downloader.jobs.copy_file_job import CopyFileJob
 from downloader.jobs.errors import FileCopyError
-from downloader.jobs.worker_context import DownloaderWorker
+from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.job_system import WorkerResult
 from typing import Optional
 
 
-class CopyFileWorker(DownloaderWorker):
+class CopyFileWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return CopyFileJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 

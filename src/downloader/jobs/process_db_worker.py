@@ -25,13 +25,13 @@ from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_ind
 from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
 from downloader.constants import K_USER_DEFINED_OPTIONS, K_FILTER, K_OPTIONS, K_BASE_PATH
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE, ReadOnlyStoreAdapter
 
 
-class ProcessDbWorker(DownloaderWorker):
+class ProcessDbWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return ProcessDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 

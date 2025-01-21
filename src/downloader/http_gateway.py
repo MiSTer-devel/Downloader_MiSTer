@@ -315,7 +315,7 @@ class _Connection:
         return (
             f'[conn obj id={self._connection_queue.id[0]}://{self._connection_queue.id[1]}/{self.id}, '
                 f'uses={self._uses}, max_uses={self._max_uses}, timeout={self._timeout}, last_use_time={self._last_use_time}]\n'
-            f'Response HTTP Ver.{self.response.version} | Headers\n'
+            f'Response HTTP Ver.{self.response.version} | Headers\n------------------------------\n'
             f'{self.response.headers}'
         )
 

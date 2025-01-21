@@ -31,7 +31,7 @@ from downloader.path_package import PathPackage, PathPackageKind, PathType
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
 from downloader.constants import FILE_MiSTer, FILE_MiSTer_old, K_BASE_PATH
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE, ReadOnlyStoreAdapter
 from downloader.other import calculate_url
@@ -48,7 +48,7 @@ _CreateFolderPackage = PathPackage
 _DeleteFolderPackage = PathPackage
 
 
-class ProcessIndexWorker(DownloaderWorker):
+class ProcessIndexWorker(DownloaderWorkerBase):
     def __init__(self, ctx: DownloaderWorkerContext):
         super().__init__(ctx)
         self._folders_created: Set[str] = set()

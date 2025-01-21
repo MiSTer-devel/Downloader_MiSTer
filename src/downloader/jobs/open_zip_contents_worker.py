@@ -24,14 +24,14 @@ from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
 from downloader.job_system import WorkerResult
 from downloader.jobs.index import Index
 from downloader.path_package import PathPackage, PathType
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.file_system import FileCopyError
 from downloader.storage_priority_resolver import StoragePriorityError
 from downloader.target_path_calculator import TargetPathsCalculator
 
 
-class OpenZipContentsWorker(DownloaderWorker):
+class OpenZipContentsWorker(DownloaderWorkerBase):
     def __init__(self, ctx: DownloaderWorkerContext):
         super().__init__(ctx)
 
