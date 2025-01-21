@@ -248,12 +248,12 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             self._report.add_file_fetch_started(job.info)
 
         self._active_jobs[job.type_id] = self._active_jobs.get(job.type_id, 0) + 1
-        self._check_time = time.monotonic() + 2.0
+        self._check_time = time.time() + 2.0
 
     def notify_work_in_progress(self):
         if self._deactivated:
             return
-        now = time.monotonic()
+        now = time.time()
         if self._check_time < now:
             self._symbols.append('*')
             self._print_symbols()
@@ -262,7 +262,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         self._report.add_job_completed(job)
         if isinstance(job, FetchFileJob) or (isinstance(job, GetFileJob) and not job.silent):
             self._symbols.append('.')
-            if self._needs_newline or self._check_time < time.monotonic():
+            if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
             if isinstance(job, GetFileJob) and not job.silent:
@@ -270,13 +270,13 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
 
         elif isinstance(job, ValidateFileJob):
             self._symbols.append('+')
-            if self._needs_newline or self._check_time < time.monotonic():
+            if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
             self._report.add_downloaded_file(job.fetch_job.path)
         elif isinstance(job, ValidateFileJob2) and job.after_job is None:
             self._symbols.append('+')
-            if self._needs_newline or self._check_time < time.monotonic():
+            if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
             self._report.add_validated_file(job.info)
@@ -306,7 +306,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
 
         self._need_clear_header = False
         self._needs_newline = True
-        self._check_time = time.monotonic() + (1.0 if last_is_asterisk else 2.0)
+        self._check_time = time.time() + (1.0 if last_is_asterisk else 2.0)
 
     def _print_line(self, line):
         if self._need_clear_header: line = '\n' + line
@@ -317,7 +317,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
 
     def print_progress_line(self, line):
         self._print_line(line)
-        self._check_time = time.monotonic() + 2.0
+        self._check_time = time.time() + 2.0
 
     def print_pending(self):
         self._print_symbols()
@@ -362,7 +362,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             )
 
         self._need_clear_header = True
-        self._check_time = time.monotonic() + 2.0
+        self._check_time = time.time() + 2.0
 
     def notify_job_failed(self, job: Job, exception: BaseException):
         self._report.add_job_failed(job, exception)
