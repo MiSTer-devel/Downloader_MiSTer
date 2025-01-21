@@ -22,14 +22,14 @@ from downloader.constants import K_DOWNLOADER_TIMEOUT
 from downloader.job_system import WorkerResult
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.validate_file_job import ValidateFileJob
-from downloader.jobs.worker_context import DownloaderWorker
+from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.jobs.errors import FileDownloadError
 import socket
 from urllib.error import URLError
 from http.client import HTTPException
 
 
-class FetchFileWorker(DownloaderWorker):
+class FetchFileWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return FetchFileJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 

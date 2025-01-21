@@ -24,10 +24,10 @@ from downloader.job_system import WorkerResult
 from downloader.jobs.download_db_job import DownloadDbJob
 from downloader.jobs.jobs_factory import make_get_file_job
 from downloader.jobs.open_db_job import OpenDbJob
-from downloader.jobs.worker_context import DownloaderWorker
+from downloader.jobs.worker_context import DownloaderWorkerBase
 
 
-class DownloadDbWorker(DownloaderWorker):
+class DownloadDbWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return DownloadDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 

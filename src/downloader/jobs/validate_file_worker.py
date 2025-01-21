@@ -17,13 +17,13 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.jobs.validate_file_job import ValidateFileJob
-from downloader.jobs.worker_context import DownloaderWorker
+from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.jobs.errors import FileDownloadError
 from downloader.job_system import WorkerResult
 from typing import Optional
 
 
-class ValidateFileWorker(DownloaderWorker):
+class ValidateFileWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return ValidateFileJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 

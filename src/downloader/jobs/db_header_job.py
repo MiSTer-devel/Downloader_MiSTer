@@ -20,7 +20,7 @@ from dataclasses import field, dataclass
 
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.worker_context import DownloaderWorker
+from downloader.jobs.worker_context import DownloaderWorkerBase
 
 
 @dataclass(eq=False)
@@ -29,6 +29,6 @@ class DbHeaderJob(Job):
     db: DbEntity
 
 
-class DbHeaderWorker(DownloaderWorker):
+class DbHeaderWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return DbHeaderJob.type_id
     def operate_on(self, job: DbHeaderJob): self._ctx.file_download_session_logger.print_header(job.db)

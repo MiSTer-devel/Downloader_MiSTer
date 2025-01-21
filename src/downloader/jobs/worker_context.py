@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from dataclasses import dataclass
 import threading
 from typing import Dict, Any, Tuple, Set, List
@@ -72,14 +72,14 @@ def make_downloader_worker_context(job_ctx: JobContext, http_gateway: HttpGatewa
         top_lock=threading.Lock(),
     )
 
-
 class DownloaderWorker(Worker):
-    def __init__(self, ctx: DownloaderWorkerContext):
-        self._ctx = ctx
-
     @abstractmethod
     def job_type_id(self) -> int:
         """Returns the type id of the job this worker operates on."""
+
+
+class DownloaderWorkerBase(DownloaderWorker, ABC):
+    def __init__(self, ctx: DownloaderWorkerContext): self._ctx = ctx
 
 
 class PendingRemovals:
