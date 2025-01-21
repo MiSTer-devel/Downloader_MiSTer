@@ -89,7 +89,7 @@ def main() -> None:
 
         start = time.time()
         with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gateway:
-            with ThreadPoolExecutor(max_workers=20) as thread_executor:
+            with ThreadPoolExecutor(max_workers=6) as thread_executor:
                 futures = [thread_executor.submit(fetch_url, gateway, input_url, dir_path) for input_url in urls * 20]
 
                 while len(futures) > 0 and not interrupted:
