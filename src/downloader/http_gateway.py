@@ -43,16 +43,14 @@ class HttpGateway:
         self._logger = logger
         self._connections: Dict[_QueueId, _ConnectionQueue] = {}
         self._connections_lock = threading.Lock()
-        self._clean_connections_timer = now
+        self._clean_timeout_connections_timer = now
         self._clean_timeout_connections_lock = threading.Lock()
-        self._clean_timeout_connections_temp: List[Tuple[_QueueId, _ConnectionQueue]] = []
         self._queue_redirects: Dict[_QueueId, _Redirect[_QueueId]] = {}
         self._queue_redirects_lock = threading.Lock()
         self._url_redirects: Dict[str, _Redirect[str]] = {}
         self._url_redirects_lock = threading.Lock()
-        self._redirects_swap = {}
-        self._redirects_temp = []
-        self._clean_redirects_timer = now
+        self._redirects_swap: Dict[T, _Redirect[T]] = {}
+        self._clean_timeout_redirects_timer = now
         self._clean_timeout_redirects_lock = threading.Lock()
 
     def __enter__(self): return self
@@ -157,25 +155,25 @@ class HttpGateway:
             return self._connections[queue_id].pull()
 
     def _clean_timeout_connections(self, now: float) -> None:
-        if now - self._clean_connections_timer < 30.0:
+        if now - self._clean_timeout_connections_timer < 30.0:
             return
 
         if not self._clean_timeout_connections_lock.acquire(blocking=False):
             return
 
         try:
-            if now - self._clean_connections_timer < 30.0:
+            if now - self._clean_timeout_connections_timer < 30.0:
                 return
 
-            self._clean_connections_timer = now
+            self._clean_timeout_connections_timer = now
 
             if self._logger is not None: self._logger.debug('Checking keep-alive timeouts...')
 
-            self._clean_timeout_connections_temp.clear()
+            connection_items: List[Tuple[Tuple[str, str], _ConnectionQueue]]
             with self._connections_lock:
-                self._clean_timeout_connections_temp.extend(self._connections.items())
+                connection_items = list(self._connections.items())
 
-            for queue_id, queue in self._clean_timeout_connections_temp:
+            for queue_id, queue in connection_items:
                 cleaned_up_connections = queue.clear_timed_outs(now)
                 if cleaned_up_connections > 0 and self._logger is not None:
                     self._logger.debug(f'Cleaning up {cleaned_up_connections} connections on queue: "{queue_id}".')
@@ -184,17 +182,17 @@ class HttpGateway:
             self._clean_timeout_connections_lock.release()
 
     def _clean_timeout_redirects(self, now: float) -> None:
-        if now - self._clean_redirects_timer < 30.0:
+        if now - self._clean_timeout_redirects_timer < 30.0:
             return
 
         if not self._clean_timeout_redirects_lock.acquire(blocking=False):
             return
 
         try:
-            if now - self._clean_redirects_timer < 30.0:
+            if now - self._clean_timeout_redirects_timer < 30.0:
                 return
 
-            self._clean_redirects_timer = now
+            self._clean_timeout_redirects_timer = now
 
             if self._logger is not None: self._logger.debug('Checking redirect timeouts...')
 
@@ -209,19 +207,19 @@ class HttpGateway:
         finally:
             self._clean_timeout_redirects_lock.release()
 
-    def _fill_redirects_swap(self, now: float, lock: threading.Lock, main_dict: Dict[T, '_Redirect[T]']) -> bool:
-        # We are minimizing lock time, by doing most of the operations in temp and swap.
-        # If we see that main_dict needs to change, we return True to indicate that it needs to be swapped outside.
+    def _fill_redirects_swap(self, now: float, lock: threading.Lock, redirects: Dict[T, '_Redirect[T]']) -> bool:
+        # We are minimizing lock time, by doing most of the operations in redirect_items and self._redirects_swap.
+        # If we see that redirects needs to change, we return True to indicate that it needs to be swapped outside.
 
         self._redirects_swap.clear()
-        self._redirects_temp.clear()
+        redirect_items: List[Tuple[T, _Redirect[T]]]
 
         with lock:
-            size = len(main_dict)
+            size = len(redirects)
             if size == 0: return False
-            self._redirects_temp.extend(main_dict.items())
+            redirect_items = list(redirects.items())
 
-        for key, redirect in self._redirects_temp:
+        for key, redirect in redirect_items:
             if not redirect.is_expired(now):
                 self._redirects_swap[key] = redirect
 
