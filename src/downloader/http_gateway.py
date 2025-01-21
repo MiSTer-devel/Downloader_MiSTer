@@ -258,10 +258,8 @@ class _Connection:
         self._http = http
         self._connection_queue = connection_queue
         self._logger = logger
-        if http.timeout is not None:
-            self._timeout = http.timeout
+        self._timeout = http.timeout if http.timeout is not None else 120.0
         self._last_use_time: float = 0.0
-        self._timeout: float = 120.0
         self._uses: int = 0
         self._max_uses: int = sys.maxsize
         self._response: Optional[Union[HTTPResponse, '_FinishedResponse']] = None
