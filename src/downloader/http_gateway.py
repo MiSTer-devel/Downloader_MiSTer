@@ -85,6 +85,7 @@ class HttpGateway:
             yield final_url, conn.response
         finally:
             conn.finish_response()
+            if self._logger is not None: self._logger.debug(f'|||| {final_url} response finished {time.time() - now:.3f}s')
 
     def cleanup(self) -> None:
         total_cleared = 0
