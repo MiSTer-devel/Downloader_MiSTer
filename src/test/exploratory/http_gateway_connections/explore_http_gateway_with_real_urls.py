@@ -67,7 +67,7 @@ def main() -> None:
             if fut.done():
                 e = fut.exception()
                 if e is not None:
-                    print(f'>>>>>>>>>>>>> TASK FAILED!! {describe_time(time.time())}', e)
+                    print(f'>>>>>>>>>>>>> TASK FAILED!! {describe_time(time.monotonic())}', e)
             elif not fut.running():
                 if fut.cancel():
                     cancelled += 1
@@ -83,11 +83,11 @@ def main() -> None:
         signal.signal(sig, lambda s, fr: handle_interrupt(s, fr, cb))
 
     try:
-        logger = PrintLogger.make_configured({'verbose': True, 'start_time': time.time()})
+        logger = PrintLogger.make_configured({'verbose': True, 'start_time': time.monotonic()})
         dir_path = f'{os.path.dirname(os.path.realpath(__file__))}/delme'
         os.makedirs(dir_path, exist_ok=True)
 
-        start = time.time()
+        start = time.monotonic()
         with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gateway:
             with ThreadPoolExecutor(max_workers=20) as thread_executor:
                 futures = [thread_executor.submit(fetch_url, gateway, input_url, dir_path) for input_url in urls * 20]
@@ -98,7 +98,7 @@ def main() -> None:
                         if f.done():
                             future_exception = f.exception()
                             if future_exception is not None:
-                                print(f'>>>>>>>>>>>>> TASK FAILED!! {describe_time(time.time())}', future_exception)
+                                print(f'>>>>>>>>>>>>> TASK FAILED!! {describe_time(time.monotonic())}', future_exception)
                         else:
                             next_futures.append(f)
 
@@ -107,7 +107,7 @@ def main() -> None:
 
                 cleanup(False)
 
-        end = time.time()
+        end = time.monotonic()
         print()
         print()
         print(f'Time: {end - start}s')
