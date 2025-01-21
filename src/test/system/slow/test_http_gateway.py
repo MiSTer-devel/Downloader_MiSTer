@@ -42,7 +42,7 @@ class TestHttpGateway(unittest.TestCase):
         shutil.rmtree(self.dir_path)
 
     def test_http_gateway_with_distribution_mister_urls___gets_500_files(self):
-        logger = PrintLogger.make_configured({'verbose': True, 'start_time': time.monotonic()})
+        logger = PrintLogger.make_configured({'verbose': True, 'start_time': time.time()})
         with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gateway:
             with tempfile.NamedTemporaryFile() as temp_file, gateway.open(DISTRIBUTION_MISTER_DB_URL) as (url, res):
                 shutil.copyfileobj(res, temp_file)
