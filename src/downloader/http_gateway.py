@@ -81,7 +81,7 @@ class HttpGateway:
             0
         )
         if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}: {final_url}\n'
-                                                        f'First byte {describe_time(t := time.time())} ({t - now:.3f}s)\nvvvv\n')
+                                                        f'1st byte @ {describe_time(t := time.time())} ({t - now:.3f}s)\nvvvv\n')
         try:
             yield final_url, conn.response
         finally:
