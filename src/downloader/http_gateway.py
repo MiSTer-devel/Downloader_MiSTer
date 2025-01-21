@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@ from urllib.parse import urlparse, ParseResult, urlunparse
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException, HTTPMessage
 
 
+T = TypeVar('T')
 class HttpGatewayException(Exception): pass
 
 class Logger(Protocol):
@@ -65,7 +66,6 @@ class HttpGateway:
 
     @contextmanager
     def open(self, url: str, method: str = None, body: Any = None, headers: Any = None) -> Generator[Tuple[str, HTTPResponse], None, None]:
-        #print(url)
         now = time.time()
         self._clean_timeout_connections(now)
         self._clean_timeout_redirects(now)
@@ -90,26 +90,21 @@ class HttpGateway:
             for queue in self._connections.values():
                 total_cleared += queue.clear_all()
             self._connections.clear()
-        print('queue redirects', list(self._queue_redirects.keys()))
-        with self._queue_redirects_lock:
-            self._queue_redirects.clear()
-        print('url redirects', list(self._url_redirects.keys()))
-        with self._url_redirects_lock:
-            self._url_redirects.clear()
         if self._logger is not None: self._logger.debug(f'Cleaning up {total_cleared} connections.')
+        with self._queue_redirects_lock: self._queue_redirects.clear()
+        with self._url_redirects_lock: self._url_redirects.clear()
 
     def _request(self, url: str, method: str, body: Any, headers: Any, retry: int) -> Tuple[str, '_Connection', int]:
         parsed_url = urlparse(url)
-        #print('>>>>', parsed_url.path, parsed_url.query, parsed_url.params, parsed_url.fragment)
         queue_id: _QueueId = self._process_queue_id((parsed_url.scheme, parsed_url.netloc))
         conn = self._take_connection(queue_id)
         try:
-            conn.do_request(method, self._build_request_url(parsed_url), body, headers)
+            conn.do_request(method, str(urlunparse(parsed_url)), body, headers)
         except (HTTPException, OSError) as e:
-            if self._logger is not None: self._logger.debug(f'Closing "{parsed_url.scheme}://{parsed_url.netloc}" connection {conn.id}.')
             conn.kill()
             if retry < 10:
-                if self._logger is not None: self._logger.debug(f'HTTP Exception! {type(e).__name__} ({retry}): {url} {str(e)}')
+                if self._logger is not None: self._logger.debug(f'HTTP Exception! {type(e).__name__} ({retry}): {url} {str(e)}\n'
+                                                                f'Killed "{parsed_url.scheme}://{parsed_url.netloc}" connection {conn.id}.\n')
                 return self._request(url, method, body, headers, retry + 1)
             else:
                 raise e
@@ -126,7 +121,6 @@ class HttpGateway:
         if location is None:
             raise HttpGatewayException('Invalid header response during Resource moved response at ' + current_url)
 
-        #print(f'move {conn.response.status}: {current_url} -> {location} [{redirect_timeout}]')
         if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}! Resource moved: {current_url} -> {location}\n\n')
         conn.finish_response()
 
@@ -143,52 +137,18 @@ class HttpGateway:
                 target_queue_id: _QueueId = (parsed_location.scheme, parsed_location.netloc)
                 if target_queue_id != current_queue_id:
                     redirect = _Redirect(target_queue_id, redirect_timeout)
-                    #print(f'set queue redirect {current_queue_id} -> {redirect.target}', parsed_url, parsed_location)
                     with self._queue_redirects_lock:
                         self._queue_redirects[current_queue_id] = redirect
 
             elif current_url != location:
                 redirect = _Redirect(location, redirect_timeout)
-                #print(f'set url redirect {current_url} -> {redirect.target}', parsed_url, parsed_location)
                 with self._url_redirects_lock:
                     self._url_redirects[current_url] = redirect
 
         return location
 
-    @staticmethod
-    def _build_request_url(parsed_url: ParseResult) -> str:
-        url_path = parsed_url.path
-        while len(url_path) > 0 and url_path[0] == '/':
-            url_path = url_path.lstrip('/')
-        return f'/{url_path}?{parsed_url.query}'.rstrip('?')
-
-    def _process_url(self, input_url: str) -> str:
-        redirects = 0
-        url = input_url
-        with self._url_redirects_lock:
-            while url in self._url_redirects and redirects < 10:
-                #print(f'url: {url} -> {self._url_redirects[url].target} ({redirects})')
-                url = self._url_redirects[url].target
-                redirects += 1
-
-            if redirects > 1:
-                self._url_redirects[input_url].target = url
-
-        return url
-
-    def _process_queue_id(self, input_queue_id: Tuple[str, str]) -> Tuple[str, str]:
-        redirects = 0
-        queue_id = input_queue_id
-        with self._queue_redirects_lock:
-            while queue_id in self._queue_redirects and redirects < 10:
-                #print(f'queue_id: {queue_id} -> {self._queue_redirects[queue_id].target} ({redirects})')
-                queue_id = self._queue_redirects[queue_id].target
-                redirects += 1
-
-            if redirects > 1:
-                self._queue_redirects[input_queue_id].target = queue_id
-
-        return queue_id
+    def _process_url(self, url: str) -> str: return _redirect(url, self._url_redirects, self._url_redirects_lock)
+    def _process_queue_id(self, queue_id: '_QueueId') -> '_QueueId': return _redirect(queue_id, self._queue_redirects, self._queue_redirects_lock)
 
     def _take_connection(self, queue_id: '_QueueId') -> '_Connection':
         with self._connections_lock:
@@ -249,7 +209,10 @@ class HttpGateway:
         finally:
             self._clean_timeout_redirects_lock.release()
 
-    def _fill_redirects_swap(self, now: float, lock: threading.Lock, main_dict) -> bool:
+    def _fill_redirects_swap(self, now: float, lock: threading.Lock, main_dict: Dict[T, '_Redirect[T]']) -> bool:
+        # We are minimizing lock time, by doing most of the operations in temp and swap.
+        # If we see that main_dict needs to change, we return True to indicate that it needs to be swapped outside.
+
         self._redirects_swap.clear()
         self._redirects_temp.clear()
 
@@ -260,28 +223,35 @@ class HttpGateway:
 
         for key, redirect in self._redirects_temp:
             if not redirect.is_expired(now):
-                #print('Keeping ' + str(key))
                 self._redirects_swap[key] = redirect
-            else:
-                pass
-                #print('EXPIRED!! ' + str(key))
 
         return size != len(self._redirects_swap)
 
-_default_headers = {'Connection': 'keep-alive', 'Keep-Alive': 'timeout=120', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0'}
+_default_headers = {'Connection': 'keep-alive', 'Keep-Alive': 'timeout=120'}
 
 
 _QueueId = Tuple[str, str]
 
-T = TypeVar('T')
 class _Redirect[T]:
     def __init__(self, target: T, timeout: float):
         self.target = target
         self.timeout = timeout
 
     def is_expired(self, now: float) -> bool:
-        #print('is_expired?', self.target, now, self.timeout)
         return now > self.timeout
+
+def _redirect(input_arg: T, res_dict: Dict[T, _Redirect[T]], lock: threading.Lock) -> T:
+    redirects = 0
+    arg = input_arg
+    with lock:
+        while arg in res_dict and redirects < 10:
+            arg = res_dict[arg].target
+            redirects += 1
+
+        if redirects > 1:  # When redirecting, only 1 redirect should be enough, so we prepare the dict for the next run.
+            res_dict[input_arg].target = arg
+
+    return arg
 
 
 class _Connection:
@@ -474,7 +444,10 @@ class _ResponseHeaders:
 
         expires = self.headers.get('expires', None)
         if expires is not None:
-            return new_url, parsedate_to_datetime(expires).timestamp()
+            try:
+                return new_url, parsedate_to_datetime(expires).timestamp()
+            except Exception as e:
+                if self._logger is not None: self._logger.debug(f"Could not parse Expires from {expires}", e)
 
         if status == 300 or status == 301:
             return new_url, time.time() + 60 * 60 * 24  # Permanent redirects, caching 1 day by default
