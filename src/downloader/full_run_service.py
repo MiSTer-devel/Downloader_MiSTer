@@ -165,7 +165,7 @@ class FullRunService:
         return 0
 
     def _display_summary(self, installed_files, failed_files, failed_folders, failed_zips, unused_filter_tags, new_files_not_installed, full_partitions, start_time):
-        run_time = str(datetime.timedelta(seconds=time.monotonic() - start_time))[0:-4]
+        run_time = str(datetime.timedelta(seconds=time.time() - start_time))[0:-4]
 
         self._logger.print()
         self._logger.print('===========================')

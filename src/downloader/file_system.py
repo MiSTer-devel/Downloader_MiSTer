@@ -392,10 +392,10 @@ class _FileSystem(FileSystem):
         return self._path(path)
 
     def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int):
-        start_time = time.monotonic()
+        start_time = time.time()
         with open(target_path, 'wb') as out_file:
             while True:
-                elapsed_time = time.monotonic() - start_time
+                elapsed_time = time.time() - start_time
                 if elapsed_time > timeout:
                     raise FsTimeoutError(f"Copy operation timed out after {timeout} seconds")
 
