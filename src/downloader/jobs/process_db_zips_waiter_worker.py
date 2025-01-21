@@ -19,7 +19,7 @@
 from downloader.job_system import WorkerResult
 from downloader.jobs.index import Index
 from downloader.jobs.process_index_job import ProcessIndexJob
-from downloader.jobs.worker_context import DownloaderWorker
+from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 
 
@@ -27,7 +27,7 @@ from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 # This way decentralized orchestration happens only here, and the job can be removed once we make tag-based scheduling
 # in the job system, so that we can centralize scheduling there.
 
-class ProcessDbZipsWaiterWorker(DownloaderWorker):
+class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return ProcessDbZipsWaiterJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 

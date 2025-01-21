@@ -21,10 +21,10 @@ from downloader.file_system import FsError
 from downloader.job_system import WorkerResult
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_job import ProcessDbJob
-from downloader.jobs.worker_context import DownloaderWorker
+from downloader.jobs.worker_context import DownloaderWorkerBase
 
 
-class OpenDbWorker(DownloaderWorker):
+class OpenDbWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return OpenDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 

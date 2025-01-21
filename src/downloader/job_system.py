@@ -20,6 +20,7 @@ from abc import abstractmethod, ABC
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
+from types import FrameType
 from typing import Dict, Optional, Callable, List, Tuple, Any, Iterable, Protocol, Union
 import sys
 import time
@@ -73,6 +74,10 @@ class JobSystem(JobContext):
         self._tag_dict: Dict[str, int] = defaultdict(int)
         self._jobs_pushed: int = 0
         self._timeout_clock: int = 0
+        self._signals = [signal.SIGINT]
+
+    def set_interfering_signals(self, signals: List[signal.Signals]):
+        self._signals = signals
 
     def register_worker(self, job_id: int, worker: 'Worker') -> None:
         self.register_workers([(job_id, worker)])
@@ -170,9 +175,10 @@ class JobSystem(JobContext):
         self._pending_jobs_amount -= 1
 
     def _execute_with_threads(self, max_threads: int) -> None:
-        previous_handler = signal.getsignal(signal.SIGINT)
+        previous_handlers = [(s, signal.getsignal(s)) for s in self._signals]
         try:
-            signal.signal(signal.SIGINT, lambda sig, frame: self._sigint_handler(previous_handler, sig, frame))
+            for sig1, cb in previous_handlers:
+                signal.signal(sig1, lambda sig2, frame: self._signal_handler(cb, sig2, frame))
 
             futures = []
             with ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
@@ -198,7 +204,7 @@ class JobSystem(JobContext):
                 self._cancel_futures(self._handle_futures(futures))
 
         finally:
-            signal.signal(signal.SIGINT, previous_handler)
+            for sig, cb in previous_handlers: signal.signal(sig, cb)
 
     def _execute_without_threads(self) -> None:
         notifications: queue.Queue[Tuple[bool, '_JobPackage']] = queue.Queue()
@@ -331,12 +337,14 @@ class JobSystem(JobContext):
             seen[current.job.type_id] = seen_value + 1
             current = current.parent
 
-    def _sigint_handler(self, previous_handler: Any, sig: Any, frame: Any) -> None:
-        self._logger.print('SIGINT RECEIVED!')
+    def _signal_handler(self, previous_handler: Callable[[int, Optional[FrameType]], Any], sig: int, frame: Optional[FrameType]) -> None:
+        self._logger.print('SIGNAL RECEIVED!')
         self._logger.print('SHUTTING DOWN, PLEASE WAIT...')
         self.cancel_pending_jobs()
-        if previous_handler is not None:
+        try:
             previous_handler(sig, frame)
+        except Exception as e:
+            self._logger.print('PREVIOUS HANDLER FAILED!', e)
 
     def _update_timeout_clock(self) -> None:
         self._timeout_clock = time.time() + self._max_timeout

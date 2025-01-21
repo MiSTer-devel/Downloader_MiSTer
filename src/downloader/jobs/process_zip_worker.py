@@ -24,7 +24,7 @@ from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_open_zip_c
 from downloader.local_store_wrapper import StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_zip_job import ProcessZipJob
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
@@ -32,7 +32,7 @@ from downloader.target_path_calculator import TargetPathsCalculator
 from downloader.jobs.index import Index
 
 
-class ProcessZipWorker(DownloaderWorker):
+class ProcessZipWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return ProcessZipJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 

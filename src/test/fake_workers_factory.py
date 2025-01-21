@@ -31,7 +31,9 @@ def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
     if isinstance(ctx.http_gateway, FakeHttpGateway):
         fake_http: FakeHttpGateway = ctx.http_gateway
         replacement_workers.extend([
-            FakeWorkerDecorator(FetchFileWorker2(ctx), fake_http),
+            FakeWorkerDecorator(FetchFileWorker2(
+                progress_reporter=ctx.progress_reporter, http_gateway=fake_http, file_system=ctx.file_system, config=ctx.config,
+            ), fake_http),
             FakeWorkerDecorator(FetchFileWorker(ctx), fake_http)
         ])
 
@@ -44,7 +46,6 @@ class FakeWorkerDecorator(DownloaderWorker):
     def __init__(self, worker: DownloaderWorker, fake_http: FakeHttpGateway):
         self._worker = worker
         self._fake_http = fake_http
-        super().__init__(worker._ctx)
 
     def job_type_id(self) -> int: return self._worker.job_type_id()
     def operate_on(self, job: Job) -> WorkerResult:

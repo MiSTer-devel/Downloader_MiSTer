@@ -16,13 +16,13 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.jobs.worker_context import DownloaderWorker
+from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.jobs.open_zip_index_job import OpenZipIndexJob
 from downloader.jobs.jobs_factory import make_process_zip_job
 from downloader.job_system import WorkerResult
 
 
-class OpenZipIndexWorker(DownloaderWorker):
+class OpenZipIndexWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return OpenZipIndexJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
