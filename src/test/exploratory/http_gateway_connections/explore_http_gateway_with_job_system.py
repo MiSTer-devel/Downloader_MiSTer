@@ -47,7 +47,7 @@ class Reporter(ProgressReporter):
         self.completed.append(job)
 
     def notify_job_failed(self, job: FetchFileJob2, exception: Exception) -> None:
-        print(f'>>>>>> FAILED! {job.info} [{describe_time(time.time())}]')
+        print(f'>>>>>> FAILED! {job.info} [{describe_time(time.time())}]', exception)
         self.failed.append((job, exception))
 
 
