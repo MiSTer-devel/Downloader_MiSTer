@@ -24,9 +24,8 @@ from typing import Dict, Optional, Tuple, List, Any, Iterable, Set
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
+from downloader.interruptions import Interruptions
 from downloader.jobs.get_file_job import GetFileJob
-from downloader.jobs.index import Index
-from downloader.jobs.open_zip_index_job import OpenZipIndexJob
 from downloader.local_store_wrapper import StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_index_job import ProcessIndexJob
@@ -221,9 +220,10 @@ class FileDownloadSessionLogger:
 
 class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
 
-    def __init__(self, logger: Logger, waiter: Waiter, report: InstallationReportImpl):
+    def __init__(self, logger: Logger, waiter: Waiter, interrupts: Interruptions, report: InstallationReportImpl):
         self._logger = logger
         self._waiter = waiter
+        self._interrupts = interrupts
         self._report = report
         self._check_time: float = 0
         self._active_jobs: Dict[int, int] = {}
@@ -233,7 +233,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         self._symbols: List[str] = []
 
     def start_session(self):
-        self.__init__(self._logger, self._waiter, InstallationReportImpl())
+        self.__init__(self._logger, self._waiter, self._interrupts, InstallationReportImpl())
 
     def _deactivate(self):
         self._deactivated = True
@@ -262,7 +262,10 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             self._print_symbols()
 
     def notify_cancelled_pending_jobs(self) -> None:
-        pass
+        try:
+            self._interrupts.interrupt()
+        except Exception as e:
+            self._logger.debug(e)
 
     def notify_job_completed(self, job: Job):
         self._report.add_job_completed(job)
