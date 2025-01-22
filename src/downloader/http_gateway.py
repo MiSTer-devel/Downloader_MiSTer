@@ -74,6 +74,7 @@ class HttpGateway:
         if self._logger is not None: self._logger.debug(f'^^^^ {method} {url}\n{describe_time(now)}')
         url = self._process_url(url)
         parsed_url = urlparse(url)
+        if parsed_url.scheme not in {'http', 'https'}: raise HttpGatewayException(f"URL '{url}' has wrong scheme '{parsed_url.scheme}'.")
         final_url, conn, _ = self._request(
             url,
             parsed_url,
@@ -101,7 +102,7 @@ class HttpGateway:
         with self._url_redirects_lock: self._url_redirects.clear()
 
     def _request(self, url: str, parsed_url: ParseResult, method: str, body: Any, headers: Any, retry: int) -> Tuple[str, '_Connection', int]:
-        if retry > 2: time.sleep(retry * retry * retry * 0.0001)
+        if retry > 2: time.sleep(2 ** retry * 0.0001)
         queue_id: _QueueId = self._process_queue_id((parsed_url.scheme, parsed_url.netloc))
         conn = self._take_connection(queue_id)
         try:
@@ -136,6 +137,9 @@ class HttpGateway:
 
         location = self._process_url(location)
         parsed_location = urlparse(location)
+        if parsed_location.scheme not in {'http', 'https'}:
+            if self._logger is not None: self._logger.debug(f"Location URL '{location}' has wrong scheme '{parsed_location.scheme}'. Ignoring it.")
+            return url, parsed_url
 
         if redirect_timeout is not None:
             if (parsed_location.path == parsed_url.path and
@@ -353,11 +357,8 @@ class _ConnectionQueue:
         with self._lock:
             if len(self._queue) == 0:
                 self._last_conn_id += 1
-                http_conn, error_msg = self._create_http_connection(self.id, self._timeout, self._ctx)
-                if error_msg is not None and self._logger is not None: self._logger.debug(error_msg)
-                return _Connection(
-                    conn_id=self._last_conn_id, http=http_conn, connection_queue=self, logger=self._logger
-                )
+                http_conn = self._create_http_connection(self.id, self._timeout, self._ctx)
+                return _Connection(conn_id=self._last_conn_id, http=http_conn, connection_queue=self, logger=self._logger)
             return self._queue.pop()
 
     def push(self, connection: _Connection) -> None:
@@ -389,10 +390,10 @@ class _ConnectionQueue:
 
             return expired_count
 
-def _create_http_connection(queue_id: '_QueueId', timeout: int, ctx: ssl.SSLContext) -> Tuple[HTTPConnection, Optional[str]]:
-    if queue_id[0] == 'http': return HTTPConnection(queue_id[1], timeout=timeout), None
-    elif queue_id[0] == 'https': return HTTPSConnection(queue_id[1], timeout=timeout, context=ctx), None
-    else: return HTTPConnection(queue_id[1], timeout=timeout), f"Scheme {queue_id[0]} not supported. Using default HTTPConnection."
+def _create_http_connection(queue_id: '_QueueId', timeout: int, ctx: ssl.SSLContext) -> HTTPConnection:
+    if queue_id[0] == 'http': return HTTPConnection(queue_id[1], timeout=timeout)
+    elif queue_id[0] == 'https': return HTTPSConnection(queue_id[1], timeout=timeout, context=ctx)
+    else: raise HttpGatewayException(f"Scheme {queue_id[0]} not supported")
 
 
 class _ResponseHeaders:
