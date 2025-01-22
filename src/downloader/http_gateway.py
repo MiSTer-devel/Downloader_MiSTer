@@ -321,7 +321,7 @@ class _Connection:
 
     def _handle_keep_alive(self):
         if not self._response_headers.is_keep_alive_connection():
-            self._logger.debug(f'Keep-Alive off')
+            if self._logger is not None: self._logger.debug(f'Keep-Alive off')
             self._max_uses = 0
             return
 
