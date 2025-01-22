@@ -353,10 +353,10 @@ class _ConnectionQueue:
         with self._lock:
             if len(self._queue) == 0:
                 self._last_conn_id += 1
-                conn = self._create_http_connection(self.id, self._timeout, self._ctx)
-                if conn is None and self._logger is not None: self._logger.debug(f"Scheme {self.id[0]} not supported. Using default HTTPConnection.")
+                http_conn, error_msg = self._create_http_connection(self.id, self._timeout, self._ctx)
+                if error_msg is not None and self._logger is not None: self._logger.debug(error_msg)
                 return _Connection(
-                    conn_id=self._last_conn_id, http=conn, connection_queue=self, logger=self._logger
+                    conn_id=self._last_conn_id, http=http_conn, connection_queue=self, logger=self._logger
                 )
             return self._queue.pop()
 
@@ -389,10 +389,10 @@ class _ConnectionQueue:
 
             return expired_count
 
-def _create_http_connection(queue_id: '_QueueId', timeout: int, ctx: ssl.SSLContext) -> Optional[HTTPConnection]:
-    if queue_id[0] == 'http': return HTTPConnection(queue_id[1], timeout=timeout)
-    elif queue_id[0] == 'https': return HTTPSConnection(queue_id[1], timeout=timeout, context=ctx)
-    else: return None
+def _create_http_connection(queue_id: '_QueueId', timeout: int, ctx: ssl.SSLContext) -> Tuple[HTTPConnection, Optional[str]]:
+    if queue_id[0] == 'http': return HTTPConnection(queue_id[1], timeout=timeout), None
+    elif queue_id[0] == 'https': return HTTPSConnection(queue_id[1], timeout=timeout, context=ctx), None
+    else: return HTTPConnection(queue_id[1], timeout=timeout), f"Scheme {queue_id[0]} not supported. Using default HTTPConnection."
 
 
 class _ResponseHeaders:
