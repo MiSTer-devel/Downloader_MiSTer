@@ -138,7 +138,9 @@ class JobSystem(JobContext):
     def cancel_pending_jobs(self) -> None:
         # This must be thread-safe. We lock so that execution can be interrupted asap.
 
-        with self._lock: self._pending_jobs_cancelled = True
+        with self._lock:
+            self._pending_jobs_cancelled = True
+            self._report_cancelled_pending_jobs()
 
     def wait_for_other_jobs(self):
         # This must be thread-safe. We lock because we need the strict value of _is_executing_jobs.
@@ -199,9 +201,16 @@ class JobSystem(JobContext):
                     self._check_clock()
                     sys.stdout.flush()
 
-            if self._pending_jobs_cancelled:
-                self._handle_notifications(self._notifications)
-                self._cancel_futures(self._handle_futures(futures))
+                if self._pending_jobs_cancelled:
+                    self._cancel_futures(futures)
+
+            self._handle_notifications(self._notifications)
+            while True:
+                try:
+                    package = self._job_queue.get(timeout=self._wait_timeout)
+                    self._report_job_failed(package, JobCancelled(f'Cancelled: {str(package)}'))
+                except queue.Empty:
+                    break
 
         finally:
             for sig, cb in previous_handlers: signal.signal(sig, cb)
@@ -225,8 +234,10 @@ class JobSystem(JobContext):
         self._handle_notifications(self._notifications)
         self._report_work_in_progress()
 
-    @staticmethod
-    def _operate_on_next_job(package: '_JobPackage', notifications: queue.Queue[Tuple[bool, '_JobPackage']]) -> None:
+    def _operate_on_next_job(self, package: '_JobPackage', notifications: queue.Queue[Tuple[bool, '_JobPackage']]) -> None:
+        if self._pending_jobs_cancelled:
+            raise JobCancelled(f'Cancelled: {str(package)}')
+
         job, worker = package.job, package.worker
         notifications.put((False, package))
 
@@ -311,8 +322,15 @@ class JobSystem(JobContext):
 
     def _cancel_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> None:
         for package, future in futures:
-            future.cancel()
-            self._report_job_failed(package, TimeoutError(f'ERROR! {str(package)} timed out.'))
+            if future.cancel():
+                self._report_job_failed(package, JobCancelled(f'Cancelled: {str(package)}'))
+            else:
+                future_exception = future.exception()
+                if future_exception is not None:
+                    if isinstance(future_exception, Exception):
+                        self._report_job_failed(package, future_exception)
+                    else:
+                        self._logger.print(f'CRITICAL! Unexpected exception while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {future_exception}')
 
     def _check_clock(self) -> None:
         if self._timeout_clock > time.time():
@@ -338,13 +356,17 @@ class JobSystem(JobContext):
             current = current.parent
 
     def _signal_handler(self, previous_handler: Callable[[int, Optional[FrameType]], Any], sig: int, frame: Optional[FrameType]) -> None:
-        self._logger.print('SIGNAL RECEIVED!')
-        self._logger.print('SHUTTING DOWN, PLEASE WAIT...')
-        self.cancel_pending_jobs()
         try:
-            previous_handler(sig, frame)
+            self._logger.print('SIGNAL RECEIVED!')
+            self._logger.print('SHUTTING DOWN, PLEASE WAIT...')
+            self.cancel_pending_jobs()
         except Exception as e:
-            self._logger.print('PREVIOUS HANDLER FAILED!', e)
+            self._logger.print('CANCELING PENDING JOBS FAILED!', sig, e)
+        try:
+            if callable(previous_handler) and previous_handler not in (signal.SIG_IGN, signal.SIG_DFL):
+                previous_handler(sig, frame)
+        except Exception as e:
+            self._logger.print('PREVIOUS HANDLER FAILED!', sig, e)
 
     def _update_timeout_clock(self) -> None:
         self._timeout_clock = time.time() + self._max_timeout
@@ -363,6 +385,9 @@ class JobSystem(JobContext):
 
     def _report_work_in_progress(self) -> None:
         self._try_report('in progress', lambda: self._reporter.notify_work_in_progress())
+
+    def _report_cancelled_pending_jobs(self) -> None:
+        self._try_report('cancelled pending jobs', lambda: self._reporter.notify_cancelled_pending_jobs())
 
     def _try_report(self, context: str, cb: Callable[[], None]) -> None:
         if context != 'in progress': self._update_timeout_clock()
@@ -436,6 +461,10 @@ class ProgressReporter(ABC):
         """Called after each loop."""
 
     @abstractmethod
+    def notify_cancelled_pending_jobs(self) -> None:
+        """Called when all pending jobs are cancelled."""
+
+    @abstractmethod
     def notify_job_completed(self, job: Job) -> None:
         """Called when a job is completed. Must not throw exceptions."""
 
@@ -456,6 +485,7 @@ class CantExecuteJobs(JobSystemAbortException): pass
 class CantPushJobs(JobSystemAbortException): pass
 class CantWaitWhenNotExecutingJobs(JobSystemAbortException): pass
 class ReportException(Exception): pass
+class JobCancelled(Exception): pass
 
 
 class JobSystemLogger(Protocol):
