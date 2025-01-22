@@ -144,6 +144,10 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
+    def cancel_ongoing_operations(self) -> None:
+        """interface"""
+
+    @abstractmethod
     def unlink(self, path: str, verbose: bool = True) -> bool:
         """interface"""
 
@@ -209,6 +213,7 @@ class ReadOnlyFileSystem:
 
 class UnlinkTemporaryException: pass
 class FsError(Exception): pass
+class FsOperationsError(FsError): pass
 class FolderCreationError(FsError): pass
 class FileCopyError(FsError): pass
 class FileReadError(FsError): pass
@@ -222,6 +227,7 @@ class _FileSystem(FileSystem):
         self._logger = logger
         self._unique_temp_filenames = unique_temp_filenames
         self._fs_cache = fs_cache
+        self._cancel_ongoing_operations = False
         self._quick_hit = 0
         self._slow_hit = 0
 
@@ -397,12 +403,18 @@ class _FileSystem(FileSystem):
             while True:
                 elapsed_time = time.time() - start_time
                 if elapsed_time > timeout:
-                    raise FsTimeoutError(f"Copy operation timed out after {timeout} seconds")
+                    raise FsTimeoutError(f"Copy operation timed out after {timeout} seconds.")
+
+                if self._cancel_ongoing_operations:
+                    raise FsOperationsError("File system operations have been disabled.")
 
                 buf = in_stream.read(COPY_BUFSIZE)
                 if not buf:
                     break
                 out_file.write(buf)
+
+    def cancel_ongoing_operations(self) -> None:
+        self._cancel_ongoing_operations = True
 
     def unlink(self, path: str, verbose: bool = True) -> bool:
         verbose = verbose and not path.startswith('/tmp/')

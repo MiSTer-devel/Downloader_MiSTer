@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 from downloader.constants import K_DOWNLOADER_TIMEOUT
-from downloader.file_system import FileSystemFactory
+from downloader.file_system import FileSystemFactory, FileSystem
 from downloader.job_system import JobSystem, ProgressReporter, Job
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
@@ -35,6 +35,9 @@ from test.exploratory.http_gateway_connections.explore_http_gateway_with_real_ur
 
 
 class Reporter(ProgressReporter):
+    def __init__(self, fs: FileSystem):
+        self._fs = fs
+
     def notify_work_in_progress(self) -> None: pass
     def notify_job_retried(self, job: Job, exception: Exception) -> None: pass
     def notify_job_started(self, job: Job) -> None: pass
@@ -50,11 +53,15 @@ class Reporter(ProgressReporter):
         print(f'>>>>>> FAILED! {job.info} [{describe_time(time.time())}]', exception)
         self.failed.append((job, exception))
 
+    def notify_cancelled_pending_jobs(self) -> None:
+        print(f">>>>>> CANCELING PENDING JOBS!")
+        self._fs.cancel_ongoing_operations()
+
 
 def main() -> None:
     logger = PrintLogger.make_configured({'verbose': True, 'start_time': time.time()})
     fs = FileSystemFactory({}, {}, logger=logger).create_for_system_scope()
-    reporter = Reporter()
+    reporter = Reporter(fs)
     job_system = JobSystem(reporter=reporter, logger=logger, max_threads=20)
     job_system.set_interfering_signals([signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT])
 
@@ -82,16 +89,18 @@ def main() -> None:
         end = time.time()
 
     print()
-    print('Completed jobs: ' + str(len(reporter.completed)))
+    print('Completed jobs: ')
     for completed in reporter.completed:
         print(completed.info)
 
     print()
-    print('Failed jobs: ' + str(len(reporter.failed)))
+    print('Failed jobs: ')
     for failed, e in reporter.failed:
         print(failed.info, e)
 
     print()
+    print('Completed jobs: ' + str(len(reporter.completed)))
+    print('Failed jobs: ' + str(len(reporter.failed)))
     print()
     print(f'Time: {end - start}s')
 
