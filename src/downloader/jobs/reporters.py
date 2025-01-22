@@ -59,6 +59,9 @@ class DownloaderProgressReporter(ProgressReporter):
         for r in self._other_reporters:
             r.notify_work_in_progress()
 
+    def notify_cancelled_pending_jobs(self) -> None:
+        pass
+
     def notify_job_completed(self, job: Job):
         pass
 
@@ -257,6 +260,9 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         if self._check_time < now:
             self._symbols.append('*')
             self._print_symbols()
+
+    def notify_cancelled_pending_jobs(self) -> None:
+        pass
 
     def notify_job_completed(self, job: Job):
         self._report.add_job_completed(job)

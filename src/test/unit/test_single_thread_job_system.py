@@ -323,6 +323,9 @@ class TestProgressReporter(ProgressReporter):
     def notify_work_in_progress(self):
         pass
 
+    def notify_cancelled_pending_jobs(self) -> None:
+        pass
+
     def notify_job_started(self, job: 'Job'):
         self.started_jobs[job.type_id] = self.started_jobs.get(job.type_id, 0) + 1
         self.in_progress_jobs[job.type_id] = self.in_progress_jobs.get(job.type_id, 0) + 1

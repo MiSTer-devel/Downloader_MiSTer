@@ -263,6 +263,9 @@ class FakeFileSystem(ProductionFileSystem):
         self.state.files[lower_path] = in_stream.description
         self._fs_cache.add_file(lower_path)
 
+    def cancel_ongoing_operations(self) -> None:
+        pass
+
     def unlink(self, path, verbose=True):
         full_path = self._path(path)
         if full_path in self.state.files:
