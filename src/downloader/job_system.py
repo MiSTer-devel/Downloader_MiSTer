@@ -309,6 +309,18 @@ class JobSystem(JobContext):
                 still_pending.append((package, future))
         return still_pending
 
+    def _cancel_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> None:
+        for package, future in futures:
+            if future.cancel():
+                self._report_job_failed(package, JobCancelled(f'Cancelled: {str(package)}'))
+            else:
+                future_exception = future.exception()
+                if future_exception is not None:
+                    if isinstance(future_exception, Exception):
+                        self._report_job_failed(package, future_exception)
+                    else:
+                        self._logger.print(f'CRITICAL! Unexpected exception while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {future_exception}')
+
     def _handle_exception(self, package: '_JobPackage', e: BaseException):
         if isinstance(e, _JobError):
             self._retry_package(package, e.child)
@@ -321,18 +333,6 @@ class JobSystem(JobContext):
         else:
             self._logger.print(f'CRITICAL! Unexpected exception while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
             raise e
-
-    def _cancel_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> None:
-        for package, future in futures:
-            if future.cancel():
-                self._report_job_failed(package, JobCancelled(f'Cancelled: {str(package)}'))
-            else:
-                future_exception = future.exception()
-                if future_exception is not None:
-                    if isinstance(future_exception, Exception):
-                        self._report_job_failed(package, future_exception)
-                    else:
-                        self._logger.print(f'CRITICAL! Unexpected exception while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {future_exception}')
 
     def _check_clock(self) -> None:
         if self._timeout_clock > time.time():
