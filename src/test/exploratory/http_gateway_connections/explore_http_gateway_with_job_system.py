@@ -60,7 +60,7 @@ def main() -> None:
 
     with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gw:
         job_system.register_worker(FetchFileJob2.type_id, FetchFileWorker2(
-            progress_reporter=reporter, file_system=fs, http_gateway=gw, config={K_DOWNLOADER_TIMEOUT: 180}
+            progress_reporter=reporter, file_system=fs, http_gateway=gw, config={K_DOWNLOADER_TIMEOUT: 600}
         ))
 
         dir_path = f'{os.path.dirname(os.path.realpath(__file__))}/job_system_delme'
