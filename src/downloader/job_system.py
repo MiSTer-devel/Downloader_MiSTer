@@ -279,9 +279,11 @@ class JobSystem(JobContext):
         return worker
 
     def _handle_notifications(self, notification_queue: queue.Queue[Tuple[bool, '_JobPackage']]) -> None:
-        while notification_queue.empty() is False:
-            notification = notification_queue.get(block=False)
-            notification_queue.task_done()
+        while True:
+            try:
+                notification = notification_queue.get(block=False)
+            except queue.Empty:
+                break
 
             completed, package = notification
             if completed:
