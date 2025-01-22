@@ -20,6 +20,7 @@ from downloader.constants import MEDIA_USB0
 from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.importer_command import ImporterCommand, ImporterCommandFactory
+from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
@@ -76,7 +77,7 @@ class OnlineImporter(ProductionOnlineImporter):
 
         self.dbs = []
         installation_report = InstallationReportImpl()
-        self._file_download_reporter = FileDownloadProgressReporter(logger, waiter, installation_report)
+        self._file_download_reporter = FileDownloadProgressReporter(logger, waiter, Interruptions(file_system_factory), installation_report)
         self._report_tracker = ProgressReporterTracker(self._file_download_reporter)
         self._job_system = JobSystem(self._report_tracker, logger=logger, max_threads=1, retry_unexpected_exceptions=False)
         external_drives_repository = ExternalDrivesRepository(file_system=self.file_system)

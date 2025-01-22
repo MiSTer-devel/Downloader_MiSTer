@@ -22,7 +22,7 @@ from typing import Any
 from downloader.constants import K_BASE_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
-    absolute_parent_folder, is_windows, FolderCreationError, FsCache, FileCopyError
+    absolute_parent_folder, is_windows, FolderCreationError, FsSharedState, FileCopyError
 from downloader.other import ClosableValue, UnreachableException
 from test.fake_importer_implicit_inputs import FileSystemState
 from downloader.logger import NoLogger
@@ -47,7 +47,7 @@ class FileSystemFactory:
         self._state = state if state is not None else FileSystemState(config=config)
         self._fake_failures = {}
         self._write_records = write_records if write_records is not None else []
-        self._fs_cache = FsCache()
+        self._fs_cache = FsSharedState()
 
     def set_create_folders_will_error(self):
         self._fake_failures['create_folders_error'] = True
@@ -91,7 +91,7 @@ def fs_state_to_data(state: FileSystemState):
 class FakeFileSystem(ProductionFileSystem):
     unique_temp_filename_index = 0
 
-    def __init__(self, state, config, fake_failures, write_records, fs_cache: FsCache):
+    def __init__(self, state, config, fake_failures, write_records, fs_cache: FsSharedState):
         self.state = state
         self._config = config
         self._fake_failures = fake_failures
@@ -262,9 +262,6 @@ class FakeFileSystem(ProductionFileSystem):
         self._write_records.append(_Record('write_incoming_stream', lower_path))
         self.state.files[lower_path] = in_stream.description
         self._fs_cache.add_file(lower_path)
-
-    def cancel_ongoing_operations(self) -> None:
-        pass
 
     def unlink(self, path, verbose=True):
         full_path = self._path(path)

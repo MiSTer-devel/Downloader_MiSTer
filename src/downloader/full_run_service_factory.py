@@ -28,6 +28,7 @@ from downloader.free_space_reservation import LinuxFreeSpaceReservation, Unlimit
 from downloader.full_run_service import FullRunService
 from downloader.http_gateway import HttpGateway
 from downloader.importer_command import ImporterCommandFactory
+from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import DownloaderWorkerContext, make_downloader_worker_context
@@ -77,7 +78,8 @@ class FullRunServiceFactory:
         )
         atexit.register(http_gateway.cleanup)
         installation_report = InstallationReportImpl()
-        file_download_reporter = FileDownloadProgressReporter(self._logger, waiter, installation_report)
+        interrupts = Interruptions(file_system_factory)
+        file_download_reporter = FileDownloadProgressReporter(self._logger, waiter, interrupts, installation_report)
         job_system = JobSystem(
             reporter=DownloaderProgressReporter(self._logger, [file_download_reporter]),
             logger=self._logger,

@@ -44,13 +44,16 @@ class FileSystemFactory:
         self._logger = logger
         self._unique_temp_filenames: Set[Optional[str]] = set()
         self._unique_temp_filenames.add(None)
-        self._fs_cache = FsCache()
+        self._shared_state = FsSharedState()
 
     def create_for_system_scope(self) -> 'FileSystem':
         return self.create_for_config(self._config)
 
     def create_for_config(self, config) -> 'FileSystem':
-        return _FileSystem(config, self._path_dictionary, self._logger, self._unique_temp_filenames, self._fs_cache)
+        return _FileSystem(config, self._path_dictionary, self._logger, self._unique_temp_filenames, self._shared_state)
+
+    def cancel_ongoing_operations(self):
+        self._shared_state.interrupting_operations = True
 
 
 class FileSystem(ABC):
@@ -144,10 +147,6 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def cancel_ongoing_operations(self) -> None:
-        """interface"""
-
-    @abstractmethod
     def unlink(self, path: str, verbose: bool = True) -> bool:
         """interface"""
 
@@ -221,13 +220,12 @@ class FileWriteError(FsError): pass
 class FsTimeoutError(FsError): pass
 
 class _FileSystem(FileSystem):
-    def __init__(self, config: Dict[str, Any], path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], fs_cache: 'FsCache'):
+    def __init__(self, config: Dict[str, Any], path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], shared_state: 'FsSharedState'):
         self._config = config
         self._path_dictionary = path_dictionary
         self._logger = logger
         self._unique_temp_filenames = unique_temp_filenames
-        self._fs_cache = fs_cache
-        self._cancel_ongoing_operations = False
+        self._shared_state = shared_state
         self._quick_hit = 0
         self._slow_hit = 0
 
@@ -246,12 +244,12 @@ class _FileSystem(FileSystem):
 
     def is_file(self, path: str, use_cache: bool = True) -> bool:
         full_path = self._path(path)
-        if use_cache and self._fs_cache.contains_file(full_path):
+        if use_cache and self._shared_state.contains_file(full_path):
             self._quick_hit += 1
             return True
         elif os.path.isfile(full_path):
             self._slow_hit += 1
-            self._fs_cache.add_file(full_path)
+            self._shared_state.add_file(full_path)
             return True
 
         return False
@@ -270,7 +268,7 @@ class _FileSystem(FileSystem):
                 continue
 
             files = [f.path for f in os.scandir(full_folder_path) if f.is_file()]
-            self._fs_cache.add_many_files(files)
+            self._shared_state.add_many_files(files)
 
     def read_file_contents(self, path: str) -> str:
         full_path = self._path(path)
@@ -295,8 +293,8 @@ class _FileSystem(FileSystem):
         full_target = self._path(target)
         self._debug_log('Moving', (source, full_source), (target, full_target))
         os.replace(full_source, full_target)
-        self._fs_cache.remove_file(full_source)
-        self._fs_cache.add_file(full_target)
+        self._shared_state.remove_file(full_source)
+        self._shared_state.add_file(full_target)
 
     def copy(self, source: str, target: str) -> None:
         full_source = self._path(source)
@@ -307,7 +305,7 @@ class _FileSystem(FileSystem):
         except OSError as e:
             self._logger.debug(e)
             raise FileCopyError(f"Cannot copy '{source}' to '{target}'") from e
-        self._fs_cache.add_file(full_target)
+        self._shared_state.add_file(full_target)
 
     def copy_fast(self, source: str, target: str) -> None:
         full_source = self._path(source)
@@ -316,7 +314,7 @@ class _FileSystem(FileSystem):
         with open(full_source, 'rb') as fsource:
             with open(full_target, 'wb') as ftarget:
                 shutil.copyfileobj(fsource, ftarget, length=1024 * 1024 * 4)
-        self._fs_cache.add_file(full_target)
+        self._shared_state.add_file(full_target)
 
     def hash(self, path: str) -> str:
         try:
@@ -405,16 +403,13 @@ class _FileSystem(FileSystem):
                 if elapsed_time > timeout:
                     raise FsTimeoutError(f"Copy operation timed out after {timeout} seconds.")
 
-                if self._cancel_ongoing_operations:
+                if self._shared_state.interrupting_operations:
                     raise FsOperationsError("File system operations have been disabled.")
 
                 buf = in_stream.read(COPY_BUFSIZE)
                 if not buf:
                     break
                 out_file.write(buf)
-
-    def cancel_ongoing_operations(self) -> None:
-        self._cancel_ongoing_operations = True
 
     def unlink(self, path: str, verbose: bool = True) -> bool:
         verbose = verbose and not path.startswith('/tmp/')
@@ -487,7 +482,7 @@ class _FileSystem(FileSystem):
             self._debug_log('Removing', (path, full_path))
         try:
             Path(full_path).unlink()
-            self._fs_cache.remove_file(full_path)
+            self._shared_state.remove_file(full_path)
             return True
         except FileNotFoundError as _:
             return False
@@ -546,8 +541,11 @@ def _load_json(file_path: str) -> Dict[str, Any]:
         return json.loads(f.read())
 
 
-class FsCache:
-    def __init__(self): self._files: Set[str] = set()
+class FsSharedState:
+    def __init__(self):
+        self.interrupting_operations = False
+        self._files: Set[str] = set()
+
     def contains_file(self, path: str) -> bool: return path in self._files
 
     def add_many_files(self, paths: List[str]) -> None:

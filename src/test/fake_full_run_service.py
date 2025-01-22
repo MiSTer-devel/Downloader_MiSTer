@@ -24,6 +24,7 @@ from downloader.constants import K_DATABASES, K_DB_URL, K_SECTION, K_VERBOSE, K_
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.full_run_service import FullRunService as ProductionFullRunService
 from downloader.importer_command import ImporterCommandFactory
+from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import make_downloader_worker_context
@@ -70,7 +71,9 @@ class FullRunService(ProductionFullRunService):
         system_file_system = file_system_factory.create_for_system_scope()
         file_downloader_factory = file_downloader_factory or FileDownloaderFactory(file_system_factory=file_system_factory)
         linux_updater = linux_updater or LinuxUpdater(file_system=system_file_system, file_downloader_factory=file_downloader_factory)
-        file_download_reporter = file_download_reporter if file_download_reporter is not None else FileDownloadProgressReporter(NoLogger(), NoWaiter(), installation_report)
+        file_download_reporter = file_download_reporter if file_download_reporter is not None else FileDownloadProgressReporter(
+            NoLogger(), NoWaiter(), Interruptions(file_system_factory), installation_report
+        )
         job_system = job_system if job_system is not None else JobSystem(file_download_reporter, logger=NoLogger(), max_threads=1)
         super().__init__(config,
                          NoLogger(),
