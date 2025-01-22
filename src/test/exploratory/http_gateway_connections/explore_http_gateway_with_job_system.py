@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 from downloader.constants import K_DOWNLOADER_TIMEOUT
-from downloader.file_system import FileSystemFactory, FileSystem
+from downloader.file_system import FileSystemFactory
 from downloader.job_system import JobSystem, ProgressReporter, Job
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
@@ -35,7 +35,7 @@ from test.exploratory.http_gateway_connections.explore_http_gateway_with_real_ur
 
 
 class Reporter(ProgressReporter):
-    def __init__(self, fs: FileSystem):
+    def __init__(self, fs: FileSystemFactory):
         self._fs = fs
 
     def notify_work_in_progress(self) -> None: pass
@@ -60,18 +60,18 @@ class Reporter(ProgressReporter):
 
 def main() -> None:
     logger = PrintLogger.make_configured({'verbose': True, 'start_time': time.time()})
-    fs = FileSystemFactory({}, {}, logger=logger).create_for_system_scope()
+    fs = FileSystemFactory({}, {}, logger=logger)
     reporter = Reporter(fs)
     job_system = JobSystem(reporter=reporter, logger=logger, max_threads=20)
     job_system.set_interfering_signals([signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT])
 
     with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gw:
         job_system.register_worker(FetchFileJob2.type_id, FetchFileWorker2(
-            progress_reporter=reporter, file_system=fs, http_gateway=gw, config={K_DOWNLOADER_TIMEOUT: 600}
+            progress_reporter=reporter, file_system=fs.create_for_system_scope(), http_gateway=gw, config={K_DOWNLOADER_TIMEOUT: 600}
         ))
 
         dir_path = f'{os.path.dirname(os.path.realpath(__file__))}/job_system_delme'
-        fs.make_dirs(dir_path)
+        os.makedirs(dir_path, exist_ok=True)
 
         for i in range(20):
             for u in urls:
