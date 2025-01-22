@@ -36,13 +36,11 @@ class Logger(Protocol):
 
 
 class HttpGateway:
-    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: int, logger: Logger = None,
-                 create_http_connection: Callable[['_QueueId', int, ssl.SSLContext], Optional[HTTPConnection]] = None):
+    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: int, logger: Logger = None):
         now = time.time()
         self._ssl_ctx = ssl_ctx
         self._timeout = timeout
         self._logger = logger
-        self._create_http_connection = create_http_connection or _create_http_connection
         self._connections: Dict[_QueueId, _ConnectionQueue] = {}
         self._connections_lock = threading.Lock()
         self._clean_timeout_connections_timer = now
@@ -102,7 +100,7 @@ class HttpGateway:
         with self._url_redirects_lock: self._url_redirects.clear()
 
     def _request(self, url: str, parsed_url: ParseResult, method: str, body: Any, headers: Any, retry: int) -> Tuple[str, '_Connection', int]:
-        if retry > 2: time.sleep(2 ** retry * 0.0001)
+        if retry > 2: time.sleep(2 ** retry * 0.01)
         queue_id: _QueueId = self._process_queue_id((parsed_url.scheme, parsed_url.netloc))
         conn = self._take_connection(queue_id)
         try:
@@ -166,8 +164,7 @@ class HttpGateway:
     def _take_connection(self, queue_id: '_QueueId') -> '_Connection':
         with self._connections_lock:
             if queue_id not in self._connections:
-                self._connections[queue_id] = _ConnectionQueue(queue_id,self._timeout, self._ssl_ctx, self._logger,
-                                                               self._create_http_connection)
+                self._connections[queue_id] = _ConnectionQueue(queue_id,self._timeout, self._ssl_ctx, self._logger)
             return self._connections[queue_id].pull()
 
     def _clean_timeout_connections(self, now: float) -> None:
@@ -341,13 +338,11 @@ class _FinishedResponse: pass
 
 
 class _ConnectionQueue:
-    def __init__(self, queue_id: _QueueId, timeout: int, ctx: ssl.SSLContext, logger: Optional[Logger],
-                 create_http_connection: Callable[[_QueueId, int, ssl.SSLContext], Optional[HTTPConnection]]):
+    def __init__(self, queue_id: _QueueId, timeout: int, ctx: ssl.SSLContext, logger: Optional[Logger]):
         self.id = queue_id
         self._timeout = timeout
         self._ctx = ctx
         self._logger = logger
-        self._create_http_connection = create_http_connection
         self._queue: List[_Connection] = []
         self._queue_swap: List[_Connection] = []
         self._lock = threading.Lock()
@@ -357,7 +352,7 @@ class _ConnectionQueue:
         with self._lock:
             if len(self._queue) == 0:
                 self._last_conn_id += 1
-                http_conn = self._create_http_connection(self.id, self._timeout, self._ctx)
+                http_conn = create_http_connection(self.id[0], self.id[1], self._timeout, self._ctx)
                 return _Connection(conn_id=self._last_conn_id, http=http_conn, connection_queue=self, logger=self._logger)
             return self._queue.pop()
 
@@ -390,10 +385,11 @@ class _ConnectionQueue:
 
             return expired_count
 
-def _create_http_connection(queue_id: '_QueueId', timeout: int, ctx: ssl.SSLContext) -> HTTPConnection:
-    if queue_id[0] == 'http': return HTTPConnection(queue_id[1], timeout=timeout)
-    elif queue_id[0] == 'https': return HTTPSConnection(queue_id[1], timeout=timeout, context=ctx)
-    else: raise HttpGatewayException(f"Scheme {queue_id[0]} not supported")
+
+def create_http_connection(scheme: str, netloc: str, timeout: int, ctx: ssl.SSLContext) -> HTTPConnection:
+    if scheme == 'http': return HTTPConnection(netloc, timeout=timeout)
+    elif scheme == 'https': return HTTPSConnection(netloc, timeout=timeout, context=ctx)
+    else: raise HttpGatewayException(f"Scheme {scheme} not supported")
 
 
 class _ResponseHeaders:
@@ -408,7 +404,7 @@ class _ResponseHeaders:
         for k, v in headers:
             k = k.lower()
             if k not in _used_headers: continue
-            self._headers[k] = self._headers[k] + ',' + v if k in headers else v
+            self._headers[k] = self._headers[k] + ',' + v if k in self._headers else v
         self._version = version
 
     def redirect_params(self, status: int) -> Tuple[Optional[str], Optional[float]]:
@@ -427,7 +423,7 @@ class _ResponseHeaders:
                 if max_age <= 0:
                     return new_url, None
 
-                age = self._headers.get('age', '0')
+                age = self._headers.get('age', 0)
                 try:
                     age = int(age)
                 except Exception as e:
@@ -488,7 +484,7 @@ class _ParamsParser:
     def int(self, key: str) -> Optional[int]:
         if key not in self._data: return None
         try:
-            return int(self._data[key])
+            return int(self._data[key].strip('\"\''))
         except Exception as e:
             if self._logger is not None: self._logger.debug(f"ERROR! Could not parse int '{key}' from: {self._data[key]}", e)
             return None
