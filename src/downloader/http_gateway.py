@@ -125,7 +125,8 @@ class HttpGateway:
     def _follow_move(self, conn: '_Connection', queue_id: '_QueueId', url: str, parsed_url: ParseResult) -> Tuple[str, ParseResult]:
         location, redirect_timeout = conn.response_headers.redirect_params(conn.response.status)
         if location is None:
-            raise HttpGatewayException('Invalid header response during Resource moved response at ' + url)
+            if self._logger is not None: self._logger.debug(f"Invalid header on resource moved response at: {url}")
+            return url, parsed_url
 
         if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}! Resource moved: {url} -> {location} [{describe_time(time.time())}]\n\n')
         conn.finish_response()
