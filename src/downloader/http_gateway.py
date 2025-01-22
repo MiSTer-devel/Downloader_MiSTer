@@ -24,7 +24,7 @@ from contextlib import contextmanager
 from email.utils import parsedate_to_datetime
 from typing import Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar
 from urllib.parse import urlparse, ParseResult, urlunparse
-from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException, HTTPMessage
+from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
 
 
 T = TypeVar('T')
@@ -280,7 +280,7 @@ class _Connection:
         self._http.request(method, url, headers=headers, body=body)
         self._uses += 1
         self._response = self._http.getresponse()
-        self._response_headers.set_headers(self._response.headers, self._response.version)
+        self._response_headers.set_headers(self._response.getheaders(), self._response.version)
         self._handle_keep_alive()
 
     def kill(self) -> None:
@@ -393,32 +393,30 @@ class _ConnectionQueue:
             if self._logger: self._logger.debug(f"Scheme {scheme} not supported. Using default HTTPConnection.")
             return HTTPConnection(netloc, timeout=self._timeout)
 
-
 class _FinishedResponse: pass
 
 
 class _ResponseHeaders:
     def __init__(self, logger: Optional[Logger]):
         self._logger = logger
-        self._headers: Optional[HTTPMessage] = None
+        self._headers: Dict[str, str] = {}
         self._version = 11
         self._params_parser = _ParamsParser(logger)
 
-    def set_headers(self, headers: HTTPMessage, version: int) -> None:
-        self._headers = headers
+    def set_headers(self, headers: List[Tuple[str, str]], version: int) -> None:
+        self._headers.clear()
+        for k, v in headers:
+            k = k.lower()
+            if k not in _used_headers: continue
+            self._headers[k] = self._headers[k] + ',' + v if k in headers else v
         self._version = version
 
-    @property
-    def headers(self) -> HTTPMessage:
-        if self._headers is None: raise HttpGatewayException('Set headers before accessing them.')
-        return self._headers
-
     def redirect_params(self, status: int) -> Tuple[Optional[str], Optional[float]]:
-        new_url = self.headers.get('location', None)
+        new_url = self._headers.get('location', None)
         if new_url is None:
             return None, None
 
-        cache_control = self.headers.get('cache-control', None)
+        cache_control = self._headers.get('cache-control', None)
         if cache_control is not None:
             self._params_parser.parse(cache_control)
             if self._params_parser.bool('no-cache') or self._params_parser.bool('no-store'):
@@ -429,7 +427,7 @@ class _ResponseHeaders:
                 if max_age <= 0:
                     return new_url, None
 
-                age = self.headers.get('age', '0')
+                age = self._headers.get('age', '0')
                 try:
                     age = int(age)
                 except Exception as e:
@@ -440,7 +438,7 @@ class _ResponseHeaders:
 
             pass
 
-        expires = self.headers.get('expires', None)
+        expires = self._headers.get('expires', None)
         if expires is not None:
             try:
                 return new_url, parsedate_to_datetime(expires).timestamp()
@@ -453,15 +451,17 @@ class _ResponseHeaders:
         return new_url, None  # Temporary redirects, no cache by default
 
     def is_keep_alive_connection(self):
-        connection = self.headers.get('connection', '').lower()
+        connection = self._headers.get('connection', '').lower()
         is_keep_alive = (self._version == 10 and connection == 'keep-alive') or (self._version >= 11 and connection != 'close')
         return is_keep_alive
 
     def keep_alive_params(self) -> Tuple[Optional[float], Optional[float]]:
-        keep_alive_header = self.headers.get('keep-alive', None)
+        keep_alive_header = self._headers.get('keep-alive', None)
         if keep_alive_header is None: return None, None
         self._params_parser.parse(keep_alive_header)
         return self._params_parser.int('timeout'), self._params_parser.int('max')
+
+_used_headers = {'location', 'cache-control', 'age', 'expires', 'connection', 'keep-alive'}
 
 
 class _ParamsParser:
@@ -474,8 +474,8 @@ class _ParamsParser:
         self._data.clear()
         for p in source.lower().split(','):
             kv = p.split('=')
-            if len(kv) == 1: self._data[kv[0]] = True
-            elif len(kv) == 2: self._data[kv[0]] =  kv[1]
+            if len(kv) == 1: self._data[kv[0].strip()] = True
+            elif len(kv) == 2: self._data[kv[0].strip()] = kv[1].strip()
             elif self._logger is not None: self._logger.debug(f"ERROR! Could not parse param '{p}' from: {source}")
         return self
 
