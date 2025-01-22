@@ -22,7 +22,7 @@ import threading
 import time
 from contextlib import contextmanager
 from email.utils import parsedate_to_datetime
-from typing import Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar
+from typing import Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar, Callable
 from urllib.parse import urlparse, ParseResult, urlunparse
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
 
@@ -31,16 +31,18 @@ T = TypeVar('T')
 class HttpGatewayException(Exception): pass
 
 class Logger(Protocol):
-    def print(self, msg: str) -> None: ...
-    def debug(self, msg: str, e: Exception = None) -> None: ...
+    def print(self, *args: Any) -> None: ...
+    def debug(self, *args: Any) -> None: ...
 
 
 class HttpGateway:
-    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: int, logger: Logger = None):
+    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: int, logger: Logger = None,
+                 create_http_connection: Callable[['_QueueId', int, ssl.SSLContext], Optional[HTTPConnection]] = None):
         now = time.time()
         self._ssl_ctx = ssl_ctx
         self._timeout = timeout
         self._logger = logger
+        self._create_http_connection = create_http_connection or _create_http_connection
         self._connections: Dict[_QueueId, _ConnectionQueue] = {}
         self._connections_lock = threading.Lock()
         self._clean_timeout_connections_timer = now
@@ -57,7 +59,7 @@ class HttpGateway:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None and self._logger is not None:
-            self._logger.print(f"An exception of type {exc_type} occurred with value {exc_val}. Traceback: {exc_tb}")
+            self._logger.debug(f"An exception of type {exc_type} occurred with value {exc_val}. Traceback: {exc_tb}")
 
         self.cleanup()
         return False
@@ -86,7 +88,7 @@ class HttpGateway:
             yield final_url, conn.response
         finally:
             conn.finish_response()
-            if self._logger is not None: self._logger.debug(f'|||| Done {describe_time(t := time.time())}: {final_url} ({t - now:.3f}s)')
+            if self._logger is not None: self._logger.print(f'|||| Done {describe_time(t := time.time())}: {final_url} ({t - now:.3f}s)')
 
     def cleanup(self) -> None:
         total_cleared = 0
@@ -160,7 +162,8 @@ class HttpGateway:
     def _take_connection(self, queue_id: '_QueueId') -> '_Connection':
         with self._connections_lock:
             if queue_id not in self._connections:
-                self._connections[queue_id] = _ConnectionQueue(queue_id, self._timeout, self._ssl_ctx, self._logger)
+                self._connections[queue_id] = _ConnectionQueue(queue_id,self._timeout, self._ssl_ctx, self._logger,
+                                                               self._create_http_connection)
             return self._connections[queue_id].pull()
 
     def _clean_timeout_connections(self, now: float) -> None:
@@ -330,13 +333,17 @@ class _Connection:
         if keep_alive_timeout is not None: self._timeout = keep_alive_timeout
         if keep_alive_max is not None: self._max_uses = keep_alive_max
 
+class _FinishedResponse: pass
+
 
 class _ConnectionQueue:
-    def __init__(self, queue_id: _QueueId, timeout: int, ctx: ssl.SSLContext, logger: Optional[Logger]):
+    def __init__(self, queue_id: _QueueId, timeout: int, ctx: ssl.SSLContext, logger: Optional[Logger],
+                 create_http_connection: Callable[[_QueueId, int, ssl.SSLContext], Optional[HTTPConnection]]):
         self.id = queue_id
         self._timeout = timeout
         self._ctx = ctx
         self._logger = logger
+        self._create_http_connection = create_http_connection
         self._queue: List[_Connection] = []
         self._queue_swap: List[_Connection] = []
         self._lock = threading.Lock()
@@ -346,11 +353,10 @@ class _ConnectionQueue:
         with self._lock:
             if len(self._queue) == 0:
                 self._last_conn_id += 1
+                conn = self._create_http_connection(self.id, self._timeout, self._ctx)
+                if conn is None and self._logger is not None: self._logger.debug(f"Scheme {self.id[0]} not supported. Using default HTTPConnection.")
                 return _Connection(
-                    conn_id=self._last_conn_id,
-                    http=self._create_http_connection(),
-                    connection_queue=self,
-                    logger=self._logger
+                    conn_id=self._last_conn_id, http=conn, connection_queue=self, logger=self._logger
                 )
             return self._queue.pop()
 
@@ -383,17 +389,10 @@ class _ConnectionQueue:
 
             return expired_count
 
-    def _create_http_connection(self) -> HTTPConnection:
-        scheme, netloc = self.id[0], self.id[1]
-        if scheme == 'http':
-            return HTTPConnection(netloc, timeout=self._timeout)
-        elif scheme == 'https':
-            return HTTPSConnection(netloc, timeout=self._timeout, context=self._ctx)
-        else:
-            if self._logger: self._logger.debug(f"Scheme {scheme} not supported. Using default HTTPConnection.")
-            return HTTPConnection(netloc, timeout=self._timeout)
-
-class _FinishedResponse: pass
+def _create_http_connection(queue_id: '_QueueId', timeout: int, ctx: ssl.SSLContext) -> Optional[HTTPConnection]:
+    if queue_id[0] == 'http': return HTTPConnection(queue_id[1], timeout=timeout)
+    elif queue_id[0] == 'https': return HTTPSConnection(queue_id[1], timeout=timeout, context=ctx)
+    else: return None
 
 
 class _ResponseHeaders:
