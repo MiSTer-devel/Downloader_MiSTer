@@ -77,7 +77,7 @@ def main() -> None:
             progress_reporter=reporter, file_system=fs.create_for_system_scope(), http_gateway=gw, config={K_DOWNLOADER_TIMEOUT: 600}
         ))
 
-        dir_path = f'{os.path.dirname(os.path.realpath(__file__))}/job_system_delme'
+        dir_path = f'{os.path.dirname(os.path.realpath(__file__))}/delme'
         os.makedirs(dir_path, exist_ok=True)
 
         for i in range(20):
