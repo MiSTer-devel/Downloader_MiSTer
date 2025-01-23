@@ -27,8 +27,8 @@ from pathlib import Path
 from shutil import copyfileobj
 from typing import List
 
-from downloader.logger import PrintLogger
-from downloader.http_gateway import HttpGateway, describe_time
+from downloader.logger import PrintLogger, describe_time
+from downloader.http_gateway import HttpGateway
 
 urls = [
     'https://google.com',
