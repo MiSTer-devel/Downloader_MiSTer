@@ -23,12 +23,11 @@ import ssl
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, Future
+from datetime import datetime
 from pathlib import Path
-from shutil import copyfileobj
 from typing import List
 
-from downloader.logger import PrintLogger, describe_time
-from downloader.http_gateway import HttpGateway
+from downloader.http_gateway import HttpGateway, Logger
 
 urls = [
     'https://google.com',
@@ -51,46 +50,68 @@ urls = [
     'https://archive.org/download/publicmovies212/Charlie_Chaplin_Caught_in_a_Caberet.mp4',
 ]
 
+class LoggerImpl(Logger):
+    def debug(self, *args): self.print(*args)
+    def print(self, *args):
+        t = datetime.now().isoformat(' ', 'seconds') + '| '
+        print(t, *[a.replace('\n', '\n' + t) if isinstance(a, str) else a for a in args])
+
+
+COPY_BUFSIZE = 1024 * 1024 if os.name == 'nt' else 64 * 1024
 
 def main() -> None:
+    logger = LoggerImpl()
     signals = [signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT]
     signal_handlers = [(s, signal.getsignal(s)) for s in signals]
 
     futures: List[Future[None]] = []
     interrupted = False
     cancelled = 0
-    def cleanup(interrupt: bool):
-        nonlocal interrupted, futures, cancelled
-        if interrupt: print('\n\n>>>>>>>>>>>>> INTERRUPTED!! CLEANING UP!\n\n')
+    dir_path = f'{os.path.dirname(os.path.realpath(__file__))}/delme'
 
-        for fut in futures:
-            if fut.done():
-                e = fut.exception()
-                if e is not None:
-                    print(f'>>>>>>>>>>>>> TASK FAILED!! {describe_time(time.time())}', e)
-            elif not fut.running():
-                if fut.cancel():
-                    cancelled += 1
+    with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gateway:
+        def fetch_url(input_url: str):
+            nonlocal interrupted, gateway, dir_path
+            with gateway.open(input_url) as (url, res):
+                if res.status == 200:
+                    with open(f'{dir_path}/{threading.get_ident()}_{Path(url).name[-30:]}', 'wb') as out_file:
+                        fsrc_read = res.read
+                        fdst_write = out_file.write
+                        while (buf := fsrc_read(COPY_BUFSIZE)) and not interrupted:
+                            fdst_write(buf)
 
-        futures = []
-        interrupted = True
+        def cleanup(interrupt: bool):
+            nonlocal interrupted, futures, cancelled, gateway
+            if interrupt:
+                logger.print('\n\n>>>>>>>>>>>>> INTERRUPTED!! CLEANING UP!\n\n')
+                gateway.cleanup()
 
-    def handle_interrupt(signum, frame, phandler):
-        cleanup(True)
-        if phandler: phandler(signum, frame)
+            for fut in futures:
+                if fut.done():
+                    e = fut.exception()
+                    if e is not None:
+                        logger.print(f'>>>>>>>>>>>>> TASK FAILED!!', e)
+                        logger.print(e)
+                elif not fut.running():
+                    if fut.cancel():
+                        cancelled += 1
 
-    for sig, cb in signal_handlers:
-        signal.signal(sig, lambda s, fr: handle_interrupt(s, fr, cb))
+            futures = []
+            interrupted = True
 
-    try:
-        logger = PrintLogger.make_configured({'verbose': True, 'start_time': time.time()})
-        dir_path = f'{os.path.dirname(os.path.realpath(__file__))}/delme'
-        os.makedirs(dir_path, exist_ok=True)
+        def handle_interrupt(signum, frame, phandler):
+            cleanup(True)
+            if phandler: phandler(signum, frame)
 
-        start = time.time()
-        with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gateway:
+        for sig, cb in signal_handlers:
+            signal.signal(sig, lambda s, fr: handle_interrupt(s, fr, cb))
+
+        try:
+            os.makedirs(dir_path, exist_ok=True)
+
+            start = time.monotonic()
             with ThreadPoolExecutor(max_workers=20) as thread_executor:
-                futures = [thread_executor.submit(fetch_url, gateway, input_url, dir_path) for input_url in urls * 20]
+                futures = [thread_executor.submit(fetch_url, input_url) for input_url in urls * 20]
 
                 while len(futures) > 0 and not interrupted:
                     next_futures = []
@@ -98,7 +119,7 @@ def main() -> None:
                         if f.done():
                             future_exception = f.exception()
                             if future_exception is not None:
-                                print(f'>>>>>>>>>>>>> TASK FAILED!! {describe_time(time.time())}', future_exception)
+                                logger.print(f'>>>>>>>>>>>>> TASK FAILED!!', future_exception)
                         else:
                             next_futures.append(f)
 
@@ -107,22 +128,15 @@ def main() -> None:
 
                 cleanup(False)
 
-        end = time.time()
-        print()
-        print()
-        print(f'Time: {end - start}s')
-        print(f'Cancelled {cancelled} tasks.')
+            end = time.monotonic()
+            print()
+            print()
+            print(f'Time: {end - start}s')
+            print(f'Cancelled {cancelled} tasks.')
 
-    finally:
-        for sig, cb in signal_handlers:
-            signal.signal(sig, cb)
-
-
-def fetch_url(gateway: HttpGateway, input_url: str, dir_path: str):
-    with gateway.open(input_url) as (url, res):
-        if res.status == 200:
-            with open(f'{dir_path}/{threading.get_ident()}_{Path(url).name[-30:]}', 'wb') as out_file:
-                copyfileobj(res, out_file)
+        finally:
+            for sig, cb in signal_handlers:
+                signal.signal(sig, cb)
 
 
 if __name__ == '__main__':
