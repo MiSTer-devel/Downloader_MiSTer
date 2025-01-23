@@ -319,19 +319,22 @@ class JobSystem(JobContext):
                     if isinstance(future_exception, Exception):
                         self._report_job_failed(package, future_exception)
                     else:
-                        self._logger.print(f'CRITICAL! Unexpected exception while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {future_exception}')
+                        self._logger.print(f'Unknown exception "{type(future_exception).__name__}" while canceling job {package.job.type_id}|{package.job.__class__.__name__}: {future_exception}')
 
     def _handle_exception(self, package: '_JobPackage', e: BaseException):
         if isinstance(e, _JobError):
             self._retry_package(package, e.child)
+        elif isinstance(e, JobCancelled):
+            package.tries = self._max_tries + 1
+            self._retry_package(package, e)
         elif isinstance(e, JobSystemAbortException):
             self._logger.print(f'Unexpected system abort while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
             raise e
         elif isinstance(e, Exception) and self._retry_unexpected_exceptions:
-            self._logger.print(f'Unexpected exception while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
+            self._logger.print(f'Unexpected exception "{type(e).__name__}" while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
             self._retry_package(package, e)
         else:
-            self._logger.print(f'CRITICAL! Unexpected exception while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
+            self._logger.print(f'CRITICAL! Unexpected exception "{type(e).__name__}" while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
             raise e
 
     def _check_clock(self) -> None:
@@ -359,8 +362,11 @@ class JobSystem(JobContext):
 
     def _signal_handler(self, previous_handler: Callable[[int, Optional[FrameType]], Any], sig: int, frame: Optional[FrameType]) -> None:
         try:
-            self._logger.print('SIGNAL RECEIVED!')
-            self._logger.print('SHUTTING DOWN, PLEASE WAIT...')
+            self._logger.print(f"SIGNAL '{signal.strsignal(sig)}' RECEIVED!")
+            for thread_name, stack in stacks_from_all_threads().items():
+                self._logger.print(f"Thread: {thread_name} [{len(stack)}]")
+                for entry in stack: self._logger.print(f"  {entry['file']}:{entry['line']} ({entry['func']})")
+            self._logger.print('SHUTTING DOWN...')
             self.cancel_pending_jobs()
         except Exception as e:
             self._logger.print('CANCELING PENDING JOBS FAILED!', sig, e)
@@ -491,8 +497,8 @@ class JobCancelled(Exception): pass
 
 
 class JobSystemLogger(Protocol):
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
-        """Prints a message to the logger."""
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True): """Prints a message to the logger."""
+    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=True): """Prints a message to the logger."""
 
 
 @dataclass
@@ -512,3 +518,27 @@ class _JobError(Exception):
     def __init__(self, child: Exception):
         super().__init__(child)
         self.child = child
+
+
+def stacks_from_all_threads() -> dict:
+    try:
+        current_frames = sys._current_frames()
+    except Exception as _e:
+        return {}
+
+    thread_stacks = {}
+    for thread in threading.enumerate():
+        if thread.ident not in current_frames: continue
+        stack = []
+        current_frame: Optional[FrameType] = current_frames[thread.ident]
+        while current_frame:
+            stack.append({
+                "file": current_frame.f_code.co_filename,
+                "line": current_frame.f_lineno,
+                "func": current_frame.f_code.co_name
+            })
+            current_frame = current_frame.f_back
+
+        thread_stacks[thread.name] = stack[::-1]
+
+    return thread_stacks

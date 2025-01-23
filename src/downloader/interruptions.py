@@ -16,12 +16,16 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from typing import Optional
 from downloader.file_system import FileSystemFactory
+from downloader.http_gateway import HttpGateway
 
 
 class Interruptions:
-    def __init__(self, fs: FileSystemFactory):
+    def __init__(self, fs: Optional[FileSystemFactory] = None, gw: Optional[HttpGateway] = None):
         self._fs = fs
+        self._gw = gw
 
     def interrupt(self):
-        self._fs.cancel_ongoing_operations()
+        if self._fs: self._fs.cancel_ongoing_operations()
+        if self._gw: self._gw.cleanup()
