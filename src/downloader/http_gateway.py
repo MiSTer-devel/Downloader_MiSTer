@@ -97,7 +97,7 @@ class HttpGateway:
             for queue in self._connections.values():
                 total_cleared += queue.clear_all()
             self._connections.clear()
-        if self._logger is not None: self._logger.debug(f'Cleaning up {total_cleared} connections.')
+        if self._logger is not None and total_cleared > 0: self._logger.debug(f'Cleaning up {total_cleared} connections.')
         with self._queue_redirects_lock: self._queue_redirects.clear()
         with self._url_redirects_lock: self._url_redirects.clear()
 
