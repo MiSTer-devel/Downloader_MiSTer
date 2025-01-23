@@ -30,15 +30,16 @@ from downloader.file_system import FileSystemFactory
 from downloader.job_system import JobSystem, ProgressReporter, Job, JobCancelled
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
-from downloader.logger import PrintLogger
-from downloader.http_gateway import HttpGateway, describe_time
+from downloader.logger import PrintLogger, DescribeNowDecorator, Logger
+from downloader.http_gateway import HttpGateway
 from test.exploratory.http_gateway_connections.explore_http_gateway_with_real_urls import urls
 
 
 class Reporter(ProgressReporter):
-    def __init__(self, fs: FileSystemFactory, gw: HttpGateway):
+    def __init__(self, fs: FileSystemFactory, gw: HttpGateway, logger: Logger):
         self._fs = fs
         self._gw = gw
+        self._logger = logger
         self.cancelled = False
 
     def notify_work_in_progress(self) -> None: pass
@@ -49,26 +50,26 @@ class Reporter(ProgressReporter):
     failed: List[Tuple[FetchFileJob2, Exception]] = []
 
     def notify_job_completed(self, job: FetchFileJob2) -> None:
-        print(f'>>>>>> COMPLETED! {job.info} [{describe_time(time.time())}]')
+        self._logger.print(f'>>>>>> COMPLETED! {job.info}')
         self.completed.append(job)
 
     def notify_job_failed(self, job: FetchFileJob2, exception: Exception) -> None:
-        print(f'>>>>>> FAILED! {job.info} [{describe_time(time.time())}]', exception)
+        self._logger.print(f'>>>>>> FAILED! {job.info}', exception)
         self.failed.append((job, exception))
 
     def notify_cancelled_pending_jobs(self) -> None:
-        print(f">>>>>> CANCELING PENDING JOBS!")
+        self._logger.print(f">>>>>> CANCELING PENDING JOBS!")
         self._fs.cancel_ongoing_operations()
         self._gw.cleanup()
         self.cancelled = True
 
 
 def main() -> None:
-    logger = PrintLogger.make_configured({'verbose': True, 'start_time': time.time()})
+    logger = DescribeNowDecorator(PrintLogger.make_configured({'verbose': True, 'start_time': time.time()}))
     with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gw:
 
         fs = FileSystemFactory({}, {}, logger=logger)
-        reporter = Reporter(fs, gw)
+        reporter = Reporter(fs, gw, logger=logger)
         job_system = JobSystem(reporter=reporter, logger=logger, max_threads=20)
         job_system.set_interfering_signals([signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT])
 

@@ -16,11 +16,14 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import datetime
+import re
 import tempfile
 import sys
 import time
 import traceback
 from abc import abstractmethod, ABC
+from pathlib import Path
+from typing import List, Any
 
 from downloader.constants import K_VERBOSE, K_START_TIME
 
@@ -56,6 +59,7 @@ class PrintLogger(Logger):
     def __init__(self):
         self._verbose_mode = False
         self._start_time = None
+        self._describe_now = False
 
     def configure(self, config):
         if config[K_VERBOSE]:
@@ -166,3 +170,32 @@ class DebugOnlyLoggerDecorator(Logger):
 
     def finalize(self):
         self._decorated_logger.finalize()
+
+
+# @TODO: Consider moving this one to test code
+class DescribeNowDecorator(Logger):
+    def __init__(self, decorated_logger):
+        self._re = re.compile(r'^ */[^:]+:\d+.*$')  # Matches paths such as /asd/bef/df:34
+        self._decorated_logger = decorated_logger
+
+    def configure(self, config): self._decorated_logger.configure(config)
+    def bench(self, label): self._decorated_logger.bench(label)
+    def finalize(self): self._decorated_logger.finalize()
+
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
+        self._decorated_logger.print(*self._handle_args([*args]), sep=sep, end=end, flush=True)
+
+    def debug(self, *args, sep='', end='\n', flush=True):
+        self._decorated_logger.debug(*self._handle_args([*args]), sep=sep, end=end, flush=True)
+
+    def _handle_args(self, args: List[Any]) -> List[Any]:
+        header = describe_time(time.time())
+        for i in range(len(args)):
+            if isinstance(args[i], str) and not self._re.fullmatch(args[i]):
+                args[i] = f"{header}| {args[i].replace('\n', f"\n{header}| ")}"
+
+        return args
+
+
+
+def describe_time(t: float) -> str: return time.strftime(f'%Y-%m-%d %H:%M:%S.{t % 1 * 1000:03.0f}', time.localtime(t))
