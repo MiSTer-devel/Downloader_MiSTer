@@ -101,7 +101,7 @@ def main() -> None:
 
         def handle_interrupt(signum, frame, phandler):
             cleanup(True)
-            if phandler: phandler(signum, frame)
+            if callable(phandler): phandler(signum, frame)
 
         for sig, cb in signal_handlers:
             signal.signal(sig, lambda s, fr: handle_interrupt(s, fr, cb))
