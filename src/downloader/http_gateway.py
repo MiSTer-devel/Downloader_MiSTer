@@ -74,13 +74,12 @@ class HttpGateway:
         url = self._process_url(url)
         parsed_url = urlparse(url)
         if parsed_url.scheme not in {'http', 'https'}: raise HttpGatewayException(f"URL '{url}' has wrong scheme '{parsed_url.scheme}'.")
-        final_url, conn, _ = self._request(
+        final_url, conn = self._request(
             url,
             parsed_url,
             method,
             body,
             headers or _default_headers,
-            0
         )
         if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}: {final_url}\n'
                                                         f'1st byte @ {time.monotonic() - now:.3f}s\nvvvv\n')
@@ -101,29 +100,28 @@ class HttpGateway:
         with self._queue_redirects_lock: self._queue_redirects.clear()
         with self._url_redirects_lock: self._url_redirects.clear()
 
-    def _request(self, url: str, parsed_url: ParseResult, method: str, body: Any, headers: Any, retry: int) -> Tuple[str, '_Connection', int]:
-        if retry > 2: time.sleep(2 ** retry * 0.01)
-        queue_id: _QueueId = self._process_queue_id((parsed_url.scheme, parsed_url.netloc))
-        conn = self._take_connection(queue_id)
-        if self._out_of_service: raise HttpGatewayException(f'{HttpGateway.__name__} out of service.')
-        try:
-            conn.do_request(method, str(urlunparse(parsed_url)), body, headers)
-        except (HTTPException, OSError) as e:
-            conn.kill()
-            if retry < 10:
-                if self._logger is not None: self._logger.debug(f'HTTP Exception! {type(e).__name__} ({retry}) [{url}] {str(e)}\n'
-                                                                f'Killed "{parsed_url.scheme}://{parsed_url.netloc}" connection {conn.id}.\n')
-                return self._request(url, parsed_url, method, body, headers, retry + 1)
+    def _request(self, url: str, parsed_url: ParseResult, method: str, body: Any, headers: Any) -> Tuple[str, '_Connection']:
+        for retry in range(11):
+            queue_id: _QueueId = self._process_queue_id((parsed_url.scheme, parsed_url.netloc))
+            conn = self._take_connection(queue_id)
+            if self._out_of_service: raise HttpGatewayException(f'{HttpGateway.__name__} out of service.')
+            try:
+                conn.do_request(method, str(urlunparse(parsed_url)), body, headers)
+            except (HTTPException, OSError) as e:
+                conn.kill()
+                if retry >= 10: raise e
+                elif self._logger is not None: self._logger.debug(f'HTTP Exception! {type(e).__name__} ({retry}) [{url}] {str(e)}\n'
+                                                                  f'Killed "{parsed_url.scheme}://{parsed_url.netloc}" connection {conn.id}.\n')
+                if retry >= 3: time.sleep(2 ** retry * 0.01)  # Exponential backoff starting on fourth retry after a failure
             else:
-                raise e
+                if self._logger is not None: self._logger.debug(conn.describe())
+                is_resource_moved = 300 <= conn.response.status < 400
+                if not is_resource_moved:
+                    break  # If the resource is not moved, we got a final response already
 
-        if self._logger is not None: self._logger.debug(conn.describe())
+                url, parsed_url = self._follow_move(conn, queue_id, url, parsed_url)
 
-        if 300 <= conn.response.status < 400 and retry < 10:
-            location, parsed_location = self._follow_move(conn, queue_id, url, parsed_url)
-            return self._request(location, parsed_location, method, body, headers, retry + 1)
-
-        return url, conn, retry
+        return url, conn
 
     def _follow_move(self, conn: '_Connection', queue_id: '_QueueId', url: str, parsed_url: ParseResult) -> Tuple[str, ParseResult]:
         location, redirect_timeout = conn.response_headers.redirect_params(conn.response.status)
