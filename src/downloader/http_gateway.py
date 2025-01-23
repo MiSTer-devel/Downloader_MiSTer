@@ -52,6 +52,7 @@ class HttpGateway:
         self._redirects_swap: Dict[T, _Redirect[T]] = {}
         self._clean_timeout_redirects_timer = now
         self._clean_timeout_redirects_lock = threading.Lock()
+        self._out_of_service = False
 
     def __enter__(self): return self
 
@@ -90,6 +91,7 @@ class HttpGateway:
             if self._logger is not None: self._logger.print(f'|||| Done: {final_url} ({time.monotonic() - now:.3f}s)')
 
     def cleanup(self) -> None:
+        self._out_of_service = True
         total_cleared = 0
         with self._connections_lock:
             for queue in self._connections.values():
@@ -103,6 +105,7 @@ class HttpGateway:
         if retry > 2: time.sleep(2 ** retry * 0.01)
         queue_id: _QueueId = self._process_queue_id((parsed_url.scheme, parsed_url.netloc))
         conn = self._take_connection(queue_id)
+        if self._out_of_service: raise HttpGatewayException(f'{HttpGateway.__name__} out of service.')
         try:
             conn.do_request(method, str(urlunparse(parsed_url)), body, headers)
         except (HTTPException, OSError) as e:
