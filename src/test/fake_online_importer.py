@@ -77,7 +77,8 @@ class OnlineImporter(ProductionOnlineImporter):
 
         self.dbs = []
         installation_report = InstallationReportImpl()
-        self._file_download_reporter = FileDownloadProgressReporter(logger, waiter, Interruptions(file_system_factory), installation_report)
+        http_gateway = FakeHttpGateway(self._config, network_state or NetworkState())
+        self._file_download_reporter = FileDownloadProgressReporter(logger, waiter, Interruptions(fs=file_system_factory, gw=http_gateway), installation_report)
         self._report_tracker = ProgressReporterTracker(self._file_download_reporter)
         self._job_system = JobSystem(self._report_tracker, logger=logger, max_threads=1, retry_unexpected_exceptions=False)
         external_drives_repository = ExternalDrivesRepository(file_system=self.file_system)
@@ -85,7 +86,7 @@ class OnlineImporter(ProductionOnlineImporter):
             job_ctx=self._job_system,
             waiter=waiter,
             logger=logger,
-            http_gateway=FakeHttpGateway(self._config, network_state or NetworkState()),
+            http_gateway=http_gateway,
             file_system=self.file_system,
             target_path_repository=None,
             progress_reporter=self._report_tracker,

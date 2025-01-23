@@ -21,12 +21,13 @@ import os
 import signal
 import ssl
 import time
+import sys
 from pathlib import Path
 from typing import List, Tuple
 
 from downloader.constants import K_DOWNLOADER_TIMEOUT
 from downloader.file_system import FileSystemFactory
-from downloader.job_system import JobSystem, ProgressReporter, Job
+from downloader.job_system import JobSystem, ProgressReporter, Job, JobCancelled
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
 from downloader.logger import PrintLogger
@@ -35,8 +36,10 @@ from test.exploratory.http_gateway_connections.explore_http_gateway_with_real_ur
 
 
 class Reporter(ProgressReporter):
-    def __init__(self, fs: FileSystemFactory):
+    def __init__(self, fs: FileSystemFactory, gw: HttpGateway):
         self._fs = fs
+        self._gw = gw
+        self.cancelled = False
 
     def notify_work_in_progress(self) -> None: pass
     def notify_job_retried(self, job: Job, exception: Exception) -> None: pass
@@ -56,16 +59,19 @@ class Reporter(ProgressReporter):
     def notify_cancelled_pending_jobs(self) -> None:
         print(f">>>>>> CANCELING PENDING JOBS!")
         self._fs.cancel_ongoing_operations()
+        self._gw.cleanup()
+        self.cancelled = True
 
 
 def main() -> None:
     logger = PrintLogger.make_configured({'verbose': True, 'start_time': time.time()})
-    fs = FileSystemFactory({}, {}, logger=logger)
-    reporter = Reporter(fs)
-    job_system = JobSystem(reporter=reporter, logger=logger, max_threads=20)
-    job_system.set_interfering_signals([signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT])
-
     with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gw:
+
+        fs = FileSystemFactory({}, {}, logger=logger)
+        reporter = Reporter(fs, gw)
+        job_system = JobSystem(reporter=reporter, logger=logger, max_threads=20)
+        job_system.set_interfering_signals([signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT])
+
         job_system.register_worker(FetchFileJob2.type_id, FetchFileWorker2(
             progress_reporter=reporter, file_system=fs.create_for_system_scope(), http_gateway=gw, config={K_DOWNLOADER_TIMEOUT: 600}
         ))
@@ -96,13 +102,15 @@ def main() -> None:
     print()
     print('Failed jobs: ')
     for failed, e in reporter.failed:
-        print(failed.info, e)
+        if isinstance(e, JobCancelled): continue
+        print(failed, e)
 
     print()
     print('Completed jobs: ' + str(len(reporter.completed)))
     print('Failed jobs: ' + str(len(reporter.failed)))
     print()
     print(f'Time: {end - start}s')
+    if reporter.cancelled: sys.exit(1)
 
 if __name__ == '__main__':
     main()

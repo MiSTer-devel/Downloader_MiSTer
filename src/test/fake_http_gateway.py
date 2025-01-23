@@ -1,5 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-
+import ssl
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -19,6 +19,7 @@
 from typing import Dict, Any, Tuple, Generator, Optional
 from contextlib import contextmanager
 
+from downloader.http_gateway import HttpGateway
 from downloader.job_system import Job
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
@@ -26,8 +27,9 @@ from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from test.objects import binary_content
 
 
-class FakeHttpGateway:
+class FakeHttpGateway(HttpGateway):
     def __init__(self, config, network_state):
+        super().__init__(ssl.SSLContext(ssl.PROTOCOL_TLS), 200, None)
         self._config = config
         self._network_state = network_state
         self._job: Optional[Job] = None
