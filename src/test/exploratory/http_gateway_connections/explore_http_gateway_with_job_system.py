@@ -35,35 +35,6 @@ from downloader.http_gateway import HttpGateway
 from test.exploratory.http_gateway_connections.explore_http_gateway_with_real_urls import urls
 
 
-class Reporter(ProgressReporter):
-    def __init__(self, fs: FileSystemFactory, gw: HttpGateway, logger: Logger):
-        self._fs = fs
-        self._gw = gw
-        self._logger = logger
-        self.cancelled = False
-
-    def notify_work_in_progress(self) -> None: pass
-    def notify_job_retried(self, job: Job, exception: Exception) -> None: pass
-    def notify_job_started(self, job: Job) -> None: pass
-
-    completed: List[FetchFileJob2] = []
-    failed: List[Tuple[FetchFileJob2, Exception]] = []
-
-    def notify_job_completed(self, job: FetchFileJob2) -> None:
-        self._logger.print(f'>>>>>> COMPLETED! {job.info}')
-        self.completed.append(job)
-
-    def notify_job_failed(self, job: FetchFileJob2, exception: Exception) -> None:
-        self._logger.print(f'>>>>>> FAILED! {job.info}', exception)
-        self.failed.append((job, exception))
-
-    def notify_cancelled_pending_jobs(self) -> None:
-        self._logger.print(f">>>>>> CANCELING PENDING JOBS!")
-        self._fs.cancel_ongoing_operations()
-        self._gw.cleanup()
-        self.cancelled = True
-
-
 def main() -> None:
     logger = DescribeNowDecorator(PrintLogger.make_configured({'verbose': True, 'start_time': time.time()}))
     with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gw:
@@ -112,6 +83,34 @@ def main() -> None:
     print()
     print(f'Time: {end - start}s')
     if reporter.cancelled: sys.exit(1)
+
+class Reporter(ProgressReporter):
+    def __init__(self, fs: FileSystemFactory, gw: HttpGateway, logger: Logger):
+        self._fs = fs
+        self._gw = gw
+        self._logger = logger
+        self.cancelled = False
+
+    def notify_work_in_progress(self) -> None: pass
+    def notify_job_retried(self, job: Job, exception: Exception) -> None: pass
+    def notify_job_started(self, job: Job) -> None: pass
+
+    completed: List[FetchFileJob2] = []
+    failed: List[Tuple[FetchFileJob2, Exception]] = []
+
+    def notify_job_completed(self, job: FetchFileJob2) -> None:
+        self._logger.print(f'>>>>>> COMPLETED! {job.info}')
+        self.completed.append(job)
+
+    def notify_job_failed(self, job: FetchFileJob2, exception: Exception) -> None:
+        self._logger.print(f'>>>>>> FAILED! {job.info}', exception)
+        self.failed.append((job, exception))
+
+    def notify_cancelled_pending_jobs(self) -> None:
+        self._logger.print(f">>>>>> CANCELING PENDING JOBS!")
+        self._fs.cancel_ongoing_operations()
+        self._gw.cleanup()
+        self.cancelled = True
 
 if __name__ == '__main__':
     main()
