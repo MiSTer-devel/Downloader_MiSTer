@@ -22,7 +22,7 @@ import threading
 import time
 from contextlib import contextmanager
 from email.utils import parsedate_to_datetime
-from typing import Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar, Callable
+from typing import Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar
 from urllib.parse import urlparse, ParseResult, urlunparse
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
 
@@ -37,7 +37,7 @@ class Logger(Protocol):
 
 class HttpGateway:
     def __init__(self, ssl_ctx: ssl.SSLContext, timeout: int, logger: Logger = None):
-        now = time.time()
+        now = time.monotonic()
         self._ssl_ctx = ssl_ctx
         self._timeout = timeout
         self._logger = logger
@@ -64,12 +64,12 @@ class HttpGateway:
 
     @contextmanager
     def open(self, url: str, method: str = None, body: Any = None, headers: Any = None) -> Generator[Tuple[str, HTTPResponse], None, None]:
-        now = time.time()
+        now = time.monotonic()
         self._clean_timeout_connections(now)
         self._clean_timeout_redirects(now)
 
         method = 'GET' if method is None else method.upper()
-        if self._logger is not None: self._logger.debug(f'^^^^ {method} {url}\n{describe_time(now)}')
+        if self._logger is not None: self._logger.debug(f'^^^^ {method} {url}')
         url = self._process_url(url)
         parsed_url = urlparse(url)
         if parsed_url.scheme not in {'http', 'https'}: raise HttpGatewayException(f"URL '{url}' has wrong scheme '{parsed_url.scheme}'.")
@@ -82,12 +82,12 @@ class HttpGateway:
             0
         )
         if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}: {final_url}\n'
-                                                        f'1st byte @ {describe_time(t := time.time())} ({t - now:.3f}s)\nvvvv\n')
+                                                        f'1st byte @ {time.monotonic() - now:.3f}s\nvvvv\n')
         try:
             yield final_url, conn.response
         finally:
             conn.finish_response()
-            if self._logger is not None: self._logger.print(f'|||| Done {describe_time(t := time.time())}: {final_url} ({t - now:.3f}s)')
+            if self._logger is not None: self._logger.print(f'|||| Done: {final_url} ({time.monotonic() - now:.3f}s)')
 
     def cleanup(self) -> None:
         total_cleared = 0
@@ -108,7 +108,7 @@ class HttpGateway:
         except (HTTPException, OSError) as e:
             conn.kill()
             if retry < 10:
-                if self._logger is not None: self._logger.debug(f'HTTP Exception! {type(e).__name__} ({retry}) {describe_time(time.time())} [{url}] {str(e)}\n'
+                if self._logger is not None: self._logger.debug(f'HTTP Exception! {type(e).__name__} ({retry}) [{url}] {str(e)}\n'
                                                                 f'Killed "{parsed_url.scheme}://{parsed_url.netloc}" connection {conn.id}.\n')
                 return self._request(url, parsed_url, method, body, headers, retry + 1)
             else:
@@ -128,7 +128,7 @@ class HttpGateway:
             if self._logger is not None: self._logger.debug(f"Invalid header on resource moved response at: {url}")
             return url, parsed_url
 
-        if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}! Resource moved: {url} -> {location} [{describe_time(time.time())}]\n\n')
+        if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}! Resource moved: {url} -> {location}\n\n')
         conn.finish_response()
 
         if location[0] == '/':
@@ -330,7 +330,7 @@ class _Connection:
             self._max_uses = 0
             return
 
-        self._last_use_time = time.time()
+        self._last_use_time = time.monotonic()
         keep_alive_timeout, keep_alive_max = self.response_headers.keep_alive_params()
         if keep_alive_timeout is not None: self._timeout = keep_alive_timeout
         if keep_alive_max is not None: self._max_uses = keep_alive_max
@@ -431,7 +431,7 @@ class _ResponseHeaders:
                     if self._logger is not None: self._logger.debug(f"Could not parse Age from {age}", e)
                     age = 0
 
-                return new_url, time.time() + max_age - age
+                return new_url, time.monotonic() + max_age - age
 
             pass
 
@@ -443,7 +443,7 @@ class _ResponseHeaders:
                 if self._logger is not None: self._logger.debug(f"Could not parse Expires from {expires}", e)
 
         if status == 300 or status == 301:
-            return new_url, time.time() + 60 * 60 * 24  # Permanent redirects, caching 1 day by default
+            return new_url, time.monotonic() + 60 * 60 * 24  # Permanent redirects, caching 1 day by default
 
         return new_url, None  # Temporary redirects, no cache by default
 
@@ -493,5 +493,3 @@ class _ParamsParser:
     def str(self, key: str) -> Optional[str]:
         if key not in self._data: return None
         return self._data[key]
-
-def describe_time(t: float) -> str: return time.strftime(f'%Y-%m-%d %H:%M:%S.{t % 1 * 1000:03.0f}', time.localtime(t))

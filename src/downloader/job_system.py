@@ -338,7 +338,7 @@ class JobSystem(JobContext):
             raise e
 
     def _check_clock(self) -> None:
-        if self._timeout_clock > time.time():
+        if self._timeout_clock > time.monotonic():
             return
 
         self.cancel_pending_jobs()
@@ -377,7 +377,7 @@ class JobSystem(JobContext):
             self._logger.print('PREVIOUS HANDLER FAILED!', sig, e)
 
     def _update_timeout_clock(self) -> None:
-        self._timeout_clock = time.time() + self._max_timeout
+        self._timeout_clock = time.monotonic() + self._max_timeout
 
     def _report_job_started(self, package: '_JobPackage') -> None:
         self._try_report('started', lambda: self._reporter_for_package(package).notify_job_started(package.job))
