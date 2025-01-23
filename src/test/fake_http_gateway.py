@@ -1,5 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-import ssl
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -18,6 +18,7 @@ import ssl
 
 from typing import Dict, Any, Tuple, Generator, Optional
 from contextlib import contextmanager
+import ssl
 
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import Job
