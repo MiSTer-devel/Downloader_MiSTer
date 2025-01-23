@@ -364,8 +364,8 @@ class JobSystem(JobContext):
         try:
             self._logger.print(f"SIGNAL '{signal.strsignal(sig)}' RECEIVED!")
             for thread_name, stack in stacks_from_all_threads().items():
-                self._logger.print(f"Thread: {thread_name} [{len(stack)}]")
-                for entry in stack: self._logger.print(f"  {entry['file']}:{entry['line']} ({entry['func']})")
+                self._logger.debug(f"Thread: {thread_name} [{len(stack)}]")
+                for entry in stack: self._logger.debug(f"  {entry['file']}:{entry['line']} ({entry['func']})")
             self._logger.print('SHUTTING DOWN...')
             self.cancel_pending_jobs()
         except Exception as e:
