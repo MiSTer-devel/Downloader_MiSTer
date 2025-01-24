@@ -22,7 +22,7 @@ import threading
 import time
 from contextlib import contextmanager
 from email.utils import parsedate_to_datetime
-from typing import Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar
+from typing import Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar, Generic
 from urllib.parse import urlparse, ParseResult, urlunparse
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
 
@@ -36,7 +36,7 @@ class Logger(Protocol):
 
 
 class HttpGateway:
-    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: int, logger: Logger = None):
+    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: int, logger: Optional[Logger] = None):
         now = time.monotonic()
         self._ssl_ctx = ssl_ctx
         self._timeout = timeout
@@ -49,7 +49,7 @@ class HttpGateway:
         self._queue_redirects_lock = threading.Lock()
         self._url_redirects: Dict[str, _Redirect[str]] = {}
         self._url_redirects_lock = threading.Lock()
-        self._redirects_swap: Dict[T, _Redirect[T]] = {}
+        self._redirects_swap: Dict[Any, _Redirect[Any]] = {}
         self._clean_timeout_redirects_timer = now
         self._clean_timeout_redirects_lock = threading.Lock()
         self._out_of_service = False
@@ -64,7 +64,7 @@ class HttpGateway:
         return False
 
     @contextmanager
-    def open(self, url: str, method: str = None, body: Any = None, headers: Any = None) -> Generator[Tuple[str, HTTPResponse], None, None]:
+    def open(self, url: str, method: Optional[str] = None, body: Any = None, headers: Any = None) -> Generator[Tuple[str, HTTPResponse], None, None]:
         now = time.monotonic()
         self._clean_timeout_connections(now)
         self._clean_timeout_redirects(now)
@@ -149,14 +149,14 @@ class HttpGateway:
             ):
                 target_queue_id: _QueueId = (parsed_location.scheme, parsed_location.netloc)
                 if target_queue_id != queue_id:
-                    redirect = _Redirect(target_queue_id, redirect_timeout)
+                    redirect_queue = _Redirect(target_queue_id, redirect_timeout)
                     with self._queue_redirects_lock:
-                        self._queue_redirects[queue_id] = redirect
+                        self._queue_redirects[queue_id] = redirect_queue
 
             elif url != location:
-                redirect = _Redirect(location, redirect_timeout)
+                redirect_url = _Redirect(location, redirect_timeout)
                 with self._url_redirects_lock:
-                    self._url_redirects[url] = redirect
+                    self._url_redirects[url] = redirect_url
 
         return location, parsed_location
 
@@ -243,7 +243,7 @@ _default_headers = {'Connection': 'keep-alive', 'Keep-Alive': 'timeout=120'}
 
 _QueueId = Tuple[str, str]
 
-class _Redirect[T]:
+class _Redirect(Generic[T]):
     def __init__(self, target: T, timeout: float):
         self.target = target
         self.timeout = timeout
@@ -465,7 +465,7 @@ _used_headers = {'location', 'cache-control', 'age', 'expires', 'connection', 'k
 class _ParamsParser:
     def __init__(self, logger: Optional[Logger]):
         self._logger = logger
-        self._data = dict()
+        self._data: Dict[str, Union[bool, str, None]] = dict()
 
     def parse(self, source: Optional[str]) -> '_ParamsParser':
         if source is None: return self
@@ -486,11 +486,14 @@ class _ParamsParser:
     def int(self, key: str) -> Optional[int]:
         if key not in self._data: return None
         try:
-            return int(self._data[key].strip('\"\''))
+            return int(self._data[key].strip('\"\''))  # type: ignore[union-attr]
         except Exception as e:
             if self._logger is not None: self._logger.debug(f"ERROR! Could not parse int '{key}' from: {self._data[key]}", e)
             return None
 
     def str(self, key: str) -> Optional[str]:
         if key not in self._data: return None
-        return self._data[key]
+        value = self._data[key]
+        if isinstance(value, str): return value
+        if self._logger is not None: self._logger.debug(f"ERROR! Could not parse str from: {value}")
+        return None
