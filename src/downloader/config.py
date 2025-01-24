@@ -22,26 +22,39 @@ import re
 import time
 from enum import IntEnum, unique
 from pathlib import Path
+from typing import TypedDict, Optional, List, Any, Dict, NotRequired
 
 from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_BASE_SYSTEM_PATH, K_STORAGE_PRIORITY, K_DATABASES, \
     K_ALLOW_DELETE, K_ALLOW_REBOOT, K_UPDATE_LINUX, K_VERBOSE, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, \
-    K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, K_FILTER, K_DB_URL, K_SECTION, K_CONFIG_PATH, \
-    K_USER_DEFINED_OPTIONS, KENV_DOWNLOADER_INI_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, \
-    KENV_DEFAULT_BASE_PATH, KENV_ALLOW_REBOOT, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEBUG, K_OPTIONS, \
-    MEDIA_FAT, K_DEBUG, K_CURL_SSL, KENV_CURL_SSL, KENV_UPDATE_LINUX, KENV_FAIL_ON_FILE_ERROR, KENV_COMMIT, \
-    K_FAIL_ON_FILE_ERROR, K_COMMIT, K_DEFAULT_DB_ID, DISTRIBUTION_MISTER_DB_ID, \
-    K_START_TIME, KENV_LOGFILE, K_LOGFILE, K_DOWNLOADER_THREADS_LIMIT, \
-    KENV_PC_LAUNCHER, K_IS_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, STORAGE_PRIORITY_PREFER_SD, \
-    STORAGE_PRIORITY_PREFER_EXTERNAL, STORAGE_PRIORITY_OFF, KENV_FORCED_BASE_PATH, K_MINIMUM_SYSTEM_FREE_SPACE_MB, K_MINIMUM_EXTERNAL_FREE_SPACE_MB, DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB, \
+    K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD, K_FILTER, K_DB_URL, K_CONFIG_PATH, \
+    K_USER_DEFINED_OPTIONS, K_OPTIONS, MEDIA_FAT, K_DEBUG, K_CURL_SSL, K_FAIL_ON_FILE_ERROR, K_COMMIT, \
+    K_DEFAULT_DB_ID, DISTRIBUTION_MISTER_DB_ID, K_START_TIME, K_LOGFILE, K_DOWNLOADER_THREADS_LIMIT, \
+    K_IS_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL, \
+    STORAGE_PRIORITY_OFF, K_MINIMUM_SYSTEM_FREE_SPACE_MB, K_MINIMUM_EXTERNAL_FREE_SPACE_MB, DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB
 from downloader.db_options import DbOptionsKind, DbOptions, DbOptionsValidationException
 from downloader.ini_parser import IniParser
+from downloader.logger import Logger
 
 
-def config_with_base_path(config, base_path):
-    result = config.copy()
-    result[K_BASE_PATH] = base_path
-    return result
+class Environment(TypedDict):
+    DOWNLOADER_LAUNCHER_PATH: Optional[str]
+    DOWNLOADER_INI_PATH: Optional[str]
+    LOGFILE: Optional[str]
+    CURL_SSL: str
+    COMMIT: str
+    ALLOW_REBOOT: Optional[str]
+    UPDATE_LINUX: str
+    DEFAULT_DB_URL: str
+    DEFAULT_DB_ID: str
+    DEFAULT_BASE_PATH: Optional[str]
+    FORCED_BASE_PATH: Optional[str]
+    PC_LAUNCHER: Optional[str]
+    DEBUG: str
+    FAIL_ON_FILE_ERROR: str
+
+
+Config = Dict[str, Any]
 
 
 @unique
@@ -58,7 +71,36 @@ class AllowReboot(IntEnum):
     ONLY_AFTER_LINUX_UPDATE = 2
 
 
-def default_config():
+class ConfigMisterSection(TypedDict):
+    base_path: str
+    base_system_path: str
+    storage_priority: str
+    allow_delete: AllowDelete
+    allow_reboot: AllowReboot
+    verbose: bool
+    update_linux: bool
+    downloader_threads_limit: int
+    downloader_timeout: int
+    downloader_retries: int
+    filter: str
+    minimum_system_free_space_mb: int
+    minimum_external_free_space_mb: int
+    user_defined_options: List[str]
+
+
+class ConfigDatabaseSection(TypedDict):
+    section: str
+    db_url: str
+    options: NotRequired[DbOptions]
+
+
+def config_with_base_path(config: Config, base_path: str) -> Config:
+    result = config.copy()
+    result[K_BASE_PATH] = base_path
+    return result
+
+
+def default_config() -> Config:
     return {
         K_DATABASES: {},
         K_CONFIG_PATH: Path(FILE_downloader_ini),
@@ -88,24 +130,24 @@ def default_config():
     }
 
 
-def download_sensitive_configs():
+def download_sensitive_configs() -> List[str]:
     return [K_BASE_PATH, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES]
 
 
 class ConfigReader:
-    def __init__(self, logger, env):
+    def __init__(self, logger: Logger, env: Environment):
         self._logger = logger
         self._env = env
 
-    def calculate_config_path(self, current_working_dir):
-        if self._env[KENV_PC_LAUNCHER] is not None:
-            return str(Path(self._env[KENV_PC_LAUNCHER]).with_name('downloader.ini')).replace('\\', '/')
+    def calculate_config_path(self, current_working_dir) -> str:
+        if self._env['PC_LAUNCHER'] is not None:
+            return str(Path(self._env['PC_LAUNCHER']).with_name('downloader.ini')).replace('\\', '/')
 
-        ini_path = self._env.get(KENV_DOWNLOADER_INI_PATH, None)
+        ini_path = self._env.get('DOWNLOADER_INI_PATH', None)
         if ini_path is not None:
             return ini_path
 
-        original_executable = self._env.get(KENV_DOWNLOADER_LAUNCHER_PATH, None)
+        original_executable = self._env.get('DOWNLOADER_LAUNCHER_PATH', None)
         if original_executable is None:
             return FILE_downloader_ini
 
@@ -127,17 +169,17 @@ class ConfigReader:
 
         return result.replace('/update.ini', '/downloader.ini')
 
-    def read_config(self, config_path):
+    def read_config(self, config_path) -> Config:
         self._logger.print("Reading file: %s" % config_path)
 
         result = default_config()
-        result[K_DEBUG] = self._env[KENV_DEBUG] == 'true'
+        result[K_DEBUG] = self._env['DEBUG'] == 'true'
         if result[K_DEBUG]:
             result[K_VERBOSE] = True
 
-        if self._env[KENV_DEFAULT_BASE_PATH] is not None:
-            result[K_BASE_PATH] = self._env[KENV_DEFAULT_BASE_PATH]
-            result[K_BASE_SYSTEM_PATH] = self._env[KENV_DEFAULT_BASE_PATH]
+        if self._env['DEFAULT_BASE_PATH'] is not None:
+            result[K_BASE_PATH] = self._env['DEFAULT_BASE_PATH']
+            result[K_BASE_SYSTEM_PATH] = self._env['DEFAULT_BASE_PATH']
 
         ini_config = self._load_ini_config(config_path)
         default_db = self._default_db_config()
@@ -159,33 +201,33 @@ class ConfigReader:
             self._logger.print('Reading default db')
             self._add_default_database(ini_config, result)
 
-        if self._env[KENV_ALLOW_REBOOT] is not None:
-            result[K_ALLOW_REBOOT] = AllowReboot(int(self._env[KENV_ALLOW_REBOOT]))
+        if self._env['ALLOW_REBOOT'] is not None:
+            result[K_ALLOW_REBOOT] = AllowReboot(int(self._env['ALLOW_REBOOT']))
 
         if K_USER_DEFINED_OPTIONS not in result:
             result[K_USER_DEFINED_OPTIONS] = []
 
-        result[K_CURL_SSL] = self._valid_max_length(KENV_CURL_SSL, self._env[KENV_CURL_SSL], 50)
-        if self._env[KENV_UPDATE_LINUX] != DEFAULT_UPDATE_LINUX_ENV:
-            result[K_UPDATE_LINUX] = self._env[KENV_UPDATE_LINUX] == 'true'
+        result[K_CURL_SSL] = self._valid_max_length('CURL_SSL', self._env['CURL_SSL'], 50)
+        if self._env['UPDATE_LINUX'] != DEFAULT_UPDATE_LINUX_ENV:
+            result[K_UPDATE_LINUX] = self._env['UPDATE_LINUX'] == 'true'
 
-        if self._env[KENV_FORCED_BASE_PATH] is not None:
-            result[K_BASE_PATH] = self._env[KENV_FORCED_BASE_PATH]
-            result[K_BASE_SYSTEM_PATH] = self._env[KENV_FORCED_BASE_PATH]
+        if self._env['FORCED_BASE_PATH'] is not None:
+            result[K_BASE_PATH] = self._env['FORCED_BASE_PATH']
+            result[K_BASE_SYSTEM_PATH] = self._env['FORCED_BASE_PATH']
             for section, db in result[K_DATABASES].items():
                 if K_OPTIONS in db: db[K_OPTIONS].remove_base_path()
 
-        result[K_FAIL_ON_FILE_ERROR] = self._env[KENV_FAIL_ON_FILE_ERROR] == 'true'
-        result[K_COMMIT] = self._valid_max_length(KENV_COMMIT, self._env[KENV_COMMIT], 50)
-        result[K_DEFAULT_DB_ID] = self._valid_db_id(K_DEFAULT_DB_ID, self._env[KENV_DEFAULT_DB_ID])
+        result[K_FAIL_ON_FILE_ERROR] = self._env['FAIL_ON_FILE_ERROR'] == 'true'
+        result[K_COMMIT] = self._valid_max_length('COMMIT', self._env['COMMIT'], 50)
+        result[K_DEFAULT_DB_ID] = self._valid_db_id(K_DEFAULT_DB_ID, self._env['DEFAULT_DB_ID'])
         result[K_START_TIME] = time.time()
         result[K_CONFIG_PATH] = config_path
-        result[K_LOGFILE] = self._env[KENV_LOGFILE]
+        result[K_LOGFILE] = self._env['LOGFILE']
 
-        if self._env[KENV_PC_LAUNCHER] is not None:
+        if self._env['PC_LAUNCHER'] is not None:
             result[K_IS_PC_LAUNCHER] = True
             default_values = default_config()
-            launcher_path = Path(self._env[KENV_PC_LAUNCHER])
+            launcher_path = Path(self._env['PC_LAUNCHER'])
             if result[K_BASE_PATH] != default_values[K_BASE_PATH]:
                 self._abort_pc_launcher_wrong_paths('base', 'base_path', 'MiSTer')
 
@@ -222,12 +264,12 @@ class ConfigReader:
         return result
 
     @staticmethod
-    def _abort_pc_launcher_wrong_paths(path_kind, path_variable, section):
+    def _abort_pc_launcher_wrong_paths(path_kind: str, path_variable: str, section: str) -> None:
         print('Can not run the PC Launcher with custom "%s" under the [%s] section of the downloader.ini file.' % (path_variable, section))
         print('PC Launcher and custom %s paths are not possible simultaneously.' % path_kind)
         exit(1)
 
-    def _load_ini_config(self, config_path):
+    def _load_ini_config(self, config_path) -> configparser.ConfigParser:
         ini_config = configparser.ConfigParser(inline_comment_prefixes=(';', '#'))
         try:
             ini_config.read(config_path)
@@ -237,32 +279,33 @@ class ConfigReader:
             raise e
         return ini_config
 
-    def _add_default_database(self, ini_config, result):
+    def _add_default_database(self, ini_config: configparser.ConfigParser, result: Config) -> None:
         default_db = self._default_db_config()
-        result[K_DATABASES][default_db[K_SECTION]] = {
-            K_DB_URL: ini_config['DEFAULT'].get(K_DB_URL, default_db[K_DB_URL]),
-            K_SECTION: default_db[K_SECTION]
+        db_section: ConfigDatabaseSection = {
+            'db_url': ini_config['DEFAULT'].get(K_DB_URL, default_db['db_url']),
+            'section': default_db['section']
         }
+        result[K_DATABASES][default_db['section']] = db_section
 
-    def _parse_database_section(self, default_db, parser, section_id):
-        default_db_url = default_db[K_DB_URL] if section_id == default_db[K_SECTION].lower() else None
+    def _parse_database_section(self, default_db: ConfigDatabaseSection, parser: IniParser, section_id: str) -> ConfigDatabaseSection:
+        default_db_url = default_db['db_url'] if section_id == default_db['section'].lower() else None
         db_url = parser.get_string(K_DB_URL, default_db_url)
 
         if db_url is None:
             raise InvalidConfigParameter("Can't import db for section '%s' without an url field" % section_id)
 
-        description = {
-            K_DB_URL: db_url,
-            K_SECTION: section_id
+        description: ConfigDatabaseSection = {
+            'db_url': db_url,
+            'section': section_id
         }
 
         options = self._parse_database_options(parser, section_id)
         if len(options.items()) > 0:
-            description[K_OPTIONS] = options
+            description['options'] = options
 
         return description
 
-    def _parse_database_options(self, parser, section_id):
+    def _parse_database_options(self, parser: IniParser, section_id: str) -> DbOptions:
         options = dict()
         if parser.has(K_BASE_PATH):
             options[K_BASE_PATH] = self._valid_base_path(parser.get_string(K_BASE_PATH, None), K_BASE_PATH)
@@ -280,39 +323,38 @@ class ConfigReader:
         except DbOptionsValidationException as e:
             raise InvalidConfigParameter("Invalid options for section '%s': %s" % (section_id, e.fields_to_string()))
 
-    def _parse_mister_section(self, result, parser):
-        mister = dict()
-        mister[K_BASE_PATH] = self._valid_base_path(parser.get_string(K_BASE_PATH, result[K_BASE_PATH]), K_BASE_PATH)
-        mister[K_BASE_SYSTEM_PATH] = self._valid_base_path(parser.get_string(K_BASE_SYSTEM_PATH, result[K_BASE_SYSTEM_PATH]), K_BASE_SYSTEM_PATH)
-        mister[K_STORAGE_PRIORITY] = self._valid_storage_priority(parser.get_string(K_STORAGE_PRIORITY, result[K_STORAGE_PRIORITY]))
-        mister[K_ALLOW_DELETE] = AllowDelete(parser.get_int(K_ALLOW_DELETE, result[K_ALLOW_DELETE].value))
-        mister[K_ALLOW_REBOOT] = AllowReboot(parser.get_int(K_ALLOW_REBOOT, result[K_ALLOW_REBOOT].value))
-        mister[K_VERBOSE] = parser.get_bool(K_VERBOSE, result[K_VERBOSE])
-        mister[K_UPDATE_LINUX] = parser.get_bool(K_UPDATE_LINUX, result[K_UPDATE_LINUX])
-        mister[K_DOWNLOADER_THREADS_LIMIT] = parser.get_int(K_DOWNLOADER_THREADS_LIMIT, result[K_DOWNLOADER_THREADS_LIMIT])
-        mister[K_DOWNLOADER_TIMEOUT] = parser.get_int(K_DOWNLOADER_TIMEOUT, result[K_DOWNLOADER_TIMEOUT])
-        mister[K_DOWNLOADER_RETRIES] = parser.get_int(K_DOWNLOADER_RETRIES, result[K_DOWNLOADER_RETRIES])
-        mister[K_FILTER] = parser.get_string(K_FILTER, result[K_FILTER])
-        mister[K_MINIMUM_SYSTEM_FREE_SPACE_MB] = parser.get_int(K_MINIMUM_SYSTEM_FREE_SPACE_MB, result[K_MINIMUM_SYSTEM_FREE_SPACE_MB])
-        mister[K_MINIMUM_EXTERNAL_FREE_SPACE_MB] = parser.get_int(K_MINIMUM_EXTERNAL_FREE_SPACE_MB, result[K_MINIMUM_EXTERNAL_FREE_SPACE_MB])
+    def _parse_mister_section(self, result: Config, parser: IniParser) -> None:
+        mister: ConfigMisterSection = {
+            'base_path': self._valid_base_path(parser.get_string(K_BASE_PATH, result[K_BASE_PATH]), K_BASE_PATH),
+            'base_system_path': self._valid_base_path(parser.get_string(K_BASE_SYSTEM_PATH, result[K_BASE_SYSTEM_PATH]), K_BASE_SYSTEM_PATH),
+            'storage_priority': self._valid_storage_priority(parser.get_string(K_STORAGE_PRIORITY, result[K_STORAGE_PRIORITY])),
+            'allow_delete': AllowDelete(parser.get_int(K_ALLOW_DELETE, result[K_ALLOW_DELETE].value)),
+            'allow_reboot': AllowReboot(parser.get_int(K_ALLOW_REBOOT, result[K_ALLOW_REBOOT].value)),
+            'verbose': parser.get_bool(K_VERBOSE, result[K_VERBOSE]),
+            'update_linux': parser.get_bool(K_UPDATE_LINUX, result[K_UPDATE_LINUX]),
+            'downloader_threads_limit': parser.get_int(K_DOWNLOADER_THREADS_LIMIT, result[K_DOWNLOADER_THREADS_LIMIT]),
+            'downloader_timeout': parser.get_int(K_DOWNLOADER_TIMEOUT, result[K_DOWNLOADER_TIMEOUT]),
+            'downloader_retries': parser.get_int(K_DOWNLOADER_RETRIES, result[K_DOWNLOADER_RETRIES]),
+            'filter': parser.get_string(K_FILTER, result[K_FILTER]),
+            'minimum_system_free_space_mb': parser.get_int(K_MINIMUM_SYSTEM_FREE_SPACE_MB, result[K_MINIMUM_SYSTEM_FREE_SPACE_MB]),
+            'minimum_external_free_space_mb': parser.get_int(K_MINIMUM_EXTERNAL_FREE_SPACE_MB, result[K_MINIMUM_EXTERNAL_FREE_SPACE_MB]),
+            'user_defined_options': []
+        }
 
-        user_defined = []
         for key in mister:
             if parser.has(key):
-                user_defined.append(key)
-
-        mister[K_USER_DEFINED_OPTIONS] = user_defined
+                mister['user_defined_options'].append(key)
 
         result.update(mister)
 
-    def _default_db_config(self):
+    def _default_db_config(self) -> ConfigDatabaseSection:
         return {
-            K_DB_URL: self._env[KENV_DEFAULT_DB_URL],
-            K_SECTION: self._env[KENV_DEFAULT_DB_ID].lower()
+            'db_url': self._env['DEFAULT_DB_URL'],
+            'section': self._env['DEFAULT_DB_ID'].lower()
         }
 
-    def _valid_base_path(self, path, key):
-        if self._env[KENV_DEBUG] != 'true':
+    def _valid_base_path(self, path: str, key: str) -> str:
+        if self._env['DEBUG'] != 'true':
             if path == '' or path[0] == '.' or path[0] == '\\':
                 raise InvalidConfigParameter("Invalid path '%s', %s paths should start with '/media/*/'" % (path, key))
 
@@ -325,13 +367,13 @@ class ConfigReader:
         
         return path
 
-    def _valid_max_length(self, key, value, max_limit):
+    def _valid_max_length(self, key: str, value: str, max_limit: int) -> str:
         if len(value) <= max_limit:
             return value
 
         raise InvalidConfigParameter("Invalid %s with value '%s'. Too long string (max is %s)." % (key, value, max_limit))
 
-    def _valid_db_id(self, key, value):
+    def _valid_db_id(self, key: str, value: str) -> str:
         value = self._valid_max_length(key, value, 255)
 
         regex = re.compile("^[a-zA-Z][-._a-zA-Z0-9]*[/]?[-._a-zA-Z0-9]+$")
@@ -340,7 +382,7 @@ class ConfigReader:
 
         raise InvalidConfigParameter("Invalid %s with value '%s'. Not matching ID regex." % (key, value))
 
-    def _valid_storage_priority(self, parameter):
+    def _valid_storage_priority(self, parameter: str) -> str:
         lower_parameter = parameter.lower()
         if lower_parameter in [STORAGE_PRIORITY_OFF, 'false', 'no', 'base_path', '0', 'f', 'n']:
             return STORAGE_PRIORITY_OFF
