@@ -21,7 +21,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
 from types import FrameType
-from typing import Dict, Optional, Callable, List, Tuple, Any, Iterable, Protocol, Union
+from typing import Dict, Optional, Callable, List, Tuple, Any, Iterable, Protocol, Union, TypeVar, Generic
 import sys
 import time
 import queue
@@ -251,8 +251,8 @@ class JobSystem(JobContext):
 
     def _retry_package(self, package: '_JobPackage', e: Exception) -> None:
         retry_job = package.job.retry_job()
-        should_retry = package.tries < self._max_tries and retry_job is not None
-        if should_retry:
+        if package.tries < self._max_tries and retry_job is not None:
+            retrying = True
             self._job_queue.put(_JobPackage(
                 job=retry_job,
                 worker=self._get_worker(retry_job),
@@ -261,9 +261,10 @@ class JobSystem(JobContext):
                 next_jobs=package.next_jobs
             ))
         else:
+            retrying = False
             self._decrease_jobs_amount(package.job)
         try:
-            if should_retry:
+            if retrying:
                 self._report_job_retried(package, e)
             else:
                 self._report_job_failed(package, e)
@@ -350,7 +351,7 @@ class JobSystem(JobContext):
             return
 
         seen: Dict[int, int] = dict()
-        current = parent_package
+        current: Optional[_JobPackage] = parent_package
 
         while current is not None:
             seen_value = seen.get(current.job.type_id, 0)
@@ -360,7 +361,7 @@ class JobSystem(JobContext):
             seen[current.job.type_id] = seen_value + 1
             current = current.parent
 
-    def _signal_handler(self, previous_handler: Callable[[int, Optional[FrameType]], Any], sig: int, frame: Optional[FrameType]) -> None:
+    def _signal_handler(self, previous_handler: Union[Callable[[int, Optional[FrameType]], Any], int, None], sig: int, frame: Optional[FrameType]) -> None:
         try:
             self._logger.print(f"SIGNAL '{signal.strsignal(sig)}' RECEIVED!")
             for thread_name, stack in stacks_from_all_threads().items():
@@ -377,7 +378,7 @@ class JobSystem(JobContext):
             self._logger.print('PREVIOUS HANDLER FAILED!', sig, e)
 
     def _update_timeout_clock(self) -> None:
-        self._timeout_clock = time.monotonic() + self._max_timeout
+        self._timeout_clock = int(time.monotonic()) + self._max_timeout
 
     def _report_job_started(self, package: '_JobPackage') -> None:
         self._try_report('started', lambda: self._reporter_for_package(package).notify_job_started(package.job))
@@ -457,30 +458,24 @@ class Worker(ABC):
         return None
 
 
-class ProgressReporter(ABC):
-    """Abstract base class for reporting progress of jobs."""
+class ProgressReporter(Protocol):
+    """Interface for reporting progress of jobs."""
 
-    @abstractmethod
     def notify_job_started(self, job: Job) -> None:
         """Called when a job is started. Must not throw exceptions."""
 
-    @abstractmethod
     def notify_work_in_progress(self) -> None:
         """Called after each loop."""
 
-    @abstractmethod
     def notify_cancelled_pending_jobs(self) -> None:
         """Called when all pending jobs are cancelled."""
 
-    @abstractmethod
     def notify_job_completed(self, job: Job) -> None:
         """Called when a job is completed. Must not throw exceptions."""
 
-    @abstractmethod
     def notify_job_failed(self, job: Job, exception: Exception) -> None:
         """Called when a job fails. Must not throw exceptions."""
 
-    @abstractmethod
     def notify_job_retried(self, job: Job, exception: Exception) -> None:
         """Called when a job is retried. Must not throw exceptions."""
 
