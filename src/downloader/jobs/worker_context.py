@@ -21,6 +21,7 @@ from dataclasses import dataclass
 import threading
 from typing import Dict, Any, Tuple, Set, List
 
+from downloader.config import Config, ConfigMisterSection
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
 from downloader.free_space_reservation import FreeSpaceReservation
@@ -48,7 +49,7 @@ class DownloaderWorkerContext:
     free_space_reservation: FreeSpaceReservation
     external_drives_repository: ExternalDrivesRepository
     target_paths_calculator_factory: TargetPathsCalculatorFactory
-    config: Dict[str, Any]
+    config: Config
     pending_removals: 'PendingRemovals'
     top_lock: threading.Lock
 
