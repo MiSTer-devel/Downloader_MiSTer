@@ -80,19 +80,6 @@ class FullRunService:
 
         return result
 
-    def _check_certificates(self):
-        for i in range(3):
-            if i != 0:
-                self._logger.debug()
-                self._logger.debug("Attempting again in 10 seconds...")
-                self._waiter.sleep(10)
-                self._logger.debug()
-
-            if self._certificates_fix.fix_certificates_if_needed():
-                return True
-
-        return False
-
     def _full_run_impl(self):
         self._logger.debug('Linux Version: %s' % self._linux_updater.get_current_linux_version())
 
@@ -163,6 +150,19 @@ class FullRunService:
             return 1
 
         return 0
+
+    def _check_certificates(self):
+        for i in range(3):
+            if i != 0:
+                self._logger.debug()
+                self._logger.debug("Attempting again in 10 seconds...")
+                self._waiter.sleep(10)
+                self._logger.debug()
+
+            if self._certificates_fix.fix_certificates_if_needed():
+                return True
+
+        return False
 
     def _display_summary(self, installed_files, failed_files, failed_folders, failed_zips, unused_filter_tags, new_files_not_installed, full_partitions, start_time):
         run_time = str(datetime.timedelta(seconds=time.time() - start_time))[0:-4]

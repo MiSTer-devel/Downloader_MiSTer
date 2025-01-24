@@ -16,6 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from typing import Final
+
 # Default SSL option
 
 DEFAULT_CACERT_FILE = '/etc/ssl/certs/cacert.pem'
@@ -145,7 +147,7 @@ K_MINIMUM_SYSTEM_FREE_SPACE_MB = 'minimum_system_free_space_mb'
 K_MINIMUM_EXTERNAL_FREE_SPACE_MB = 'minimum_external_free_space_mb'
 
 # Env
-KENV_DOWNLOADER_LAUNCHER_PATH = 'DOWNLOADER_LAUNCHER_PATH'
+KENV_DOWNLOADER_LAUNCHER_PATH: Final[str] = 'DOWNLOADER_LAUNCHER_PATH'
 KENV_DOWNLOADER_INI_PATH = 'DOWNLOADER_INI_PATH'
 KENV_CURL_SSL = 'CURL_SSL'
 KENV_COMMIT = 'COMMIT'
