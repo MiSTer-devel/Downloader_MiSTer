@@ -22,15 +22,14 @@ import sys
 import time
 import traceback
 from abc import abstractmethod, ABC
-from pathlib import Path
 from typing import List, Any
 
-from downloader.constants import K_VERBOSE, K_START_TIME
+from downloader.config import Config
 
 
 class Logger(ABC):
     @abstractmethod
-    def configure(self, _config):
+    def configure(self, config: Config):
         """makes logs more verbose"""
 
     @abstractmethod
@@ -42,7 +41,7 @@ class Logger(ABC):
         """print only to debug target"""
 
     @abstractmethod
-    def bench(self, label):
+    def bench(self, label: str):
         """print only to debug target"""
 
     def finalize(self):
@@ -51,7 +50,7 @@ class Logger(ABC):
 
 class PrintLogger(Logger):
     @staticmethod
-    def make_configured(config):
+    def make_configured(config: Config):
         logger = PrintLogger()
         logger.configure(config)
         return logger
@@ -61,10 +60,10 @@ class PrintLogger(Logger):
         self._start_time = None
         self._describe_now = False
 
-    def configure(self, config):
-        if config[K_VERBOSE]:
+    def configure(self, config: Config):
+        if config['verbose']:
             self._verbose_mode = True
-            self._start_time = config[K_START_TIME]
+            self._start_time = config['start_time']
 
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
         self._do_print(*args, sep=sep, end=end, file=file, flush=flush)
@@ -81,7 +80,7 @@ class PrintLogger(Logger):
                     self._do_print("".join(traceback.format_exception(type(e), e, e.__traceback__)), sep=sep, end=end, file=sys.stdout, flush=flush)
             self._do_print(*args, sep=sep, end=end, file=sys.stdout, flush=flush)
 
-    def bench(self, label):
+    def bench(self, label: str):
         if self._start_time is not None:
             self._do_print('%s| %s' % (str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-4], label), sep='', end='\n', file=sys.stdout, flush=True)
 
@@ -107,10 +106,10 @@ class NoLogger(Logger):
     def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
         pass
 
-    def bench(self, _label):
+    def bench(self, label: str):
         pass
 
-    def configure(self, _config):
+    def configure(self, config: Config):
         pass
 
     def finalize(self):
@@ -118,12 +117,12 @@ class NoLogger(Logger):
 
 
 class FileLoggerDecorator(Logger):
-    def __init__(self, decorated_logger, local_repository_provider):
+    def __init__(self, decorated_logger: Logger, local_repository_provider):
         self._decorated_logger = decorated_logger
         self._logfile = tempfile.NamedTemporaryFile('w', delete=False)
         self._local_repository_provider = local_repository_provider
 
-    def configure(self, config):
+    def configure(self, config: Config):
         self._decorated_logger.configure(config)
 
     def finalize(self):
@@ -143,7 +142,7 @@ class FileLoggerDecorator(Logger):
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
         self._do_print_in_file(*args, sep=sep, end=end, flush=flush)
 
-    def bench(self, label):
+    def bench(self, label: str):
         self._decorated_logger.bench(label)
 
     def _do_print_in_file(self, *args, sep, end, flush):
@@ -152,10 +151,10 @@ class FileLoggerDecorator(Logger):
 
 
 class DebugOnlyLoggerDecorator(Logger):
-    def __init__(self, decorated_logger):
+    def __init__(self, decorated_logger: Logger):
         self._decorated_logger = decorated_logger
 
-    def configure(self, config):
+    def configure(self, config: Config):
         self._decorated_logger.configure(config)
 
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
@@ -165,7 +164,7 @@ class DebugOnlyLoggerDecorator(Logger):
     def debug(self, *args, sep='', end='\n', flush=True):
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
 
-    def bench(self, label):
+    def bench(self, label: str):
         self._decorated_logger.bench(label)
 
     def finalize(self):
@@ -174,12 +173,12 @@ class DebugOnlyLoggerDecorator(Logger):
 
 # @TODO: Consider moving this one to test code
 class DescribeNowDecorator(Logger):
-    def __init__(self, decorated_logger):
+    def __init__(self, decorated_logger: Logger):
         self._re = re.compile(r'^ */[^:]+:\d+.*$')  # Matches paths such as /asd/bef/df:34
         self._decorated_logger = decorated_logger
 
-    def configure(self, config): self._decorated_logger.configure(config)
-    def bench(self, label): self._decorated_logger.bench(label)
+    def configure(self, config: Config): self._decorated_logger.configure(config)
+    def bench(self, label: str): self._decorated_logger.bench(label)
     def finalize(self): self._decorated_logger.finalize()
 
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):

@@ -23,7 +23,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from downloader.config import ConfigReader, Environment
+from downloader.config import Environment
+from downloader.config_reader import ConfigReader
 from downloader.local_repository import LocalRepositoryProvider
 from downloader.logger import FileLoggerDecorator, PrintLogger
 from downloader.full_run_service_factory import FullRunServiceFactory

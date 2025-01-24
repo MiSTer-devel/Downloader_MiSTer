@@ -21,7 +21,7 @@ import shutil
 import os
 import os.path
 from pathlib import Path
-from downloader.config import ConfigReader
+from downloader.config_reader import ConfigReader
 from downloader.constants import FILE_mister_downloader_needs_reboot, K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_CURL_SSL, \
     KENV_DEBUG, \
     KENV_FAIL_ON_FILE_ERROR, KENV_DEFAULT_BASE_PATH, KENV_DOWNLOADER_INI_PATH

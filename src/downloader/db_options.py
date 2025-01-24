@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from enum import unique, Enum
-from typing import Dict, Any
+from typing import Dict, Any, Set
 
 from downloader.constants import K_BASE_PATH, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER
 from downloader.other import test_only
@@ -31,7 +31,7 @@ class DbOptionsKind(Enum):
 
 class DbOptions:
     def __init__(self, props: Dict[str, Any], kind: DbOptionsKind):
-        present = set()
+        present: Set[str] = set()
 
         if kind == DbOptionsKind.INI_SECTION:
             if K_BASE_PATH in props:

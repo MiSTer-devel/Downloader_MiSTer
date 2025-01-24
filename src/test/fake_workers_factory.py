@@ -32,7 +32,7 @@ def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
         fake_http: FakeHttpGateway = ctx.http_gateway
         replacement_workers.extend([
             FakeWorkerDecorator(FetchFileWorker2(
-                progress_reporter=ctx.progress_reporter, http_gateway=fake_http, file_system=ctx.file_system, config=ctx.config,
+                progress_reporter=ctx.progress_reporter, http_gateway=fake_http, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout'],
             ), fake_http),
             FakeWorkerDecorator(FetchFileWorker(ctx), fake_http)
         ])
