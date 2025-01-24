@@ -39,7 +39,7 @@ def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
     return [
         CopyFileWorker(ctx),
         FetchFileWorker(ctx),
-        FetchFileWorker2(progress_reporter=ctx.progress_reporter, http_gateway=ctx.http_gateway, file_system=ctx.file_system, config=ctx.config),
+        FetchFileWorker2(progress_reporter=ctx.progress_reporter, http_gateway=ctx.http_gateway, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout']),
         ValidateFileWorker(ctx),
         ValidateFileWorker2(progress_reporter=ctx.progress_reporter, file_system=ctx.file_system),
         DbHeaderWorker(ctx),

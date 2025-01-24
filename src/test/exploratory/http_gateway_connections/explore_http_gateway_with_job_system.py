@@ -45,7 +45,7 @@ def main() -> None:
         job_system.set_interfering_signals([signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT])
 
         job_system.register_worker(FetchFileJob2.type_id, FetchFileWorker2(
-            progress_reporter=reporter, file_system=fs.create_for_system_scope(), http_gateway=gw, config={K_DOWNLOADER_TIMEOUT: 600}
+            progress_reporter=reporter, file_system=fs.create_for_system_scope(), http_gateway=gw, timeout=600
         ))
 
         dir_path = f'{os.path.dirname(os.path.realpath(__file__))}/delme'

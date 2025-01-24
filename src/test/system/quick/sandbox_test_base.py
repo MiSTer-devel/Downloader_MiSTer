@@ -20,7 +20,7 @@ import shutil
 import os
 import json
 from pathlib import Path, PurePosixPath
-from downloader.config import ConfigReader
+from downloader.config_reader import ConfigReader
 from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, KENV_UPDATE_LINUX, \
     KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR, FILE_downloader_storage_json, KENV_DEFAULT_BASE_PATH
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory

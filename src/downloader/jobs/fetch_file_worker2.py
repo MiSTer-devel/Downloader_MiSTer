@@ -16,7 +16,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import K_DOWNLOADER_TIMEOUT
 from downloader.file_system import FileSystem
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import WorkerResult, ProgressReporter
@@ -26,15 +25,15 @@ from downloader.jobs.errors import FileDownloadError
 import socket
 from urllib.error import URLError
 from http.client import HTTPException
-from typing import Optional, Any, Dict
+from typing import Optional
 
 
 class FetchFileWorker2(DownloaderWorker):
-    def __init__(self, progress_reporter: ProgressReporter, http_gateway: HttpGateway, file_system: FileSystem, config: Dict[str, Any]):
+    def __init__(self, progress_reporter: ProgressReporter, http_gateway: HttpGateway, file_system: FileSystem, timeout: int):
         self._progress_reporter = progress_reporter
         self._http_gateway = http_gateway
         self._file_system = file_system
-        self._timeout = config[K_DOWNLOADER_TIMEOUT]
+        self._timeout = timeout
 
     def job_type_id(self) -> int: return FetchFileJob2.type_id
     def reporter(self): return self._progress_reporter
@@ -69,3 +68,5 @@ class FetchFileWorker2(DownloaderWorker):
 
         if not self._file_system.is_file(download_path, use_cache=False):
             return FileDownloadError(f'Missing {info}')
+
+        return None

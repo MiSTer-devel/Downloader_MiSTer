@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.config import ConfigReader as ProductionConfigReader
+from downloader.config_reader import ConfigReader as ProductionConfigReader
 from downloader.logger import NoLogger
 from test.objects import default_env
 
