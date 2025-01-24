@@ -20,7 +20,7 @@ import platform
 from pathlib import Path
 from typing import Dict, Any
 
-from downloader.config import default_config
+from downloader.config import default_config, Environment
 from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, FILE_MiSTer_new, K_BASE_PATH, \
     K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, \
     K_DOWNLOADER_RETRIES, K_FILTER, K_DATABASES, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, \
@@ -775,7 +775,7 @@ def default_base_path():
     return '/media/fat'
 
 
-def default_env():
+def default_env() -> Environment:
     return {
         KENV_DEFAULT_DB_URL: DISTRIBUTION_MISTER_DB_URL,
         KENV_DEFAULT_DB_ID: DISTRIBUTION_MISTER_DB_ID,
