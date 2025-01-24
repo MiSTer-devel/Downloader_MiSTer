@@ -16,59 +16,59 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Final
+from typing import Final, Tuple, List
 
 # Default SSL option
 
-DEFAULT_CACERT_FILE = '/etc/ssl/certs/cacert.pem'
-DEFAULT_CURL_SSL_OPTIONS = '--cacert %s' % DEFAULT_CACERT_FILE
-DEFAULT_UPDATE_LINUX_ENV = 'undefined'
-DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB = 512
-DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB = 128
+DEFAULT_CACERT_FILE: Final[str] = '/etc/ssl/certs/cacert.pem'
+DEFAULT_CURL_SSL_OPTIONS: Final[str] = '--cacert %s' % DEFAULT_CACERT_FILE
+DEFAULT_UPDATE_LINUX_ENV: Final[str] = 'undefined'
+DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB: Final[int] = 512
+DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB: Final[int] = 128
 
 # Pre-selected database
-DISTRIBUTION_MISTER_DB_URL = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'
-DISTRIBUTION_MISTER_DB_ID = 'distribution_mister'
+DISTRIBUTION_MISTER_DB_URL: Final[str] = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'
+DISTRIBUTION_MISTER_DB_ID: Final[str] = 'distribution_mister'
 
 # Firmware files
-FILE_MiSTer = 'MiSTer'
-FILE_PDFViewer = 'linux/pdfviewer'
-FILE_lesskey = 'linux/lesskey'
-FILE_glow = 'linux/glow'
-FILE_MiSTer_new = 'MiSTer.new'
-FILE_MiSTer_old = '.MiSTer.old'
-FILE_menu_rbf = 'menu.rbf'
+FILE_MiSTer: Final[str] = 'MiSTer'
+FILE_PDFViewer: Final[str] = 'linux/pdfviewer'
+FILE_lesskey: Final[str] = 'linux/lesskey'
+FILE_glow: Final[str] = 'linux/glow'
+FILE_MiSTer_new: Final[str] = 'MiSTer.new'
+FILE_MiSTer_old: Final[str] = '.MiSTer.old'
+FILE_menu_rbf: Final[str] = 'menu.rbf'
 
 # INI files
-FILE_MiSTer_ini = 'MiSTer.ini'
-FILE_MiSTer_alt_ini = 'MiSTer_alt.ini'
-FILE_MiSTer_alt_1_ini = 'MiSTer_alt_1.ini'
-FILE_MiSTer_alt_2_ini = 'MiSTer_alt_2.ini'
-FILE_MiSTer_alt_3_ini = 'MiSTer_alt_3.ini'
+FILE_MiSTer_ini: Final[str] = 'MiSTer.ini'
+FILE_MiSTer_alt_ini: Final[str] = 'MiSTer_alt.ini'
+FILE_MiSTer_alt_1_ini: Final[str] = 'MiSTer_alt_1.ini'
+FILE_MiSTer_alt_2_ini: Final[str] = 'MiSTer_alt_2.ini'
+FILE_MiSTer_alt_3_ini: Final[str] = 'MiSTer_alt_3.ini'
 
 # System folders
-FOLDER_linux = 'linux'
-FOLDER_saves = 'saves'
-FOLDER_savestates = 'savestates'
-FOLDER_screenshots = 'screenshots'
-FOLDER_gamecontrollerdb = 'linux/gamecontrollerdb'
-FILE_gamecontrollerdb = 'linux/gamecontrollerdb/gamecontrollerdb.txt'
-FILE_gamecontrollerdb_user = 'linux/gamecontrollerdb/gamecontrollerdb_user.txt'
-FILE_yc_txt = 'yc.txt'
+FOLDER_linux: Final[str] = 'linux'
+FOLDER_saves: Final[str] = 'saves'
+FOLDER_savestates: Final[str] = 'savestates'
+FOLDER_screenshots: Final[str] = 'screenshots'
+FOLDER_gamecontrollerdb: Final[str] = 'linux/gamecontrollerdb'
+FILE_gamecontrollerdb: Final[str] = 'linux/gamecontrollerdb/gamecontrollerdb.txt'
+FILE_gamecontrollerdb_user: Final[str] = 'linux/gamecontrollerdb/gamecontrollerdb_user.txt'
+FILE_yc_txt: Final[str] = 'yc.txt'
 
 # Downloader files
-FILE_downloader_storage_zip = 'Scripts/.config/downloader/downloader.json.zip'
-FILE_downloader_storage_json = 'Scripts/.config/downloader/downloader.json'
-FILE_downloader_external_storage = '.downloader_db.json'
-FILE_downloader_last_successful_run = 'Scripts/.config/downloader/%s.last_successful_run'
-FILE_downloader_log = 'Scripts/.config/downloader/%s.log'
-FILE_downloader_ini = '/media/fat/downloader.ini'
-FILE_downloader_launcher_script = 'Scripts/downloader.sh'
+FILE_downloader_storage_zip: Final[str] = 'Scripts/.config/downloader/downloader.json.zip'
+FILE_downloader_storage_json: Final[str] = 'Scripts/.config/downloader/downloader.json'
+FILE_downloader_external_storage: Final[str] = '.downloader_db.json'
+FILE_downloader_last_successful_run: Final[str] = 'Scripts/.config/downloader/%s.last_successful_run'
+FILE_downloader_log: Final[str] = 'Scripts/.config/downloader/%s.log'
+FILE_downloader_ini: Final[str] = '/media/fat/downloader.ini'
+FILE_downloader_launcher_script: Final[str] = 'Scripts/downloader.sh'
 
 # Linux Update files
-FILE_MiSTer_version = '/MiSTer.version'
-FILE_Linux_7z = '/media/fat/linux/7za'
-FILE_Linux_user_files = [
+FILE_MiSTer_version: Final[str] = '/MiSTer.version'
+FILE_Linux_7z: Final[str] = '/media/fat/linux/7za'
+FILE_Linux_user_files: Final[List[Tuple[str, str]]] = [
     # source -> destination
     ('/media/fat/linux/hostname', '/etc/hostname'),
     ('/media/fat/linux/hosts', '/etc/hosts'),
@@ -79,29 +79,29 @@ FILE_Linux_user_files = [
 ]
 
 # Reboot files
-FILE_downloader_needs_reboot_after_linux_update = '/tmp/downloader_needs_reboot_after_linux_update'
-FILE_mister_downloader_needs_reboot = '/tmp/MiSTer_downloader_needs_reboot'
+FILE_downloader_needs_reboot_after_linux_update: Final[str] = '/tmp/downloader_needs_reboot_after_linux_update'
+FILE_mister_downloader_needs_reboot: Final[str] = '/tmp/MiSTer_downloader_needs_reboot'
 
 # Hash exceptional cases
-HASH_file_does_not_exist = 'file_does_not_exist'
+HASH_file_does_not_exist: Final[str] = 'file_does_not_exist'
 
 # Storage Priority
-STORAGE_PRIORITY_PREFER_SD = 'prefer_sd'
-STORAGE_PRIORITY_PREFER_EXTERNAL = 'prefer_external'
-STORAGE_PRIORITY_OFF = 'off'
+STORAGE_PRIORITY_PREFER_SD: Final[str] = 'prefer_sd'
+STORAGE_PRIORITY_PREFER_EXTERNAL: Final[str] = 'prefer_external'
+STORAGE_PRIORITY_OFF: Final[str] = 'off'
 
 # Standard Drives
-MEDIA_USB0 = '/media/usb0'
-MEDIA_USB1 = '/media/usb1'
-MEDIA_USB2 = '/media/usb2'
-MEDIA_USB3 = '/media/usb3'
-MEDIA_USB4 = '/media/usb4'
-MEDIA_USB5 = '/media/usb5'
-MEDIA_FAT_CIFS = '/media/fat/cifs'
-MEDIA_FAT = '/media/fat'
+MEDIA_USB0: Final[str] = '/media/usb0'
+MEDIA_USB1: Final[str] = '/media/usb1'
+MEDIA_USB2: Final[str] = '/media/usb2'
+MEDIA_USB3: Final[str] = '/media/usb3'
+MEDIA_USB4: Final[str] = '/media/usb4'
+MEDIA_USB5: Final[str] = '/media/usb5'
+MEDIA_FAT_CIFS: Final[str] = '/media/fat/cifs'
+MEDIA_FAT: Final[str] = '/media/fat'
 
 # Storage Priority Resolution Sequence
-STORAGE_PATHS_PRIORITY_SEQUENCE = [
+STORAGE_PATHS_PRIORITY_SEQUENCE: Final[List[str]] = [
     MEDIA_USB0,
     MEDIA_USB1,
     MEDIA_USB2,
@@ -116,50 +116,48 @@ STORAGE_PATHS_PRIORITY_SEQUENCE = [
 # Dictionary Keys:
 
 # Config
-K_BASE_PATH = 'base_path'
-K_BASE_SYSTEM_PATH = 'base_system_path'
-K_STORAGE_PRIORITY = 'storage_priority'
-K_DATABASES = 'databases'
-K_ALLOW_DELETE = 'allow_delete'
-K_ALLOW_REBOOT = 'allow_reboot'
-K_UPDATE_LINUX = 'update_linux'
-K_DOWNLOADER_THREADS_LIMIT = 'downloader_threads_limit'
-K_DOWNLOADER_TIMEOUT = 'downloader_timeout'
-K_DOWNLOADER_RETRIES = 'downloader_retries'
-K_ZIP_FILE_COUNT_THRESHOLD = 'zip_file_count_threshold'
-K_ZIP_ACCUMULATED_MB_THRESHOLD = 'zip_accumulated_mb_threshold'
-K_FILTER = 'filter'
-K_VERBOSE = 'verbose'
-K_CONFIG_PATH = 'config_path'
-K_LOGFILE = 'logfile'
-K_USER_DEFINED_OPTIONS = 'user_defined_options'
-K_CURL_SSL = 'curl_ssl'
-K_DB_URL = 'db_url'
-K_SECTION = 'section'
-K_OPTIONS = 'options'
-K_DEBUG = 'debug'
-K_FAIL_ON_FILE_ERROR = 'fail_on_file_error'
-K_COMMIT = 'commit'
-K_DEFAULT_DB_ID = 'default_db_id'
-K_START_TIME = 'start_time'
-K_IS_PC_LAUNCHER = 'is_pc_launcher'
-K_MINIMUM_SYSTEM_FREE_SPACE_MB = 'minimum_system_free_space_mb'
-K_MINIMUM_EXTERNAL_FREE_SPACE_MB = 'minimum_external_free_space_mb'
+K_BASE_PATH: Final[str] = 'base_path'
+K_BASE_SYSTEM_PATH: Final[str] = 'base_system_path'
+K_STORAGE_PRIORITY: Final[str] = 'storage_priority'
+K_DATABASES: Final[str] = 'databases'
+K_ALLOW_DELETE: Final[str] = 'allow_delete'
+K_ALLOW_REBOOT: Final[str] = 'allow_reboot'
+K_UPDATE_LINUX: Final[str] = 'update_linux'
+K_DOWNLOADER_THREADS_LIMIT: Final[str] = 'downloader_threads_limit'
+K_DOWNLOADER_TIMEOUT: Final[str] = 'downloader_timeout'
+K_DOWNLOADER_RETRIES: Final[str] = 'downloader_retries'
+K_ZIP_FILE_COUNT_THRESHOLD: Final[str] = 'zip_file_count_threshold'
+K_ZIP_ACCUMULATED_MB_THRESHOLD: Final[str] = 'zip_accumulated_mb_threshold'
+K_FILTER: Final[str] = 'filter'
+K_VERBOSE: Final[str] = 'verbose'
+K_CONFIG_PATH: Final[str] = 'config_path'
+K_LOGFILE: Final[str] = 'logfile'
+K_USER_DEFINED_OPTIONS: Final[str] = 'user_defined_options'
+K_CURL_SSL: Final[str] = 'curl_ssl'
+K_DB_URL: Final[str] = 'db_url'
+K_SECTION: Final[str] = 'section'
+K_OPTIONS: Final[str] = 'options'
+K_DEBUG: Final[str] = 'debug'
+K_FAIL_ON_FILE_ERROR: Final[str] = 'fail_on_file_error'
+K_COMMIT: Final[str] = 'commit'
+K_DEFAULT_DB_ID: Final[str] = 'default_db_id'
+K_START_TIME: Final[str] = 'start_time'
+K_IS_PC_LAUNCHER: Final[str] = 'is_pc_launcher'
+K_MINIMUM_SYSTEM_FREE_SPACE_MB: Final[str] = 'minimum_system_free_space_mb'
+K_MINIMUM_EXTERNAL_FREE_SPACE_MB: Final[str] = 'minimum_external_free_space_mb'
 
 # Env
 KENV_DOWNLOADER_LAUNCHER_PATH: Final[str] = 'DOWNLOADER_LAUNCHER_PATH'
-KENV_DOWNLOADER_INI_PATH = 'DOWNLOADER_INI_PATH'
-KENV_CURL_SSL = 'CURL_SSL'
-KENV_COMMIT = 'COMMIT'
-KENV_ALLOW_REBOOT = 'ALLOW_REBOOT'
-KENV_UPDATE_LINUX = 'UPDATE_LINUX'
-KENV_DEFAULT_DB_URL = 'DEFAULT_DB_URL'
-KENV_DEFAULT_DB_ID = 'DEFAULT_DB_ID'
-KENV_DEFAULT_BASE_PATH = 'DEFAULT_BASE_PATH'
-KENV_FORCED_BASE_PATH = 'FORCED_BASE_PATH'
-KENV_PC_LAUNCHER = 'PC_LAUNCHER'
-KENV_DEBUG = 'DEBUG'
-KENV_FAIL_ON_FILE_ERROR = 'FAIL_ON_FILE_ERROR'
-KENV_LOGFILE = 'LOGFILE'
-
-
+KENV_DOWNLOADER_INI_PATH: Final[str] = 'DOWNLOADER_INI_PATH'
+KENV_CURL_SSL: Final[str] = 'CURL_SSL'
+KENV_COMMIT: Final[str] = 'COMMIT'
+KENV_ALLOW_REBOOT: Final[str] = 'ALLOW_REBOOT'
+KENV_UPDATE_LINUX: Final[str] = 'UPDATE_LINUX'
+KENV_DEFAULT_DB_URL: Final[str] = 'DEFAULT_DB_URL'
+KENV_DEFAULT_DB_ID: Final[str] = 'DEFAULT_DB_ID'
+KENV_DEFAULT_BASE_PATH: Final[str] = 'DEFAULT_BASE_PATH'
+KENV_FORCED_BASE_PATH: Final[str] = 'FORCED_BASE_PATH'
+KENV_PC_LAUNCHER: Final[str] = 'PC_LAUNCHER'
+KENV_DEBUG: Final[str] = 'DEBUG'
+KENV_FAIL_ON_FILE_ERROR: Final[str] = 'FAIL_ON_FILE_ERROR'
+KENV_LOGFILE: Final[str] = 'LOGFILE'
