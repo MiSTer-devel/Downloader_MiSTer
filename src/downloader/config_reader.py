@@ -153,6 +153,8 @@ class ConfigReader:
             result['logfile'] = str(launcher_path.with_suffix('.log'))
             result['curl_ssl'] = ''
 
+        result['environment'] = self._env
+
         self._logger.debug('env: ' + json.dumps(self._env, indent=4))
         self._logger.debug('config: ' + json.dumps(result, default=lambda o: str(o) if isinstance(o, Path) else o.__dict__, indent=4))
 
