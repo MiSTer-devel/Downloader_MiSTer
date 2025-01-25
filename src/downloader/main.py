@@ -35,14 +35,15 @@ def main(env: Environment) -> int:
     # It should receive an 'env' dictionary produced by calling the "read_env" function below.
 
     local_repository_provider = LocalRepositoryProvider()
-    logger = FileLoggerDecorator(PrintLogger(), local_repository_provider)
+    printer = PrintLogger()
+    logger = FileLoggerDecorator(printer, local_repository_provider)
     logger.print('START!')
     logger.print()
     # noinspection PyBroadException
     try:
         exit_code = execute_full_run(
-            FullRunServiceFactory(logger, local_repository_provider=local_repository_provider),
-            ConfigReader(logger, env),
+            FullRunServiceFactory(logger, logger, local_repository_provider=local_repository_provider),
+            ConfigReader(logger, printer, env),
             sys.argv
         )
     except Exception as _:
@@ -78,7 +79,7 @@ def read_env(default_commit: Optional[str]) -> Environment:
     }
 
 
-def execute_full_run(full_run_service_factory, config_reader, argv) -> int:
+def execute_full_run(full_run_service_factory: FullRunServiceFactory, config_reader: ConfigReader, argv) -> int:
     # The config will merge env inputs and 'downloader.ini' inputs, representing all configurable inputs.
     config = config_reader.read_config(config_reader.calculate_config_path(str(Path().resolve())))
 

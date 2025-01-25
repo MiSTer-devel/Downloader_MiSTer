@@ -32,11 +32,11 @@ from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import DownloaderWorkerContext, make_downloader_worker_context
-from downloader.logger import DebugOnlyLoggerDecorator
+from downloader.logger import DebugOnlyLoggerDecorator, Logger, LogFinalizer
 from downloader.os_utils import LinuxOsUtils
 from downloader.storage_priority_resolver import StoragePriorityResolver
 from downloader.linux_updater import LinuxUpdater
-from downloader.local_repository import LocalRepository
+from downloader.local_repository import LocalRepository, LocalRepositoryProvider
 from downloader.migrations import migrations
 from downloader.offline_importer import OfflineImporter
 from downloader.online_importer import OnlineImporter
@@ -49,8 +49,9 @@ import atexit
 
 
 class FullRunServiceFactory:
-    def __init__(self, logger, local_repository_provider, external_drives_repository_factory=None):
+    def __init__(self, logger: Logger, log_finalizer: LogFinalizer, local_repository_provider: LocalRepositoryProvider, external_drives_repository_factory=None):
         self._logger = logger
+        self._log_finalizer = log_finalizer
         self._external_drives_repository_factory = external_drives_repository_factory or ExternalDrivesRepositoryFactory()
         self._local_repository_provider = local_repository_provider
 
@@ -115,6 +116,7 @@ class FullRunServiceFactory:
         return FullRunService(
             config,
             self._logger,
+            self._log_finalizer,
             local_repository,
             db_gateway,
             offline_importer,

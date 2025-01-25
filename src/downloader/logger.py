@@ -21,49 +21,30 @@ import tempfile
 import sys
 import time
 import traceback
-from abc import abstractmethod, ABC
-from typing import List, Any
+from typing import List, Any, Optional, Protocol
 
 from downloader.config import Config
 
 
-class Logger(ABC):
-    @abstractmethod
-    def configure(self, config: Config):
-        """makes logs more verbose"""
-
-    @abstractmethod
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
-        """print always"""
-
-    @abstractmethod
-    def debug(self, *args, sep='', end='\n', flush=True):
-        """print only to debug target"""
-
-    @abstractmethod
-    def bench(self, label: str):
-        """print only to debug target"""
-
-    def finalize(self):
-        """to be called at the very end, should not call any method after this one"""
+class Logger(Protocol):
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True) -> None: """print always"""
+    def debug(self, *args, sep='', end='\n', flush=True) -> None: """print only to debug target"""
+    def bench(self, label: str) -> None: """print only to debug target"""
 
 
-class PrintLogger(Logger):
-    @staticmethod
-    def make_configured(config: Config):
-        logger = PrintLogger()
-        logger.configure(config)
-        return logger
+class LogConfigurer(Protocol):
+    def configure(self, config: Config) -> None: pass
 
-    def __init__(self):
-        self._verbose_mode = False
-        self._start_time = None
-        self._describe_now = False
+class PrintLogger(Logger, LogConfigurer):
+    def __init__(self, start_time: Optional[int] = None):
+        self._verbose_mode = True
+        self._start_time = start_time
 
     def configure(self, config: Config):
         if config['verbose']:
-            self._verbose_mode = True
             self._start_time = config['start_time']
+        else:
+            self._verbose_mode = False
 
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
         self._do_print(*args, sep=sep, end=end, file=file, flush=flush)
@@ -84,9 +65,6 @@ class PrintLogger(Logger):
         if self._start_time is not None:
             self._do_print('%s| %s' % (str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-4], label), sep='', end='\n', file=sys.stdout, flush=True)
 
-    def finalize(self):
-        pass
-
     def _do_print(self, *args, sep, end, file, flush):
         try:
             print(*args, sep=sep, end=end, file=file, flush=flush)
@@ -99,34 +77,16 @@ class PrintLogger(Logger):
             print('An unknown exception occurred during logging: %s' % str(error))
 
 
-class NoLogger(Logger):
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
-        pass
+class LogFinalizer(Protocol):
+    def finalize(self) -> None: pass
 
-    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
-        pass
-
-    def bench(self, label: str):
-        pass
-
-    def configure(self, config: Config):
-        pass
-
-    def finalize(self):
-        pass
-
-
-class FileLoggerDecorator(Logger):
+class FileLoggerDecorator(Logger, LogFinalizer):
     def __init__(self, decorated_logger: Logger, local_repository_provider):
         self._decorated_logger = decorated_logger
         self._logfile = tempfile.NamedTemporaryFile('w', delete=False)
         self._local_repository_provider = local_repository_provider
 
-    def configure(self, config: Config):
-        self._decorated_logger.configure(config)
-
     def finalize(self):
-        self._decorated_logger.finalize()
         if self._logfile is None:
             return
 
@@ -154,9 +114,6 @@ class DebugOnlyLoggerDecorator(Logger):
     def __init__(self, decorated_logger: Logger):
         self._decorated_logger = decorated_logger
 
-    def configure(self, config: Config):
-        self._decorated_logger.configure(config)
-
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
         """Calls debug instead of print"""
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
@@ -167,8 +124,14 @@ class DebugOnlyLoggerDecorator(Logger):
     def bench(self, label: str):
         self._decorated_logger.bench(label)
 
-    def finalize(self):
-        self._decorated_logger.finalize()
+
+# @TODO: Consider moving this one to test code
+class NoLogger(Logger, LogFinalizer, LogConfigurer):
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
+    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
+    def bench(self, label: str): pass
+    def finalize(self) -> None: pass
+    def configure(self, config: Config) -> None: pass
 
 
 # @TODO: Consider moving this one to test code
@@ -177,9 +140,7 @@ class DescribeNowDecorator(Logger):
         self._re = re.compile(r'^ */[^:]+:\d+.*$')  # Matches paths such as /asd/bef/df:34
         self._decorated_logger = decorated_logger
 
-    def configure(self, config: Config): self._decorated_logger.configure(config)
     def bench(self, label: str): self._decorated_logger.bench(label)
-    def finalize(self): self._decorated_logger.finalize()
 
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
         self._decorated_logger.print(*self._handle_args([*args]), sep=sep, end=end, flush=True)

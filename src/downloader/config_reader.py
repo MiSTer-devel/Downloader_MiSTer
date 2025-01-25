@@ -31,12 +31,13 @@ from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, 
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL
 from downloader.db_options import DbOptions, DbOptionsKind, DbOptionsValidationException
-from downloader.logger import Logger
+from downloader.logger import Logger, LogConfigurer
 
 
 class ConfigReader:
-    def __init__(self, logger: Logger, env: Environment):
+    def __init__(self, logger: Logger, log_configurer: LogConfigurer, env: Environment):
         self._logger = logger
+        self._log_configurer = log_configurer
         self._env = env
 
     def calculate_config_path(self, current_working_dir: str) -> str:
@@ -152,10 +153,10 @@ class ConfigReader:
             result['logfile'] = str(launcher_path.with_suffix('.log'))
             result['curl_ssl'] = ''
 
-        self._logger.configure(result)
-
         self._logger.debug('env: ' + json.dumps(self._env, indent=4))
         self._logger.debug('config: ' + json.dumps(result, default=lambda o: str(o) if isinstance(o, Path) else o.__dict__, indent=4))
+
+        self._log_configurer.configure(result)
 
         return result
 
