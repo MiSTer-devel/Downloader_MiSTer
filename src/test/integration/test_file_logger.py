@@ -20,7 +20,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from downloader.local_repository import LocalRepositoryProvider
 from downloader.logger import FileLoggerDecorator
 from downloader.logger import NoLogger
 from test.fake_external_drives_repository import ExternalDrivesRepositoryStub
@@ -62,9 +61,8 @@ class TestFileLogger(unittest.TestCase):
         self.assertNotEqual(print_line, Path(self.local_repository.logfile_path).read_text())
 
     def configure_and_initialize_file_logger(self):
-        local_repository_provider = LocalRepositoryProvider()
-        self.logger = FileLoggerDecorator(NoLogger(), local_repository_provider)
+        self.logger = FileLoggerDecorator(NoLogger())
         config = config_with(base_path=self.tempdir.name, base_system_path=self.tempdir.name)
         file_system = make_production_filesystem_factory(config=config).create_for_system_scope()
         self.local_repository = LocalRepository(config=config, file_system=file_system, external_drive_repository=ExternalDrivesRepositoryStub([self.tempdir.name]))
-        local_repository_provider.initialize(self.local_repository)
+        self.logger.set_local_repository(self.local_repository)

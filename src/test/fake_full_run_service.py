@@ -78,6 +78,7 @@ class FullRunService(ProductionFullRunService):
         super().__init__(config,
                          NoLogger(),
                          NoLogger(),
+                         NoLogger(),
                          LocalRepository(config=config, file_system=system_file_system),
                          db_gateway or DbGateway(config, file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory),
                          OfflineImporter(file_downloader_factory=file_downloader_factory),
