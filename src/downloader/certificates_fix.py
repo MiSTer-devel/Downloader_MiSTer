@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import subprocess
-from downloader.constants import DEFAULT_CURL_SSL_OPTIONS, K_CURL_SSL
+from downloader.constants import DEFAULT_CURL_SSL_OPTIONS
 
 
 class CertificatesFix:
@@ -38,7 +38,7 @@ class CertificatesFix:
         return result
 
     def _fix_certificates_if_needed_impl(self):
-        curl_ssl = self._config[K_CURL_SSL].strip().lower()
+        curl_ssl = self._config['curl_ssl'].strip().lower()
         if curl_ssl != DEFAULT_CURL_SSL_OPTIONS.strip().lower():
             return True
 

@@ -93,7 +93,7 @@ class Config(ConfigMisterSection):
     commit: str
     fail_on_file_error: bool
     curl_ssl: str
-    environment: NotRequired[Environment]
+    environment: NotRequired[Environment]  # This should never be used. It's there just to be debug-logged.
 
 
 def config_with_base_path(config: Config, base_path: str) -> Config:

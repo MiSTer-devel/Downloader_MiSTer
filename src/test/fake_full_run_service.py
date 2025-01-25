@@ -19,8 +19,6 @@
 from pathlib import Path
 
 from downloader.config import default_config
-from downloader.constants import K_DATABASES, K_DB_URL, K_SECTION, K_VERBOSE, K_CONFIG_PATH, K_USER_DEFINED_OPTIONS, \
-    K_COMMIT, K_FAIL_ON_FILE_ERROR, K_UPDATE_LINUX
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.full_run_service import FullRunService as ProductionFullRunService
 from downloader.importer_command import ImporterCommandFactory
@@ -113,19 +111,17 @@ class FullRunService(ProductionFullRunService):
     def with_single_empty_db() -> ProductionFullRunService:
         config = default_config()
         config.update({
-            K_DATABASES: {
+            'databases': {
                 db_empty: {
-                    K_DB_URL: db_empty,
-                    K_SECTION: db_empty,
-                    'base_files_url': '',
-                    'zips': {}
+                    'db_url': db_empty,
+                    'section': db_empty
                 }
             },
-            K_VERBOSE: False,
-            K_CONFIG_PATH: Path(''),
-            K_USER_DEFINED_OPTIONS: [],
-            K_COMMIT: 'test',
-            K_FAIL_ON_FILE_ERROR: True
+            'verbose': False,
+            'config_path': Path(''),
+            'user_defined_options': [],
+            'commit': 'test',
+            'fail_on_file_error': True,
         })
 
         file_system_state = FileSystemState(files={db_empty: {'unzipped_json': {}}})
@@ -155,20 +151,18 @@ class FullRunService(ProductionFullRunService):
         update_linux = update_linux if update_linux is not None else True
         config = default_config()
         config.update({
-                K_DATABASES: {
+                'databases': {
                     db_id: {
-                        K_DB_URL: db_id,
-                        K_SECTION: db_id,
-                        'base_files_url': '',
-                        'zips': {}
+                        'db_url': db_id,
+                        'section': db_id
                     }
                 },
-                K_VERBOSE: False,
-                K_USER_DEFINED_OPTIONS: [],
-                K_CONFIG_PATH: Path(''),
-                K_COMMIT: 'test',
-                K_UPDATE_LINUX: update_linux,
-                K_FAIL_ON_FILE_ERROR: True
+                'verbose': False,
+                'user_defined_options': [],
+                'config_path': Path(''),
+                'commit': 'test',
+                'update_linux': update_linux,
+                'fail_on_file_error': True
             })
         return config
 
@@ -176,8 +170,8 @@ class FullRunService(ProductionFullRunService):
     def with_no_dbs() -> ProductionFullRunService:
         config = default_config()
         config.update({
-            K_DATABASES: {}, K_VERBOSE: False, K_CONFIG_PATH: Path(''), K_USER_DEFINED_OPTIONS: [],
-            K_COMMIT: 'test', K_FAIL_ON_FILE_ERROR: True
+            'databases': {}, 'verbose': False, 'config_path': Path(''), 'user_defined_options': [],
+            'commit': 'test', 'fail_on_file_error': True
         })
         return FullRunService(
             config,

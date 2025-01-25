@@ -26,7 +26,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Set, Dict, Any, Tuple
 
-from downloader.config import AllowDelete
+from downloader.config import AllowDelete, Config
 from downloader.constants import K_ALLOW_DELETE, K_BASE_PATH, HASH_file_does_not_exist
 from downloader.logger import Logger, NoLogger
 from downloader.other import ClosableValue
@@ -38,7 +38,7 @@ COPY_BUFSIZE = 1024 * 1024 if is_windows else 64 * 1024
 
 
 class FileSystemFactory:
-    def __init__(self, config: Dict[str, Any], path_dictionary: Dict[str, str], logger: Logger):
+    def __init__(self, config: Config, path_dictionary: Dict[str, str], logger: Logger):
         self._config = config
         self._path_dictionary = path_dictionary
         self._logger = logger
