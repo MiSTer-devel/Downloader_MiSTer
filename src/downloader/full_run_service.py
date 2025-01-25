@@ -20,17 +20,16 @@ import datetime
 import sys
 import time
 
-from downloader.constants import K_DATABASES, K_UPDATE_LINUX, \
-    K_FAIL_ON_FILE_ERROR, K_COMMIT, K_START_TIME, K_IS_PC_LAUNCHER, K_MINIMUM_SYSTEM_FREE_SPACE_MB, K_BASE_SYSTEM_PATH, K_MINIMUM_EXTERNAL_FREE_SPACE_MB
+from downloader.config import Config
 from downloader.importer_command import ImporterCommandFactory
 from downloader.job_system import JobSystem
-from downloader.jobs.download_db_job import DownloadDbJob
 from downloader.jobs.worker_context import DownloaderWorkerContext
+from downloader.logger import LogFinalizer, Logger
 from downloader.other import format_files_message, format_folders_message, format_zips_message
 
 
 class FullRunService:
-    def __init__(self, config, logger, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter, importer_command_factory: ImporterCommandFactory, job_system: JobSystem, workers_ctx: DownloaderWorkerContext):
+    def __init__(self, config: Config, logger: Logger, log_finalizer: LogFinalizer, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter, importer_command_factory: ImporterCommandFactory, job_system: JobSystem, workers_ctx: DownloaderWorkerContext):
         self._importer_command_factory = importer_command_factory
         self._waiter = waiter
         self._os_utils = os_utils
@@ -44,6 +43,7 @@ class FullRunService:
         self._db_gateway = db_gateway
         self._local_repository = local_repository
         self._logger = logger
+        self._log_finalizer = log_finalizer
         self._config = config
         self._job_system = job_system
         self._workers_ctx = workers_ctx
@@ -64,12 +64,12 @@ class FullRunService:
         result = self._full_run_impl()
         self._logger.bench('Full Run done.')
 
-        if not self._config[K_IS_PC_LAUNCHER] and self._needs_reboot():
+        if not self._config['is_pc_launcher'] and self._needs_reboot():
             self._logger.print()
             self._logger.print("Rebooting in 10 seconds...")
             sys.stdout.flush()
             self._waiter.sleep(2)
-            self._logger.finalize()
+            self._log_finalizer.finalize()
             sys.stdout.flush()
             self._waiter.sleep(4)
             self._os_utils.sync()
@@ -94,7 +94,7 @@ class FullRunService:
         full_resync = not self._local_repository.has_last_successful_run()
 
         # self._workers_factory.prepare_workers()
-        # for section, ini_description in self._config[K_DATABASES].items():
+        # for section, ini_description in self._config['databases'].items():
         #     self._job_system.push_job(DownloadDbJob(
         #         ini_section=section,
         #         ini_description=ini_description,
@@ -106,11 +106,11 @@ class FullRunService:
         # self._job_system.execute_jobs()
         # failed_dbs = []
 
-        databases, failed_dbs = self._db_gateway.fetch_all(self._config[K_DATABASES])
+        databases, failed_dbs = self._db_gateway.fetch_all(self._config['databases'])
 
         importer_command = self._importer_command_factory.create()
         for db in databases:
-            description = self._config[K_DATABASES][db.db_id]
+            description = self._config['databases'][db.db_id]
             importer_command.add_db(db, local_store.store_by_id(db.db_id), description)
 
         for relocation_package in self._base_path_relocator.relocating_base_paths(importer_command):
@@ -129,14 +129,14 @@ class FullRunService:
                               self._online_importer.unused_filter_tags(),
                               self._online_importer.new_files_not_overwritten(),
                               self._online_importer.full_partitions(),
-                              self._config[K_START_TIME])
+                              self._config['start_time'])
 
         self._logger.print()
 
-        if self._config[K_UPDATE_LINUX]:
+        if self._config['update_linux']:
             self._linux_updater.update_linux(importer_command)
 
-        if self._config[K_FAIL_ON_FILE_ERROR]:
+        if self._config['fail_on_file_error']:
             failure_count = len(self._online_importer.files_that_failed()) + len(self._online_importer.folders_that_failed()) + len(self._online_importer.zips_that_failed())
             if failure_count > 0:
                 self._logger.debug('Length of files_that_failed: %d' % len(self._online_importer.files_that_failed()))
@@ -169,8 +169,8 @@ class FullRunService:
 
         self._logger.print()
         self._logger.print('===========================')
-        self._logger.print(f'Downloader 1.8 ({self._config[K_COMMIT][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
-        self._logger.debug(f'Commit: {self._config[K_COMMIT]}')
+        self._logger.print(f'Downloader 1.8 ({self._config['commit'][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        self._logger.debug(f'Commit: {self._config['commit']}')
         self._logger.print(f'Log: {self._local_repository.logfile_path}')
         if len(unused_filter_tags) > 0:
             self._logger.print()
@@ -198,8 +198,8 @@ class FullRunService:
             self._logger.print()
             self._logger.print(' * Delete the file that you wish to upgrade from the previous list, and run this again.')
         if len(full_partitions) > 0:
-            has_system = any(partition == self._config[K_BASE_SYSTEM_PATH] for partition in full_partitions)
-            has_external = any(partition != self._config[K_BASE_SYSTEM_PATH] for partition in full_partitions)
+            has_system = any(partition == self._config['base_system_path'] for partition in full_partitions)
+            has_external = any(partition != self._config['base_system_path'] for partition in full_partitions)
             self._logger.print()
             self._logger.print("################################################################################")
             self._logger.print("################################## IMPORTANT! ##################################")
@@ -208,8 +208,8 @@ class FullRunService:
             self._logger.print("You DON'T have enough free space to run Downloader!")
             for partition in full_partitions: self._logger.print(f' - {partition} is FULL')
             self._logger.print()
-            if has_system: self._logger.print(f'Minimum required space for {self._config[K_BASE_SYSTEM_PATH]} is {self._config[K_MINIMUM_SYSTEM_FREE_SPACE_MB]}MB.')
-            if has_external: self._logger.print(f'Minimum required space for external storage is {self._config[K_MINIMUM_EXTERNAL_FREE_SPACE_MB]}MB.')
+            if has_system: self._logger.print(f'Minimum required space for {self._config['base_system_path']} is {self._config['minimum_system_free_space_mb']}MB.')
+            if has_external: self._logger.print(f'Minimum required space for external storage is {self._config['minimum_external_free_space_mb']}MB.')
             self._logger.print('Free some space and try again. [Waiting 10 seconds...]')
             self._waiter.sleep(10)
 

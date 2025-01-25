@@ -67,5 +67,4 @@ class TestFileLogger(unittest.TestCase):
         config = config_with(base_path=self.tempdir.name, base_system_path=self.tempdir.name)
         file_system = make_production_filesystem_factory(config=config).create_for_system_scope()
         self.local_repository = LocalRepository(config=config, file_system=file_system, external_drive_repository=ExternalDrivesRepositoryStub([self.tempdir.name]))
-        self.logger.configure(config)
         local_repository_provider.initialize(self.local_repository)

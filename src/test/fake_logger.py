@@ -36,9 +36,3 @@ class SpyLoggerDecorator(Logger):
 
     def bench(self, label):
         self._decorated_logger.bench(label)
-
-    def configure(self, config):
-        self._decorated_logger.configure(config)
-
-    def finalize(self):
-        self._decorated_logger.finalize()

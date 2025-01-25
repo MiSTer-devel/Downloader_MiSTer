@@ -30,13 +30,13 @@ from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPExcep
 T = TypeVar('T')
 class HttpGatewayException(Exception): pass
 
-class Logger(Protocol):
+class HttpLogger(Protocol):
     def print(self, *args: Any) -> None: ...
     def debug(self, *args: Any) -> None: ...
 
 
 class HttpGateway:
-    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: int, logger: Optional[Logger] = None):
+    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: int, logger: Optional[HttpLogger] = None):
         now = time.monotonic()
         self._ssl_ctx = ssl_ctx
         self._timeout = timeout
@@ -266,7 +266,7 @@ def _redirect(input_arg: T, res_dict: Dict[T, _Redirect[T]], lock: threading.Loc
 
 
 class _Connection:
-    def __init__(self, conn_id: int, http: HTTPConnection, connection_queue: '_ConnectionQueue', logger: Optional[Logger]):
+    def __init__(self, conn_id: int, http: HTTPConnection, connection_queue: '_ConnectionQueue', logger: Optional[HttpLogger]):
         self.id = conn_id
         self._http = http
         self._connection_queue = connection_queue
@@ -340,7 +340,7 @@ class _FinishedResponse: pass
 
 
 class _ConnectionQueue:
-    def __init__(self, queue_id: _QueueId, timeout: int, ctx: ssl.SSLContext, logger: Optional[Logger]):
+    def __init__(self, queue_id: _QueueId, timeout: int, ctx: ssl.SSLContext, logger: Optional[HttpLogger]):
         self.id = queue_id
         self._timeout = timeout
         self._ctx = ctx
@@ -395,7 +395,7 @@ def create_http_connection(scheme: str, netloc: str, timeout: int, ctx: ssl.SSLC
 
 
 class _ResponseHeaders:
-    def __init__(self, logger: Optional[Logger]):
+    def __init__(self, logger: Optional[HttpLogger]):
         self._logger = logger
         self._headers: Dict[str, str] = {}
         self._version = 11
@@ -463,7 +463,7 @@ _used_headers = {'location', 'cache-control', 'age', 'expires', 'connection', 'k
 
 
 class _ParamsParser:
-    def __init__(self, logger: Optional[Logger]):
+    def __init__(self, logger: Optional[HttpLogger]):
         self._logger = logger
         self._data: Dict[str, Union[bool, str, None]] = dict()
 
