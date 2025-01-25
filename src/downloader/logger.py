@@ -47,7 +47,7 @@ class PrintLogger(Logger, LogConfigurer):
             self._verbose_mode = False
 
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
-        self._do_print(*args, sep=sep, end=end, file=file, flush=flush)
+        _do_print(*args, sep=sep, end=end, file=file, flush=flush)
 
     def debug(self, *args, sep='', end='\n', flush=True):
         if self._verbose_mode:
@@ -58,23 +58,23 @@ class PrintLogger(Logger, LogConfigurer):
             if len(exceptions) > 0:
                 args = list(set(args) - set(exceptions))
                 for e in exceptions:
-                    self._do_print("".join(traceback.format_exception(type(e), e, e.__traceback__)), sep=sep, end=end, file=sys.stdout, flush=flush)
-            self._do_print(*args, sep=sep, end=end, file=sys.stdout, flush=flush)
+                    _do_print("".join(traceback.format_exception(type(e), e, e.__traceback__)), sep=sep, end=end, file=sys.stdout, flush=flush)
+            _do_print(*args, sep=sep, end=end, file=sys.stdout, flush=flush)
 
     def bench(self, label: str):
         if self._start_time is not None:
-            self._do_print('%s| %s' % (str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-4], label), sep='', end='\n', file=sys.stdout, flush=True)
+            _do_print('%s| %s' % (str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-4], label), sep='', end='\n', file=sys.stdout, flush=True)
 
-    def _do_print(self, *args, sep, end, file, flush):
-        try:
-            print(*args, sep=sep, end=end, file=file, flush=flush)
-        except UnicodeEncodeError:
-            pack = []
-            for a in args:
-                pack.append(a.encode('utf8', 'surrogateescape'))
-            print(*pack, sep=sep, end=end, file=file, flush=flush)
-        except BaseException as error:
-            print('An unknown exception occurred during logging: %s' % str(error))
+def _do_print(*args, sep, end, file, flush):
+    try:
+        print(*args, sep=sep, end=end, file=file, flush=flush)
+    except UnicodeEncodeError:
+        pack = []
+        for a in args:
+            pack.append(a.encode('utf8', 'surrogateescape'))
+        print(*pack, sep=sep, end=end, file=file, flush=flush)
+    except BaseException as error:
+        print('An unknown exception occurred during logging: %s' % str(error))
 
 
 class LogFinalizer(Protocol):
