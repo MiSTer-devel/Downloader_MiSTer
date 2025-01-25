@@ -493,7 +493,7 @@ class JobCancelled(Exception): pass
 
 class JobSystemLogger(Protocol):
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True): """Prints a message to the logger."""
-    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=True): """Prints a message to the logger."""
+    def debug(self, *args, sep='', end='\n', flush=True): """Prints a debug message to the logger."""
 
 
 @dataclass

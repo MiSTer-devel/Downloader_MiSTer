@@ -30,7 +30,7 @@ from test.objects import binary_content
 
 class FakeHttpGateway(HttpGateway):
     def __init__(self, config, network_state):
-        super().__init__(ssl.SSLContext(ssl.PROTOCOL_TLS), 200, None)
+        super().__init__(ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT), 200, None)
         self._config = config
         self._network_state = network_state
         self._job: Optional[Job] = None

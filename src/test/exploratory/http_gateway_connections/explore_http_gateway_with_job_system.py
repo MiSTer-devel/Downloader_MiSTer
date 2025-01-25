@@ -25,7 +25,6 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
-from downloader.constants import K_DOWNLOADER_TIMEOUT
 from downloader.file_system import FileSystemFactory
 from downloader.job_system import JobSystem, ProgressReporter, Job, JobCancelled
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
@@ -36,7 +35,7 @@ from test.exploratory.http_gateway_connections.explore_http_gateway_with_real_ur
 
 
 def main() -> None:
-    logger = DescribeNowDecorator(PrintLogger.make_configured({'verbose': True, 'start_time': time.time()}))
+    logger = DescribeNowDecorator(PrintLogger(int(time.time())))
     with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gw:
 
         fs = FileSystemFactory({}, {}, logger=logger)
@@ -98,11 +97,13 @@ class Reporter(ProgressReporter):
     completed: List[FetchFileJob2] = []
     failed: List[Tuple[FetchFileJob2, Exception]] = []
 
-    def notify_job_completed(self, job: FetchFileJob2) -> None:
+    def notify_job_completed(self, job: Job) -> None:
+        if not isinstance(job, FetchFileJob2): return None
         self._logger.print(f'>>>>>> COMPLETED! {job.info}')
         self.completed.append(job)
 
-    def notify_job_failed(self, job: FetchFileJob2, exception: Exception) -> None:
+    def notify_job_failed(self, job: Job, exception: Exception) -> None:
+        if not isinstance(job, FetchFileJob2): return None
         self._logger.print(f'>>>>>> FAILED! {job.info}', exception)
         self.failed.append((job, exception))
 

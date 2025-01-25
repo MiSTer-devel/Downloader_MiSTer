@@ -31,7 +31,7 @@ class TestFullRunServiceFactory(unittest.TestCase):
 
     def test_make_full_run_service___with_proper_parameters___does_not_throw(self):
         try:
-            FullRunServiceFactory(NoLogger(), LocalRepositoryProvider()).create({
+            FullRunServiceFactory(NoLogger(), NoLogger(), LocalRepositoryProvider()).create({
                 **default_config(),
                 K_ALLOW_REBOOT: AllowReboot.NEVER,
                 K_CURL_SSL: '',

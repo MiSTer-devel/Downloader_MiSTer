@@ -77,6 +77,7 @@ class FullRunService(ProductionFullRunService):
         job_system = job_system if job_system is not None else JobSystem(file_download_reporter, logger=NoLogger(), max_threads=1)
         super().__init__(config,
                          NoLogger(),
+                         NoLogger(),
                          LocalRepository(config=config, file_system=system_file_system),
                          db_gateway or DbGateway(config, file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory),
                          OfflineImporter(file_downloader_factory=file_downloader_factory),

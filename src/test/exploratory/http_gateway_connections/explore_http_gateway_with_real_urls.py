@@ -27,7 +27,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from downloader.http_gateway import HttpGateway, Logger
+from downloader.http_gateway import HttpGateway, HttpLogger
 
 urls = [
     'https://google.com',
@@ -50,7 +50,7 @@ urls = [
     'https://archive.org/download/publicmovies212/Charlie_Chaplin_Caught_in_a_Caberet.mp4',
 ]
 
-class LoggerImpl(Logger):
+class LoggerImpl(HttpLogger):
     def debug(self, *args): self.print(*args)
     def print(self, *args):
         t = datetime.now().isoformat(' ', 'seconds') + '| '

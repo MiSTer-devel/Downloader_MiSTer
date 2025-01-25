@@ -66,7 +66,7 @@ class TestSmallDbInstall(unittest.TestCase):
         self.assertTrue(os.path.isfile('/tmp/special_base_path/_Cores/core.rbf'))
 
     def assertRunOk(self, ini_path, save=True):
-        config = ConfigReader(NoLogger(), {**debug_env(), KENV_DEFAULT_BASE_PATH: tmp_default_base_path}).read_config(ini_path)
+        config = ConfigReader(NoLogger(), NoLogger(),{**debug_env(), KENV_DEFAULT_BASE_PATH: tmp_default_base_path}).read_config(ini_path)
         shutil.rmtree(config[K_BASE_PATH], ignore_errors=True)
         shutil.rmtree(config[K_BASE_SYSTEM_PATH], ignore_errors=True)
         mister_path = Path('%s/MiSTer' % config[K_BASE_SYSTEM_PATH])

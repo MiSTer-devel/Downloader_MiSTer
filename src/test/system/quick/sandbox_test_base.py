@@ -55,7 +55,7 @@ class SandboxTestBase(unittest.TestCase):
 
         transform_windows_paths_from_expected(expected)
 
-        config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
+        config = ConfigReader(NoLogger(), NoLogger(), debug_env()).read_config(ini_path)
         self.file_system = make_production_filesystem_factory(config).create_for_system_scope()
         counter = 0
         if 'local_store' in expected:
@@ -126,8 +126,8 @@ class SandboxTestBase(unittest.TestCase):
         env[KENV_CURL_SSL] = ''
         env[KENV_DEFAULT_BASE_PATH] = tmp_default_base_path
 
-        config_reader = ConfigReader(logger, env)
-        factory = FullRunServiceFactory(logger, LocalRepositoryProvider(), external_drives_repository_factory=external_drives_repository_factory)
+        config_reader = ConfigReader(logger, NoLogger(), env)
+        factory = FullRunServiceFactory(logger, NoLogger(), LocalRepositoryProvider(), external_drives_repository_factory=external_drives_repository_factory)
         return execute_full_run(factory, config_reader, argv or [])
 
     def find_all_files(self, directory):
@@ -177,7 +177,7 @@ def fix_relative_files(files):
 
 
 def cleanup(ini_path):
-    config = ConfigReader(NoLogger(), {**debug_env(), KENV_DEFAULT_BASE_PATH: tmp_default_base_path}).read_config(ini_path)
+    config = ConfigReader(NoLogger(), NoLogger(), {**debug_env(), KENV_DEFAULT_BASE_PATH: tmp_default_base_path}).read_config(ini_path)
     delete_folder(config[K_BASE_PATH])
     delete_folder(config[K_BASE_SYSTEM_PATH])
     create_folder(config[K_BASE_PATH])
