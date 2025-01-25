@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.certificates_fix import CertificatesFix as ProductionCertificatesFix
 from downloader.config import default_config
-from downloader.constants import DEFAULT_CURL_SSL_OPTIONS, K_CURL_SSL
+from downloader.constants import DEFAULT_CURL_SSL_OPTIONS
 from test.fake_waiter import NoWaiter
 from test.fake_file_system_factory import FileSystemFactory
 from downloader.logger import NoLogger
@@ -52,7 +52,7 @@ class CertificatesFix(ProductionCertificatesFix):
 
 def _config():
     config = default_config()
-    config[K_CURL_SSL] = DEFAULT_CURL_SSL_OPTIONS
+    config['curl_ssl'] = DEFAULT_CURL_SSL_OPTIONS
     return config
 
 

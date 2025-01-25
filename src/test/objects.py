@@ -16,9 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import unittest
-import platform
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Final
 
 from downloader.config import default_config, Environment
 from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, FILE_MiSTer_new, K_BASE_PATH, \
@@ -37,63 +36,63 @@ from test.fake_db_entity import DbEntity
 import copy
 import tempfile
 
-file_test_json_zip = 'test.json.zip'
-file_a = 'a/A'
-file_b = 'b/B'
-file_c = 'c/C'
-file_d = 'd/D'
-file_abc = 'a/b/C'
-file_nes_smb1 = '|games/NES/smb.nes'
-file_nes_contra = '|games/NES/contra.nes'
-file_nes_palette_a = '|games/NES/Palette/a.pal'
-file_nes_manual = '|docs/NES/nes.md'
-file_md_sonic = '|games/MegaDrive/sonic.md'
-file_boot_rom = 'boot.rom'
-file_menu_rbf = 'menu.rbf'
-file_s32x_md = '|docs/S32X/S32X.md'
-file_neogeo_md = '|docs/NeoGeo/NeoGeo.md'
-file_foo = 'foo.txt'
-file_save_psx_castlevania = 'saves/PSX/castlevania.sav'
-hash_menu_rbf = 'menu.rbf'
-hash_MiSTer = FILE_MiSTer_new
-hash_PDFViewer = 'pdfviewer'
-hash_MiSTer_old = 'something_old'
-hash_real_test_file = '3de8f8b0dc94b8c2230fab9ec0ba0506'
-folder_a = 'a'
-folder_b = 'b'
-folder_c = 'c'
-folder_d = 'd'
-folder_ab = 'a/b'
-folder_games = '|games'
-folder_games_nes = '|games/NES'
-folder_games_nes_palettes = '|games/NES/Palette'
-folder_games_md = '|games/MegaDrive'
-folder_docs = '|docs'
-folder_docs_nes = '|docs/NES'
-folder_docs_neogeo = '|docs/NeoGeo'
-folder_docs_s32x = '|docs/S32X'
-folder_save_psx = 'saves/PSX'
-db_test = 'test'
-db_palettes = 'db_palettes'
-db_demo = 'demo'
-db_id_external_drives_1 = 'external_drives_1'
-db_id_external_drives_2 = 'external_drives_2'
-file_one = 'one'
-hash_one = 'one'
-file_big = 'big'
-hash_big = 'big'
-hash_updated_big = 'updated_big'
-file_reboot = 'reboot.file'
-hash_reboot = 'reboot.hash'
-db_empty = 'empty'
-big_size = 100_000_000
-binary_content = b'This is a test file.'
-file_size_a = 2915040
-file_size_b = 1915040
-file_size_c = 3915440
-file_size_d = 4115440
-file_size_sonic = 2915020
-file_size_smb1 = 2915020
+file_test_json_zip: Final = 'test.json.zip'
+file_a: Final = 'a/A'
+file_b: Final = 'b/B'
+file_c: Final = 'c/C'
+file_d: Final = 'd/D'
+file_abc: Final = 'a/b/C'
+file_nes_smb1: Final = '|games/NES/smb.nes'
+file_nes_contra: Final = '|games/NES/contra.nes'
+file_nes_palette_a: Final = '|games/NES/Palette/a.pal'
+file_nes_manual: Final = '|docs/NES/nes.md'
+file_md_sonic: Final = '|games/MegaDrive/sonic.md'
+file_boot_rom: Final = 'boot.rom'
+file_menu_rbf: Final = 'menu.rbf'
+file_s32x_md: Final = '|docs/S32X/S32X.md'
+file_neogeo_md: Final = '|docs/NeoGeo/NeoGeo.md'
+file_foo: Final = 'foo.txt'
+file_save_psx_castlevania: Final = 'saves/PSX/castlevania.sav'
+hash_menu_rbf: Final = 'menu.rbf'
+hash_MiSTer: Final = FILE_MiSTer_new
+hash_PDFViewer: Final = 'pdfviewer'
+hash_MiSTer_old: Final = 'something_old'
+hash_real_test_file: Final = '3de8f8b0dc94b8c2230fab9ec0ba0506'
+folder_a: Final = 'a'
+folder_b: Final = 'b'
+folder_c: Final = 'c'
+folder_d: Final = 'd'
+folder_ab: Final = 'a/b'
+folder_games: Final = '|games'
+folder_games_nes: Final = '|games/NES'
+folder_games_nes_palettes: Final = '|games/NES/Palette'
+folder_games_md: Final = '|games/MegaDrive'
+folder_docs: Final = '|docs'
+folder_docs_nes: Final = '|docs/NES'
+folder_docs_neogeo: Final = '|docs/NeoGeo'
+folder_docs_s32x: Final = '|docs/S32X'
+folder_save_psx: Final = 'saves/PSX'
+db_test: Final = 'test'
+db_palettes: Final = 'db_palettes'
+db_demo: Final = 'demo'
+db_id_external_drives_1: Final = 'external_drives_1'
+db_id_external_drives_2: Final = 'external_drives_2'
+file_one: Final = 'one'
+hash_one: Final = 'one'
+file_big: Final = 'big'
+hash_big: Final = 'big'
+hash_updated_big: Final = 'updated_big'
+file_reboot: Final = 'reboot.file'
+hash_reboot: Final = 'reboot.hash'
+db_empty: Final = 'empty'
+big_size: Final = 100_000_000
+binary_content: Final = b'This is a test file.'
+file_size_a: Final = 2915040
+file_size_b: Final = 1915040
+file_size_c: Final = 3915440
+file_size_d: Final = 4115440
+file_size_sonic: Final = 2915020
+file_size_smb1: Final = 2915020
 
 
 def media_fat(path):

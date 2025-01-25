@@ -16,8 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
-    FILE_downloader_last_successful_run, K_CONFIG_PATH, K_BASE_SYSTEM_PATH, \
-    FILE_downloader_external_storage, K_LOGFILE, FILE_downloader_storage_json
+    FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json
 from downloader.file_system import FileSystem
 from downloader.local_store_wrapper import LocalStoreWrapper
 from downloader.logger import FilelogSaver, Logger
@@ -42,13 +41,13 @@ class LocalRepository(FilelogSaver):
     @property
     def _storage_save_path(self):
         if self._storage_path_save_value is None:
-            self._storage_path_save_value = f'{self._config[K_BASE_SYSTEM_PATH]}/{FILE_downloader_storage_json}'
+            self._storage_path_save_value = f'{self._config['base_system_path']}/{FILE_downloader_storage_json}'
         return self._storage_path_save_value
 
     @property
     def _storage_old_path(self):
         if self._storage_path_old_value is None:
-            self._storage_path_old_value = f'{self._config[K_BASE_SYSTEM_PATH]}/{FILE_downloader_storage_zip}'
+            self._storage_path_old_value = f'{self._config['base_system_path']}/{FILE_downloader_storage_zip}'
         return self._storage_path_old_value
 
     @property
@@ -64,16 +63,16 @@ class LocalRepository(FilelogSaver):
     @property
     def _last_successful_run(self):
         if self._last_successful_run_value is None:
-            self._last_successful_run_value = '%s/%s' % (self._config[K_BASE_SYSTEM_PATH], FILE_downloader_last_successful_run % self._config[K_CONFIG_PATH].stem)
+            self._last_successful_run_value = '%s/%s' % (self._config['base_system_path'], FILE_downloader_last_successful_run % self._config['config_path'].stem)
         return self._last_successful_run_value
 
     @property
     def logfile_path(self):
         if self._logfile_path_value is None:
-            if self._config[K_LOGFILE] is not None:
-                self._logfile_path_value = self._config[K_LOGFILE]
+            if self._config['logfile'] is not None:
+                self._logfile_path_value = self._config['logfile']
             else:
-                self._logfile_path_value = '%s/%s' % (self._config[K_BASE_SYSTEM_PATH], FILE_downloader_log % self._config[K_CONFIG_PATH].stem)
+                self._logfile_path_value = '%s/%s' % (self._config['base_system_path'], FILE_downloader_log % self._config['config_path'].stem)
         return self._logfile_path_value
 
     def set_logfile_path(self, value):
