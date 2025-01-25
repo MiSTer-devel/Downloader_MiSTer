@@ -1,5 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-import time
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -18,12 +18,12 @@ import time
 
 import unittest
 import shutil
+import time
 import os
 import os.path
 from pathlib import Path
 from downloader.config_reader import ConfigReader
-from downloader.constants import FILE_mister_downloader_needs_reboot, K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_CURL_SSL, \
-    KENV_DEBUG, \
+from downloader.constants import FILE_mister_downloader_needs_reboot, KENV_CURL_SSL, KENV_DEBUG, \
     KENV_FAIL_ON_FILE_ERROR, KENV_DEFAULT_BASE_PATH, KENV_DOWNLOADER_INI_PATH
 from downloader.file_system import is_windows
 from test.objects import debug_env
@@ -66,10 +66,12 @@ class TestSmallDbInstall(unittest.TestCase):
         self.assertTrue(os.path.isfile('/tmp/special_base_path/_Cores/core.rbf'))
 
     def assertRunOk(self, ini_path, save=True):
-        config = ConfigReader(NoLogger(), NoLogger(),{**debug_env(), KENV_DEFAULT_BASE_PATH: tmp_default_base_path}).read_config(ini_path)
-        shutil.rmtree(config[K_BASE_PATH], ignore_errors=True)
-        shutil.rmtree(config[K_BASE_SYSTEM_PATH], ignore_errors=True)
-        mister_path = Path('%s/MiSTer' % config[K_BASE_SYSTEM_PATH])
+        env = debug_env()
+        env['DEFAULT_BASE_PATH'] = tmp_default_base_path
+        config = ConfigReader(NoLogger(), env).read_config(ini_path)
+        shutil.rmtree(config['base_path'], ignore_errors=True)
+        shutil.rmtree(config['base_system_path'], ignore_errors=True)
+        mister_path = Path('%s/MiSTer' % config['base_system_path'])
         os.makedirs(str(mister_path.parent), exist_ok=True)
         mister_path.touch()
 
@@ -93,4 +95,4 @@ class TestSmallDbInstall(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0)
         time.sleep(0.25)
-        self.assertEqual(save, os.path.isfile("%s/Scripts/.config/downloader/downloader.json" % config[K_BASE_SYSTEM_PATH]))
+        self.assertEqual(save, os.path.isfile("%s/Scripts/.config/downloader/downloader.json" % config['base_system_path']))

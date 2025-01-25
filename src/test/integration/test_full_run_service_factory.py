@@ -19,11 +19,8 @@
 import unittest
 
 from downloader.config import default_config, AllowReboot
-from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, KENV_DEFAULT_DB_URL, \
-    KENV_DEFAULT_DB_ID, \
-    KENV_ALLOW_REBOOT, KENV_CURL_SSL, KENV_DEFAULT_BASE_PATH, KENV_DEBUG, K_ALLOW_REBOOT, K_CURL_SSL, K_DEBUG
+from downloader.constants import K_ALLOW_REBOOT, K_CURL_SSL, K_DEBUG
 from downloader.full_run_service_factory import FullRunServiceFactory
-from downloader.local_repository import LocalRepositoryProvider
 from downloader.logger import NoLogger
 
 
@@ -31,7 +28,7 @@ class TestFullRunServiceFactory(unittest.TestCase):
 
     def test_make_full_run_service___with_proper_parameters___does_not_throw(self):
         try:
-            FullRunServiceFactory(NoLogger(), NoLogger(), LocalRepositoryProvider()).create({
+            FullRunServiceFactory(NoLogger(), NoLogger(), NoLogger()).create({
                 **default_config(),
                 K_ALLOW_REBOOT: AllowReboot.NEVER,
                 K_CURL_SSL: '',

@@ -31,12 +31,13 @@ from downloader.importer_command import ImporterCommandFactory
 from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
-from downloader.jobs.worker_context import DownloaderWorkerContext, make_downloader_worker_context
-from downloader.logger import DebugOnlyLoggerDecorator, Logger, LogFinalizer
+from downloader.jobs.worker_context import make_downloader_worker_context
+from downloader.logger import DebugOnlyLoggerDecorator, Logger, FilelogManager, PrintLogManager, FileLoggerDecorator, \
+    PrintLogger
 from downloader.os_utils import LinuxOsUtils
 from downloader.storage_priority_resolver import StoragePriorityResolver
 from downloader.linux_updater import LinuxUpdater
-from downloader.local_repository import LocalRepository, LocalRepositoryProvider
+from downloader.local_repository import LocalRepository
 from downloader.migrations import migrations
 from downloader.offline_importer import OfflineImporter
 from downloader.online_importer import OnlineImporter
@@ -49,11 +50,16 @@ import atexit
 
 
 class FullRunServiceFactory:
-    def __init__(self, logger: Logger, log_finalizer: LogFinalizer, local_repository_provider: LocalRepositoryProvider, external_drives_repository_factory=None):
+    def __init__(self, logger: Logger, filelog_manager: FilelogManager, printlog_manager: PrintLogManager, external_drives_repository_factory=None):
         self._logger = logger
-        self._log_finalizer = log_finalizer
+        self._filelog_manager = filelog_manager
+        self._printlog_manager = printlog_manager
         self._external_drives_repository_factory = external_drives_repository_factory or ExternalDrivesRepositoryFactory()
-        self._local_repository_provider = local_repository_provider
+
+
+    @staticmethod
+    def for_main(file_logger: FileLoggerDecorator, print_logger: PrintLogger):
+        return FullRunServiceFactory(file_logger, file_logger, print_logger)
 
     def create(self, config):
         path_dictionary = dict()
@@ -64,10 +70,8 @@ class FullRunServiceFactory:
         storage_priority_resolver_factory = StoragePriorityResolver(file_system_factory, external_drives_repository)
         path_resolver_factory = PathResolverFactory(storage_priority_resolver_factory, path_dictionary)
         store_migrator = StoreMigrator(migrations(config, file_system_factory, path_resolver_factory), self._logger)
-
         local_repository = LocalRepository(config, self._logger, system_file_system, store_migrator, external_drives_repository)
 
-        self._local_repository_provider.initialize(local_repository)
         importer_command_factory = ImporterCommandFactory(config)
 
         http_connection_timeout = config[K_DOWNLOADER_TIMEOUT] / 4 if config[K_DOWNLOADER_TIMEOUT] > 60 else 15
@@ -113,10 +117,11 @@ class FullRunServiceFactory:
             config=config
         )
 
-        return FullRunService(
+        instance = FullRunService(
             config,
             self._logger,
-            self._log_finalizer,
+            self._filelog_manager,
+            self._printlog_manager,
             local_repository,
             db_gateway,
             offline_importer,
@@ -132,3 +137,5 @@ class FullRunServiceFactory:
             job_system,
             workers_ctx
         )
+        instance.configure_components()
+        return instance

@@ -20,13 +20,16 @@ import os
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
     FILE_downloader_last_successful_run, K_CONFIG_PATH, K_BASE_SYSTEM_PATH, \
     FILE_downloader_external_storage, K_LOGFILE, FILE_downloader_storage_json
+from downloader.file_system import FileSystem
 from downloader.local_store_wrapper import LocalStoreWrapper
+from downloader.logger import FilelogSaver, Logger
 from downloader.other import UnreachableException, empty_store_without_base_path
-from downloader.store_migrator import make_new_local_store
+from downloader.store_migrator import make_new_local_store, StoreMigrator
+from downloader.config import Config
 
 
-class LocalRepository:
-    def __init__(self, config, logger, file_system, store_migrator, external_drives_repository):
+class LocalRepository(FilelogSaver):
+    def __init__(self, config: Config, logger: Logger, file_system: FileSystem, store_migrator: StoreMigrator, external_drives_repository):
         self._config = config
         self._logger = logger
         self._file_system = file_system
@@ -168,25 +171,3 @@ class LocalRepository:
         self._file_system.turn_off_logs()
         self._file_system.make_dirs_parent(self.logfile_path)
         self._file_system.copy(path, self.logfile_path)
-
-
-class LocalRepositoryProvider:
-    def __init__(self):
-        self._local_repository = None
-
-    def initialize(self, local_repository):
-        if self._local_repository is not None:
-            raise LocalRepositoryProviderException("Shouldn't initialize self twice.")
-
-        self._local_repository = local_repository
-
-    @property
-    def local_repository(self):
-        if self._local_repository is None:
-            raise LocalRepositoryProviderException("Can't get a local repository before initializing self.")
-
-        return self._local_repository
-
-
-class LocalRepositoryProviderException(Exception):
-    pass

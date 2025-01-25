@@ -20,8 +20,10 @@ import shutil
 import os
 import json
 from pathlib import Path, PurePosixPath
+
+from downloader.config import Environment
 from downloader.config_reader import ConfigReader
-from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, KENV_UPDATE_LINUX, \
+from downloader.constants import KENV_DOWNLOADER_LAUNCHER_PATH, KENV_UPDATE_LINUX, \
     KENV_ALLOW_REBOOT, KENV_COMMIT, KENV_CURL_SSL, KENV_DEBUG, KENV_FAIL_ON_FILE_ERROR, FILE_downloader_storage_json, KENV_DEFAULT_BASE_PATH
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from downloader.full_run_service_factory import FullRunServiceFactory
@@ -34,7 +36,6 @@ from downloader.logger import NoLogger
 from test.fake_store_migrator import StoreMigrator
 from downloader.file_system import hash_file, is_windows
 from downloader.main import execute_full_run
-from downloader.local_repository import LocalRepositoryProvider
 from downloader.store_migrator import make_new_local_store
 
 
@@ -55,44 +56,44 @@ class SandboxTestBase(unittest.TestCase):
 
         transform_windows_paths_from_expected(expected)
 
-        config = ConfigReader(NoLogger(), NoLogger(), debug_env()).read_config(ini_path)
+        config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
         self.file_system = make_production_filesystem_factory(config).create_for_system_scope()
         counter = 0
         if 'local_store' in expected:
             counter += 1
             with self.subTestAdapter('local_store'):
-                actual_store = load_json(os.path.join(config[K_BASE_SYSTEM_PATH], FILE_downloader_storage_json))
+                actual_store = load_json(os.path.join(config['base_system_path'], FILE_downloader_storage_json))
                 self.assertEqual(expected['local_store'], actual_store)
 
         if 'files' in expected:
             counter += 1
             with self.subTestAdapter('files'):
-                self.assertEqual(expected['files'], self.find_all_files(config[K_BASE_PATH]))
+                self.assertEqual(expected['files'], self.find_all_files(config['base_path']))
 
         if 'files_count' in expected:
             counter += 1
             with self.subTestAdapter('files_count'):
-                self.assertEqual(expected['files_count'], len(self.find_all_files(config[K_BASE_PATH])))
+                self.assertEqual(expected['files_count'], len(self.find_all_files(config['base_path'])))
 
         if 'system_files' in expected:
             counter += 1
             with self.subTestAdapter('system_files'):
-                self.assertEqual(expected['system_files'], self.find_all_files(config[K_BASE_SYSTEM_PATH]))
+                self.assertEqual(expected['system_files'], self.find_all_files(config['base_system_path']))
 
         if 'system_files_count' in expected:
             counter += 1
             with self.subTestAdapter('system_files_count'):
-                self.assertEqual(expected['system_files_count'], len(self.find_all_files(config[K_BASE_PATH])))
+                self.assertEqual(expected['system_files_count'], len(self.find_all_files(config['base_path'])))
 
         if 'folders' in expected:
             counter += 1
             with self.subTestAdapter('folders'):
-                self.assertEqual(sorted(list(expected['folders'])), self.find_all_folders(config[K_BASE_PATH]))
+                self.assertEqual(sorted(list(expected['folders'])), self.find_all_folders(config['base_path']))
 
         if 'system_folders' in expected:
             counter += 1
             with self.subTestAdapter('system_folders'):
-                self.assertEqual(sorted(list(expected['system_folders'])), self.find_all_folders(config[K_BASE_SYSTEM_PATH]))
+                self.assertEqual(sorted(list(expected['system_folders'])), self.find_all_folders(config['base_system_path']))
 
         if 'installed_log' in expected:
             counter += 1
@@ -117,17 +118,17 @@ class SandboxTestBase(unittest.TestCase):
 
     def run_execute_full_run(self, ini_path, external_drives_repository_factory, logger, argv=None):
         env = default_env()
-        env[KENV_DOWNLOADER_LAUNCHER_PATH] = str(Path(ini_path).with_suffix('.sh'))
-        env[KENV_UPDATE_LINUX] = 'false'
-        env[KENV_ALLOW_REBOOT] = '0'
-        env[KENV_COMMIT] = 'quick system test'
-        env[KENV_DEBUG] = 'true'
-        env[KENV_FAIL_ON_FILE_ERROR] = 'true'
-        env[KENV_CURL_SSL] = ''
-        env[KENV_DEFAULT_BASE_PATH] = tmp_default_base_path
+        env['DOWNLOADER_LAUNCHER_PATH'] = str(Path(ini_path).with_suffix('.sh'))
+        env['UPDATE_LINUX'] = 'false'
+        env['ALLOW_REBOOT'] = '0'
+        env['COMMIT'] = 'quick system test'
+        env['DEBUG'] = 'true'
+        env['FAIL_ON_FILE_ERROR'] = 'true'
+        env['CURL_SSL'] = ''
+        env['DEFAULT_BASE_PATH'] = tmp_default_base_path
 
-        config_reader = ConfigReader(logger, NoLogger(), env)
-        factory = FullRunServiceFactory(logger, NoLogger(), LocalRepositoryProvider(), external_drives_repository_factory=external_drives_repository_factory)
+        config_reader = ConfigReader(logger, env)
+        factory = FullRunServiceFactory(logger, NoLogger(), NoLogger(), external_drives_repository_factory=external_drives_repository_factory)
         return execute_full_run(factory, config_reader, argv or [])
 
     def find_all_files(self, directory):
@@ -163,7 +164,7 @@ def local_store_files(tuples):
     store = make_new_local_store(StoreMigrator())
     for store_id, files, folders in tuples:
         store['dbs'][store_id] = {
-            K_BASE_PATH: tmp_delme_sandbox[0:-1],
+            'base_path': tmp_delme_sandbox[0:-1],
             'folders': {(f if f[0] != '|' else f[1:]): d for f, d in folders.items()},
             'files': fix_relative_files(files),
             'offline_databases_imported': [],
@@ -177,11 +178,13 @@ def fix_relative_files(files):
 
 
 def cleanup(ini_path):
-    config = ConfigReader(NoLogger(), NoLogger(), {**debug_env(), KENV_DEFAULT_BASE_PATH: tmp_default_base_path}).read_config(ini_path)
-    delete_folder(config[K_BASE_PATH])
-    delete_folder(config[K_BASE_SYSTEM_PATH])
-    create_folder(config[K_BASE_PATH])
-    create_folder(config[K_BASE_SYSTEM_PATH])
+    env = debug_env()
+    env['DEFAULT_BASE_PATH'] = tmp_default_base_path
+    config = ConfigReader(NoLogger(), env).read_config(ini_path)
+    delete_folder(config['base_path'])
+    delete_folder(config['base_system_path'])
+    create_folder(config['base_path'])
+    create_folder(config['base_system_path'])
 
 
 def create_folder(path):

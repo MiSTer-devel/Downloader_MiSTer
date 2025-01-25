@@ -32,10 +32,10 @@ class Logger(Protocol):
     def bench(self, label: str) -> None: """print only to debug target"""
 
 
-class LogConfigurer(Protocol):
+class PrintLogManager(Protocol):
     def configure(self, config: Config) -> None: pass
 
-class PrintLogger(Logger, LogConfigurer):
+class PrintLogger(Logger, PrintLogManager):
     def __init__(self, start_time: Optional[int] = None):
         self._verbose_mode = True
         self._start_time = start_time
@@ -77,22 +77,33 @@ def _do_print(*args, sep, end, file, flush):
         print('An unknown exception occurred during logging: %s' % str(error))
 
 
-class LogFinalizer(Protocol):
-    def finalize(self) -> None: pass
+class FilelogSaver(Protocol):
+    def save_log_from_tmp(self, tmp_logfile: str) -> None: pass
 
-class FileLoggerDecorator(Logger, LogFinalizer):
-    def __init__(self, decorated_logger: Logger, local_repository_provider):
+class FilelogManager(Protocol):
+    def finalize(self) -> None: pass
+    def set_local_repository(self, local_repository: FilelogSaver) -> None: pass
+
+class FileLoggerDecorator(Logger, FilelogManager):
+    def __init__(self, decorated_logger: Logger):
         self._decorated_logger = decorated_logger
         self._logfile = tempfile.NamedTemporaryFile('w', delete=False)
-        self._local_repository_provider = local_repository_provider
+        self._local_repository: Optional[FilelogSaver] = None
 
     def finalize(self):
         if self._logfile is None:
             return
 
+        if self._local_repository is None:
+            self.print('Log saved in temp file: ' + self._logfile.name)
+
         self._logfile.close()
-        self._local_repository_provider.local_repository.save_log_from_tmp(self._logfile.name)
+        if self._local_repository is not None:
+            self._local_repository.save_log_from_tmp(self._logfile.name)
         self._logfile = None
+
+    def set_local_repository(self, local_repository: FilelogSaver):
+        self._local_repository = local_repository
 
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
         self._decorated_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
@@ -126,11 +137,12 @@ class DebugOnlyLoggerDecorator(Logger):
 
 
 # @TODO: Consider moving this one to test code
-class NoLogger(Logger, LogFinalizer, LogConfigurer):
+class NoLogger(Logger, FilelogManager, PrintLogManager):
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
     def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
     def bench(self, label: str): pass
     def finalize(self) -> None: pass
+    def set_local_repository(self, local_repository: FilelogSaver) -> None: pass
     def configure(self, config: Config) -> None: pass
 
 

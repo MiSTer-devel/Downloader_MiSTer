@@ -23,7 +23,7 @@ from downloader.logger import NoLogger
 
 
 def calculate_config_path(env_vars, working_dir):
-    return ConfigReader(NoLogger(), NoLogger(), env_vars).calculate_config_path(working_dir)
+    return ConfigReader(NoLogger(), env_vars).calculate_config_path(working_dir)
 
 
 class TestConfigFilePath(unittest.TestCase):

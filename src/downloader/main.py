@@ -25,7 +25,6 @@ from typing import Optional
 
 from downloader.config import Environment
 from downloader.config_reader import ConfigReader
-from downloader.local_repository import LocalRepositoryProvider
 from downloader.logger import FileLoggerDecorator, PrintLogger
 from downloader.full_run_service_factory import FullRunServiceFactory
 
@@ -34,16 +33,13 @@ def main(env: Environment) -> int:
     # This function should be called in __main__.py which just bootstraps the application.
     # It should receive an 'env' dictionary produced by calling the "read_env" function below.
 
-    local_repository_provider = LocalRepositoryProvider()
     printer = PrintLogger()
-    logger = FileLoggerDecorator(printer, local_repository_provider)
-    logger.print('START!')
-    logger.print()
+    logger = FileLoggerDecorator(printer)
     # noinspection PyBroadException
     try:
         exit_code = execute_full_run(
-            FullRunServiceFactory(logger, logger, local_repository_provider=local_repository_provider),
-            ConfigReader(logger, printer, env),
+            FullRunServiceFactory.for_main(logger, printer),
+            ConfigReader(logger, env),
             sys.argv
         )
     except Exception as _:
