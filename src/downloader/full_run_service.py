@@ -17,19 +17,21 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import datetime
+import json
 import sys
 import time
+from pathlib import Path
 
 from downloader.config import Config
 from downloader.importer_command import ImporterCommandFactory
 from downloader.job_system import JobSystem
 from downloader.jobs.worker_context import DownloaderWorkerContext
-from downloader.logger import LogFinalizer, Logger
+from downloader.logger import FilelogManager, Logger, PrintLogManager
 from downloader.other import format_files_message, format_folders_message, format_zips_message
 
 
 class FullRunService:
-    def __init__(self, config: Config, logger: Logger, log_finalizer: LogFinalizer, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter, importer_command_factory: ImporterCommandFactory, job_system: JobSystem, workers_ctx: DownloaderWorkerContext):
+    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: PrintLogManager, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter, importer_command_factory: ImporterCommandFactory, job_system: JobSystem, workers_ctx: DownloaderWorkerContext):
         self._importer_command_factory = importer_command_factory
         self._waiter = waiter
         self._os_utils = os_utils
@@ -43,10 +45,16 @@ class FullRunService:
         self._db_gateway = db_gateway
         self._local_repository = local_repository
         self._logger = logger
-        self._log_finalizer = log_finalizer
+        self._filelog_manager = filelog_manager
+        self._printlog_manager = printlog_manager
         self._config = config
         self._job_system = job_system
         self._workers_ctx = workers_ctx
+
+    def configure_components(self):
+        self._printlog_manager.configure(self._config)
+        self._filelog_manager.set_local_repository(self._local_repository)
+        self._logger.debug('config: ' + json.dumps(self._config, default=lambda o: str(o) if isinstance(o, Path) else o.__dict__, indent=4))
 
     def print_drives(self):
         self._logger.bench('Print Drives start.')
@@ -69,7 +77,7 @@ class FullRunService:
             self._logger.print("Rebooting in 10 seconds...")
             sys.stdout.flush()
             self._waiter.sleep(2)
-            self._log_finalizer.finalize()
+            self._filelog_manager.finalize()
             sys.stdout.flush()
             self._waiter.sleep(4)
             self._os_utils.sync()
@@ -81,6 +89,8 @@ class FullRunService:
         return result
 
     def _full_run_impl(self):
+        self._logger.print('START!')
+        self._logger.print()
         self._logger.debug('Linux Version: %s' % self._linux_updater.get_current_linux_version())
 
         if not self._check_certificates():
