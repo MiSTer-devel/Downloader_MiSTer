@@ -18,7 +18,8 @@
 
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
-from downloader.constants import K_DOWNLOADER_TIMEOUT, K_DEBUG, K_CURL_SSL, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_RETRIES, K_IS_PC_LAUNCHER, FILE_MiSTer_version
+from downloader.config import Config
+from downloader.constants import FILE_MiSTer_version
 from downloader.db_gateway import DbGateway
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from downloader.file_downloader import FileDownloaderFactory, context_from_curl_ssl
@@ -61,7 +62,7 @@ class FullRunServiceFactory:
     def for_main(file_logger: FileLoggerDecorator, print_logger: PrintLogger):
         return FullRunServiceFactory(file_logger, file_logger, print_logger)
 
-    def create(self, config):
+    def create(self, config: Config):
         path_dictionary = dict()
         waiter = Waiter()
         file_system_factory = FileSystemFactory(config, path_dictionary, self._logger)
@@ -74,12 +75,12 @@ class FullRunServiceFactory:
 
         importer_command_factory = ImporterCommandFactory(config)
 
-        http_connection_timeout = config[K_DOWNLOADER_TIMEOUT] / 4 if config[K_DOWNLOADER_TIMEOUT] > 60 else 15
+        http_connection_timeout = config['downloader_timeout'] / 4 if config['downloader_timeout'] > 60 else 15
 
         http_gateway = HttpGateway(
-            ssl_ctx=context_from_curl_ssl(config[K_CURL_SSL]),
+            ssl_ctx=context_from_curl_ssl(config['curl_ssl']),
             timeout=http_connection_timeout,
-            logger=DebugOnlyLoggerDecorator(self._logger) if config[K_DEBUG] else None
+            logger=DebugOnlyLoggerDecorator(self._logger) if config['debug'] else None
         )
         atexit.register(http_gateway.cleanup)
         installation_report = InstallationReportImpl()
@@ -88,9 +89,9 @@ class FullRunServiceFactory:
         job_system = JobSystem(
             reporter=DownloaderProgressReporter(self._logger, [file_download_reporter]),
             logger=self._logger,
-            max_threads=config[K_DOWNLOADER_THREADS_LIMIT],
-            max_tries=config[K_DOWNLOADER_RETRIES],
-            max_timeout=config[K_DOWNLOADER_TIMEOUT] * 2,
+            max_threads=config['downloader_threads_limit'],
+            max_tries=config['downloader_retries'],
+            max_timeout=config['downloader_timeout'] * 2,
         )
 
         file_filter_factory = FileFilterFactory(self._logger)
