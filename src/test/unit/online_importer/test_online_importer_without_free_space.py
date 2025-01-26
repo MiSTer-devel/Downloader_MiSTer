@@ -30,12 +30,16 @@ from test.objects import file_a, folder_a, db_test_with_file_a, empty_test_store
     media_usb1, media_fat, db_test_descr, db_test_with_file_d, file_d, file_size_d
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 from test.unit.online_importer.online_importer_with_priority_storage_test_base import fs_files_smb1_on_usb1, fs_files_sonic_on_usb1, store_smb1_on_usb1, store_sonic_on_usb1, \
-    store_sonic_on_usb1_but_just_folders, store_smb1_on_usb1_but_just_folders, store_smb1_on_fat, fs_files_smb1_on_fat
+    store_sonic_on_usb1_but_just_folders, store_smb1_on_usb1_but_just_folders
 from test.zip_objects import cheats_folder_id, cheats_folder_zip_desc, zipped_files_from_cheats_folder, summary_json_from_cheats_folder, store_with_unzipped_cheats, cheats_folder_folders, \
     cheats_folder_nes_file_path, cheats_folder_sms_file_path, cheats_folder_nes_file_size, cheats_folder_sms_file_size
 
 
 class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
+    # @TODO: Right now the "free" expected value is NOT the final space value on the disk, but what would have been if the failed files were allocated.
+    # I don't think this makes sense anymore, but needs to be changed in a later release. Because right now I prefer not to break the contracts anymore
+    # than I had to do by not saving failed stores.
+
     def setUp(self) -> None:
         self.mb600 = 1024 * 1024 * 600
         self.size_a = file_size_on_disk(file_size_a, 32)
@@ -64,6 +68,20 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
             "errors": [file_a],
             "full_partitions": [MEDIA_FAT],
             "free": {MEDIA_FAT: 1000 - self.size_a},
+            "save": False
+        }, sut, stores, free=free)
+
+    def test_download_db_file_a___without_enough_space_but_the_file_already_exists_somehow___reports_no_error(self):
+        sut, free, stores = self.download_db_file_a(
+            {MEDIA_FAT: Partition(1000, min_space=0, block_size=32)},
+            input_stores=[store_test_with_file_a_descr()], with_fs=fs(files={file_a: file_a_descr()})
+        )
+        self.assertSystem({
+            "fs": fs_data(files={file_a: file_a_descr()}, folders=[folder_a]),
+            "stores": [store_test_with_file_a_descr()],
+            "errors": [],
+            "full_partitions": [],
+            "free": {MEDIA_FAT: 1000},
             "save": False
         }, sut, stores, free=free)
 
@@ -152,7 +170,21 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
             partitions
         )
 
-    def test_download_three_dbs_with_external_priority_files___with_enough_free_space_on_fat_but_not_on_usb1___fills_fat_and_just_fitting_db_on_usb1_but_reports_error_for_second_db_on_usb1(self):
+    def test_download_three_dbs_with_external_priority_files___with_enough_free_space_on_fat_but_not_on_usb1___fills_fat_and_reports_error_for_usb1(self):
+        sut, free, stores = self.download_three_dbs_with_external_priority_files({
+            MEDIA_FAT: Partition(self.mb600, min_space=595, block_size=32),
+            MEDIA_USB1: Partition(int(self.mb600 /2), min_space=595, block_size=32)
+        })
+        self.assertSystem({
+            "fs": fs_data(files={**files_a()}, folders=[folder_a, folder_games, media_usb1(folder_games)]),
+            "stores": [store_test_with_file_a_descr(), empty_test_store(), empty_test_store()],
+            "ok": [file_a],
+            "errors": [file_nes_smb1, file_md_sonic],
+            "full_partitions": [MEDIA_USB1],
+            "free": {MEDIA_FAT: self.mb600 - self.size_a, MEDIA_USB1: int(self.mb600 /2) - self.size_smb1 - self.size_sonic}
+        }, sut, stores, free=free)
+
+    def test_download_three_dbs_with_external_priority_files___with_enough_free_space_on_fat_but_only_partially_on_usb1___fills_fat_and_just_fitting_db_on_usb1_but_reports_error_for_second_db_on_usb1(self):
         sut, free, stores = self.download_three_dbs_with_external_priority_files({
             MEDIA_FAT: Partition(self.mb600, min_space=595, block_size=32),
             MEDIA_USB1: Partition(self.mb600, min_space=595, block_size=32)
@@ -174,9 +206,9 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
         self.assertSystem({
             "fs": fs_data(
                 files={**fs_files_smb1_on_usb1(), **fs_files_sonic_on_usb1()},
-                folders=[folder_a, folder_games, media_usb1(folder_games), media_usb1(folder_games_nes), media_usb1(folder_games_md)]
+                folders=[folder_games, media_usb1(folder_games), media_usb1(folder_games_nes), media_usb1(folder_games_md)]
             ),
-            "stores": [store_with_folders([folder_a]), store_smb1_on_usb1(), store_sonic_on_usb1()],
+            "stores": [empty_test_store(), store_smb1_on_usb1(), store_sonic_on_usb1()],
             "ok": [file_nes_smb1, file_md_sonic],
             "errors": [file_a],
             "full_partitions": [MEDIA_FAT],
@@ -191,11 +223,12 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
         self.assertSystem({
             "fs": fs_data(
                 files={},
-                folders=[folder_a, folder_games, media_usb1(folder_games), media_usb1(folder_games_nes), media_usb1(folder_games_md)]
+                folders=[folder_games, media_usb1(folder_games)]
             ),
-            "stores": [store_with_folders([folder_a]), store_smb1_on_usb1_but_just_folders(), store_sonic_on_usb1_but_just_folders()],
+            "stores": [empty_test_store(), empty_test_store(), empty_test_store()],
             "errors": [file_a, file_nes_smb1, file_md_sonic],
             "full_partitions": [MEDIA_FAT, MEDIA_USB1],
+            "save": False,
             "free": {MEDIA_FAT: self.mb600 - self.size_a, MEDIA_USB1: self.mb600 - self.size_smb1 - self.size_sonic}
         }, sut, stores, free=free)
 
@@ -276,9 +309,13 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
         )
 
     def _download_dbs(self, fs_inputs, dbs, partitions, input_stores=None):
+        for partition_path, partition in partitions.items():
+            if partition.path == '':
+                partition.path = partition_path
+
         free_space_reservation = FakeFreeSpaceReservation(logger=NoLogger(), config=fs_inputs.config, partitions=partitions)
         sut, stores = self._download_databases(fs_inputs, dbs, input_stores=input_stores, free_space_reservation=free_space_reservation)
-        return sut, free_space_reservation.free_space(), stores
+        return sut, sut.free_space(), stores
 
 
 class FakeFreeSpaceReservation(LinuxFreeSpaceReservation):

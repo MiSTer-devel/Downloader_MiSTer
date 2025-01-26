@@ -331,6 +331,15 @@ class OnlineImporter(ProductionOnlineImporter):
     def needs_reboot(self):
         return self._needs_reboot
 
+    def full_partitions(self):
+        return [p for p, s in self._worker_ctx.file_download_session_logger.report().get_full_partitions()]
+
+    def free_space(self):
+        actual_remaining_space = dict(self._free_space_reservation.free_space())
+        for p, reservation in self._worker_ctx.file_download_session_logger.report().get_full_partitions():
+            actual_remaining_space[p] -= reservation
+        return actual_remaining_space
+
     def add_db(self, db, store, description=None):
         self.dbs.append((db, store, {} if description is None else description))
         return self
