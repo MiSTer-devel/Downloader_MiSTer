@@ -16,16 +16,17 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import abc
 import os
-from typing import Dict, List, Any, Tuple, Optional, Iterable
+import threading
+from typing import Dict, List, Any, Tuple, Optional, Iterable, Protocol
 
+from downloader.config import Config
 from downloader.constants import STORAGE_PATHS_PRIORITY_SEQUENCE, K_MINIMUM_SYSTEM_FREE_SPACE_MB, K_BASE_SYSTEM_PATH, K_MINIMUM_EXTERNAL_FREE_SPACE_MB
 from downloader.logger import Logger
 from downloader.path_package import PathPackage
 
 
-class FreeSpaceReservation(abc.ABC):
+class FreeSpaceReservation(Protocol):
     # @deprecated
     def reserve_space_for_file(self, full_file_path: str, file_description: Dict[str, Any]) -> None:
         """Reserve space for a file that will be downloaded later"""
@@ -52,36 +53,38 @@ class FullPartition:
 
 
 class LinuxFreeSpaceReservation(FreeSpaceReservation):
-    def __init__(self, logger: Logger, config: Dict[str, Any], partitions: Optional[Dict[str, 'Partition']] = None):
+    def __init__(self, logger: Logger, config: Config, partitions: Optional[Dict[str, 'Partition']] = None):
         self._logger = logger
         self._config = config
         self._partitions: Dict[str, Partition] = partitions or {}
+        self._lock = threading.Lock()
 
     def reserve_space_for_file(self, full_file_path: str, file_description: Dict[str, Any]) -> None:
         partition = self._get_partition_for_file(full_file_path)
         partition.reserve_space(full_file_path, file_description)
 
     def reserve_space_for_file_pkgs(self, file_pkgs: Iterable[PathPackage]) -> Tuple[bool, List[Tuple['Partition', int]]]:
-        partitions_reservations: Dict[str, int] = {}
-        for file_pkg in file_pkgs:
-            partition = self._get_partition_for_file(file_pkg.full_path)
-            if partition.path not in partitions_reservations:
-                partitions_reservations[partition.path] = 0
-            partitions_reservations[partition.path] += partition.file_size(file_pkg.description['size'])
+        with self._lock:
+            partitions_reservations: Dict[str, int] = {}
+            for file_pkg in file_pkgs:
+                partition = self._get_partition_for_file(file_pkg.full_path)
+                if partition.path not in partitions_reservations:
+                    partitions_reservations[partition.path] = 0
+                partitions_reservations[partition.path] += partition.file_size(file_pkg.description['size'])
 
-        full_partitions: List[Tuple[Partition, int]] = []
-        for partition_path, size in partitions_reservations.items():
-            remaining_space = self._partitions[partition_path].check_potential_remaining_space(size)
-            if remaining_space <= self._partitions[partition_path].min_space:
-                full_partitions.append((self._partitions[partition_path], size))
+            full_partitions: List[Tuple[Partition, int]] = []
+            for partition_path, size in partitions_reservations.items():
+                remaining_space = self._partitions[partition_path].check_potential_remaining_space(size)
+                if remaining_space <= self._partitions[partition_path].min_space:
+                    full_partitions.append((self._partitions[partition_path], size))
 
-        if len(full_partitions) > 0:
-            return False, full_partitions
+            if len(full_partitions) > 0:
+                return False, full_partitions
 
-        for partition_path, size in partitions_reservations.items():
-            self._partitions[partition_path].reserve_raw_space(size)
+            for partition_path, size in partitions_reservations.items():
+                self._partitions[partition_path].reserve_raw_space(size)
 
-        return True, []
+            return True, []
         
     def release_space_for_file(self, full_file_path: str, file_description: Dict[str, Any]) -> None:
         partition = self._get_partition_for_file(full_file_path)
