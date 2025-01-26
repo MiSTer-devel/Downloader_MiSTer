@@ -271,25 +271,24 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             return True
 
         with self._ctx.top_lock:
-            for pkg in fetch_pkgs:
-                # @TODO Should reserve a collection instead of a single file to minimize lock time
-                self._ctx.free_space_reservation.reserve_space_for_file(pkg.full_path,  pkg.description)
-
-            self._ctx.logger.debug(f"Free space: {self._ctx.free_space_reservation.free_space()}")
-            full_partitions = self._ctx.free_space_reservation.get_full_partitions()
-            if len(full_partitions) > 0:
-                for partition in full_partitions:
-                    # @TODO No need to be within the lock
-                    self._ctx.file_download_session_logger.print_progress_line(f"Partition {partition.partition_path} would get full!")
+            fits_well, full_partitions = self._ctx.free_space_reservation.reserve_space_for_file_pkgs(fetch_pkgs)
+        if fits_well:
+            return True
+        else:
+            for partition, _ in full_partitions:
+                self._ctx.file_download_session_logger.print_progress_line(f"Partition {partition.path} would get full!")
+            with self._ctx.top_lock:
+                # @TODO Should use a report lock instead of the top lock
+                for partition, failed_reserve in full_partitions:
+                    # @TODO Should add a collection instead of a single file to minimize lock time
+                    self._ctx.installation_report.add_full_partition(partition, failed_reserve)
 
                 for pkg in fetch_pkgs:
                     # @TODO Should add a collection instead of a single file to minimize lock time
                     self._ctx.installation_report.add_failed_file(pkg.rel_path)
                 #    self._ctx.free_space_reservation.release_space_for_file(pkg.full_path, pkg.description)
 
-                return False
-
-        return True
+            return False
 
     def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], db: DbEntity, store: ReadOnlyStoreAdapter):
         if len(create_folder_pkgs) == 0:

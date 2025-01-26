@@ -24,6 +24,7 @@ from typing import Dict, Optional, Tuple, List, Any, Iterable, Set
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
+from downloader.free_space_reservation import Partition
 from downloader.interruptions import Interruptions
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.local_store_wrapper import StoreFragmentDrivePaths
@@ -87,6 +88,7 @@ class ProcessedFolder:
 class InstallationReport(abc.ABC):
     def get_completed_jobs(self, job_id: int) -> List[Job]: """Return all successful jobs with that id"""
     def get_failed_jobs(self, job_id: int) -> List[Job]: """Return all failed jobs with that id"""
+    def get_full_partitions(self) -> Iterable[Tuple[str, int]]: """Return all full partitions."""
     def is_file_processed(self, path: str) -> bool: """Returns True if the file has been processed."""
     def is_folder_installed(self, path: str) -> bool: """Returns True if the file has been processed."""
     def processed_file(self, path: str) -> ProcessedFile: """File that a database is currently processing."""
@@ -115,6 +117,7 @@ class InstallationReportImpl(InstallationReport):
         self._present_not_validated_files = []
         self._fetch_started_files = []
         self._failed_files = []
+        self._full_partitions = dict()
         self._failed_db_options: List[WrongDatabaseOptions] = []
         self._removed_files = []
         self._removed_copies: List[Tuple[bool, str, str, PathType]] = []
@@ -158,6 +161,11 @@ class InstallationReportImpl(InstallationReport):
     def add_skipped_updated_files(self, paths: List[str]): self._skipped_updated_files.extend(paths)
     def add_file_fetch_started(self, path: str): self._fetch_started_files.append(path)
     def add_failed_file(self, path: str): self._failed_files.append(path)
+    def add_full_partition(self, partition: Partition, failed_reserve: int):
+        if partition.path not in self._full_partitions:
+            self._full_partitions[partition.path] = failed_reserve
+        else:
+            self._full_partitions[partition.path] += failed_reserve
 
     def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
         files, folders = filtered_data['files'], filtered_data['folders']
@@ -194,6 +202,7 @@ class InstallationReportImpl(InstallationReport):
     def filtered_zip_data(self): return self._filtered_zip_data
     def get_completed_jobs(self, job_id: int) -> List[Job]: return self._jobs_completed[job_id]
     def get_failed_jobs(self, job_id: int) -> List[Tuple[Job, BaseException]]: return self._jobs_failed[job_id]
+    def get_full_partitions(self) -> Iterable[Tuple[str, int]]: return self._full_partitions.items()
 
 
 class FileDownloadSessionLogger:
