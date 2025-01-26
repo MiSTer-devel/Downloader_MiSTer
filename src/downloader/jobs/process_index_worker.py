@@ -270,8 +270,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         if len(fetch_pkgs) == 0:
             return True
 
-        with self._ctx.top_lock:
-            fits_well, full_partitions = self._ctx.free_space_reservation.reserve_space_for_file_pkgs(fetch_pkgs)
+        fits_well, full_partitions = self._ctx.free_space_reservation.reserve_space_for_file_pkgs(fetch_pkgs)
         if fits_well:
             return True
         else:
