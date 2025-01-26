@@ -28,7 +28,6 @@ from test.objects import file_a, folder_a, db_test_with_file_a, empty_test_store
     db_test_with_file_b, db_test_with_file_c, file_c, file_b, files_a, files_b, files_c, folder_c, folder_b, store_test_with_file_b_descr, store_test_with_file_c_descr, \
     file_size_b, file_size_c, db_smb1, db_sonic, folder_games_nes, folder_games, folder_games_md, file_nes_smb1, file_md_sonic, file_size_sonic, file_size_smb1, \
     media_usb1, media_fat, db_test_descr, db_test_with_file_d, file_d, file_size_d
-from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 from test.unit.online_importer.online_importer_with_priority_storage_test_base import fs_files_smb1_on_usb1, fs_files_sonic_on_usb1, store_smb1_on_usb1, store_sonic_on_usb1, \
     store_sonic_on_usb1_but_just_folders, store_smb1_on_usb1_but_just_folders, store_smb1_on_fat, fs_files_smb1_on_fat
@@ -153,16 +152,16 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
             partitions
         )
 
-    def test_download_three_dbs_with_external_priority_files___with_enough_free_space_on_fat_but_not_on_usb1___fills_fat_and_reports_error_for_usb1(self):
+    def test_download_three_dbs_with_external_priority_files___with_enough_free_space_on_fat_but_not_on_usb1___fills_fat_and_just_fitting_db_on_usb1_but_reports_error_for_second_db_on_usb1(self):
         sut, free, stores = self.download_three_dbs_with_external_priority_files({
             MEDIA_FAT: Partition(self.mb600, min_space=595, block_size=32),
             MEDIA_USB1: Partition(self.mb600, min_space=595, block_size=32)
         })
         self.assertSystem({
-            "fs": fs_data(files={**files_a()}, folders=[folder_a, folder_games, media_usb1(folder_games), media_usb1(folder_games_nes), media_usb1(folder_games_md)]),
-            "stores": [store_test_with_file_a_descr(), store_smb1_on_usb1_but_just_folders(), store_sonic_on_usb1_but_just_folders()],
-            "ok": [file_a],
-            "errors": [file_nes_smb1, file_md_sonic],
+            "fs": fs_data(files={**files_a(), **fs_files_smb1_on_usb1()}, folders=[folder_a, folder_games, media_usb1(folder_games), media_usb1(folder_games_nes)]),
+            "stores": [store_test_with_file_a_descr(), store_smb1_on_usb1(), empty_test_store()],
+            "ok": [file_a, file_nes_smb1],
+            "errors": [file_md_sonic],
             "full_partitions": [MEDIA_USB1],
             "free": {MEDIA_FAT: self.mb600 - self.size_a, MEDIA_USB1: self.mb600 - self.size_smb1 - self.size_sonic}
         }, sut, stores, free=free)
