@@ -291,11 +291,8 @@ class WriteOnlyStoreAdapter:
             external['files'] = {}
             self._top_wrapper.mark_force_save()
 
-        if 'files' in external and not external['files']:
+        if 'files' in external and not external['files'] and 'folders' in external and not external['folders']:
             del external['files']
-            self._top_wrapper.mark_force_save()
-
-        if 'folders' in external and not external['folders']:
             del external['folders']
             self._top_wrapper.mark_force_save()
 
