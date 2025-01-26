@@ -18,19 +18,26 @@
 
 import abc
 import os
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple, Optional, Iterable
 
 from downloader.constants import STORAGE_PATHS_PRIORITY_SEQUENCE, K_MINIMUM_SYSTEM_FREE_SPACE_MB, K_BASE_SYSTEM_PATH, K_MINIMUM_EXTERNAL_FREE_SPACE_MB
 from downloader.logger import Logger
+from downloader.path_package import PathPackage
 
 
 class FreeSpaceReservation(abc.ABC):
+    # @deprecated
     def reserve_space_for_file(self, full_file_path: str, file_description: Dict[str, Any]) -> None:
         """Reserve space for a file that will be downloaded later"""
 
+    def reserve_space_for_file_pkgs(self, file_pkgs: Iterable[PathPackage]) -> Tuple[bool, List[Tuple['Partition', int]]]:
+        """Reserve space for a file that will be downloaded later"""
+
+    # @deprecated
     def release_space_for_file(self, full_file_path: str, file_description: Dict[str, Any]) -> None:
         """Release space previously reserved for a file that won't be downloaded later"""
 
+    # @deprecated
     def get_full_partitions(self) -> List['FullPartition']:
         """Get a list of partitions that are full"""
 
@@ -45,7 +52,7 @@ class FullPartition:
 
 
 class LinuxFreeSpaceReservation(FreeSpaceReservation):
-    def __init__(self, logger: Logger, config: Dict[str, Any], partitions: Dict[str, 'Partition'] = None):
+    def __init__(self, logger: Logger, config: Dict[str, Any], partitions: Optional[Dict[str, 'Partition']] = None):
         self._logger = logger
         self._config = config
         self._partitions: Dict[str, Partition] = partitions or {}
@@ -53,6 +60,28 @@ class LinuxFreeSpaceReservation(FreeSpaceReservation):
     def reserve_space_for_file(self, full_file_path: str, file_description: Dict[str, Any]) -> None:
         partition = self._get_partition_for_file(full_file_path)
         partition.reserve_space(full_file_path, file_description)
+
+    def reserve_space_for_file_pkgs(self, file_pkgs: Iterable[PathPackage]) -> Tuple[bool, List[Tuple['Partition', int]]]:
+        partitions_reservations: Dict[str, int] = {}
+        for file_pkg in file_pkgs:
+            partition = self._get_partition_for_file(file_pkg.full_path)
+            if partition.path not in partitions_reservations:
+                partitions_reservations[partition.path] = 0
+            partitions_reservations[partition.path] += partition.file_size(file_pkg.description['size'])
+
+        full_partitions: List[Tuple[Partition, int]] = []
+        for partition_path, size in partitions_reservations.items():
+            remaining_space = self._partitions[partition_path].check_potential_remaining_space(size)
+            if remaining_space <= self._partitions[partition_path].min_space:
+                full_partitions.append((self._partitions[partition_path], size))
+
+        if len(full_partitions) > 0:
+            return False, full_partitions
+
+        for partition_path, size in partitions_reservations.items():
+            self._partitions[partition_path].reserve_raw_space(size)
+
+        return True, []
         
     def release_space_for_file(self, full_file_path: str, file_description: Dict[str, Any]) -> None:
         partition = self._get_partition_for_file(full_file_path)
@@ -92,6 +121,7 @@ def partition_min_space(config, path: str) -> int:
 
 class UnlimitedFreeSpaceReservation(FreeSpaceReservation):
     def reserve_space_for_file(self, full_file_path: str, file_description: Dict[str, Any]) -> None: pass
+    def reserve_space_for_file_pkgs(self, file_pkgs: Iterable[PathPackage]) -> Tuple[bool, List[Tuple['Partition', int]]]: return True, []
     def release_space_for_file(self, full_file_path: str, file_description: Dict[str, Any]) -> None: pass
     def get_full_partitions(self) -> List[FullPartition]: return []
     def free_space(self) -> Dict[str, int]: return {}
@@ -110,12 +140,24 @@ class Partition:
         self._reserved_space += file_size_on_disk(int(file_description['size']), self._block_size)
         self.files.append(file_path)
 
+    def reserve_raw_space(self, size: int) -> None:
+        self._reserved_space += size
+
     def release_space(self, file_path: str, file_description: Dict[str, Any]) -> None:
         self._reserved_space -= file_size_on_disk(int(file_description['size']), self._block_size)
         self.files.remove(file_path)
 
+    def check_potential_remaining_space(self, size: int) -> int:
+        return self.available_space - self._reserved_space - size
+
+    def fits_raw_size(self, size: int) -> bool:
+        return self.check_potential_remaining_space(size) <= self.min_space
+
     def is_full(self) -> bool:
         return self.remaining_space <= self.min_space
+
+    def file_size(self, size: int) -> int:
+        return file_size_on_disk(size, self._block_size)
 
     @property
     def remaining_space(self) -> int:

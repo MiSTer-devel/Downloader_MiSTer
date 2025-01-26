@@ -497,6 +497,9 @@ class OnlineImporter:
     def full_partitions(self):
         return [p.partition_path for p in self._free_space_reservation.get_full_partitions()]
 
+    def free_space(self):
+        return self._free_space_reservation.free_space()
+
     def new_files_not_overwritten(self):
         return self._base_session.new_files_not_overwritten
 
