@@ -26,3 +26,7 @@ class Index:
     folders: Dict[str, Any]
     base_files_url: str = None
 
+    def merge_zip_index(self, zip_index: 'Index'):
+        self.files.update(zip_index.files)
+        self.folders.update(zip_index.folders)
+

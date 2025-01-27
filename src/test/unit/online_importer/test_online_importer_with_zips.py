@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import default_config
-from downloader.constants import K_BASE_PATH, K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD
+from downloader.constants import K_BASE_PATH
 from test.fake_file_system_factory import fs_data
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.objects import db_test_descr, empty_zip_summary, store_descr, empty_test_store, media_fat, db_entity
@@ -44,17 +44,17 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         return store
 
     def test_download_zipped_cheats_folder___on_empty_store_from_summary_and_contents_files_when_file_count_threshold_is_surpassed___installs_from_zip_content(self):
-        self.config[K_ZIP_FILE_COUNT_THRESHOLD] = 0  # This will cause to unzip the contents
+        self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
         store = self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=True)
         self.assertEqual(store_with_unzipped_cheats(url=False), store)
 
     def test_download_zipped_cheats_folder___on_empty_store_from_internal_summary_and_contents_file_when_file_count_threshold_is_surpassed___installs_from_zip_content(self):
-        self.config[K_ZIP_FILE_COUNT_THRESHOLD] = 0  # This will cause to unzip the contents
+        self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
         store = self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=True, is_internal_summary=True)
         self.assertEqual(store_with_unzipped_cheats(url=False, is_internal_summary=True), store)
 
     def test_download_zipped_cheats_folder___on_empty_store_from_summary_and_contents_files_when_accumulated_mb_threshold_is_surpassed___installs_from_zip_content(self):
-        self.config[K_ZIP_ACCUMULATED_MB_THRESHOLD] = 0  # This will cause to unzip the contents
+        self.config['zip_accumulated_mb_threshold'] = 0  # This will cause to unzip the contents
         store = self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=True)
         self.assertEqual(store_with_unzipped_cheats(url=False), store)
 
@@ -142,7 +142,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         self.assertEqual(expected_store, actual_store)
 
     def test_download_zipped_cheats_folder___with_summary_file_containing_already_existing_files_but_old_hash___when_file_count_threshold_is_surpassed_but_network_fails____reports_error_and_installs_from_zip_content_using_store_information(self):
-        self.config[K_ZIP_FILE_COUNT_THRESHOLD] = 0  # This will cause to unzip the contents
+        self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
         self.implicit_inputs.network_state.remote_failures['temp zip file test:cheats_id:summary_file'] = 99
         self.assertEqual(fs_data(), self.sut.fs_data)
 
@@ -161,7 +161,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         ), self.sut.fs_data)
 
     def test_download_zipped_cheats_folder___on_empty_store_when_file_count_threshold_is_surpassed_but_network_fails___reports_error_and_installs_nothing(self):
-        self.config[K_ZIP_FILE_COUNT_THRESHOLD] = 0  # This will cause to unzip the contents
+        self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
         self.implicit_inputs.network_state.remote_failures['temp zip file test:cheats_id:summary_file'] = 99
         store = self.download(db_test_descr(zips={
             cheats_folder_id: cheats_folder_zip_desc(
