@@ -68,7 +68,7 @@ def make_get_zip_file_jobs(db: DbEntity, zip_id: str, description: Dict[str, Any
     return get_file_job, validate_job, info
 
 
-def make_open_zip_index_job(z: ZipJobContext, file_description: Dict[str, Any]) -> Tuple[GetFileJob, str]:
+def make_open_zip_index_job(z: ZipJobContext, file_description: Dict[str, Any], backup_job: Optional[ProcessZipJob]) -> Tuple[GetFileJob, str]:
     get_file_job, validate_job, info = make_get_zip_file_jobs(db=z.job.db, zip_id=z.zip_id, description=file_description)
     open_zip_index_job = OpenZipIndexJob(
         zip_id=z.zip_id,
@@ -80,6 +80,7 @@ def make_open_zip_index_job(z: ZipJobContext, file_description: Dict[str, Any]) 
         download_path=validate_job.target_file_path,
         config=z.config,
         get_file_job=get_file_job,
+        backup_job=backup_job
     )
     open_zip_index_job.add_tag(make_zip_tag(z.job.db, z.zip_id))
     validate_job.after_job = open_zip_index_job

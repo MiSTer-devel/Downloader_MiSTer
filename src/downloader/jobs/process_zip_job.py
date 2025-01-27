@@ -41,5 +41,6 @@ class ProcessZipJob(Job):
 
     # results
     result_zip_index: StoreFragmentDrivePaths
+    not_enough_space: bool = field(default=False)
 
     def retry_job(self): return None

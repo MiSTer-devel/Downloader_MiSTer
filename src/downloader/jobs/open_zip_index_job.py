@@ -17,11 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.get_file_job import GetFileJob
+from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.local_store_wrapper import StoreWrapper
 
 
@@ -38,5 +39,6 @@ class OpenZipIndexJob(Job):
     download_path: str
     config: Dict[str, Any]
     get_file_job: GetFileJob
+    backup_job: Optional[ProcessZipJob]
 
     def retry_job(self): return self.get_file_job
