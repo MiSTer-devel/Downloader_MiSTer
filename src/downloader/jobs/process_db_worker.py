@@ -105,11 +105,13 @@ def _make_zip_job(z: ZipJobContext) -> Job:
 
         #@TODO ZIP_INDEX method does not pull data from filtered_zip_data so and that makes the current test to not pass
 
-        there_is_a_recent_store_index = index is not None and index['hash'] == z.zip_description['summary_file']['hash'] and index['hash'] != NO_HASH_IN_STORE_CODE
+        process_zip_job = None if index is None else _make_process_zip_job_from_ctx(z, zip_index=index, has_new_zip_index=False)
+
+        there_is_a_recent_store_index = process_zip_job is not None and index['hash'] == z.zip_description['summary_file']['hash'] and index['hash'] != NO_HASH_IN_STORE_CODE
         if there_is_a_recent_store_index:
-            job = _make_process_zip_job_from_ctx(z, zip_index=index, has_new_zip_index=False)
+            job = process_zip_job
         else:
-            job, summary_info =  make_open_zip_index_job(z, z.zip_description['summary_file'])
+            job, summary_info =  make_open_zip_index_job(z, z.zip_description['summary_file'], process_zip_job)
 
     elif 'internal_summary' in z.zip_description:
         job = _make_process_zip_job_from_ctx(z, zip_index=z.zip_description['internal_summary'], has_new_zip_index=True)

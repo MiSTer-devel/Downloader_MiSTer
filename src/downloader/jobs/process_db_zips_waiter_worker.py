@@ -17,8 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.job_system import WorkerResult
+from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.index import Index
+from downloader.jobs.open_zip_index_job import OpenZipIndexJob
 from downloader.jobs.process_index_job import ProcessIndexJob
+from downloader.jobs.process_zip_job import ProcessZipJob
+from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 
@@ -28,6 +32,7 @@ from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 # in the job system, so that we can centralize scheduling there.
 
 class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
+    _wait = 0
     def job_type_id(self) -> int: return ProcessDbZipsWaiterJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
@@ -36,11 +41,34 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
         while self._ctx.job_ctx.any_in_progress_job_with_tags(job.zip_job_tags):
             self._ctx.job_ctx.wait_for_other_jobs()
 
-        return ProcessIndexJob(
+        for tag in job.zip_job_tags:
+            for zip_job in self._ctx.installation_report.get_jobs_failed_by_tag(tag):
+                if (
+                    isinstance(zip_job, FetchFileJob2) and
+                    isinstance(zip_job.after_job, ValidateFileJob2) and
+                    isinstance(zip_job.after_job.after_job, OpenZipIndexJob) and
+                    zip_job.after_job.after_job.backup_job is not None
+                ):
+                    backup_job = zip_job.after_job.after_job.backup_job
+                    zip_job.after_job.after_job.backup_job = None
+                    return [backup_job, job], None
+
+        index = Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url)
+
+        for tag in job.zip_job_tags:
+            for zip_job in self._ctx.installation_report.get_jobs_completed_by_tag(tag):
+                if isinstance(zip_job, ProcessZipJob):
+                    if zip_job.not_enough_space:
+                        return None, None
+
+                    index.merge_zip_index(zip_job.zip_index)
+
+        resulting_job = ProcessIndexJob(
             db=job.db,
             ini_description=job.ini_description,
             config=job.config,
-            index=Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url),
+            index=index,
             store=job.store,
             full_resync=job.full_resync,
-        ), None
+        )
+        return resulting_job, None
