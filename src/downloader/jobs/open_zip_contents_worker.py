@@ -86,14 +86,19 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         self._ctx.file_system.unlink(download_path)
 
-        for file_path, file_description in job.filtered_data['files'].items():
-            self._ctx.pending_removals.queue_file_removal(PathPackage(full_path=file_path, rel_path=file_path, description=file_description), db.db_id)
+        if len(job.filtered_data['files']) > 0:
+            self._ctx.pending_removals.queue_file_removal(
+                [PathPackage(full_path=file_path, rel_path=file_path, description=file_description) for file_path, file_description in job.filtered_data['files'].items()],
+                db.db_id
+            )
 
-        for folder_path, folder_description in job.filtered_data['folders'].items():
-            self._ctx.pending_removals.queue_directory_removal(PathPackage(full_path=folder_path, rel_path=folder_path, description=folder_description), db.db_id)
+        if len(job.filtered_data['folders']) > 0:
+            self._ctx.pending_removals.queue_directory_removal(
+                [PathPackage(full_path=folder_path, rel_path=folder_path, description=folder_description) for folder_path, folder_description in job.filtered_data['folders'].items()],
+                db.db_id
+            )
 
-        for pkg in contained_files:
-            job.downloaded_files.append(pkg.rel_path)
+        job.downloaded_files.extend(contained_files)
 
     def _process_create_folders_packages(self, db, create_folder_pkgs):
         # @TODO inspired in ProcessIndexWorker._process_create_folders_packages
@@ -111,11 +116,8 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
             folders_to_create.add(pkg.full_path)
         for full_folder_path in sorted(folders_to_create, key=lambda x: len(x), reverse=True):
             self._ctx.file_system.make_dirs(full_folder_path)
-        with self._ctx.top_lock:
-            for pkg in create_folder_pkgs:
-                #if pkg.db_path() not in db.folders: continue
-                self._ctx.installation_report.add_processed_folder(pkg, db.db_id)
-                self._ctx.installation_report.add_installed_folder(pkg.rel_path)
+        self._ctx.installation_report.add_processed_folders(create_folder_pkgs, db.db_id)
+        self._ctx.installation_report.add_installed_folders(create_folder_pkgs)
 
     def _extract_single_files(self, job: OpenZipContentsJob):
         zip_id = job.zip_id
@@ -142,11 +144,11 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
                 try:
                     self._ctx.file_system.copy(str(Path(tmp_path) / Path(file_description['zip_path'])), file_path)
                 except FileCopyError as _e:
-                    job.failed_files.append(file_path)
+                    job.failed_files.append(pkg)
                     self._ctx.logger.print('ERROR: File "%s" could not be copied, skipping.' % file_path)
                     continue
 
-                job.downloaded_files.append(file_path)
+                job.downloaded_files.append(pkg)
 
         self._ctx.file_system.unlink(download_path)
         self._ctx.file_system.remove_non_empty_folder(tmp_path)
