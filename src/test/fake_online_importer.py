@@ -1,4 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+from collections import defaultdict
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -159,6 +160,8 @@ class OnlineImporter(ProductionOnlineImporter):
         self._job_system.execute_jobs()
 
         report = self._worker_ctx.file_download_session_logger.report()
+        removed_files = []
+        processed_files = defaultdict(list)
         for pkg, dbs in self._worker_ctx.pending_removals.consume_files():
             for db_id in dbs:
                 stores[db_id].write_only().remove_file(pkg.rel_path)
@@ -176,8 +179,12 @@ class OnlineImporter(ProductionOnlineImporter):
                         self._worker_ctx.file_system.unlink(file_path)
 
             self._worker_ctx.file_system.unlink(pkg.full_path)
-            self._worker_ctx.installation_report.add_processed_file(pkg, list(dbs)[0])
-            self._worker_ctx.installation_report.add_removed_file(pkg.rel_path)
+            processed_files[list(dbs)[0]].append(pkg)
+            removed_files.append(pkg)
+
+        for db_id, pkgs in processed_files.items():
+            self._worker_ctx.installation_report.add_processed_files(pkgs, db_id)
+        self._worker_ctx.installation_report.add_removed_files(removed_files)
 
         for pkg, dbs in sorted(self._worker_ctx.pending_removals.consume_directories(), key=lambda x: len(x[0].full_path), reverse=True):
             if report.is_folder_installed(pkg.rel_path):
@@ -332,11 +339,11 @@ class OnlineImporter(ProductionOnlineImporter):
         return self._needs_reboot
 
     def full_partitions(self):
-        return [p for p, s in self._worker_ctx.file_download_session_logger.report().get_full_partitions()]
+        return [p for p, s in self._worker_ctx.file_download_session_logger.report().full_partitions_iter()]
 
     def free_space(self):
         actual_remaining_space = dict(self._free_space_reservation.free_space())
-        for p, reservation in self._worker_ctx.file_download_session_logger.report().get_full_partitions():
+        for p, reservation in self._worker_ctx.file_download_session_logger.report().full_partitions_iter():
             actual_remaining_space[p] -= reservation
         return actual_remaining_space
 

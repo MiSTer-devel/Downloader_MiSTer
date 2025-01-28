@@ -170,20 +170,9 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
         file_system = ReadOnlyFileSystem(self._ctx.file_system)
 
-        non_duplicated_pkgs: List[_CheckFilePackage] = []
-        duplicated_files = []
-        with self._ctx.top_lock:
-            for pkg in check_file_pkgs:
-                # @TODO Should check a collection instead of a single file to minimize lock time
-                if self._ctx.installation_report.is_file_processed(pkg.rel_path):
-                    duplicated_files.append(pkg.rel_path)
-                else:
-                    # @TODO Should add a collection instead of a single file to minimize lock time
-                    self._ctx.installation_report.add_processed_file(pkg, db_id)
-                    non_duplicated_pkgs.append(pkg)
-
-        for file_path in duplicated_files:
-            self._ctx.file_download_session_logger.print_progress_line(f'DUPLICATED: {file_path} [using {self._ctx.installation_report.processed_file(file_path).db_id} instead]')
+        non_duplicated_pkgs, duplicated_files = self._ctx.installation_report.add_processed_files(check_file_pkgs, db_id)
+        for dup in duplicated_files:
+            self._ctx.file_download_session_logger.print_progress_line(f'DUPLICATED: {dup.pkg.rel_path} [using {dup.db_id} instead]')
 
         fetch_pkgs: List[_FetchFilePackage] = []
         validate_pkgs: List[_ValidateFilePackage] = []
@@ -208,9 +197,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         if len(already_installed_pkgs) == 0:
             return
 
-        already_installed_files: List[str] = [pkg.rel_path for pkg in already_installed_pkgs]
-        with self._ctx.top_lock:
-            self._ctx.installation_report.add_present_not_validated_files(already_installed_files)
+        self._ctx.installation_report.add_present_not_validated_files(already_installed_pkgs)
 
     def _process_validate_packages(self, validate_pkgs: List[_ValidateFilePackage]) -> List[_FetchFilePackage]:
         if len(validate_pkgs) == 0:
@@ -219,33 +206,28 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         file_system = ReadOnlyFileSystem(self._ctx.file_system)
 
         more_fetch_pkgs: List[_FetchFilePackage] = []
-        present_validated_files: List[str] = []
-        skipped_updated_files: List[str] = []
+        present_validated_files: List[_FetchFilePackage] = []
+        skipped_updated_files: List[_FetchFilePackage] = []
 
         for pkg in validate_pkgs:
             # @TODO: Parallelize the slow hash calculations
             if file_system.hash(pkg.full_path) == pkg.description['hash']:
                 self._ctx.file_download_session_logger.print_progress_line(f'No changes: {pkg.rel_path}')
-                present_validated_files.append(pkg.rel_path)
+                present_validated_files.append(pkg)
                 continue
 
             if 'overwrite' in pkg.description and not pkg.description['overwrite']:
                 if file_system.hash(pkg.full_path) != pkg.description['hash']:
-                    skipped_updated_files.append(pkg.rel_path)
+                    skipped_updated_files.append(pkg)
                 else:
-                    present_validated_files.append(pkg.rel_path)
+                    present_validated_files.append(pkg)
 
                 continue
 
             more_fetch_pkgs.append(pkg)
 
-        if len(present_validated_files) > 0:
-            with self._ctx.top_lock:
-                self._ctx.installation_report.add_present_validated_files(present_validated_files)
-
-        if len(skipped_updated_files) > 0:
-            with self._ctx.top_lock:
-                self._ctx.installation_report.add_skipped_updated_files(skipped_updated_files)
+        self._ctx.installation_report.add_present_validated_files(present_validated_files)
+        self._ctx.installation_report.add_skipped_updated_files(skipped_updated_files)
 
         return more_fetch_pkgs
 
@@ -260,11 +242,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
                 if not self._ctx.file_system.is_file(other_file):
                     moved_files.append((is_external, pkg.rel_path, other_drive, PathType.FILE))
 
-        if len(moved_files) == 0:
-            return
-
-        with self._ctx.top_lock:
-            self._ctx.installation_report.add_removed_copies(moved_files)
+        self._ctx.installation_report.add_removed_copies(moved_files)
 
     def _try_reserve_space(self, fetch_pkgs: List[_FetchFilePackage]) -> bool:
         if len(fetch_pkgs) == 0:
@@ -276,16 +254,9 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         else:
             for partition, _ in full_partitions:
                 self._ctx.file_download_session_logger.print_progress_line(f"Partition {partition.path} would get full!")
-            with self._ctx.top_lock:
-                # @TODO Should use a report lock instead of the top lock
-                for partition, failed_reserve in full_partitions:
-                    # @TODO Should add a collection instead of a single file to minimize lock time
-                    self._ctx.installation_report.add_full_partition(partition, failed_reserve)
 
-                for pkg in fetch_pkgs:
-                    # @TODO Should add a collection instead of a single file to minimize lock time
-                    self._ctx.installation_report.add_failed_file(pkg.rel_path)
-                #    self._ctx.free_space_reservation.release_space_for_file(pkg.full_path, pkg.description)
+            self._ctx.installation_report.add_full_partitions(full_partitions)
+            self._ctx.installation_report.add_failed_files(fetch_pkgs)
 
             return False
 
@@ -320,15 +291,11 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         for full_folder_path in sorted(folders_to_create, key=lambda x: len(x), reverse=True):
             self._ctx.file_system.make_dirs(full_folder_path)
 
-        with self._ctx.top_lock:
-            self._ctx.installation_report.add_removed_copies(folder_copies_to_be_removed)
-            for pkg in create_folder_pkgs:
-                if pkg.db_path() not in db.folders: continue
-
-                # @TODO Why two adds?
-                # @TODO Should add a collection instead of a single file to minimize lock time
-                self._ctx.installation_report.add_processed_folder(pkg, db.db_id)
-                self._ctx.installation_report.add_installed_folder(pkg.rel_path)
+        self._ctx.installation_report.add_removed_copies(folder_copies_to_be_removed)
+        # @TODO Why two adds?
+        folders = [f for f in create_folder_pkgs if f.db_path() in db.folders]
+        self._ctx.installation_report.add_processed_folders(folders, db.db_id)
+        self._ctx.installation_report.add_installed_folders(folders)
 
     def _maybe_add_copies_to_remove(self, copies: List[Tuple[bool, str, str, PathType]], store: ReadOnlyStoreAdapter, folder_path: str, drive: Optional[str]):
         if store.folder_drive(folder_path) == drive: return
@@ -342,19 +309,13 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         if len(remove_files_pkgs) == 0:
             return
 
-        with self._ctx.top_lock:
-            for pkg in remove_files_pkgs:
-                # @TODO Should queue a collection instead of a single file to minimize lock time
-                self._ctx.pending_removals.queue_file_removal(pkg, db_id)
+        self._ctx.pending_removals.queue_file_removal(remove_files_pkgs, db_id)
 
     def _process_delete_folder_packages(self, delete_folder_pkgs: List[_DeleteFolderPackage], db_id: str):
         if len(delete_folder_pkgs) == 0:
             return
 
-        with self._ctx.top_lock:
-            for pkg in delete_folder_pkgs:
-                # @TODO Should queue a collection instead of a single file to minimize lock time
-                self._ctx.pending_removals.queue_directory_removal(pkg, db_id)
+        self._ctx.pending_removals.queue_directory_removal(delete_folder_pkgs, db_id)
 
     def _process_fetch_packages_and_launch_jobs(self, fetch_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
         if len(fetch_pkgs) == 0:
