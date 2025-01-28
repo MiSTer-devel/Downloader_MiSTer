@@ -107,8 +107,8 @@ def _make_zip_job(z: ZipJobContext) -> Job:
 
         process_zip_job = None if index is None else _make_process_zip_job_from_ctx(z, zip_index=index, has_new_zip_index=False)
 
-        there_is_a_recent_store_index = process_zip_job is not None and index['hash'] == z.zip_description['summary_file']['hash'] and index['hash'] != NO_HASH_IN_STORE_CODE
-        if there_is_a_recent_store_index:
+        # if there is a recent enough index in the store, use it
+        if process_zip_job is not None and index['hash'] == z.zip_description['summary_file']['hash'] and index['hash'] != NO_HASH_IN_STORE_CODE:
             job = process_zip_job
         else:
             job, summary_info =  make_open_zip_index_job(z, z.zip_description['summary_file'], process_zip_job)

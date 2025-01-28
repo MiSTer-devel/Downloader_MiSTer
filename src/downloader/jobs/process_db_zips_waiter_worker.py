@@ -41,8 +41,8 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
         while self._ctx.job_ctx.any_in_progress_job_with_tags(job.zip_job_tags):
             self._ctx.job_ctx.wait_for_other_jobs()
 
-        for tag in job.zip_job_tags:
-            for zip_job in self._ctx.installation_report.get_jobs_failed_by_tag(tag):
+        for tag, zip_jobs in self._ctx.installation_report.get_jobs_failed_by_tags(job.zip_job_tags):
+            for zip_job in zip_jobs:
                 if (
                     isinstance(zip_job, FetchFileJob2) and
                     isinstance(zip_job.after_job, ValidateFileJob2) and
@@ -55,8 +55,8 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
 
         index = Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url)
 
-        for tag in job.zip_job_tags:
-            for zip_job in self._ctx.installation_report.get_jobs_completed_by_tag(tag):
+        for tag, zip_jobs in self._ctx.installation_report.get_jobs_completed_by_tags(job.zip_job_tags):
+            for zip_job in zip_jobs:
                 if isinstance(zip_job, ProcessZipJob):
                     if zip_job.not_enough_space:
                         return None, None
