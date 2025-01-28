@@ -67,9 +67,8 @@ class ProcessZipWorker(DownloaderWorkerBase):
             self._ctx.logger.debug(f"Reserving space '{job.db.db_id}'...")
             if not self._try_reserve_space(file_packs):
                 self._ctx.logger.debug(f"Not enough space '{job.db.db_id} zip:{job.zip_id}'!")
-                with self._ctx.top_lock:
-                    for pkg in file_packs:
-                        self._ctx.installation_report.add_failed_file(pkg.rel_path)
+                self._ctx.installation_report.add_failed_files(file_packs)
+
                 job.not_enough_space = True
                 next_job = None  # @TODO return error instead to retry later?
             else:
@@ -77,17 +76,12 @@ class ProcessZipWorker(DownloaderWorkerBase):
                 for folder_path, folder_description in zip_index.folders.items():
                     folder_packs.append(target_paths_calculator.deduce_target_path(folder_path, folder_description, PathType.FOLDER))
 
-                already_processed: Optional[Tuple[str, str]] = None
-                with self._ctx.top_lock:
-                    for pkg in file_packs:
-                        if self._ctx.installation_report.is_file_processed(pkg.rel_path):
-                            already_processed = (pkg.rel_path, self._ctx.installation_report.processed_file(pkg.rel_path).db_id)
-                            break
-                        else:
-                            self._ctx.installation_report.add_processed_file(pkg, job.db.db_id)
+                already_processed = self._ctx.installation_report.any_file_processed(file_packs)
+                if already_processed is None:
+                    self._ctx.installation_report.add_processed_files(file_packs, job.db.db_id)
 
                 if already_processed is not None:
-                    self._ctx.logger.print(f'Skipping zip "{job.zip_id}" because file "{already_processed[0]}" was already processed by db "{already_processed[1]}"')
+                    self._ctx.logger.print(f'Skipping zip "{job.zip_id}" because file "{already_processed.pkg.rel_path}" was already processed by db "{already_processed.db_id}"')
                     return None, None
 
                 get_file_job, info = make_open_zip_contents_job(
@@ -109,11 +103,8 @@ class ProcessZipWorker(DownloaderWorkerBase):
         else:
             for partition, _ in full_partitions:
                 self._ctx.file_download_session_logger.print_progress_line(f"Partition {partition.path} would get full!")
-            with self._ctx.top_lock:
-                # @TODO Should use a report lock instead of the top lock
-                for partition, failed_reserve in full_partitions:
-                    # @TODO Should add a collection instead of a single file to minimize lock time
-                    self._ctx.installation_report.add_full_partition(partition, failed_reserve)
+
+            self._ctx.installation_report.add_full_partitions(full_partitions)
 
             return False
 
