@@ -22,7 +22,7 @@ from functools import reduce
 from downloader.job_system import Job, JobSystem, Worker, CycleDetectedException, ProgressReporter, NoWorkerException, \
     CantRegisterWorkerException, CantExecuteJobs, CantWaitWhenNotExecutingJobs, WorkerResult
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 from downloader.logger import NoLogger
 
@@ -83,7 +83,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
             self.system.execute_jobs()
 
         self.assertIsInstance(context.exception, CycleDetectedException)
-        self.assertReports(completed={1: 3, 2: 3}, started={1: 3, 2: 3}, in_progress={}, pending=2)
+        self.assertReports(completed={1: 4, 2: 3}, in_progress={}, pending=1)
 
     def test_cycle_detection___just_below_the_max_cycle_limit___doesnt_throw(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -164,14 +164,17 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         self.system.push_job(TestJob(1, next_job=(TestJob(2, cancel_pending_jobs=True, next_job=(TestJob(3, next_job=TestJob(4)))))))
 
         self.system.execute_jobs()
-        self.assertReports(completed={1: 1, 2: 1, 3: 1}, pending=1)
+        self.assertReports(completed={1: 1, 2: 1}, cancelled={3: 1})
+
+        self.reporter.reset()
+        self.system.push_job(TestJob(1, next_job=(TestJob(2, cancel_pending_jobs=False, next_job=(TestJob(3, next_job=TestJob(4)))))))
 
         self.system.execute_jobs()
         self.assertReports(completed={1: 1, 2: 1, 3: 1, 4: 1})
 
     def test_throwing_reporter_during_retries___does_not_incur_in_infinite_loop(self):
         class TestThrowingReporter(TestProgressReporter):
-            def notify_job_retried(self, job: 'Job', exception: Exception):
+            def notify_job_retried(self, job: 'Job', exception: BaseException):
                 raise Exception('Houston, we have a problem.')
 
         reporter = TestThrowingReporter()
@@ -243,17 +246,23 @@ class TestSingleThreadJobSystem(unittest.TestCase):
             job.add_tag('a')
         self.assertIsInstance(context.exception, CantExecuteJobs)
 
-    def assertReports(self, completed: Optional[Dict[int, int]] = None, started: Optional[Dict[int, int]] = None, in_progress: Optional[Dict[int, int]] = None, failed: Optional[Dict[int, int]] = None, retried: Optional[Dict[int, int]] = None, pending: int = 0):
+    def assertReports(self, completed: Optional[Dict[int, int]] = None, started: Optional[Dict[int, int]] = None, in_progress: Optional[Dict[int, int]] = None, failed: Optional[Dict[int, int]] = None, retried: Optional[Dict[int, int]] = None, cancelled: Optional[Dict[int, int]] = None, pending: int = 0, timed_out: bool = False):
         self.assertEqual({
-            'completed_jobs': len(completed or {}) > 0,
+            'started_jobs': started or completed or {},
+            'completed_jobs':completed or {},
             'failed_jobs': failed or {},
             'retried_jobs': retried or {},
-            'pending_jobs_amount': pending > 0
+            'cancelled_jobs': cancelled or {},
+            'pending_jobs_amount': pending,
+            'timed_out': timed_out
         }, {
-            'completed_jobs': len(self.reporter.completed_jobs) > 0,
+            'started_jobs': self.reporter.started_jobs,
+            'completed_jobs': self.reporter.completed_jobs,
             'failed_jobs': self.reporter.failed_jobs,
             'retried_jobs': self.reporter.retried_jobs,
-            'pending_jobs_amount': self.system.pending_jobs_amount() > 0
+            'cancelled_jobs': self.reporter.cancelled_jobs,
+            'pending_jobs_amount': self.system.pending_jobs_amount(),
+            'timed_out': self.system.timed_out()
         })
 
 
@@ -319,12 +328,17 @@ class TestProgressReporter(ProgressReporter):
         self.completed_jobs = {}
         self.failed_jobs = {}
         self.retried_jobs = {}
+        self.cancelled_jobs = {}
+
+    def reset(self): self.__init__()
 
     def notify_work_in_progress(self):
         pass
 
-    def notify_cancelled_pending_jobs(self) -> None:
-        pass
+    def notify_cancelled_jobs(self, jobs: List[Job]) -> None:
+        for job in jobs:
+            self.cancelled_jobs[job.type_id] = self.cancelled_jobs.get(job.type_id, 0) + 1
+            self._remove_in_progress(job)
 
     def notify_job_started(self, job: 'Job'):
         self.started_jobs[job.type_id] = self.started_jobs.get(job.type_id, 0) + 1

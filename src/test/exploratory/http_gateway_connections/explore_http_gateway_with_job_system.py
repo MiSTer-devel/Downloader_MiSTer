@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 from downloader.file_system import FileSystemFactory
-from downloader.job_system import JobSystem, ProgressReporter, Job, JobCancelled
+from downloader.job_system import JobSystem, ProgressReporter, Job
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
 from downloader.logger import PrintLogger, DescribeNowDecorator, Logger
@@ -73,7 +73,6 @@ def main() -> None:
     print()
     print('Failed jobs: ')
     for failed, e in reporter.failed:
-        if isinstance(e, JobCancelled): continue
         print(failed, e)
 
     print()
@@ -107,7 +106,7 @@ class Reporter(ProgressReporter):
         self._logger.print(f'>>>>>> FAILED! {job.info}', exception)
         self.failed.append((job, exception))
 
-    def notify_cancelled_pending_jobs(self) -> None:
+    def notify_cancelled_jobs(self, _obs: List[Job]) -> None:
         self._logger.print(f">>>>>> CANCELING PENDING JOBS!")
         self._fs.cancel_ongoing_operations()
         self._gw.cleanup()

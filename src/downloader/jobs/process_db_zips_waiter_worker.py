@@ -38,7 +38,7 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: ProcessDbZipsWaiterJob) -> WorkerResult:
 
-        while self._ctx.job_ctx.any_in_progress_job_with_tags(job.zip_job_tags):
+        while self._ctx.installation_report.any_in_progress_job_with_tags(job.zip_job_tags):
             self._ctx.job_ctx.wait_for_other_jobs()
 
         for tag, zip_jobs in self._ctx.installation_report.get_jobs_failed_by_tags(job.zip_job_tags):
