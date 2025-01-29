@@ -184,6 +184,7 @@ class JobSystem(JobContext):
                     sys.stdout.flush()
 
                 if self._pending_jobs_cancelled:
+                    self._report_cancelled_jobs([])
                     self._cancelled_jobs.extend(self._cancel_futures(futures))
 
             self._handle_notifications(self._notifications, self._cancelled_jobs)
