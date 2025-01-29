@@ -108,7 +108,7 @@ class Reporter(ProgressReporter):
         self._logger.print(f'>>>>>> FAILED! {job.info}', exception)
         self.failed.append((job, exception))
 
-    def notify_cancelled_jobs(self, jobs: List[Job]) -> None:
+    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
         for job in jobs:
             if not isinstance(job, FetchFileJob2): continue
             self.cancelled.append(job)

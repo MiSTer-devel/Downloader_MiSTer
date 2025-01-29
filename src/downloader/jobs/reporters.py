@@ -60,7 +60,7 @@ class DownloaderProgressReporter(ProgressReporter):
         for r in self._other_reporters:
             r.notify_work_in_progress()
 
-    def notify_cancelled_jobs(self, _jobs: List[Job]) -> None:
+    def notify_jobs_cancelled(self, _jobs: List[Job]) -> None:
         pass
 
     def notify_job_completed(self, job: Job):
@@ -380,7 +380,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             self._symbols.append('*')
             self._print_symbols()
 
-    def notify_cancelled_jobs(self, jobs: List[Job]) -> None:
+    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
         self._logger.print(f"Cancelled {len(jobs)} jobs.")
         try:
             self._interrupts.interrupt()

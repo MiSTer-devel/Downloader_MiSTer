@@ -335,7 +335,7 @@ class TestProgressReporter(ProgressReporter):
     def notify_work_in_progress(self):
         pass
 
-    def notify_cancelled_jobs(self, jobs: List[Job]) -> None:
+    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
         for job in jobs:
             self.cancelled_jobs[job.type_id] = self.cancelled_jobs.get(job.type_id, 0) + 1
             self._remove_in_progress(job)
