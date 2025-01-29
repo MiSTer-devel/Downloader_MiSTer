@@ -221,7 +221,7 @@ class JobSystem(JobContext):
         jobs, error = worker.operate_on(job)
 
         if error is not None:
-            notifications.put((_JobState.JOB_FAILED, package, _JobError(error)))
+            notifications.put((_JobState.NIL, package, _JobError(error)))
         else:
             package.next_jobs = jobs
             notifications.put((_JobState.JOB_COMPLETED, package, None))
@@ -514,10 +514,10 @@ def _wrap_unknown_base_error(e: BaseException) -> Exception:
     return wrapper
 
 class _JobState(Enum):
+    NIL = auto()
     JOB_STARTED = auto()
     JOB_COMPLETED = auto()
     JOB_CANCELLED = auto()
-    JOB_FAILED = auto()
 
 def stacks_from_all_threads() -> dict:
     try:
