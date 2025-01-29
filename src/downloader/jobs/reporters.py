@@ -60,7 +60,7 @@ class DownloaderProgressReporter(ProgressReporter):
         for r in self._other_reporters:
             r.notify_work_in_progress()
 
-    def notify_cancelled_pending_jobs(self) -> None:
+    def notify_cancelled_jobs(self, _jobs: List[Job]) -> None:
         pass
 
     def notify_job_completed(self, job: Job):
@@ -112,6 +112,7 @@ class InstallationReport(abc.ABC):
 
 T = TypeVar('T')
 class _WithLock(Generic[T]):
+    __slots__ = ("data", "lock")
     def __init__(self, data: T, lock: Optional[threading.Lock] = None):
         self.data = data
         self.lock = lock or threading.Lock()
@@ -148,6 +149,7 @@ class InstallationReportImpl(InstallationReport):
         self._jobs_started = _WithLock[Dict[int, List[Job]]](defaultdict(list), lock)
         self._jobs_completed = _WithLock[Dict[int, List[Job]]](defaultdict(list), lock)
         self._jobs_failed = _WithLock[Dict[int, List[Tuple[Job, BaseException]]]](defaultdict(list), lock)
+        self._jobs_retried = _WithLock[Dict[int, List[Tuple[Job, BaseException]]]](defaultdict(list), lock)
         job_tag_lock = threading.Lock()
         self._jobs_tag_in_progress = _WithLock[Dict[str, Set[Job]]](defaultdict(set), job_tag_lock)
         self._jobs_tag_completed = _WithLock[Dict[str, List[Job]]](defaultdict(list), job_tag_lock)
@@ -156,7 +158,8 @@ class InstallationReportImpl(InstallationReport):
     def add_job_started(self, job: Job):
         with self._jobs_started as jobs_started: jobs_started[job.type_id].append(job)
         with self._jobs_tag_in_progress as in_progress:
-            for tag in job.tags: in_progress[tag].add(job)
+            for tag in job.tags:
+                in_progress[tag].add(job)
     def add_job_completed(self, job: Job):
         with self._jobs_completed as jobs_completed: jobs_completed[job.type_id].append(job)
         with self._jobs_tag_in_progress.lock:
@@ -169,6 +172,11 @@ class InstallationReportImpl(InstallationReport):
             for tag in job.tags:
                 self._jobs_tag_in_progress.data[tag].remove(job)
                 self._jobs_tag_failed.data[tag].append(job)
+    def add_job_retried(self, job: Job, exception: BaseException):
+        with self._jobs_retried as jobs_retried: jobs_retried[job.type_id].append((job, exception))
+        with self._jobs_tag_in_progress.lock:
+            for tag in job.tags:
+                self._jobs_tag_in_progress.data[tag].remove(job)
     def get_jobs_completed_by_tags(self, tags: List[str]) -> List[Tuple[str, List[Job]]]:
         if len(tags) == 0: return []
         with self._jobs_tag_completed as tag_completed:
@@ -177,6 +185,12 @@ class InstallationReportImpl(InstallationReport):
         if len(tags) == 0: return []
         with self._jobs_tag_failed as tag_failed:
             return [(tag, tag_failed[tag]) for tag in tags if tag in tag_failed]
+    def any_in_progress_job_with_tags(self, tags: List[str]) -> bool:
+        if len(tags) == 0: return False
+        with self._jobs_tag_in_progress as tag_in_progress:
+            for tag in tags:
+                if len(tag_in_progress[tag]) > 0: return True
+        return False
     def add_downloaded_file(self, path: str):
         with self._downloaded_files as downloaded_files: downloaded_files.append(path)
     def add_downloaded_files(self, files: List[PathPackage]):
@@ -272,7 +286,8 @@ class InstallationReportImpl(InstallationReport):
     def get_completed_jobs(self, job_id: int) -> List[Job]:
         with self._jobs_completed as jobs_completed: return list(jobs_completed[job_id])
     def get_failed_jobs(self, job_id: int) -> List[Tuple[Job, BaseException]]:
-        with self._jobs_failed as jobs_failed: return list(jobs_failed[job_id])
+        with self._jobs_failed as jobs_failed:
+            return list(jobs_failed[job_id])
     def is_file_processed(self, path: str) -> bool:
         with self._processed_files as processed_files: return path in processed_files
     def is_folder_installed(self, path: str) -> bool:
@@ -365,7 +380,8 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             self._symbols.append('*')
             self._print_symbols()
 
-    def notify_cancelled_pending_jobs(self) -> None:
+    def notify_cancelled_jobs(self, jobs: List[Job]) -> None:
+        self._logger.print(f"Cancelled {len(jobs)} jobs.")
         try:
             self._interrupts.interrupt()
         except Exception as e:
@@ -483,9 +499,13 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         path = self._file_path_from_job(job)
         if path is not None:
             self._report.add_failed_file(path)
-        self.notify_job_retried(job, exception)
+        self._handle_job_error(job, exception)
 
     def notify_job_retried(self, job: Job, exception: BaseException):
+        self._report.add_job_retried(job, exception)
+        self._handle_job_error(job, exception)
+
+    def _handle_job_error(self, job: Job, exception: BaseException):
         self._logger.debug(exception)
         self._symbols.append('~')
         self._print_symbols()
