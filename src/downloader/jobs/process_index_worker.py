@@ -116,27 +116,16 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             .select_filtered_files(summary)
 
         logger.bench('Translating paths...')
+        summary_folders = self._folders_with_missing_parents(filtered_summary, store, db)
         calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(config)
 
-        check_file_pkgs: List[_CheckFilePackage] = self._translate_items(calculator, filtered_summary.files, PathType.FILE, {})
-        remove_files_pkgs: List[_RemoveFilePackage] = self._translate_items(calculator, store.files, PathType.FILE, filtered_summary.files)
+        check_file_pkgs, files_set = self._translate_items(calculator, filtered_summary.files, PathType.FILE, set())
+        remove_files_pkgs, _ = self._translate_items(calculator, store.files, PathType.FILE, files_set)
+        create_folder_pkgs, folders_set = self._translate_items(calculator, summary_folders, PathType.FOLDER, set())
+        delete_folder_pkgs, _ = self._translate_items(calculator, store.folders, PathType.FOLDER, folders_set)
 
         # @TODO REFACTOR: This looks wrong
         # remove_files_pkgs = [pkg for pkg in remove_files_pkgs if 'zip_id' not in pkg.description]
-
-        existing_folders: Dict[str, Any] = filtered_summary.folders.copy()
-        for pkg in check_file_pkgs:
-            path_obj = Path(pkg.rel_path)
-            target_path_obj = Path(pkg.full_path)
-            while len(path_obj.parts) > 1:
-                path_obj = path_obj.parent
-                target_path_obj = target_path_obj.parent
-                path_str = ('|' if pkg.is_potentially_external else '') + str(path_obj)
-                if path_str not in existing_folders:
-                    existing_folders[path_str] = store.folders.get(path_str, {})
-
-        create_folder_pkgs: List[_CreateFolderPackage] = self._translate_items(calculator, existing_folders, PathType.FOLDER, {})
-        delete_folder_pkgs: List[_DeleteFolderPackage] = self._translate_items(calculator, store.folders, PathType.FOLDER, existing_folders)
 
         # @TODO REFACTOR: This looks wrong
         # delete_folder_pkgs = [pkg for pkg in delete_folder_pkgs if 'zip_id' not in pkg.description]
@@ -147,22 +136,39 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
         return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs
 
-    @staticmethod
-    def _translate_items(calculator: TargetPathsCalculator, items: Dict[str, Dict[str, Any]], path_type: PathType, exclude_items: Dict[str, Any]) -> List[PathPackage]:
-        # @TODO: This should be optimized, calling deduce target path twice should be unnecessary.
-        exclude = set()
-        for path, description in exclude_items.items():
-            exclude.add(calculator.deduce_target_path(path, description, path_type).rel_path)
+    def _folders_with_missing_parents(self, index: Index, store: ReadOnlyStoreAdapter, db: DbEntity) -> Dict[str, Any]:
+        if len(index.files) == 0 and len(index.folders) == 0:
+            return index.folders
 
+        result_folders: Dict[str, Any] = {}
+        for collection, col_ctx in ((index.files, 'file'), (index.folders, 'folder')):
+            for path in collection:
+                path_obj = Path(path)
+                for parent_obj in path_obj.parents[:-1]:
+                    parent_str = str(parent_obj)
+                    if parent_str in index.folders or parent_str in result_folders: continue
+
+                    result_folders[parent_str] = store.folders.get(parent_str, {})
+                    self._ctx.logger.print(f"Warning: Database [{db.db_id}] should contain {col_ctx} '{parent_str}' because of {col_ctx} '{path}'. The database maintainer should fix this.")
+
+        if len(result_folders) > 0:
+            result_folders.update(index.folders)
+            return result_folders
+        else:
+            return index.folders
+
+    @staticmethod
+    def _translate_items(calculator: TargetPathsCalculator, items: Dict[str, Dict[str, Any]], path_type: PathType, exclude: Set[str]) -> Tuple[List[PathPackage], Set[str]]:
         translated = []
+        rel_set = set()
         for path, description in items.items():
             pkg = calculator.deduce_target_path(path, description, path_type)
-            if pkg.rel_path in exclude:
-                continue
+            if pkg.rel_path in exclude: continue
 
             translated.append(pkg)
+            rel_set.add(pkg.rel_path)
 
-        return translated
+        return translated, rel_set
 
     def _process_check_file_packages(self, check_file_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_MovedFilePackage], List[_AlreadyInstalledFilePackage]]:
         if len(check_file_pkgs) == 0:
@@ -317,7 +323,8 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
         self._ctx.pending_removals.queue_directory_removal(delete_folder_pkgs, db_id)
 
-    def _process_fetch_packages_and_launch_jobs(self, fetch_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
+    @staticmethod
+    def _process_fetch_packages_and_launch_jobs(fetch_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
         if len(fetch_pkgs) == 0:
             return []
 
