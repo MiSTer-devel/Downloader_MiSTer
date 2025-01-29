@@ -36,7 +36,7 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return ProcessDbZipsWaiterJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ProcessDbZipsWaiterJob) -> WorkerResult:
+    def operate_on(self, job: ProcessDbZipsWaiterJob) -> WorkerResult:  # type: ignore[override]
 
         while self._ctx.installation_report.any_in_progress_job_with_tags(job.zip_job_tags):
             self._ctx.job_ctx.wait_for_other_jobs()

@@ -38,7 +38,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return OpenZipContentsJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: OpenZipContentsJob) -> WorkerResult:
+    def operate_on(self, job: OpenZipContentsJob) -> WorkerResult:  # type: ignore[override]
         try:
             kind = job.zip_description.get('kind', None)
             if kind == 'extract_all_contents':
@@ -100,7 +100,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         job.downloaded_files.extend(contained_files)
 
-    def _process_create_folders_packages(self, db, create_folder_pkgs):
+    def _process_create_folders_packages(self, db: DbEntity, create_folder_pkgs: List[PathPackage]):
         # @TODO inspired in ProcessIndexWorker._process_create_folders_packages
         folders_to_create: Set[str] = set()
         for pkg in create_folder_pkgs:

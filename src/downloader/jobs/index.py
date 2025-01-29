@@ -17,14 +17,14 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 @dataclass
 class Index:
     files: Dict[str, Any]
     folders: Dict[str, Any]
-    base_files_url: str = None
+    base_files_url: Optional[str] = None
 
     def merge_zip_index(self, zip_index: 'Index'):
         self.files.update(zip_index.files)

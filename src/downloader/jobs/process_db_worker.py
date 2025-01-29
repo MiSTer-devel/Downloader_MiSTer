@@ -16,26 +16,26 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, Optional
-from dataclasses import dataclass
+from typing import Dict, Any, Literal
 
+from downloader.config import Config
 from downloader.db_entity import DbEntity
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_index_job, make_zip_tag, ZipJobContext
 from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
-from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
-from downloader.constants import K_USER_DEFINED_OPTIONS, K_FILTER, K_OPTIONS, K_BASE_PATH
+from downloader.jobs.worker_context import DownloaderWorkerBase
+from downloader.constants import K_OPTIONS
 from downloader.jobs.process_db_job import ProcessDbJob
-from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE, ReadOnlyStoreAdapter
+from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE
 
 
 class ProcessDbWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return ProcessDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ProcessDbJob) -> WorkerResult:
+    def operate_on(self, job: ProcessDbJob) -> WorkerResult:  # type: ignore[override]
         read_only_store = job.store.read_only()
         write_only_store = job.store.write_only()
 
@@ -43,7 +43,7 @@ class ProcessDbWorker(DownloaderWorkerBase):
         config = build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
 
         if not read_only_store.has_base_path():
-            write_only_store.set_base_path(config[K_BASE_PATH])
+            write_only_store.set_base_path(config['base_path'])
 
         for zip_id in list(read_only_store.zips):
             if zip_id in job.db.zips:
@@ -81,20 +81,20 @@ class ProcessDbWorker(DownloaderWorkerBase):
             ), None
 
 
-def build_db_config(input_config: Dict[str, Any], db: DbEntity, ini_description: Dict[str, Any]) -> Dict[str, Any]:
+def build_db_config(input_config: Config, db: DbEntity, ini_description: Dict[str, Any]) -> Config:
     config = input_config.copy()
-    user_defined_options = config[K_USER_DEFINED_OPTIONS]
+    user_defined_options = config['user_defined_options']
 
     for key, option in db.default_options.items():
-        if key not in user_defined_options or (key == K_FILTER and '[mister]' in option.lower()):
+        if key not in user_defined_options or (key == 'filter' and '[mister]' in option.lower()):
             config[key] = option
 
     if K_OPTIONS in ini_description:
         ini_description[K_OPTIONS].apply_to_config(config)
 
-    if config[K_FILTER] is not None and '[mister]' in config[K_FILTER].lower():
-        mister_filter = '' if K_FILTER not in config or config[K_FILTER] is None else config[K_FILTER].lower()
-        config[K_FILTER] = config[K_FILTER].lower().replace('[mister]', mister_filter).strip()
+    if config['filter'] is not None and '[mister]' in config['filter'].lower():
+        mister_filter = '' if 'filter' not in config or config['filter'] is None else config['filter'].lower()
+        config['filter'] = config['filter'].lower().replace('[mister]', mister_filter).strip()
 
     return config
 
