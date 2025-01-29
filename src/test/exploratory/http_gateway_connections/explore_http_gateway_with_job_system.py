@@ -78,6 +78,7 @@ def main() -> None:
     print()
     print('Completed jobs: ' + str(len(reporter.completed)))
     print('Failed jobs: ' + str(len(reporter.failed)))
+    print('Cancelled jobs: ' + str(len(reporter.cancelled)))
     print()
     print(f'Time: {end - start}s')
     if reporter.cancelled: sys.exit(1)
@@ -87,7 +88,7 @@ class Reporter(ProgressReporter):
         self._fs = fs
         self._gw = gw
         self._logger = logger
-        self.cancelled = False
+        self._cancelled = False
 
     def notify_work_in_progress(self) -> None: pass
     def notify_job_retried(self, job: Job, exception: Exception) -> None: pass
@@ -95,6 +96,7 @@ class Reporter(ProgressReporter):
 
     completed: List[FetchFileJob2] = []
     failed: List[Tuple[FetchFileJob2, Exception]] = []
+    cancelled: List[FetchFileJob2] = []
 
     def notify_job_completed(self, job: Job) -> None:
         if not isinstance(job, FetchFileJob2): return None
@@ -106,11 +108,16 @@ class Reporter(ProgressReporter):
         self._logger.print(f'>>>>>> FAILED! {job.info}', exception)
         self.failed.append((job, exception))
 
-    def notify_cancelled_jobs(self, _obs: List[Job]) -> None:
+    def notify_cancelled_jobs(self, jobs: List[Job]) -> None:
+        for job in jobs:
+            if not isinstance(job, FetchFileJob2): continue
+            self.cancelled.append(job)
+
+        if self._cancelled: return
         self._logger.print(f">>>>>> CANCELING PENDING JOBS!")
         self._fs.cancel_ongoing_operations()
         self._gw.cleanup()
-        self.cancelled = True
+        self._cancelled = True
 
 if __name__ == '__main__':
     main()
