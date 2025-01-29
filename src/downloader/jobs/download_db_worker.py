@@ -31,7 +31,7 @@ class DownloadDbWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return DownloadDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: DownloadDbJob) -> WorkerResult:
+    def operate_on(self, job: DownloadDbJob) -> WorkerResult:  # type: ignore[override]
         db_url, db_target = self._get_db_description_from_ini_section(job.ini_section, job.ini_description)
         get_file_job = make_get_file_job(source=db_url, target=db_target, info=job.ini_section, silent=True, logger=self._ctx.logger)
         get_file_job.after_job = OpenDbJob(

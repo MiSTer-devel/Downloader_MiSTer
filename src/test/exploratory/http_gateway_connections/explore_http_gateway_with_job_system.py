@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
+from downloader.config import default_config
 from downloader.file_system import FileSystemFactory
 from downloader.job_system import JobSystem, ProgressReporter, Job
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
@@ -38,7 +39,7 @@ def main() -> None:
     logger = DescribeNowDecorator(PrintLogger(int(time.time())))
     with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gw:
 
-        fs = FileSystemFactory({}, {}, logger=logger)
+        fs = FileSystemFactory(default_config(), {}, logger=logger)
         reporter = Reporter(fs, gw, logger=logger)
         job_system = JobSystem(reporter=reporter, logger=logger, max_threads=20)
         job_system.set_interfering_signals([signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT])
@@ -98,20 +99,16 @@ class Reporter(ProgressReporter):
     failed: List[Tuple[FetchFileJob2, Exception]] = []
     cancelled: List[FetchFileJob2] = []
 
-    def notify_job_completed(self, job: Job) -> None:
-        if not isinstance(job, FetchFileJob2): return None
+    def notify_job_completed(self, job: FetchFileJob2) -> None:  # type: ignore[override]
         self._logger.print(f'>>>>>> COMPLETED! {job.info}')
         self.completed.append(job)
 
-    def notify_job_failed(self, job: Job, exception: Exception) -> None:
-        if not isinstance(job, FetchFileJob2): return None
+    def notify_job_failed(self, job: FetchFileJob2, exception: Exception) -> None:  # type: ignore[override]
         self._logger.print(f'>>>>>> FAILED! {job.info}', exception)
         self.failed.append((job, exception))
 
-    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
-        for job in jobs:
-            if not isinstance(job, FetchFileJob2): continue
-            self.cancelled.append(job)
+    def notify_jobs_cancelled(self, jobs: List[FetchFileJob2]) -> None:  # type: ignore[override]
+        self.cancelled.extend(jobs)
 
         if self._cancelled: return
         self._logger.print(f">>>>>> CANCELING PENDING JOBS!")

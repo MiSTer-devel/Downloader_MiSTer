@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import List, Optional, Set, Dict, Any, Tuple
 
 from downloader.config import AllowDelete, Config
-from downloader.constants import K_ALLOW_DELETE, K_BASE_PATH, HASH_file_does_not_exist
+from downloader.constants import HASH_file_does_not_exist
 from downloader.logger import Logger, NoLogger
 from downloader.other import ClosableValue
 import zipfile
@@ -220,7 +220,7 @@ class FileWriteError(FsError): pass
 class FsTimeoutError(FsError): pass
 
 class _FileSystem(FileSystem):
-    def __init__(self, config: Dict[str, Any], path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], shared_state: 'FsSharedState'):
+    def __init__(self, config: Config, path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], shared_state: 'FsSharedState'):
         self._config = config
         self._path_dictionary = path_dictionary
         self._logger = logger
@@ -364,7 +364,7 @@ class _FileSystem(FileSystem):
         raise Exception('folders Not implemented')
 
     def remove_folder(self, path: str) -> None:
-        if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
+        if self._config['allow_delete'] != AllowDelete.ALL:
             return
 
         full_path = self._path(path)
@@ -381,7 +381,7 @@ class _FileSystem(FileSystem):
         self._logger.debug('Ignoring error.')
 
     def remove_non_empty_folder(self, path: str) -> None:
-        if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
+        if self._config['allow_delete'] != AllowDelete.ALL:
             return
 
         full_path = self._path(path)
@@ -413,8 +413,8 @@ class _FileSystem(FileSystem):
 
     def unlink(self, path: str, verbose: bool = True) -> bool:
         verbose = verbose and not path.startswith('/tmp/')
-        if self._config[K_ALLOW_DELETE] != AllowDelete.ALL:
-            if self._config[K_ALLOW_DELETE] == AllowDelete.OLD_RBF and path[-4:].lower() == ".rbf":
+        if self._config['allow_delete'] != AllowDelete.ALL:
+            if self._config['allow_delete'] == AllowDelete.OLD_RBF and path[-4:].lower() == ".rbf":
                 return self._unlink(path, verbose)
 
             return True
@@ -506,7 +506,7 @@ class _FileSystem(FileSystem):
         if path_lower in self._path_dictionary:
             return self._path_dictionary[path_lower]
 
-        return self._config[K_BASE_PATH]
+        return self._config['base_path']
 
 
 class InvalidFileResolution(Exception):
@@ -542,7 +542,7 @@ def _load_json(file_path: str) -> Dict[str, Any]:
 
 
 class FsSharedState:
-    def __init__(self):
+    def __init__(self) -> None:
         self.interrupting_operations = False
         self._files: Set[str] = set()
 

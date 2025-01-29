@@ -16,9 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, Optional
+from typing import Optional
 
-from downloader.constants import K_DOWNLOADER_TIMEOUT
 from downloader.job_system import WorkerResult
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.validate_file_job import ValidateFileJob
@@ -33,7 +32,7 @@ class FetchFileWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return FetchFileJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: FetchFileJob) -> WorkerResult:
+    def operate_on(self, job: FetchFileJob) -> WorkerResult:  # type: ignore[override]
         error = self._fetch_file(job)
         if error is not None:
             return None, error
@@ -49,7 +48,7 @@ class FetchFileWorker(DownloaderWorkerBase):
                 if in_stream.status != 200:
                     return FileDownloadError(f'Bad http status! {file_path}: {in_stream.status}')
 
-                self._ctx.file_system.write_incoming_stream(in_stream, target_path, timeout=self._ctx.config[K_DOWNLOADER_TIMEOUT])
+                self._ctx.file_system.write_incoming_stream(in_stream, target_path, timeout=self._ctx.config['downloader_timeout'])
 
         except socket.gaierror as e:
             return FileDownloadError(f'Socket Address Error! {description["url"]}: {str(e)}')
@@ -63,3 +62,4 @@ class FetchFileWorker(DownloaderWorkerBase):
             return FileDownloadError(f'OS Error! {description["url"]}: {e.errno} {str(e)}')
         except BaseException as e:
             return FileDownloadError(f'Exception during download! {description["url"]}: {str(e)}')
+        else: return None

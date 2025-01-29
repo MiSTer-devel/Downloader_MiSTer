@@ -36,7 +36,7 @@ class PrintLogManager(Protocol):
     def configure(self, config: Config) -> None: pass
 
 class PrintLogger(Logger, PrintLogManager):
-    def __init__(self, start_time: Optional[int] = None):
+    def __init__(self, start_time: Optional[float] = None):
         self._verbose_mode = True
         self._start_time = start_time
 

@@ -18,6 +18,7 @@
 
 from typing import Dict, Any, List, Tuple
 
+from downloader.config import Config
 from downloader.file_downloader import FileDownloaderFactory as ProductionFileDownloaderFactory
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.interruptions import Interruptions
@@ -64,7 +65,7 @@ class FileDownloaderFactory(ProductionFileDownloaderFactory):
         return file_downloader_factory, file_system_factory, implicit_inputs.config
 
     @staticmethod
-    def with_remote_files(fsf: FileSystemFactory, config: Dict[str, Any], remote_files: List[Tuple[str, Dict[str, Any]]]):
+    def with_remote_files(fsf: FileSystemFactory, config: Config, remote_files: List[Tuple[str, Dict[str, Any]]]):
         return FileDownloaderFactory(file_system_factory=fsf, config=config, network_state=NetworkState(remote_files={
             file_name: {'hash': 'ignore', 'unzipped_json': file_content} for file_name, file_content in remote_files
         }))

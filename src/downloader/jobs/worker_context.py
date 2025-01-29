@@ -19,9 +19,9 @@
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
 import threading
-from typing import Dict, Any, Tuple, Set, List
+from typing import Tuple, Set, List
 
-from downloader.config import Config, ConfigMisterSection
+from downloader.config import Config
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
 from downloader.free_space_reservation import FreeSpaceReservation
@@ -53,7 +53,7 @@ class DownloaderWorkerContext:
     pending_removals: 'PendingRemovals'
 
 
-def make_downloader_worker_context(job_ctx: JobContext, http_gateway: HttpGateway, logger: Logger, target_path_repository: TargetPathRepository, file_system: FileSystem, waiter: Waiter, progress_reporter: ProgressReporter, file_download_session_logger: FileDownloadSessionLogger, installation_report: InstallationReportImpl, free_space_reservation: FreeSpaceReservation, external_drives_repository: ExternalDrivesRepository, target_paths_calculator_factory: TargetPathsCalculatorFactory, config: Dict[str, Any]) -> DownloaderWorkerContext:
+def make_downloader_worker_context(job_ctx: JobContext, http_gateway: HttpGateway, logger: Logger, target_path_repository: TargetPathRepository, file_system: FileSystem, waiter: Waiter, progress_reporter: ProgressReporter, file_download_session_logger: FileDownloadSessionLogger, installation_report: InstallationReportImpl, free_space_reservation: FreeSpaceReservation, external_drives_repository: ExternalDrivesRepository, target_paths_calculator_factory: TargetPathsCalculatorFactory, config: Config) -> DownloaderWorkerContext:
     return DownloaderWorkerContext(
         job_ctx=job_ctx,
         http_gateway=http_gateway,

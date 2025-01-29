@@ -19,6 +19,7 @@
 from dataclasses import field, dataclass
 from typing import Any, Dict
 
+from downloader.config import Config
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.index import Index
@@ -31,7 +32,7 @@ class ProcessZipJob(Job):
 
     db: DbEntity
     store: StoreWrapper
-    config: Dict[str, Any]
+    config: Config
     zip_id: str
     ini_description: Dict[str, Any]
     zip_description: Dict[str, Any]

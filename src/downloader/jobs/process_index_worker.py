@@ -23,7 +23,7 @@ import os
 from collections import defaultdict
 
 from downloader.db_entity import DbEntity
-from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
+from downloader.file_filter import FileFilterFactory, BadFileFilterPartException, Config
 from downloader.file_system import ReadOnlyFileSystem
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
@@ -57,7 +57,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return ProcessIndexJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ProcessIndexJob) -> WorkerResult:
+    def operate_on(self, job: ProcessIndexJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
         db, config, summary, full_resync = job.db, job.config, job.index, job.full_resync
         store = job.store.read_only()
@@ -102,7 +102,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         except StoragePriorityError as e:
             return None, e
 
-    def _create_packages_from_index(self, config: Dict[str, Any], summary: Index, db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[
+    def _create_packages_from_index(self, config: Config, summary: Index, db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[
         List[_CheckFilePackage],
         List[_RemoveFilePackage],
         List[_CreateFolderPackage],
@@ -321,7 +321,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         if len(fetch_pkgs) == 0:
             return []
 
-        jobs = []
+        jobs: List[Job] = []
         for pkg in fetch_pkgs:
             download_path = pkg.full_path + '.new'
             fetch_job = FetchFileJob2(
