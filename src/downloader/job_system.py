@@ -65,7 +65,7 @@ class JobSystem(JobContext):
         self._workers: Dict[int, Worker] = {}
         self._lock = threading.Lock()
         self._pending_jobs_amount: int = 0
-        self._jobs_are_cancelled: bool = False
+        self._are_jobs_cancelled: bool = False
         self._is_executing_jobs: bool = False
         self._jobs_pushed: int = 0
         self._timeout_clock: float = 0
@@ -103,7 +103,7 @@ class JobSystem(JobContext):
             if self._is_executing_jobs: raise CantExecuteJobs('Can not call to execute jobs when its already running.')
 
             self._is_executing_jobs = True
-            self._jobs_are_cancelled = False
+            self._are_jobs_cancelled = False
 
         self._timed_out = False
         self._jobs_cancelled.clear()
@@ -124,7 +124,7 @@ class JobSystem(JobContext):
         # This must be thread-safe. We lock so that execution can be interrupted asap.
 
         with self._lock:
-            self._jobs_are_cancelled = True
+            self._are_jobs_cancelled = True
 
     def wait_for_other_jobs(self):
         # This must be thread-safe. We lock because we need the strict value of _is_executing_jobs.
@@ -167,7 +167,7 @@ class JobSystem(JobContext):
 
             futures = []
             with ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
-                while self._pending_jobs_amount > 0 and self._jobs_are_cancelled is False:
+                while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
                     try:
                         package = self._job_queue.get(timeout=self._wait_timeout)
                     except queue.Empty:
@@ -184,7 +184,7 @@ class JobSystem(JobContext):
                     self._check_clock()
                     sys.stdout.flush()
 
-                if self._jobs_are_cancelled:
+                if self._are_jobs_cancelled:
                     self._record_jobs_cancelled([])
                     self._jobs_cancelled.extend(self._cancel_futures(futures))
 
@@ -195,7 +195,7 @@ class JobSystem(JobContext):
             for sig, cb in previous_handlers: signal.signal(sig, cb)
 
     def _execute_without_threads(self, just_one_tick: bool = False) -> None:
-        while self._pending_jobs_amount > 0 and self._jobs_are_cancelled is False and self._job_queue.empty() is False:
+        while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False and self._job_queue.empty() is False:
             try:
                 package = self._job_queue.get(block=False)
             except queue.Empty:
@@ -219,7 +219,7 @@ class JobSystem(JobContext):
                 self._jobs_cancelled.append(self._job_queue.get_nowait())
 
     def _operate_on_next_job(self, package: '_JobPackage', notifications: queue.Queue[Tuple['_JobState', '_JobPackage', Optional['_JobError']]]) -> None:
-        if self._jobs_are_cancelled:
+        if self._are_jobs_cancelled:
             notifications.put((_JobState.JOB_CANCELLED, package, None))
             return
 
