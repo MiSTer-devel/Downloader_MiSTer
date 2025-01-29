@@ -20,10 +20,10 @@ import os
 import threading
 from pathlib import Path
 
+from downloader.config import Config
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
-from downloader.constants import K_BASE_PATH, K_STORAGE_PRIORITY, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL, \
-    K_BASE_SYSTEM_PATH
+from downloader.constants import K_STORAGE_PRIORITY, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL
 from downloader.path_package import PathPackageKind, PextPathProps, PathPackage, PextKind, PathType
 from downloader.storage_priority_resolver import StoragePriorityRegistryEntry, StoragePriorityError
 
@@ -34,13 +34,13 @@ class TargetPathsCalculatorFactory:
         self._external_drives_repository = external_drives_repository
         self._lock = threading.Lock()
 
-    def target_paths_calculator(self, config: Dict[str, Any]) -> 'TargetPathsCalculator':
+    def target_paths_calculator(self, config: Config) -> 'TargetPathsCalculator':
         drives = list(self._external_drives_repository.connected_drives_except_base_path_drives(config))
         return TargetPathsCalculator(self._file_system, config, drives, self._lock)
 
 
 class TargetPathsCalculator:
-    def __init__(self, file_system: FileSystem, config: Dict[str, Any], drives: List[str], lock: threading.Lock):
+    def __init__(self, file_system: FileSystem, config: Config, drives: List[str], lock: threading.Lock):
         self._file_system = file_system
         self._config = config
         self._drives = drives
@@ -57,15 +57,15 @@ class TargetPathsCalculator:
             full_path, extra = self._deduce_possible_external_target_path(path=rel_path, path_type=path_type)
             return PathPackage(full_path, rel_path, description, path_type, PathPackageKind.PEXT, extra)
         elif is_system_file:
-            return PathPackage(os.path.join(self._config[K_BASE_SYSTEM_PATH], path), path, description, path_type, PathPackageKind.SYSTEM, None)
+            return PathPackage(os.path.join(self._config['base_system_path'], path), path, description, path_type, PathPackageKind.SYSTEM, None)
         else:
-            return PathPackage(os.path.join(self._config[K_BASE_PATH], path), path, description, path_type, PathPackageKind.STANDARD, None)
+            return PathPackage(os.path.join(self._config['base_path'], path), path, description, path_type, PathPackageKind.STANDARD, None)
 
     def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> Tuple[str, PextPathProps]:
         path_obj = Path(path)
         parts_len = len(path_obj.parts)
         if path_type == PathType.FOLDER and parts_len <= 1:
-            return os.path.join(self._config[K_BASE_PATH], path), PextPathProps(kind=PextKind.PEXT_PARENT, parent=path, drive=self._config[K_BASE_PATH], other_drives=())
+            return os.path.join(self._config['base_path'], path), PextPathProps(kind=PextKind.PEXT_PARENT, parent=path, drive=self._config['base_path'], other_drives=())
         elif path_type == PathType.FILE and parts_len <= 2:
             raise StoragePriorityError(f"File Path '|{path}' is incorrect, please contact the database maintainer.")
         else:
@@ -90,7 +90,7 @@ class TargetPathsCalculator:
         return os.path.join(drive, source_path), PextPathProps(kind=external, parent=first_folder, drive=drive, other_drives=others, is_subfolder=len(path_obj.parts) == 2)
 
     def _search_drive_for_directory(self, first_folder: str, second_folder: str) -> Tuple[str, PextKind, Tuple[str, ...]]:
-        base_path, priority = self._config[K_BASE_PATH], self._config[K_STORAGE_PRIORITY]
+        base_path, priority = self._config['base_path'], self._config['storage_priority']
 
         if priority == STORAGE_PRIORITY_OFF:
             return base_path, PextKind.PEXT_STANDARD, ()

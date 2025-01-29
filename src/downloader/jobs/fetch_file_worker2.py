@@ -38,7 +38,7 @@ class FetchFileWorker2(DownloaderWorker):
     def job_type_id(self) -> int: return FetchFileJob2.type_id
     def reporter(self): return self._progress_reporter
 
-    def operate_on(self, job: FetchFileJob2) -> WorkerResult:
+    def operate_on(self, job: FetchFileJob2) -> WorkerResult:  # type: ignore[override]
         error = self._fetch_file(url=job.source, download_path=job.temp_path, info=job.info)
         if error is not None:
             return None, error

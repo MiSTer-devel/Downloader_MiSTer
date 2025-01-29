@@ -19,6 +19,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, Any
 
+from downloader.config import Config
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.index import Index
@@ -34,6 +35,6 @@ class ProcessIndexJob(Job):
     ini_description: Dict[str, Any]
     index: Index
     full_resync: bool
-    config: Dict[str, Any]
+    config: Config
 
     def retry_job(self): return None

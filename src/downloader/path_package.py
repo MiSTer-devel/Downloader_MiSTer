@@ -73,19 +73,19 @@ class PathPackage:
 
     @property
     def is_pext_external(self) -> bool:
-        return self.pext_props and self.pext_props.kind == PextKind.PEXT_EXTERNAL
+        return self.pext_props is not None and self.pext_props.kind == PextKind.PEXT_EXTERNAL
 
     @property
     def is_pext_standard(self) -> bool:
-        return self.pext_props and self.pext_props.kind == PextKind.PEXT_STANDARD
+        return self.pext_props is not None and self.pext_props.kind == PextKind.PEXT_STANDARD
 
     @property
     def is_pext_external_subfolder(self) -> bool:
-        return self.ty == PathType.FOLDER and self.pext_props and self.pext_props.kind == PextKind.PEXT_EXTERNAL and self.pext_props.is_subfolder
+        return self.ty == PathType.FOLDER and self.pext_props is not None and self.pext_props.kind == PextKind.PEXT_EXTERNAL and self.pext_props.is_subfolder
 
     @property
     def is_pext_parent(self) -> bool:
-        return self.pext_props and self.pext_props.kind == PextKind.PEXT_PARENT
+        return self.pext_props is not None and self.pext_props.kind == PextKind.PEXT_PARENT
 
     def db_path(self) -> str:
         if self.kind == PathPackageKind.PEXT:
@@ -94,7 +94,7 @@ class PathPackage:
             return self.rel_path
 
     def drive(self) -> Optional[str]:
-        if self.kind == PathPackageKind.PEXT:
+        if self.kind == PathPackageKind.PEXT and self.pext_props is not None:
             return self.pext_props.drive
         else:
             return None

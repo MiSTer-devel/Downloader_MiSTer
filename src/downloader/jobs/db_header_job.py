@@ -31,4 +31,5 @@ class DbHeaderJob(Job):
 
 class DbHeaderWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return DbHeaderJob.type_id
-    def operate_on(self, job: DbHeaderJob): self._ctx.file_download_session_logger.print_header(job.db)
+    def operate_on(self, job: DbHeaderJob):  # type: ignore[override]
+        self._ctx.file_download_session_logger.print_header(job.db)

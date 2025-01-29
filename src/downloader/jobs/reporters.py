@@ -21,7 +21,7 @@ import dataclasses
 import threading
 import time
 from collections import defaultdict
-from typing import Dict, Optional, Tuple, List, Any, Iterable, Set, TypeVar, Generic
+from typing import Dict, Optional, Tuple, List, Any, Iterable, Set, TypeVar, Generic, Protocol
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
@@ -86,9 +86,9 @@ class ProcessedFolder:
     dbs: Set[str]
 
 
-class InstallationReport(abc.ABC):
+class InstallationReport(Protocol):
     def get_completed_jobs(self, job_id: int) -> List[Job]: """Return all successful jobs with that id"""
-    def get_failed_jobs(self, job_id: int) -> List[Job]: """Return all failed jobs with that id"""
+    def get_failed_jobs(self, job_id: int) ->  List[Tuple[Job, BaseException]]: """Return all failed jobs with that id"""
     def get_full_partitions(self) -> Iterable[Tuple[str, int]]: """Return all full partitions."""
     def is_file_processed(self, path: str) -> bool: """Returns True if the file has been processed."""
     def is_folder_installed(self, path: str) -> bool: """Returns True if the file has been processed."""

@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Set
+from typing import Dict, Set, List, Union
 
 from downloader.config import download_sensitive_configs
 from downloader.constants import K_BASE_PATH, K_ZIP_FILE_COUNT_THRESHOLD,\
@@ -58,8 +58,8 @@ class OnlineImporter:
         self._free_space_reservation = free_space_reservation
         self._waiter = waiter
         self._logger = logger
-        self._unused_filter_tags = []
-        self._full_partitions = []
+        self._unused_filter_tags: List[Union[str, int]] = []
+        self._full_partitions: List[str] = []
         self._base_session = _Session()
 
     def download_dbs_contents(self, importer_command, full_resync):

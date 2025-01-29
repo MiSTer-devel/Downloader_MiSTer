@@ -16,36 +16,32 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Optional
 
 from downloader.file_filter import FileFilterFactory
 from downloader.job_system import WorkerResult, Job
-from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_open_zip_contents_job
+from downloader.jobs.jobs_factory import make_open_zip_contents_job
 from downloader.local_store_wrapper import StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_zip_job import ProcessZipJob
-from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.jobs.process_index_job import ProcessIndexJob
-from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_ZIP_ACCUMULATED_MB_THRESHOLD
-from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
-from downloader.target_path_calculator import TargetPathsCalculator
-from downloader.jobs.index import Index
 
 
 class ProcessZipWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return ProcessZipJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ProcessZipJob) -> WorkerResult:
+    def operate_on(self, job: ProcessZipJob) -> WorkerResult:  # type: ignore[override]
         total_files_size = 0
         for file_path, file_description in job.zip_index.files.items():
             total_files_size += file_description['size']
 
         needs_extracting_single_files = 'kind' in job.zip_description and job.zip_description['kind'] == 'extract_single_files'
-        less_file_count = len(job.zip_index.files) < job.config[K_ZIP_FILE_COUNT_THRESHOLD]
-        less_accumulated_mbs = total_files_size < (1000 * 1000 * job.config[K_ZIP_ACCUMULATED_MB_THRESHOLD])
+        less_file_count = len(job.zip_index.files) < job.config['zip_file_count_threshold']
+        less_accumulated_mbs = total_files_size < (1000 * 1000 * job.config['zip_accumulated_mb_threshold'])
 
-        next_job: Job
+        next_job: Optional[Job]
 
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
             next_job = ProcessIndexJob(

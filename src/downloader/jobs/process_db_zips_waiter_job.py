@@ -19,6 +19,7 @@
 from dataclasses import field, dataclass
 from typing import Any, Dict, List
 
+from downloader.config import Config
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
 from downloader.local_store_wrapper import StoreWrapper
@@ -32,7 +33,7 @@ class ProcessDbZipsWaiterJob(Job):
     store: StoreWrapper
     ini_description: Dict[str, Any]
     full_resync: bool
-    config: Dict[str, Any]
+    config: Config
     zip_job_tags: List[str]
 
     def retry_job(self): return None

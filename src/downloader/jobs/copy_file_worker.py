@@ -27,7 +27,7 @@ class CopyFileWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return CopyFileJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: CopyFileJob) -> WorkerResult:
+    def operate_on(self, job: CopyFileJob) -> WorkerResult:  # type: ignore[override]
         error = self._copy_file(source=job.source, temp_path=job.temp_path, info=job.info)
         if error is not None:
             return None, error
@@ -45,3 +45,4 @@ class CopyFileWorker(DownloaderWorkerBase):
                 return FileCopyError(f'Missing {info}')
         except BaseException as e:
             return FileCopyError(f'Exception during copy! {info}: {str(e)}')
+        else: return None
