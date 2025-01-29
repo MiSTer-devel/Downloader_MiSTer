@@ -72,7 +72,13 @@ class JobSystem(JobContext):
         self._timed_out: bool = False
         self._signals = [signal.SIGINT]
 
+    def timed_out(self) -> bool: return self._timed_out
+    def pending_jobs_amount(self) -> int: return self._pending_jobs_amount
+
     def set_interfering_signals(self, signals: List[signal.Signals]):
+        with self._lock:
+            if self._is_executing_jobs: raise CantSetSignalsException('Can not set interfering signals while executing jobs')
+
         self._signals = signals
 
     def register_worker(self, job_id: int, worker: 'Worker') -> None:
@@ -80,17 +86,21 @@ class JobSystem(JobContext):
 
     def register_workers(self, workers: Iterable[Tuple[int, 'Worker']]) -> None:
         with self._lock:
-            if self._is_executing_jobs:
-                raise CantRegisterWorkerException('Can not register workers while executing jobs')
+            if self._is_executing_jobs: raise CantRegisterWorkerException('Can not register workers while executing jobs')
 
             for job_id, worker in workers:
                 self._workers[job_id] = worker
 
+    def push_job(self, job: 'Job') -> None:
+        with self._lock:
+            if self._is_executing_jobs: raise CantPushJobs('Can not push more jobs while executing jobs')
+
+        self._internal_push_job(job)
+
     def execute_jobs(self) -> None:
         """This function executes all the jobs with the registered workers. It must be used in the MAIN THREAD."""
         with self._lock:
-            if self._is_executing_jobs:
-                raise CantExecuteJobs('Can not call to execute jobs when its already running.')
+            if self._is_executing_jobs: raise CantExecuteJobs('Can not call to execute jobs when its already running.')
 
             self._is_executing_jobs = True
             self._jobs_are_cancelled = False
@@ -110,27 +120,6 @@ class JobSystem(JobContext):
             with self._lock:
                 self._is_executing_jobs = False
 
-    def push_job(self, job: 'Job') -> None:
-        with self._lock:
-            if self._is_executing_jobs:
-                raise CantPushJobs('Can not push more jobs while executing jobs')
-
-        self._internal_push_job(job)
-
-    def _internal_push_job(self, job: 'Job', parent_package: Optional['_JobPackage'] = None) -> None:
-        worker = self._get_worker(job)
-        self._jobs_pushed += 1
-        package = _JobPackage(
-            job=job,
-            worker=worker,
-            tries=0 if parent_package is None else parent_package.tries,
-            priority=job.priority or self._jobs_pushed,
-            parent=parent_package,
-            next_jobs=None
-        )
-        self._job_queue.put(package)
-        self._pending_jobs_amount += 1
-
     def cancel_pending_jobs(self) -> None:
         # This must be thread-safe. We lock so that execution can be interrupted asap.
 
@@ -149,6 +138,26 @@ class JobSystem(JobContext):
         else:
             # This branch does not need to be thread-safe, since concurrency is off.
             self._execute_without_threads(just_one_tick=True)
+
+    def _get_worker(self, job: 'Job') -> 'Worker':
+        worker = self._workers.get(job.type_id, None)
+        if worker is None:
+            raise NoWorkerException(f'No worker registered for job type id "{job.type_id}" and name "{job.__class__.__name__}"')
+        return worker
+
+    def _internal_push_job(self, job: 'Job', parent_package: Optional['_JobPackage'] = None) -> None:
+        worker = self._get_worker(job)
+        self._jobs_pushed += 1
+        package = _JobPackage(
+            job=job,
+            worker=worker,
+            tries=0 if parent_package is None else parent_package.tries,
+            priority=job.priority or self._jobs_pushed,
+            parent=parent_package,
+            next_jobs=None
+        )
+        self._job_queue.put(package)
+        self._pending_jobs_amount += 1
 
     def _execute_with_threads(self, max_threads: int) -> None:
         previous_handlers = [(s, signal.getsignal(s)) for s in self._signals]
@@ -242,12 +251,6 @@ class JobSystem(JobContext):
 
         self._record_error_in_package(package, e, retrying)
 
-    def _get_worker(self, job: 'Job') -> 'Worker':
-        worker = self._workers.get(job.type_id, None)
-        if worker is None:
-            raise NoWorkerException(f'No worker registered for job type id "{job.type_id}" and name "{job.__class__.__name__}"')
-        return worker
-
     def _handle_notifications(self,
         notification_queue: queue.Queue[Tuple['_JobState', '_JobPackage', Optional['_JobError']]],
         cancelled: List['_JobPackage']
@@ -317,9 +320,6 @@ class JobSystem(JobContext):
 
             self._retry_package(package, e)
         else: raise e
-
-    def timed_out(self) -> bool: return self._timed_out
-    def pending_jobs_amount(self) -> int: return self._pending_jobs_amount
 
     def _update_timeout_clock(self) -> None:  # We only want to update the timeout when the state of the job pipeline changes
         self._timeout_clock = time.monotonic() + self._max_timeout
@@ -479,6 +479,7 @@ class JobSystemAbortException(Exception): pass
 class CycleDetectedException(JobSystemAbortException): pass
 class NoWorkerException(JobSystemAbortException): pass
 class CantRegisterWorkerException(JobSystemAbortException): pass
+class CantSetSignalsException(JobSystemAbortException): pass
 class CantExecuteJobs(JobSystemAbortException): pass
 class CantPushJobs(JobSystemAbortException): pass
 class CantWaitWhenNotExecutingJobs(JobSystemAbortException): pass
