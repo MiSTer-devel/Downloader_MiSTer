@@ -29,7 +29,8 @@ from test.objects import store_with_folders, db_distribution_mister, db_test_bei
     db_test_with_file, db_with_file, db_with_folders, file_a, folder_a, \
     store_test_with_file_a_descr, store_test_with_file, db_test_with_file_a, file_descr, empty_test_store, \
     file_pdfviewer_descr, store_descr, media_usb0, \
-    db_entity, file_c_descr, file_abc, folder_ab, path_system, file_system_abc_descr, store_reboot_descr, file_reboot, file_reboot_descr
+    db_entity, file_c_descr, file_abc, folder_ab, path_system, file_system_abc_descr, store_reboot_descr, file_reboot, \
+    file_reboot_descr, db_test
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 
@@ -214,6 +215,28 @@ class TestOnlineImporter(OnlineImporterTestBase):
         self.assertEqual(empty_test_store(), store_bar)
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders={folder_a: {}}), sut.fs_data)
         self.assertReports(sut, [file_a])
+
+    def test_download_dbs_contents___with_a_file_and_no_folders___still_creates_the_a_folder(self):
+        sut = OnlineImporter()
+        store = empty_test_store()
+
+        sut.add_db(db_with_file(db_test, file_a, file_a_descr()), store)
+        sut.download(False)
+
+        self.assertEqual(store_test_with_file(file_a, file_a_descr()), store)
+        self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders={folder_a: {}}), sut.fs_data)
+        self.assertReports(sut, [file_a])
+
+    def test_download_dbs_contents___with_folder_ab___still_creates_the_a_folder(self):
+        sut = OnlineImporter()
+        store = empty_test_store()
+
+        sut.add_db(db_with_folders(db_test, [folder_ab]), store)
+        sut.download(False)
+
+        self.assertEqual(store_with_folders([folder_ab], db_test), store)
+        self.assertEqual(fs_data(folders={folder_a: {}, folder_ab: {}}), sut.fs_data)
+        self.assertReportsNothing(sut, save=True)
 
     def test_download_dbs_contents___when_file_a_gets_removed___store_and_fs_become_empty(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))
