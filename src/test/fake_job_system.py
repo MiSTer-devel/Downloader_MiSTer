@@ -40,9 +40,9 @@ class ProgressReporterTracker(ProgressReporter):
         self.tracks["work_in_progress"] += 1
         self._reporter.notify_work_in_progress()
 
-    def notify_cancelled_jobs(self, jobs: List[Job]) -> None:
+    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
         self.tracks["job_cancelled"] += 1
-        self._reporter.notify_cancelled_jobs(jobs)
+        self._reporter.notify_jobs_cancelled(jobs)
 
     def notify_job_completed(self, job: Job) -> None:
         self.tracks["job_completed"].append((job.__class__.__name__, copy.deepcopy(job.__dict__)))
