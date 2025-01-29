@@ -1,5 +1,5 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-from typing import Any
+from typing import Any, List
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,8 +40,9 @@ class ProgressReporterTracker(ProgressReporter):
         self.tracks["work_in_progress"] += 1
         self._reporter.notify_work_in_progress()
 
-    def notify_cancelled_pending_jobs(self) -> None:
-        pass
+    def notify_cancelled_jobs(self, jobs: List[Job]) -> None:
+        self.tracks["job_cancelled"] += 1
+        self._reporter.notify_cancelled_jobs(jobs)
 
     def notify_job_completed(self, job: Job) -> None:
         self.tracks["job_completed"].append((job.__class__.__name__, copy.deepcopy(job.__dict__)))
