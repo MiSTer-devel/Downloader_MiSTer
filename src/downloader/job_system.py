@@ -49,7 +49,7 @@ class JobSystem(JobContext):
         JobSystem._next_job_type_id += 1
         return JobSystem._next_job_type_id
 
-    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', max_threads: int = 6, max_tries: int = 3, wait_timeout: float = 0.1, max_cycle: int = 3, max_timeout: float = 300, retry_unexpected_exceptions: bool = True):
+    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', max_threads: int = 6, max_tries: int = 3, wait_timeout: float = 0.1, max_cycle: int = 3, max_timeout: float = 300, retry_unexpected_exceptions: bool = True, raise_report_exceptions: bool = False):
         self._reporter: ProgressReporter = reporter
         self._logger: JobSystemLogger = logger
         self._max_threads: int = max_threads
@@ -58,13 +58,14 @@ class JobSystem(JobContext):
         self._max_cycle: int = max_cycle
         self._max_timeout: float = max_timeout
         self._retry_unexpected_exceptions: bool = retry_unexpected_exceptions
+        self._raise_report_exceptions: bool = raise_report_exceptions
         self._job_queue: queue.PriorityQueue[_JobPackage] = queue.PriorityQueue()
         self._notifications: queue.Queue[Tuple[_JobState, _JobPackage, Optional[_JobError]]] = queue.Queue()
-        self._cancelled_jobs: List[_JobPackage] = []
+        self._jobs_cancelled: List[_JobPackage] = []
         self._workers: Dict[int, Worker] = {}
         self._lock = threading.Lock()
         self._pending_jobs_amount: int = 0
-        self._pending_jobs_cancelled: bool = False
+        self._jobs_are_cancelled: bool = False
         self._is_executing_jobs: bool = False
         self._jobs_pushed: int = 0
         self._timeout_clock: float = 0
@@ -92,10 +93,10 @@ class JobSystem(JobContext):
                 raise CantExecuteJobs('Can not call to execute jobs when its already running.')
 
             self._is_executing_jobs = True
-            self._pending_jobs_cancelled = False
+            self._jobs_are_cancelled = False
 
         self._timed_out = False
-        self._cancelled_jobs.clear()
+        self._jobs_cancelled.clear()
         self._update_timeout_clock()
 
         try:
@@ -103,9 +104,8 @@ class JobSystem(JobContext):
                 self._execute_with_threads(self._max_threads)
             else:
                 self._execute_without_threads()
-            if len(self._cancelled_jobs) > 0:
-                self._report_cancelled_jobs(self._cancelled_jobs)
-                self._pending_jobs_amount -= len(self._cancelled_jobs)
+            if len(self._jobs_cancelled) > 0:
+                self._record_jobs_cancelled(self._jobs_cancelled)
         finally:
             with self._lock:
                 self._is_executing_jobs = False
@@ -129,13 +129,13 @@ class JobSystem(JobContext):
             next_jobs=None
         )
         self._job_queue.put(package)
-        self._increase_jobs_amount(job)
+        self._pending_jobs_amount += 1
 
     def cancel_pending_jobs(self) -> None:
         # This must be thread-safe. We lock so that execution can be interrupted asap.
 
         with self._lock:
-            self._pending_jobs_cancelled = True
+            self._jobs_are_cancelled = True
 
     def wait_for_other_jobs(self):
         # This must be thread-safe. We lock because we need the strict value of _is_executing_jobs.
@@ -150,14 +150,6 @@ class JobSystem(JobContext):
             # This branch does not need to be thread-safe, since concurrency is off.
             self._execute_without_threads(just_one_tick=True)
 
-    def _increase_jobs_amount(self, job: 'Job') -> None:
-        # This method does not need to be thread-safe, since it should be called only from the main thread.
-        self._pending_jobs_amount += 1
-
-    def _decrease_jobs_amount(self, job: 'Job') -> None:
-        # This method does not need to be thread-safe, since it should be called only from the main thread.
-        self._pending_jobs_amount -= 1
-
     def _execute_with_threads(self, max_threads: int) -> None:
         previous_handlers = [(s, signal.getsignal(s)) for s in self._signals]
         try:
@@ -166,7 +158,7 @@ class JobSystem(JobContext):
 
             futures = []
             with ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
-                while self._pending_jobs_amount > 0 and self._pending_jobs_cancelled is False:
+                while self._pending_jobs_amount > 0 and self._jobs_are_cancelled is False:
                     try:
                         package = self._job_queue.get(timeout=self._wait_timeout)
                     except queue.Empty:
@@ -177,25 +169,25 @@ class JobSystem(JobContext):
                         future = thread_executor.submit(self._operate_on_next_job, package, self._notifications)
                         futures.append((package, future))
 
-                    self._handle_notifications(self._notifications, self._cancelled_jobs)
+                    self._handle_notifications(self._notifications, self._jobs_cancelled)
                     futures = self._handle_futures(futures)
-                    self._report_work_in_progress()
+                    self._record_work_in_progress()
                     self._check_clock()
                     sys.stdout.flush()
 
-                if self._pending_jobs_cancelled:
-                    self._report_cancelled_jobs([])
-                    self._cancelled_jobs.extend(self._cancel_futures(futures))
+                if self._jobs_are_cancelled:
+                    self._record_jobs_cancelled([])
+                    self._jobs_cancelled.extend(self._cancel_futures(futures))
 
-            self._handle_notifications(self._notifications, self._cancelled_jobs)
+            self._handle_notifications(self._notifications, self._jobs_cancelled)
             if not self._job_queue.empty():
                 while not self._job_queue.empty():
-                    self._cancelled_jobs.append(self._job_queue.get_nowait())
+                    self._jobs_cancelled.append(self._job_queue.get_nowait())
         finally:
             for sig, cb in previous_handlers: signal.signal(sig, cb)
 
     def _execute_without_threads(self, just_one_tick: bool = False) -> None:
-        while self._pending_jobs_amount > 0 and self._pending_jobs_cancelled is False and self._job_queue.empty() is False:
+        while self._pending_jobs_amount > 0 and self._jobs_are_cancelled is False and self._job_queue.empty() is False:
             try:
                 package = self._job_queue.get(block=False)
             except queue.Empty:
@@ -208,18 +200,18 @@ class JobSystem(JobContext):
                 except BaseException as e:
                     self._handle_raised_exception(package, e)
                 finally:
-                    self._handle_notifications(self._notifications, self._cancelled_jobs)
+                    self._handle_notifications(self._notifications, self._jobs_cancelled)
 
-            self._report_work_in_progress()
+            self._record_work_in_progress()
             if just_one_tick: break
 
-        self._handle_notifications(self._notifications, self._cancelled_jobs)
+        self._handle_notifications(self._notifications, self._jobs_cancelled)
         if not self._job_queue.empty():
             while not self._job_queue.empty():
-                self._cancelled_jobs.append(self._job_queue.get_nowait())
+                self._jobs_cancelled.append(self._job_queue.get_nowait())
 
     def _operate_on_next_job(self, package: '_JobPackage', notifications: queue.Queue[Tuple['_JobState', '_JobPackage', Optional['_JobError']]]) -> None:
-        if self._pending_jobs_cancelled:
+        if self._jobs_are_cancelled:
             notifications.put((_JobState.JOB_CANCELLED, package, None))
             return
 
@@ -229,7 +221,7 @@ class JobSystem(JobContext):
         jobs, error = worker.operate_on(job)
 
         if error is not None:
-            notifications.put((_JobState.JOB_COMPLETED, package, _JobError(error)))
+            notifications.put((_JobState.JOB_FAILED, package, _JobError(error)))
         else:
             package.next_jobs = jobs
             notifications.put((_JobState.JOB_COMPLETED, package, None))
@@ -247,20 +239,8 @@ class JobSystem(JobContext):
             ))
         else:
             retrying = False
-            self._decrease_jobs_amount(package.job)
 
-        self._report_error_in_package(package, e, retrying)
-
-    def _report_error_in_package(self, package: '_JobPackage', e: Exception, retrying: bool) -> None:
-        try:
-            if retrying:
-                self._report_job_retried(package, e)
-            else:
-                self._report_job_failed(package, e)
-        except ReportException as report_exception:
-            self._logger.print('CRITICAL! Exception while reporting job failed')
-            self._logger.print(e)
-            self._logger.print(report_exception)
+        self._record_error_in_package(package, e, retrying)
 
     def _get_worker(self, job: 'Job') -> 'Worker':
         worker = self._workers.get(job.type_id, None)
@@ -278,31 +258,30 @@ class JobSystem(JobContext):
             except queue.Empty:
                 break
 
-            result, package, error = notification
+            status, package, error = notification
             if error is not None:
                 self._retry_package(package, error.child)
-            elif result == _JobState.JOB_COMPLETED:
+            elif status == _JobState.JOB_COMPLETED:
                 if isinstance(package.next_jobs, list):
                     for job in package.next_jobs:
                         self._internal_push_job(job, package)
                 elif isinstance(package.next_jobs, Job):
                     self._internal_push_job(package.next_jobs, package)
 
-                self._decrease_jobs_amount(package.job)
-                self._report_job_completed(package)
-            elif result == _JobState.JOB_STARTED:
-                self._report_job_started(package)
-            elif result == _JobState.JOB_CANCELLED:
+                self._record_job_completed(package)
+            elif status == _JobState.JOB_STARTED:
+                self._record_job_started(package)
+            elif status == _JobState.JOB_CANCELLED:
                 cancelled.append(package)
-            else: raise ValueError(f'Unknown notification "{result}"')
+            else: raise ValueError(f'Unhandled notification "{status}"')
 
     def _handle_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> List[Tuple['_JobPackage', Future[None]]]:
         still_pending = []
         for package, future in futures:
             if future.done():
-                future_exception = future.exception()
-                if future_exception is not None:
-                    self._handle_raised_exception(package, future_exception)
+                e = future.exception()
+                if e is not None:
+                    self._handle_raised_exception(package, e)
             else:
                 still_pending.append((package, future))
         return still_pending
@@ -314,14 +293,14 @@ class JobSystem(JobContext):
             if future.cancel():
                 cancelled.append(package)
             else:
-                future_exception = future.exception()
-                if future_exception is not None:
-                    self._decrease_jobs_amount(package.job)
-                    if isinstance(future_exception, Exception):
-                        self._report_error_in_package(package, future_exception, retrying=False)
-                    else:
-                        self._logger.print(f'CRITICAL! Unexpected exception "{type(future_exception).__name__}" while canceling job {package.job.type_id}|{package.job.__class__.__name__}: {future_exception}')
-                        raise future_exception
+                e = future.exception()
+                if e is None: continue
+
+                if not isinstance(e, Exception):
+                    self._logger.print(f'CRITICAL! Unexpected exception "{type(e).__name__}" while canceling job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
+                    e = _wrap_unknown_base_error(e)
+
+                self._record_error_in_package(package, e, retrying=False)
 
         return cancelled
 
@@ -329,17 +308,20 @@ class JobSystem(JobContext):
         if isinstance(e, JobSystemAbortException):
             self._logger.print(f'Unexpected system abort while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
             raise e
-        elif isinstance(e, Exception) and self._retry_unexpected_exceptions:
-            self._logger.print(f'Unexpected exception "{type(e).__name__}" while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
+        elif self._retry_unexpected_exceptions:
+            if isinstance(e, Exception):
+                self._logger.print(f'Unexpected exception "{type(e).__name__}" while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
+            else:
+                self._logger.print(f'CRITICAL! Unknown type for exception "{type(e).__name__}" while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
+                e = _wrap_unknown_base_error(e)
+
             self._retry_package(package, e)
-        else:
-            self._logger.print(f'CRITICAL! Unexpected exception "{type(e).__name__}" while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
-            raise e
+        else: raise e
 
     def timed_out(self) -> bool: return self._timed_out
     def pending_jobs_amount(self) -> int: return self._pending_jobs_amount
 
-    def _update_timeout_clock(self) -> None:
+    def _update_timeout_clock(self) -> None:  # We only want to update the timeout when the state of the job pipeline changes
         self._timeout_clock = time.monotonic() + self._max_timeout
 
     def _check_clock(self) -> None:
@@ -382,36 +364,44 @@ class JobSystem(JobContext):
         except Exception as e:
             self._logger.print('PREVIOUS HANDLER FAILED!', sig, e)
 
-    def _report_job_started(self, package: '_JobPackage') -> None:
-        self._try_report('started', lambda: self._reporter_for_package(package).notify_job_started(package.job))
+    def _record_error_in_package(self, package: '_JobPackage', e: Exception, retrying: bool) -> None:
+        if retrying: self._record_job_retried(package, e)
+        else: self._record_job_failed(package, e)
 
-    def _report_job_completed(self, package: '_JobPackage') -> None:
-        self._try_report('completed', lambda: self._reporter_for_package(package).notify_job_completed(package.job))
+    def _record_job_started(self, package: '_JobPackage') -> None:
+        self._update_timeout_clock()
+        self._try_report('started', self._reporter_for_package(package).notify_job_started, package.job)
 
-    def _report_job_retried(self, package: '_JobPackage', e: Exception) -> None:
-        self._try_report('retried', lambda: self._reporter_for_package(package).notify_job_retried(package.job, e))
+    def _record_job_completed(self, package: '_JobPackage') -> None:
+        self._pending_jobs_amount -= 1
+        self._update_timeout_clock()
+        self._try_report('completed', self._reporter_for_package(package).notify_job_completed, package.job)
 
-    def _report_job_failed(self, package: '_JobPackage', e: Exception) -> None:
-        self._try_report('failed', lambda: self._reporter_for_package(package).notify_job_failed(package.job, e))
+    def _record_job_retried(self, package: '_JobPackage', e: Exception) -> None:
+        self._update_timeout_clock()
+        self._try_report('retried', self._reporter_for_package(package).notify_job_retried, package.job, e)
 
-    def _report_work_in_progress(self) -> None:
-        self._try_report('in progress', lambda: self._reporter.notify_work_in_progress())
+    def _record_job_failed(self, package: '_JobPackage', e: Exception) -> None:
+        self._pending_jobs_amount -= 1
+        self._update_timeout_clock()
+        self._try_report('failed', self._reporter_for_package(package).notify_job_failed, package.job, e)
 
-    def _report_cancelled_jobs(self, cancelled: List['_JobPackage']) -> None:
+    def _record_jobs_cancelled(self, cancelled: List['_JobPackage']) -> None:
+        self._pending_jobs_amount -= len(cancelled)
+        self._update_timeout_clock()
         jobs = [j.job for j in cancelled]
-        self._try_report('cancelled jobs', lambda: self._reporter.notify_cancelled_jobs(jobs))
+        self._try_report('cancelled', self._reporter.notify_jobs_cancelled, jobs)
 
-    def _try_report(self, context: str, cb: Callable[[], None]) -> None:
-        if context != 'in progress':
-            # We only want to update the timeout when the state of the job pipeline changes
-            self._update_timeout_clock()
-        try:
-            cb()
-        except Exception as e:
-            raise ReportException(f'CRITICAL! Exception while reporting job {context}: {e}') from e
+    def _record_work_in_progress(self) -> None: self._try_report('in-progress', self._reporter.notify_work_in_progress)
 
-    def _reporter_for_package(self, package: '_JobPackage') -> 'ProgressReporter':
-        return package.worker.reporter() or self._reporter
+    def _try_report(self, context: str, method: Callable, *args) -> None:
+        try: method(*args)
+        except BaseException as e:
+            self._logger.print(f'CRITICAL! Exception while reporting job "{context}": {type(e).__name__}')
+            self._logger.print(e)
+            if self._raise_report_exceptions: raise ReportException(f'Unexpected exception while recording "{context}" event.') from e
+
+    def _reporter_for_package(self, package: '_JobPackage') -> 'ProgressReporter': return package.worker.reporter() or self._reporter
 
 
 class Job(ABC):
@@ -472,7 +462,7 @@ class ProgressReporter(Protocol):
     def notify_work_in_progress(self) -> None:
         """Called after each loop."""
 
-    def notify_cancelled_jobs(self, jobs: List[Job]) -> None:
+    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
         """Called when all pending jobs are cancelled."""
 
     def notify_job_completed(self, job: Job) -> None:
@@ -518,11 +508,16 @@ class _JobError(Exception):
         super().__init__(child)
         self.child = child
 
+def _wrap_unknown_base_error(e: BaseException) -> Exception:
+    wrapper = Exception(f"Unknown base error: {type(e).__name__}")
+    wrapper.__cause__ = e
+    return wrapper
+
 class _JobState(Enum):
     JOB_STARTED = auto()
     JOB_COMPLETED = auto()
     JOB_CANCELLED = auto()
-
+    JOB_FAILED = auto()
 
 def stacks_from_all_threads() -> dict:
     try:
