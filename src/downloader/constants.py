@@ -112,6 +112,9 @@ STORAGE_PATHS_PRIORITY_SEQUENCE: Final[List[str]] = [
     MEDIA_FAT
 ]
 
+# Filters
+
+ESSENTIAL_TERM: Final[str] = 'essential'
 
 # Dictionary Keys:
 

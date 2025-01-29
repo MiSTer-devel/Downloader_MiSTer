@@ -18,21 +18,23 @@
 
 import re
 from pathlib import Path
-from typing import List, Optional, Set, Dict, Tuple, Any, Iterable, TypedDict
+from typing import List, Optional, Set, Dict, Tuple, Any, Iterable, TypedDict, Union, Final
 from abc import ABC, abstractmethod
 
-from downloader.constants import K_FILTER
+from downloader.config import Config
+from downloader.constants import ESSENTIAL_TERM
 from downloader.db_entity import DbEntity
 from downloader.jobs.index import Index
 from downloader.logger import Logger
 
 FileFolderDesc = Dict[str, Any]
-Config = Dict[str, Any]
 
 
 class FileFoldersHolder(TypedDict):
     files: Dict[str, FileFolderDesc]
     folders: Dict[str, FileFolderDesc]
+
+def make_file_folders_holder() -> FileFoldersHolder: return {'files': {}, 'folders': {}}
 
 
 ZipData = Dict[str, FileFoldersHolder]
@@ -134,10 +136,10 @@ class FileFilterFactory:
         return list(self._unused - self._used)
 
     def _create_filter_calculator(self, db: DbEntity, index: Index, config: Config) -> Optional[FilterCalculator]:
-        if config[K_FILTER] is None or config[K_FILTER] == '':
+        if config['filter'] is None or config['filter'] == '':
             self._logger.debug(f'No filter for db {db.db_id}.')
             return None
-        this_filter = config[K_FILTER].strip().lower()  # @TODO: Remove strip after field is validated in other place
+        this_filter = config['filter'].strip().lower()  # @TODO: Remove strip after field is validated in other place
         self._logger.debug(f'Filter for db {db.db_id}: {this_filter}')
         if this_filter == '':
             raise BadFileFilterPartException(this_filter)
@@ -152,7 +154,7 @@ class FileFilterFactory:
 
         positive_all = False
         for part in filter_parts:
-            this_part = part.strip()
+            this_part: str = part.strip()
 
             if not filter_part_regex.match(this_part):
                 raise BadFileFilterPartException(this_part)
@@ -177,23 +179,28 @@ class FileFilterFactory:
 
             used_term = this_part
 
+            alphanumeric_part: Union[str, int]
             if this_part in db.tag_dictionary:
-                this_part = db.tag_dictionary[this_part]
+                alphanumeric_part = db.tag_dictionary[this_part]
+            else:
+                alphanumeric_part = this_part
 
-            part_in_db = _part_in_db(this_part, index)
+            part_in_db = _part_in_db(alphanumeric_part, index)
             if part_in_db:
                 self._used.add(used_term)
             else:
                 self._unused.add(this_part)
 
             if is_negative:
-                if part_in_db: negative.append(this_part)
+                if part_in_db: negative.append(alphanumeric_part)
             else:
-                positive.append(this_part)
+                positive.append(alphanumeric_part)
 
-        essential = 'essential'
-        if essential in db.tag_dictionary:
-            essential = db.tag_dictionary[essential]
+        essential: Union[str, int]
+        if ESSENTIAL_TERM in db.tag_dictionary:
+            essential = db.tag_dictionary[ESSENTIAL_TERM]
+        else:
+            essential = ESSENTIAL_TERM
 
         if len(positive) > 0 and essential not in positive and essential not in negative:
             positive.append(essential)
@@ -201,14 +208,14 @@ class FileFilterFactory:
         return FilterCalculatorImpl([] if positive_all else positive, negative)
 
 
-def _part_in_db(this_part: str, index: Index) -> bool:
-    return _part_in_descriptions(this_part, index.files.values())\
-        or _part_in_descriptions(this_part, index.folders.values())
+def _part_in_db(alphanumeric_part: Union[str, int], index: Index) -> bool:
+    return _part_in_descriptions(alphanumeric_part, index.files.values())\
+        or _part_in_descriptions(alphanumeric_part, index.folders.values())
 
 
-def _part_in_descriptions(this_part: str, descriptions: Iterable[Dict[str, Any]]) -> bool:
+def _part_in_descriptions(alphanumeric_part: Union[str, int], descriptions: Iterable[Dict[str, Any]]) -> bool:
     for descr in descriptions:
-        if 'tags' in descr and this_part in descr['tags']:
+        if 'tags' in descr and alphanumeric_part in descr['tags']:
             return True
 
     return False

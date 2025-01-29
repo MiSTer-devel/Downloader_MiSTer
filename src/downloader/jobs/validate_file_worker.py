@@ -27,7 +27,7 @@ class ValidateFileWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return ValidateFileJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ValidateFileJob) -> WorkerResult:
+    def operate_on(self, job: ValidateFileJob) -> WorkerResult:  # type: ignore[override]
         file_path, file_hash, hash_check = job.fetch_job.path, job.fetch_job.description['hash'], job.fetch_job.hash_check
         error = self._validate_file(file_path, file_hash, hash_check)
         if error is not None:
@@ -50,3 +50,4 @@ class ValidateFileWorker(DownloaderWorkerBase):
             self._ctx.target_path_repository.finish_target(file_path)
         except BaseException as e:
             return FileDownloadError(f'Exception during validation! {file_path}: {str(e)}')
+        else: return None

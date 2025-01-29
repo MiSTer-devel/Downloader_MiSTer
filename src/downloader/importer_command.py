@@ -15,17 +15,21 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from typing import Dict, Any
-from downloader.constants import K_OPTIONS, K_DEFAULT_DB_ID, K_BASE_PATH, K_USER_DEFINED_OPTIONS, K_FILTER
+from typing import Dict, Any, Tuple, List
+
+from downloader.config import Config
+from downloader.constants import K_OPTIONS, K_USER_DEFINED_OPTIONS, K_FILTER
+from downloader.db_entity import DbEntity
+from downloader.local_store_wrapper import StoreWrapper
 
 
 class ImporterCommand:
-    def __init__(self, config: Dict[str, Any], user_defined_options):
+    def __init__(self, config: Config, user_defined_options):
         self._config = config
         self._user_defined_options = user_defined_options
-        self._parameters = []
+        self._parameters: List[Tuple[DbEntity, StoreWrapper, Config]] = []
 
-    def add_db(self, db, store, ini_description):
+    def add_db(self, db: DbEntity, store: StoreWrapper, ini_description: Dict[str, Any]):
         config = self._config.copy()
 
         for key, option in db.default_options.items():
@@ -36,22 +40,22 @@ class ImporterCommand:
             ini_description[K_OPTIONS].apply_to_config(config)
 
         if not store.read_only().has_base_path():
-            store.write_only().set_base_path(config[K_BASE_PATH])
+            store.write_only().set_base_path(config['base_path'])
 
-        if config[K_FILTER] is not None and '[mister]' in config[K_FILTER].lower():
-            mister_filter = '' if K_FILTER not in self._config or self._config[K_FILTER] is None else self._config[K_FILTER].lower()
-            config[K_FILTER] = config[K_FILTER].lower().replace('[mister]', mister_filter).strip()
+        if config['filter'] is not None and '[mister]' in config['filter'].lower():
+            mister_filter = '' if 'filter' not in self._config or self._config['filter'] is None else self._config['filter'].lower()
+            config['filter'] = config['filter'].lower().replace('[mister]', mister_filter).strip()
 
         entry = (db, store, config)
 
-        if db.db_id == self._config[K_DEFAULT_DB_ID]:
+        if db.db_id == self._config['default_db_id']:
             self._parameters = [entry, *self._parameters]
         else:
             self._parameters.append(entry)
 
         return self
 
-    def read_dbs(self):
+    def read_dbs(self) -> List[Tuple[DbEntity, StoreWrapper, Config]]:
         return self._parameters
 
 

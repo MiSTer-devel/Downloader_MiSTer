@@ -28,7 +28,7 @@ class OpenDbWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return OpenDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: OpenDbJob) -> WorkerResult:
+    def operate_on(self, job: OpenDbJob) -> WorkerResult:  # type: ignore[override]
         try:
             db = self._open_db(section=job.section, temp_path=job.temp_path)
         except Exception as e:

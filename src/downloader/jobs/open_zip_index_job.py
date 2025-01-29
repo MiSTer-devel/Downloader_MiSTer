@@ -19,6 +19,7 @@
 from dataclasses import field, dataclass
 from typing import Dict, Any, Optional
 
+from downloader.config import Config
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.get_file_job import GetFileJob
@@ -37,8 +38,8 @@ class OpenZipIndexJob(Job):
     zip_description: Dict[str, Any]
     full_resync: bool
     download_path: str
-    config: Dict[str, Any]
+    config: Config
     get_file_job: GetFileJob
     backup_job: Optional[ProcessZipJob]
 
-    def retry_job(self): return self.get_file_job
+    def retry_job(self) -> Optional[Job]: return self.get_file_job

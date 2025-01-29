@@ -57,6 +57,12 @@ class AllowReboot(IntEnum):
     ONLY_AFTER_LINUX_UPDATE = 2
 
 
+class ConfigDatabaseSection(TypedDict):
+    section: str
+    db_url: str
+    options: NotRequired[DbOptions]
+
+
 class ConfigMisterSection(TypedDict):
     base_path: str
     base_system_path: str
@@ -72,12 +78,6 @@ class ConfigMisterSection(TypedDict):
     minimum_system_free_space_mb: int
     minimum_external_free_space_mb: int
     user_defined_options: List[str]
-
-
-class ConfigDatabaseSection(TypedDict):
-    section: str
-    db_url: str
-    options: NotRequired[DbOptions]
 
 
 class Config(ConfigMisterSection):

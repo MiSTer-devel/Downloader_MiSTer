@@ -34,7 +34,7 @@ class ValidateFileWorker2(DownloaderWorker):
     def job_type_id(self) -> int: return ValidateFileJob2.type_id
     def reporter(self): return self._progress_reporter
 
-    def operate_on(self, job: ValidateFileJob2) -> WorkerResult:
+    def operate_on(self, job: ValidateFileJob2) -> WorkerResult:  # type: ignore[override]
         error = self._validate_file(
             temp_path=job.temp_path,
             target_file_path=job.target_file_path,
@@ -62,3 +62,4 @@ class ValidateFileWorker2(DownloaderWorker):
 
         except BaseException as e:
             return FileDownloadError(f'Exception during validation! {info}: {str(e)}')
+        else: return None

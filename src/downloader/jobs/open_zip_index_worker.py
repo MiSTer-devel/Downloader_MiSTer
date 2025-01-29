@@ -26,7 +26,7 @@ class OpenZipIndexWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return OpenZipIndexJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: OpenZipIndexJob) -> WorkerResult:
+    def operate_on(self, job: OpenZipIndexJob) -> WorkerResult:  # type: ignore[override]
         try:
             index = self._ctx.file_system.load_dict_from_file(job.download_path)
             self._ctx.file_system.unlink(job.download_path)

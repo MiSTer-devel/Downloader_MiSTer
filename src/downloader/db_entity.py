@@ -35,7 +35,7 @@ class DbEntity:
         except DbOptionsValidationException as e:
             raise DbEntityValidationException(f'ERROR: db "{section}" has invalid default options [{e.fields_to_string()}], contact the db maintainer if this error persists.')
 
-    def _initialize(self, db_raw, section):
+    def _initialize(self, db_raw, section) -> None:
         if db_raw is None:
             raise _EmptyDbException()
 

@@ -20,11 +20,11 @@
 from typing import Optional, Dict, Any, Tuple, List
 from dataclasses import dataclass
 
+from downloader.config import Config
 from downloader.db_entity import DbEntity
 from pathlib import Path
 
 from downloader.file_filter import FileFoldersHolder
-from downloader.job_system import Job
 from downloader.jobs.copy_file_job import CopyFileJob
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.get_file_job import GetFileJob
@@ -43,7 +43,7 @@ from downloader.logger import Logger
 class ZipJobContext:
     zip_id: str
     zip_description: Dict[str, Any]
-    config: Dict[str, Any]
+    config: Config
     job: ProcessDbJob
 
 
@@ -109,7 +109,7 @@ def make_open_zip_contents_job(job: ProcessZipJob, zip_index: Index, file_packs:
     return get_file_job, info
 
 
-def make_process_zip_job(zip_id: str, zip_description: Dict[str, Any], zip_index: Dict[str, Any], config: Dict[str, Any], db: DbEntity, ini_description: Dict[str, Any], store: StoreWrapper, full_resync: bool, has_new_zip_index: bool) -> ProcessZipJob:
+def make_process_zip_job(zip_id: str, zip_description: Dict[str, Any], zip_index: Dict[str, Any], config: Config, db: DbEntity, ini_description: Dict[str, Any], store: StoreWrapper, full_resync: bool, has_new_zip_index: bool) -> ProcessZipJob:
     base_files_url = db.base_files_url
     if 'base_files_url' in zip_description:
         base_files_url = zip_description['base_files_url']
