@@ -27,13 +27,13 @@ from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
 from downloader.file_system import ReadOnlyFileSystem
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
-from downloader.path_package import PathPackage, PathPackageKind, PathType
+from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
-from downloader.constants import FILE_MiSTer, FILE_MiSTer_old, K_BASE_PATH
-from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE, ReadOnlyStoreAdapter
+from downloader.constants import FILE_MiSTer, FILE_MiSTer_old
+from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 from downloader.other import calculate_url
 from downloader.storage_priority_resolver import StoragePriorityError
 from downloader.target_path_calculator import TargetPathsCalculator
@@ -272,7 +272,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             if pkg.is_pext_parent:
                 continue
 
-            if pkg.pext_props:
+            if pkg.pext_props is not None:
                 parents[pkg.pext_props.parent].add(pkg.pext_props.drive)
                 folders_to_create.add(pkg.pext_props.parent_full_path())
 
