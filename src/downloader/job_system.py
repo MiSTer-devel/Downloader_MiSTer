@@ -189,9 +189,8 @@ class JobSystem(JobContext):
                     self._jobs_cancelled.extend(self._cancel_futures(futures))
 
             self._handle_notifications(self._notifications, self._jobs_cancelled)
-            if not self._job_queue.empty():
-                while not self._job_queue.empty():
-                    self._jobs_cancelled.append(self._job_queue.get_nowait())
+            while not self._job_queue.empty():
+                self._jobs_cancelled.append(self._job_queue.get_nowait())
         finally:
             for sig, cb in previous_handlers: signal.signal(sig, cb)
 
