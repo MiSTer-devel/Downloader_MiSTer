@@ -17,11 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from abc import abstractmethod, ABC
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
 from enum import Enum, auto
 from types import FrameType
-from typing import Dict, Optional, Callable, List, Tuple, Any, Iterable, Protocol, Union
+from typing import Deque, Dict, Optional, Callable, List, Tuple, Any, Iterable, Protocol, Union
 import sys
 import time
 import queue
@@ -59,7 +60,7 @@ class JobSystem(JobContext):
         self._max_timeout: float = max_timeout
         self._retry_unexpected_exceptions: bool = retry_unexpected_exceptions
         self._raise_report_exceptions: bool = raise_report_exceptions
-        self._job_queue: queue.PriorityQueue[_JobPackage] = queue.PriorityQueue()
+        self._job_queue: Deque[_JobPackage] = deque()
         self._notifications: queue.Queue[Tuple[_JobState, _JobPackage, Optional[_JobError]]] = queue.Queue()
         self._jobs_cancelled: List[_JobPackage] = []
         self._workers: Dict[int, Worker] = {}
@@ -67,7 +68,6 @@ class JobSystem(JobContext):
         self._pending_jobs_amount: int = 0
         self._are_jobs_cancelled: bool = False
         self._is_executing_jobs: bool = False
-        self._jobs_pushed: int = 0
         self._timeout_clock: float = 0
         self._timed_out: bool = False
         self._signals = [signal.SIGINT]
@@ -91,11 +91,11 @@ class JobSystem(JobContext):
             for job_id, worker in workers:
                 self._workers[job_id] = worker
 
-    def push_job(self, job: 'Job', priority: Optional[int] = None) -> None:
+    def push_job(self, job: 'Job') -> None:
         with self._lock:
             if self._is_executing_jobs: raise CantPushJobs('Can not push more jobs while executing jobs')
 
-        self._internal_push_job(job, priority, parent_package=None)
+        self._internal_push_job(job, parent_package=None)
 
     def execute_jobs(self) -> None:
         """This function executes all the jobs with the registered workers. It must be used in the MAIN THREAD."""
@@ -146,18 +146,19 @@ class JobSystem(JobContext):
             raise NoWorkerException(f'No worker registered for job type id "{job.type_id}" and name "{job.__class__.__name__}"')
         return worker
 
-    def _internal_push_job(self, job: 'Job',  priority: Optional[int], parent_package: Optional['_JobPackage']) -> None:
+    def _internal_push_job(self, job: 'Job', parent_package: Optional['_JobPackage']) -> None:
         worker = self._get_worker(job)
-        self._jobs_pushed += 1
         package = _JobPackage(
             job=job,
             worker=worker,
             tries=0 if parent_package is None else parent_package.tries,
-            priority=priority or self._jobs_pushed,
             parent=parent_package,
             next_jobs=None
         )
-        self._job_queue.put(package)
+        if job.priority:
+            self._job_queue.appendleft(package)
+        else:
+            self._job_queue.append(package)
         self._pending_jobs_amount += 1
 
     def _execute_with_threads(self, max_threads: int) -> None:
@@ -169,11 +170,7 @@ class JobSystem(JobContext):
             futures = []
             with ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
                 while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
-                    try:
-                        package = self._job_queue.get(timeout=self._wait_timeout)
-                    except queue.Empty:
-                        package = None
-
+                    package = self._job_queue.popleft() if self._job_queue else None
                     if package is not None:
                         self._assert_there_are_no_cycles(package)
                         future = thread_executor.submit(self._operate_on_next_job, package, self._notifications)
@@ -190,18 +187,14 @@ class JobSystem(JobContext):
                     self._jobs_cancelled.extend(self._cancel_futures(futures))
 
             self._handle_notifications(self._notifications, self._jobs_cancelled)
-            while not self._job_queue.empty():
-                self._jobs_cancelled.append(self._job_queue.get_nowait())
+            self._jobs_cancelled.extend(self._job_queue)
+            self._job_queue.clear()
         finally:
             for sig, cb in previous_handlers: signal.signal(sig, cb)
 
     def _execute_without_threads(self, just_one_tick: bool = False) -> None:
-        while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False and self._job_queue.empty() is False:
-            try:
-                package = self._job_queue.get(block=False)
-            except queue.Empty:
-                package = None
-
+        while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
+            package = self._job_queue.popleft() if self._job_queue else None
             if package is not None:
                 self._assert_there_are_no_cycles(package)
                 try:
@@ -216,9 +209,8 @@ class JobSystem(JobContext):
             if just_one_tick: return
 
         self._handle_notifications(self._notifications, self._jobs_cancelled)
-        if not self._job_queue.empty():
-            while not self._job_queue.empty():
-                self._jobs_cancelled.append(self._job_queue.get_nowait())
+        self._jobs_cancelled.extend(self._job_queue)
+        self._job_queue.clear()
 
     def _operate_on_next_job(self, package: '_JobPackage', notifications: queue.Queue[Tuple['_JobState', '_JobPackage', Optional['_JobError']]]) -> None:
         if self._are_jobs_cancelled:
@@ -240,14 +232,17 @@ class JobSystem(JobContext):
         retry_job = package.job.retry_job()
         if package.tries < self._max_tries and retry_job is not None:
             retrying = True
-            self._job_queue.put(_JobPackage(
+            retry_package = _JobPackage(
                 job=retry_job,
                 worker=self._get_worker(retry_job),
                 tries=package.tries + 1,
-                priority=package.priority,
                 parent=None,
                 next_jobs=package.next_jobs
-            ))
+            )
+            if retry_job.priority:
+                self._job_queue.appendleft(retry_package)
+            else:
+                self._job_queue.append(retry_package)
         else:
             retrying = False
 
@@ -375,7 +370,7 @@ class JobSystem(JobContext):
         elif isinstance(next_jobs, Job):
             next_jobs = [next_jobs]
         for child_job in next_jobs:
-            self._internal_push_job(child_job, priority=getattr(child_job, 'priority', None), parent_package=package)
+            self._internal_push_job(child_job, parent_package=package)
         self._pending_jobs_amount -= 1
         self._update_timeout_clock()
         self._try_report('completed', self._reporter_for_package(package).notify_job_completed, package.job, next_jobs)
@@ -435,6 +430,9 @@ class Job(ABC):
     def tags(self) -> Iterable[str]:
         return getattr(self, '_tags', set())
 
+    @property
+    def priority(self): return False
+
 
 WorkerResult = Tuple[Union[List[Job], Optional[Job]], Optional[Exception]]
 
@@ -492,18 +490,16 @@ class JobSystemLogger(Protocol):
 
 @dataclass(eq=False, order=False)
 class _JobPackage:
-    __slots__ = ('job', 'worker', 'tries', 'priority', 'next_jobs', 'parent')
+    __slots__ = ('job', 'worker', 'tries', 'next_jobs', 'parent')
 
     job: Job
     worker: Worker
     tries: int
-    priority: int
     next_jobs: Union[Optional[Job], List[Job]]
     parent: Optional['_JobPackage']
 
-    def __lt__(self, other: '_JobPackage') -> bool: return self.priority < other.priority
     # Consider removing __str__ at least in non-debug environments
-    def __str__(self): return f'JobPackage(job_type_id={self.job.type_id}, job_class={self.job.__class__.__name__}, tries={self.tries}, priority={self.priority})'
+    def __str__(self): return f'JobPackage(job_type_id={self.job.type_id}, job_class={self.job.__class__.__name__}, tries={self.tries})'
 
 
 class _JobError(Exception):
