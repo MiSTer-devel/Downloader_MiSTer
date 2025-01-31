@@ -37,7 +37,7 @@ class FetchFileWorker(DownloaderWorkerBase):
         if error is not None:
             return None, error
 
-        return ValidateFileJob(fetch_job=job).set_priority(1), None
+        return ValidateFileJob(fetch_job=job), None
 
     def _fetch_file(self, job: FetchFileJob) -> Optional[FileDownloadError]:
         file_path, description = job.path, job.description

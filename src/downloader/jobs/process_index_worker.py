@@ -185,17 +185,19 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         moved_pkgs: List[_ValidateFilePackage] = []
         already_installed_pkgs: List[_ValidateFilePackage] = []
         for pkg in non_duplicated_pkgs:
-            if file_system.is_file(pkg.full_path):
-                if not full_resync and store.hash_file(pkg.rel_path) == pkg.description['hash']:
-                    if store.is_file_in_drive(pkg.rel_path, pkg.drive()):
-                        already_installed_pkgs.append(pkg)
-                    else:
-                        validate_pkgs.append(pkg)
-                        moved_pkgs.append(pkg)
-                else:
-                    validate_pkgs.append(pkg)
-            else:
+            if not file_system.is_file(pkg.full_path):
                 fetch_pkgs.append(pkg)
+                continue
+
+            if full_resync or (store.hash_file(pkg.rel_path) != pkg.description['hash']):
+                validate_pkgs.append(pkg)
+                continue
+
+            if store.is_file_in_drive(pkg.rel_path, pkg.drive()):
+                already_installed_pkgs.append(pkg)
+            else:
+                validate_pkgs.append(pkg)
+                moved_pkgs.append(pkg)
 
         return fetch_pkgs, validate_pkgs, moved_pkgs, already_installed_pkgs
 
