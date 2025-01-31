@@ -22,7 +22,7 @@ from downloader.job_system import Job, JobSystem
 from downloader.jobs.fetch_file_job import FetchFileJob
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, order=False)
 class ValidateFileJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
     fetch_job: FetchFileJob
