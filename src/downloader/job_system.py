@@ -245,6 +245,7 @@ class JobSystem(JobContext):
                 worker=self._get_worker(retry_job),
                 tries=package.tries + 1,
                 priority=package.priority,
+                parent=None,
                 next_jobs=package.next_jobs
             ))
         else:
@@ -489,16 +490,19 @@ class JobSystemLogger(Protocol):
     def debug(self, *args, sep='', end='\n', flush=True): """Prints a debug message to the logger."""
 
 
-@dataclass
+@dataclass(eq=False, order=False)
 class _JobPackage:
+    __slots__ = ('job', 'worker', 'tries', 'priority', 'next_jobs', 'parent')
+
     job: Job
     worker: Worker
     tries: int
     priority: int
     next_jobs: Union[Optional[Job], List[Job]]
-    parent: Optional['_JobPackage'] = None
+    parent: Optional['_JobPackage']
 
     def __lt__(self, other: '_JobPackage') -> bool: return self.priority < other.priority
+    # Consider removing __str__ at least in non-debug environments
     def __str__(self): return f'JobPackage(job_type_id={self.job.type_id}, job_class={self.job.__class__.__name__}, tries={self.tries}, priority={self.priority})'
 
 
