@@ -242,12 +242,11 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         job.add_tag('b')
         self.assertEqual(['a', 'b'], sorted(job.tags))
 
-    def test_job_add_tag_a_twice___throws(self):
+    def test_job_add_tag_a___when_checking_tag_a_and_b___returns_true_and_false_respectively(self):
         job = TestJob(1)
         job.add_tag('a')
-        with self.assertRaises(Exception) as context:
-            job.add_tag('a')
-        self.assertIsInstance(context.exception, CantExecuteJobs)
+        self.assertTrue(job.has_tag('a'))
+        self.assertFalse(job.has_tag('b'))
 
     def assertReports(self, completed: Optional[Dict[int, int]] = None, started: Optional[Dict[int, int]] = None, in_progress: Optional[Dict[int, int]] = None, failed: Optional[Dict[int, int]] = None, retried: Optional[Dict[int, int]] = None, cancelled: Optional[Dict[int, int]] = None, pending: int = 0, timed_out: bool = False):
         self.assertEqual({
