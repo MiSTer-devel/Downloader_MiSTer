@@ -429,7 +429,9 @@ class Job(ABC):
         return self
 
     def has_tag(self, tag: str) -> bool:
-        return tag in getattr(self, '_tags', set())
+        tags = getattr(self, '_tags', None)
+        if tags is None: return False
+        return tag in tags
 
     @property
     def tags(self) -> Iterable[str]:
