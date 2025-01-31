@@ -1,5 +1,4 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-from collections import defaultdict
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,6 +16,10 @@ from collections import defaultdict
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from collections import defaultdict
+import os
+from typing import Dict, Set
+
 from downloader.constants import MEDIA_USB0
 from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
@@ -29,6 +32,9 @@ from downloader.jobs.worker_context import make_downloader_worker_context
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
 from downloader.path_package import PathType
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
+from downloader.logger import NoLogger
+
+from test.debug import is_debugging
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_job_system import ProgressReporterTracker
 from test.fake_local_store_wrapper import StoreWrapper, LocalStoreWrapper
@@ -37,13 +43,10 @@ from test.fake_local_repository import LocalRepository
 from test.fake_path_resolver import PathResolverFactory
 from test.fake_workers_factory import make_workers
 from test.objects import config_with
-from typing import Dict, Set
 from test.fake_waiter import NoWaiter
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs, FileSystemState, NetworkState
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
-from downloader.logger import NoLogger
-import os
 
 
 class OnlineImporter(ProductionOnlineImporter):
@@ -81,7 +84,7 @@ class OnlineImporter(ProductionOnlineImporter):
         http_gateway = FakeHttpGateway(self._config, network_state or NetworkState())
         self._file_download_reporter = FileDownloadProgressReporter(logger, waiter, Interruptions(fs=file_system_factory, gw=http_gateway), installation_report)
         self._report_tracker = ProgressReporterTracker(self._file_download_reporter)
-        self._job_system = JobSystem(self._report_tracker, logger=logger, max_threads=1, retry_unexpected_exceptions=False)
+        self._job_system = JobSystem(self._report_tracker, logger=logger, max_threads=1, retry_unexpected_exceptions=False, max_timeout=1)
         external_drives_repository = ExternalDrivesRepository(file_system=self.file_system)
         self._worker_ctx = make_downloader_worker_context(
             job_ctx=self._job_system,

@@ -99,7 +99,7 @@ class Reporter(ProgressReporter):
     failed: List[Tuple[FetchFileJob2, Exception]] = []
     cancelled: List[FetchFileJob2] = []
 
-    def notify_job_completed(self, job: FetchFileJob2) -> None:  # type: ignore[override]
+    def notify_job_completed(self, job: FetchFileJob2b, next_jobs: List[Job]) -> None:  # type: ignore[override]
         self._logger.print(f'>>>>>> COMPLETED! {job.info}')
         self.completed.append(job)
 
