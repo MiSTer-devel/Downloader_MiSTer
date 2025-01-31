@@ -423,8 +423,6 @@ class Job(ABC):
         tags = getattr(self, '_tags', None)
         if tags is None:
             self._tags = set()
-        elif tag in tags:
-            raise CantExecuteJobs(f'Tag {tag} already added to job {self.type_id}')
         self._tags.add(tag)
         return self
 
