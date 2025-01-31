@@ -73,9 +73,6 @@ class ProcessZipWorker(DownloaderWorkerBase):
                     folder_packs.append(target_paths_calculator.deduce_target_path(folder_path, folder_description, PathType.FOLDER))
 
                 already_processed = self._ctx.installation_report.any_file_processed(file_packs)
-                if already_processed is None:
-                    self._ctx.installation_report.add_processed_files(file_packs, job.db.db_id)
-
                 if already_processed is not None:
                     self._ctx.logger.print(f'Skipping zip "{job.zip_id}" because file "{already_processed.pkg.rel_path}" was already processed by db "{already_processed.db_id}"')
                     return None, None

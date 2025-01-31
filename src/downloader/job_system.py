@@ -91,11 +91,11 @@ class JobSystem(JobContext):
             for job_id, worker in workers:
                 self._workers[job_id] = worker
 
-    def push_job(self, job: 'Job') -> None:
+    def push_job(self, job: 'Job', priority: Optional[int] = None) -> None:
         with self._lock:
             if self._is_executing_jobs: raise CantPushJobs('Can not push more jobs while executing jobs')
 
-        self._internal_push_job(job)
+        self._internal_push_job(job, priority, parent_package=None)
 
     def execute_jobs(self) -> None:
         """This function executes all the jobs with the registered workers. It must be used in the MAIN THREAD."""
@@ -127,16 +127,17 @@ class JobSystem(JobContext):
             self._are_jobs_cancelled = True
 
     def wait_for_other_jobs(self):
-        # This must be thread-safe. We lock because we need the strict value of _is_executing_jobs.
+        # This must be thread-safe. But we don't need to lock next two checks, because
+        # we are only reading and we are fine with eventual consistency here.
 
-        with self._lock:
-            if not self._is_executing_jobs or self._timed_out:
-                raise CantWaitWhenNotExecutingJobs('Can not wait when not executing jobs')
+        if self._timed_out: raise CantWaitWhenTimedOut('Can not wait when timed out')
+        if not self._is_executing_jobs: raise CantWaitWhenNotExecutingJobs('Can not wait when not executing jobs')
 
-        if self._max_threads > 1:  # _max_threads is read only.
+        if self._max_threads > 1:
             time.sleep(self._wait_timeout)
         else:
-            # This branch does not need to be thread-safe, since concurrency is off.
+            # This branch does not need to be thread-safe at all, since concurrency is off.
+            self._check_clock()
             self._execute_without_threads(just_one_tick=True)
 
     def _get_worker(self, job: 'Job') -> 'Worker':
@@ -145,14 +146,14 @@ class JobSystem(JobContext):
             raise NoWorkerException(f'No worker registered for job type id "{job.type_id}" and name "{job.__class__.__name__}"')
         return worker
 
-    def _internal_push_job(self, job: 'Job', parent_package: Optional['_JobPackage'] = None) -> None:
+    def _internal_push_job(self, job: 'Job',  priority: Optional[int], parent_package: Optional['_JobPackage']) -> None:
         worker = self._get_worker(job)
         self._jobs_pushed += 1
         package = _JobPackage(
             job=job,
             worker=worker,
             tries=0 if parent_package is None else parent_package.tries,
-            priority=job.priority or self._jobs_pushed,
+            priority=priority or self._jobs_pushed,
             parent=parent_package,
             next_jobs=None
         )
@@ -211,7 +212,8 @@ class JobSystem(JobContext):
                     self._handle_notifications(self._notifications, self._jobs_cancelled)
 
             self._record_work_in_progress()
-            if just_one_tick: break
+            self._check_clock()
+            if just_one_tick: return
 
         self._handle_notifications(self._notifications, self._jobs_cancelled)
         if not self._job_queue.empty():
@@ -264,12 +266,6 @@ class JobSystem(JobContext):
             if error is not None:
                 self._retry_package(package, error.child)
             elif status == _JobState.JOB_COMPLETED:
-                if isinstance(package.next_jobs, list):
-                    for job in package.next_jobs:
-                        self._internal_push_job(job, package)
-                elif isinstance(package.next_jobs, Job):
-                    self._internal_push_job(package.next_jobs, package)
-
                 self._record_job_completed(package)
             elif status == _JobState.JOB_STARTED:
                 self._record_job_started(package)
@@ -372,9 +368,16 @@ class JobSystem(JobContext):
         self._try_report('started', self._reporter_for_package(package).notify_job_started, package.job)
 
     def _record_job_completed(self, package: '_JobPackage') -> None:
+        next_jobs = package.next_jobs
+        if next_jobs is None:
+            next_jobs = []
+        elif isinstance(next_jobs, Job):
+            next_jobs = [next_jobs]
+        for child_job in next_jobs:
+            self._internal_push_job(child_job, priority=getattr(child_job, 'priority', None), parent_package=package)
         self._pending_jobs_amount -= 1
         self._update_timeout_clock()
-        self._try_report('completed', self._reporter_for_package(package).notify_job_completed, package.job)
+        self._try_report('completed', self._reporter_for_package(package).notify_job_completed, package.job, next_jobs)
 
     def _record_job_retried(self, package: '_JobPackage', e: Exception) -> None:
         self._update_timeout_clock()
@@ -405,6 +408,7 @@ class JobSystem(JobContext):
 
 class Job(ABC):
     """Base class for defining jobs."""
+    __slots__ = ('_tags')
 
     @property
     @abstractmethod
@@ -417,24 +421,18 @@ class Job(ABC):
     def add_tag(self, tag: str) -> 'Job':
         tags = getattr(self, '_tags', None)
         if tags is None:
-            tags = list()
-            setattr(self, '_tags', tags)
-        tags.append(tag)
-        if len(tags) != len(set(tags)):
+            self._tags = set()
+        elif tag in tags:
             raise CantExecuteJobs(f'Tag {tag} already added to job {self.type_id}')
+        self._tags.add(tag)
         return self
+
+    def has_tag(self, tag: str) -> bool:
+        return tag in getattr(self, '_tags', set())
 
     @property
     def tags(self) -> Iterable[str]:
-        return getattr(self, '_tags', [])
-
-    def set_priority(self, priority: int) -> 'Job':
-        setattr(self, '_priority', priority)
-        return self
-
-    @property
-    def priority(self) -> Optional[int]:
-        return getattr(self, '_priority', None)
+        return getattr(self, '_tags', set())
 
 
 WorkerResult = Tuple[Union[List[Job], Optional[Job]], Optional[Exception]]
@@ -464,7 +462,7 @@ class ProgressReporter(Protocol):
     def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
         """Called when all pending jobs are cancelled."""
 
-    def notify_job_completed(self, job: Job) -> None:
+    def notify_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
         """Called when a job is completed. Must not throw exceptions."""
 
     def notify_job_failed(self, job: Job, exception: Exception) -> None:
@@ -482,6 +480,7 @@ class CantSetSignalsException(JobSystemAbortException): pass
 class CantExecuteJobs(JobSystemAbortException): pass
 class CantPushJobs(JobSystemAbortException): pass
 class CantWaitWhenNotExecutingJobs(JobSystemAbortException): pass
+class CantWaitWhenTimedOut(JobSystemAbortException): pass
 class ReportException(Exception): pass
 
 

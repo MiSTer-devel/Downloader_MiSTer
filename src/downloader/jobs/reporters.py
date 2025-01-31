@@ -21,7 +21,7 @@ import dataclasses
 import threading
 import time
 from collections import defaultdict
-from typing import Dict, Optional, Tuple, List, Any, Iterable, Set, TypeVar, Generic, Protocol
+from typing import Dict, Final, Optional, Tuple, List, Any, Iterable, Set, TypeVar, Generic, Protocol
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
@@ -63,7 +63,7 @@ class DownloaderProgressReporter(ProgressReporter):
     def notify_jobs_cancelled(self, _jobs: List[Job]) -> None:
         pass
 
-    def notify_job_completed(self, job: Job):
+    def notify_job_completed(self, job: Job, next_jobs: List[Job]):
         pass
 
     def notify_job_failed(self, job: Job, exception: BaseException):
@@ -125,6 +125,9 @@ class _WithLock(Generic[T]):
         self.lock.release()
 
 
+CHILD_TAG: Final[int] = 1
+
+
 # @TODO: Want to remove almost all locks in the report altogether, workers should add intermediate results to the jobs
 #  instead, only exception is tags as workers want to query that in runtime in some scenarios.
 class InstallationReportImpl(InstallationReport):
@@ -148,35 +151,48 @@ class InstallationReportImpl(InstallationReport):
         self._filtered_zip_data = _WithLock[List[Tuple[str, str, Dict[str, Any], Dict[str, Any]]]]([], lock)
         self._jobs_started = _WithLock[Dict[int, List[Job]]](defaultdict(list), lock)
         self._jobs_completed = _WithLock[Dict[int, List[Job]]](defaultdict(list), lock)
+        self._jobs_cancelled = _WithLock[Dict[int, List[Job]]](defaultdict(list), lock)
         self._jobs_failed = _WithLock[Dict[int, List[Tuple[Job, BaseException]]]](defaultdict(list), lock)
         self._jobs_retried = _WithLock[Dict[int, List[Tuple[Job, BaseException]]]](defaultdict(list), lock)
         job_tag_lock = threading.Lock()
-        self._jobs_tag_in_progress = _WithLock[Dict[str, Set[Job]]](defaultdict(set), job_tag_lock)
+        self._jobs_tag_in_progress = _WithLock[Dict[str, int]](defaultdict(lambda: 0), job_tag_lock)
         self._jobs_tag_completed = _WithLock[Dict[str, List[Job]]](defaultdict(list), job_tag_lock)
         self._jobs_tag_failed = _WithLock[Dict[str, List[Job]]](defaultdict(list), job_tag_lock)
 
     def add_job_started(self, job: Job):
         with self._jobs_started as jobs_started: jobs_started[job.type_id].append(job)
+        if job.has_tag(CHILD_TAG): return
         with self._jobs_tag_in_progress as in_progress:
             for tag in job.tags:
-                in_progress[tag].add(job)
-    def add_job_completed(self, job: Job):
+                in_progress[tag] += 1
+
+    def add_jobs_cancelled(self, jobs: List[Job]) -> None:
+        with self._jobs_cancelled as jobs_cancelled:
+            for job in jobs:
+                jobs_cancelled[job.type_id].append(job)
+        with self._jobs_tag_in_progress as in_progress:
+            for job in jobs:
+                for tag in job.tags:
+                    in_progress[tag] -= 1
+
+    def add_job_completed(self, job: Job, next_jobs: List[Job]):
         with self._jobs_completed as jobs_completed: jobs_completed[job.type_id].append(job)
         with self._jobs_tag_in_progress.lock:
+            for new_job in next_jobs:
+                for tag in new_job.tags:
+                    self._jobs_tag_in_progress.data[tag] += 1
+                new_job.add_tag(CHILD_TAG)
             for tag in job.tags:
-                self._jobs_tag_in_progress.data[tag].remove(job)
+                self._jobs_tag_in_progress.data[tag] -= 1
                 self._jobs_tag_completed.data[tag].append(job)
     def add_job_failed(self, job: Job, exception: BaseException):
         with self._jobs_failed as jobs_failed: jobs_failed[job.type_id].append((job, exception))
         with self._jobs_tag_in_progress.lock:
             for tag in job.tags:
-                self._jobs_tag_in_progress.data[tag].remove(job)
+                self._jobs_tag_in_progress.data[tag] -= 1
                 self._jobs_tag_failed.data[tag].append(job)
     def add_job_retried(self, job: Job, exception: BaseException):
         with self._jobs_retried as jobs_retried: jobs_retried[job.type_id].append((job, exception))
-        with self._jobs_tag_in_progress.lock:
-            for tag in job.tags:
-                self._jobs_tag_in_progress.data[tag].remove(job)
     def get_jobs_completed_by_tags(self, tags: List[str]) -> List[Tuple[str, List[Job]]]:
         if len(tags) == 0: return []
         with self._jobs_tag_completed as tag_completed:
@@ -189,7 +205,7 @@ class InstallationReportImpl(InstallationReport):
         if len(tags) == 0: return False
         with self._jobs_tag_in_progress as tag_in_progress:
             for tag in tags:
-                if len(tag_in_progress[tag]) > 0: return True
+                if tag_in_progress[tag] > 0: return True
         return False
     def add_downloaded_file(self, path: str):
         with self._downloaded_files as downloaded_files: downloaded_files.append(path)
@@ -381,14 +397,15 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             self._print_symbols()
 
     def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
+        self._report.add_jobs_cancelled(jobs)
         self._logger.print(f"Cancelled {len(jobs)} jobs.")
         try:
             self._interrupts.interrupt()
         except Exception as e:
             self._logger.debug(e)
 
-    def notify_job_completed(self, job: Job):
-        self._report.add_job_completed(job)
+    def notify_job_completed(self, job: Job, next_jobs: List[Job]):
+        self._report.add_job_completed(job, next_jobs)
         if isinstance(job, FetchFileJob) or (isinstance(job, GetFileJob) and not job.silent):
             self._symbols.append('.')
             if self._needs_newline or self._check_time < time.time():
