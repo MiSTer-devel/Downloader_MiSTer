@@ -32,6 +32,6 @@ class ValidateFileJob2(Job):
     temp_path: str
     get_file_job: GetFileJob
     after_job: Optional[Job] = None
-    priority: int = 1
+    priority: bool = True
 
     def retry_job(self): return self.get_file_job

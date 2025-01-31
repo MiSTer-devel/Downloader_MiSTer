@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import time
+import unittest
 from functools import reduce
 from typing import Dict, Optional
 from downloader.job_system import JobSystem, ProgressReporter, Worker, Job, CycleDetectedException
@@ -91,3 +92,6 @@ class SlowWorker(Worker):
             self.system.cancel_pending_jobs()
         return TimedJob(job.iterations, counter=job.counter + 1), None
 
+
+if __name__ == '__main__':
+    unittest.main()
