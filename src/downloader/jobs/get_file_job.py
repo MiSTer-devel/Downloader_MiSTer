@@ -23,7 +23,7 @@ from abc import ABC
 from downloader.job_system import Job
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, order=False)
 class GetFileJob(Job, ABC):
     temp_path: str
     info: str
