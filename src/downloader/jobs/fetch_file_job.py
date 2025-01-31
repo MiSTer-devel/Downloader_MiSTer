@@ -22,7 +22,7 @@ from typing import Dict, Any, Optional
 from downloader.job_system import Job, JobSystem
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, order=False)
 class FetchFileJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
     path: str
