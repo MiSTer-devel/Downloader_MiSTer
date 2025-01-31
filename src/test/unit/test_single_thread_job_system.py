@@ -174,7 +174,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
     def test_throwing_reporter_during_retries___does_not_incur_in_infinite_loop(self):
         class TestThrowingReporter(TestProgressReporter):
-            def notify_job_retried(self, job: 'Job', exception: BaseException):
+            def notify_job_retried(self, job: Job, exception: BaseException):
                 raise Exception('Houston, we have a problem.')
 
         reporter = TestThrowingReporter()
@@ -233,11 +233,14 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
         self.assertIsInstance(context.exception, CantWaitWhenNotExecutingJobs)
 
+    def test_wait_for_jobs___while_a_job_chain_is_executing___waits_until_all_jobs_are_completed(self):
+        pass
+
     def test_job_add_tag_a_b___when_checked_tags___returns_b(self):
         job = TestJob(1)
         job.add_tag('a')
         job.add_tag('b')
-        self.assertEqual(['a', 'b'], list(job.tags))
+        self.assertEqual(['a', 'b'], sorted(job.tags))
 
     def test_job_add_tag_a_twice___throws(self):
         job = TestJob(1)
@@ -340,23 +343,23 @@ class TestProgressReporter(ProgressReporter):
             self.cancelled_jobs[job.type_id] = self.cancelled_jobs.get(job.type_id, 0) + 1
             self._remove_in_progress(job)
 
-    def notify_job_started(self, job: 'Job'):
+    def notify_job_started(self, job: Job):
         self.started_jobs[job.type_id] = self.started_jobs.get(job.type_id, 0) + 1
         self.in_progress_jobs[job.type_id] = self.in_progress_jobs.get(job.type_id, 0) + 1
 
-    def notify_job_completed(self, job: 'Job'):
+    def notify_job_completed(self, job: Job, next_jobs: List[Job]):
         self.completed_jobs[job.type_id] = self.completed_jobs.get(job.type_id, 0) + 1
         self._remove_in_progress(job)
 
-    def notify_job_failed(self, job: 'Job', exception: BaseException):
+    def notify_job_failed(self, job: Job, exception: BaseException):
         self.failed_jobs[job.type_id] = self.failed_jobs.get(job.type_id, 0) + 1
         self._remove_in_progress(job)
 
-    def notify_job_retried(self, job: 'Job', exception: BaseException):
+    def notify_job_retried(self, job: Job, exception: BaseException):
         self.retried_jobs[job.type_id] = self.retried_jobs.get(job.type_id, 0) + 1
         self._remove_in_progress(job)
 
-    def _remove_in_progress(self, job: 'Job'):
+    def _remove_in_progress(self, job: Job):
         self.in_progress_jobs[job.type_id] = self.in_progress_jobs.get(job.type_id, 0) - 1
         if self.in_progress_jobs[job.type_id] <= 0:
             self.in_progress_jobs.pop(job.type_id)

@@ -83,6 +83,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         if len(contained_files) > 0:
             self._ctx.file_system.unzip_contents(download_path, target_folder_path, [pkg.full_path for pkg in contained_files])
+            self._ctx.installation_report.add_processed_files(contained_files, job.db.db_id)
 
         self._ctx.file_system.unlink(download_path)
 
@@ -137,6 +138,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         if len(contained_files) > 0:
             self._ctx.file_system.unzip_contents(download_path, tmp_path, [pkg.rel_path for pkg in contained_files])
+            self._ctx.installation_report.add_processed_files(contained_files, job.db.db_id)
 
             for pkg in contained_files:
                 file_path = pkg.rel_path
