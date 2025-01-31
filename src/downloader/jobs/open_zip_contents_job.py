@@ -28,7 +28,7 @@ from downloader.jobs.index import Index
 from downloader.local_store_wrapper import StoreWrapper
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, order=False)
 class OpenZipContentsJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
