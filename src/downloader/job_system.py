@@ -487,7 +487,6 @@ class Job(ABC):
 
 WorkerResult = Tuple[List[Job], Optional[Exception]]
 
-
 class Worker(ABC):
     """Abstract base class for defining workers that process jobs."""
 
