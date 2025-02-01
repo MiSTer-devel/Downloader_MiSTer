@@ -182,14 +182,10 @@ class JobSystem(JobContext):
             while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
                 package = self._job_queue.popleft() if self._job_queue else None
                 if package is not None:
-                    cycle_ex = self._assert_there_are_no_cycles(package)
-                    if cycle_ex is None:
+                    assert_success = self._assert_there_are_no_cycles(package)
+                    if assert_success:
                         future = thread_executor.submit(self._operate_on_next_job, package, self._notifications)
                         futures.append((package, future))
-                    else:
-                        self._add_unhandled_exception(cycle_ex, package=package, ctx='cycle-assert-failed')
-                        if package.parent is not None:
-                            self._record_job_failed(package, cycle_ex)
 
                 self._handle_notifications()
                 futures = self._remove_done_futures(futures)
@@ -207,8 +203,8 @@ class JobSystem(JobContext):
         while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
             package = self._job_queue.popleft() if self._job_queue else None
             if package is not None:
-                cycle_ex = self._assert_there_are_no_cycles(package)
-                if cycle_ex is None:
+                assert_success = self._assert_there_are_no_cycles(package)
+                if assert_success:
                     try:
                         self._operate_on_next_job(package, self._notifications)
                     except Exception as e:
@@ -216,10 +212,6 @@ class JobSystem(JobContext):
                         self._handle_raised_exception(package, e)
                     else:
                         self._handle_notifications()
-                else:
-                    self._add_unhandled_exception(cycle_ex, package=package, ctx='cycle-assert-failed')
-                    if package.parent is not None:
-                        self._record_job_failed(package, cycle_ex)
 
             self._record_work_in_progress()
             self._check_clock()
@@ -387,7 +379,7 @@ class JobSystem(JobContext):
 
     def _assert_there_are_no_cycles(self, package: '_JobPackage') -> Optional['CycleDetectedException']:
         parent_package = package.parent
-        if parent_package is None: return None
+        if parent_package is None: return True
 
         seen: Dict[int, int] = dict()
         current: Optional[_JobPackage] = parent_package
@@ -395,12 +387,16 @@ class JobSystem(JobContext):
         while current is not None:
             seen_value = seen.get(current.job.type_id, 0)
             if seen_value >= self._max_cycle:
-                return CycleDetectedException(f'Can not use Job because it introduced a cycle of length "{seen_value}".')
+                ex = CycleDetectedException(f'Can not use Job because it introduced a cycle of length "{seen_value}".')
+                self._add_unhandled_exception(ex, package=package, ctx='assert-there-are-no-cycles')
+                if package.parent is not None:
+                    self._record_job_failed(package, ex)
+                return False
 
             seen[current.job.type_id] = seen_value + 1
             current = current.parent
         
-        return None
+        return True
 
     @contextmanager
     def _temporary_signal_handlers(self):
