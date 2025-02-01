@@ -188,6 +188,8 @@ class JobSystem(JobContext):
                         futures.append((package, future))
                     else:
                         self._add_unhandled_exception(cycle_ex, package=package, ctx='cycle-assert-failed')
+                        if package.parent is not None:
+                            self._record_job_failed(package, cycle_ex)
 
                 self._handle_notifications()
                 futures = self._remove_done_futures(futures)
@@ -210,11 +212,14 @@ class JobSystem(JobContext):
                     try:
                         self._operate_on_next_job(package, self._notifications)
                     except Exception as e:
+                        self._handle_notifications()
                         self._handle_raised_exception(package, e)
-
-                    self._handle_notifications()
+                    else:
+                        self._handle_notifications()
                 else:
                     self._add_unhandled_exception(cycle_ex, package=package, ctx='cycle-assert-failed')
+                    if package.parent is not None:
+                        self._record_job_failed(package, cycle_ex)
 
             self._record_work_in_progress()
             self._check_clock()
@@ -238,18 +243,18 @@ class JobSystem(JobContext):
             package.next_jobs = jobs
             notifications.put((_JobState.JOB_COMPLETED, package, None))
 
-    def _retry_package(self, package: '_JobPackage') -> bool:
+    def _retry_package(self, package: '_JobPackage') -> Optional['Job']:
         if self._are_jobs_cancelled:
-            return False
+            return None
 
         retry_job = package.job.retry_job()
         if package.tries >= self._max_tries or retry_job is None:
-            return False
+            return None
 
         worker = self._workers.get(retry_job.type_id, None)
         if worker is None:
             self._add_unhandled_exception(CantPushJobs('Retry failed because there no worker is registered for the job.'), ctx='retry-package', package=package, sub_job=('retry', retry_job))
-            return False
+            return None
 
         retry_package = _JobPackage(
             job=retry_job,
@@ -263,7 +268,7 @@ class JobSystem(JobContext):
         else:
             self._job_queue.append(retry_package)
 
-        return True
+        return retry_job
 
     def _handle_notifications(self) -> None:
         while True:
@@ -274,8 +279,9 @@ class JobSystem(JobContext):
 
             status, package, error = notification
             if error is not None:
-                if self._retry_package(package):
-                    self._record_job_retried(package, error.child)
+                retry_job =  self._retry_package(package)
+                if retry_job is not None:
+                    self._record_job_retried(package, retry_job, error.child)
                 else:
                     self._record_job_failed(package, error.child)
             elif status == _JobState.JOB_COMPLETED:
@@ -325,8 +331,9 @@ class JobSystem(JobContext):
             return
 
         e = _wrap_unknown_base_error(e)
-        if self._retry_package(package):
-            self._record_job_retried(package, e)
+        retry_job =  self._retry_package(package)
+        if retry_job is not None:
+            self._record_job_retried(package, retry_job, e)
         else:
             self._record_job_failed(package, e)
 
@@ -429,9 +436,9 @@ class JobSystem(JobContext):
         self._update_timeout_clock()
         self._try_report('report-completed', self._reporter_for_package(package).notify_job_completed, package.job, next_jobs)
 
-    def _record_job_retried(self, package: '_JobPackage', e: Exception) -> None:
+    def _record_job_retried(self, package: '_JobPackage', retry_job: 'Job', e: Exception) -> None:
         self._update_timeout_clock()
-        self._try_report('report-retried', self._reporter_for_package(package).notify_job_retried, package.job, e)
+        self._try_report('report-retried', self._reporter_for_package(package).notify_job_retried, package.job, retry_job, e)
 
     def _record_job_failed(self, package: '_JobPackage', e: Exception) -> None:
         self._pending_jobs_amount -= 1
@@ -516,7 +523,7 @@ class ProgressReporter(Protocol):
     def notify_job_failed(self, job: Job, exception: Exception) -> None:
         """Called when a job fails. Must not throw exceptions."""
 
-    def notify_job_retried(self, job: Job, exception: Exception) -> None:
+    def notify_job_retried(self, job: Job, retry_job: Job, exception: Exception) -> None:
         """Called when a job is retried. Must not throw exceptions."""
 
 
