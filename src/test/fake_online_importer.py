@@ -25,7 +25,7 @@ from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.interruptions import Interruptions
-from downloader.job_system import JobSystem
+from downloader.job_system import JobFailPolicy, JobSystem
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
 from downloader.jobs.worker_context import make_downloader_worker_context
@@ -83,7 +83,7 @@ class OnlineImporter(ProductionOnlineImporter):
         http_gateway = FakeHttpGateway(self._config, network_state or NetworkState())
         self._file_download_reporter = FileDownloadProgressReporter(logger, waiter, Interruptions(fs=file_system_factory, gw=http_gateway), installation_report)
         self._report_tracker = ProgressReporterTracker(self._file_download_reporter)
-        self._job_system = JobSystem(self._report_tracker, logger=logger, max_threads=1, retry_unexpected_exceptions=False, max_timeout=1)
+        self._job_system = JobSystem(self._report_tracker, logger=logger, max_threads=1, fail_policy=JobFailPolicy.FAIL_FAST, max_timeout=1)
         external_drives_repository = ExternalDrivesRepository(file_system=self.file_system)
         self._worker_ctx = make_downloader_worker_context(
             job_ctx=self._job_system,

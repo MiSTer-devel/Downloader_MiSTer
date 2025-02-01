@@ -19,7 +19,7 @@
 import unittest
 from functools import reduce
 
-from downloader.job_system import Job, JobSystem, Worker, CycleDetectedException, ProgressReporter, CantPushJobs, \
+from downloader.job_system import Job, JobFailPolicy, JobSystem, Worker, CycleDetectedException, ProgressReporter, CantPushJobs, \
     CantRegisterWorkerException, CantExecuteJobs, CantWaitWhenNotExecutingJobs, WorkerResult
 import logging
 from typing import Dict, Optional, List
@@ -29,11 +29,11 @@ from downloader.logger import NoLogger
 
 class TestSingleThreadJobSystem(unittest.TestCase):
 
-    def sut(self, reporter: ProgressReporter) -> JobSystem: return JobSystem(reporter, logger=NoLogger(), max_threads=1)
+    def sut(self, fail: JobFailPolicy = JobFailPolicy.FAIL_GRACEFULLY) -> JobSystem: return JobSystem(self.reporter, logger=NoLogger(), max_threads=1, fail_policy=fail)
 
     def setUp(self):
         self.reporter = TestProgressReporter()
-        self.system = self.sut(reporter=self.reporter)
+        self.system = self.sut()
 
     def test_execute_jobs___reports_completed_jobs(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -71,7 +71,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
             self.system.execute_jobs()
 
         self.assertIsInstance(context.exception, CantPushJobs)
-        self.assertReports(started={1: 1}, completed={1: 1})
+        self.assertReports(started={1: 1}, completed={1: 1}, errors=1)
 
     def test_cycle_detection___throws(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -83,7 +83,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
             self.system.execute_jobs()
 
         self.assertIsInstance(context.exception, CycleDetectedException)
-        self.assertReports(completed={1: 4, 2: 3}, pending=1)
+        self.assertReports(completed={1: 4, 2: 3}, pending=1, errors=1)
 
     def test_cycle_detection___just_below_the_max_cycle_limit___doesnt_throw(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -103,7 +103,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
             self.system.execute_jobs()
 
         self.assertIsInstance(context.exception, CantRegisterWorkerException)
-        self.assertReports(started={1: 1}, failed={1: 1})
+        self.assertReports(started={1: 1}, failed={1: 1}, errors=1)
 
     def test_retries___when_job_retries_itself___reports_completed_jobs_and_retries(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -117,17 +117,20 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         self.system.execute_jobs()
         self.assertReports(started={1: 4}, retried={1: 3}, failed={1: 1})
 
-    def test_failed___when_job_raises_exception___and_throws_when_system_is_not_retrying_unexpected_exceptions(self):
-        self.system.register_worker(1, TestWorker(self.system))
-        self.system.push_job(TestJob(1, raises_unexpected_exception=True))
-        self.system.execute_jobs()
-        self.assertReports(started={1: 4}, retried={1: 3}, failed={1: 1})
+    def test_failed___when_job_raises_exception_and_system_is_fault_tolerant___and_throws_when_system_has_fail_fast_policy_instead(self):
+        def prepare():
+            self.system.register_worker(1, TestWorker(self.system))
+            self.system.push_job(TestJob(1, raises_unexpected_exception=True))
 
-        system = JobSystem(self.reporter, logger=NoLogger(), max_threads=1, retry_unexpected_exceptions=False)
-        system.register_worker(1, TestWorker(system))
-        system.push_job(TestJob(1, raises_unexpected_exception=True))
+        self.system = self.sut(fail=JobFailPolicy.FAULT_TOLERANT)
+        prepare()
+        self.system.execute_jobs()
+        self.assertReports(started={1: 4}, retried={1: 3}, failed={1: 1}, errors=4)
+
+        self.system = self.sut(fail=JobFailPolicy.FAIL_FAST)
+        prepare()
         with self.assertRaises(Exception) as context:
-            system.execute_jobs()
+            self.system.execute_jobs()
 
         self.assertIsInstance(context.exception, Exception)
 
@@ -174,43 +177,32 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
     def test_throwing_reporter_during_retries___does_not_incur_in_infinite_loop(self):
         class TestThrowingReporter(TestProgressReporter):
-            def notify_job_retried(self, job: Job, exception: BaseException):
+            def notify_job_retried(self, _job: Job, _exception: BaseException):
                 raise Exception('Houston, we have a problem.')
 
-        reporter = TestThrowingReporter()
-        system = self.sut(reporter=reporter)
-        system.register_worker(1, TestWorker(system))
-        system.push_job(TestJob(1, fails=3))
+        self.reporter = TestThrowingReporter()
+        self.system = self.sut(fail=JobFailPolicy.FAULT_TOLERANT)
+
+        self.system.register_worker(1, TestWorker(self.system))
+        self.system.push_job(TestJob(1, fails=3))
 
         logging.getLogger().setLevel(logging.CRITICAL + 1)
-        system.execute_jobs()
+        self.system.execute_jobs()
         logging.getLogger().setLevel(logging.NOTSET)
 
-        self.assertEqual({1: 1}, reporter.completed_jobs)
-        self.assertEqual({1: 4}, reporter.started_jobs)
-        self.assertEqual({1: 3}, reporter.in_progress_jobs)
-        self.assertEqual({}, reporter.retried_jobs)
-        self.assertEqual({}, reporter.failed_jobs)
-        self.assertEqual(0, system.pending_jobs_amount())
+        self.assertReports(completed={1: 1}, started={1: 4}, errors=3)
 
     def test_execute_jobs_with_just_1_thread___reports_completed_jobs(self):
-        reporter = TestProgressReporter()
-        system = self.sut(reporter=reporter)
-        system.register_worker(1, TestWorker(system))
+        self.system.register_worker(1, TestWorker(self.system))
 
-        system.push_job(TestJob(1))
-        system.push_job(TestJob(1))
-        system.push_job(TestJob(1))
+        self.system.push_job(TestJob(1))
+        self.system.push_job(TestJob(1))
+        self.system.push_job(TestJob(1))
 
-        self.assertEqual(system.pending_jobs_amount(), 3)
-        system.execute_jobs()
+        self.assertEqual(self.system.pending_jobs_amount(), 3)
+        self.system.execute_jobs()
 
-        self.assertEqual({1: 3}, reporter.completed_jobs)
-        self.assertEqual({1: 3}, reporter.started_jobs)
-        self.assertEqual({}, reporter.in_progress_jobs)
-        self.assertEqual({}, reporter.retried_jobs)
-        self.assertEqual({}, reporter.failed_jobs)
-        self.assertEqual(0, system.pending_jobs_amount())
+        self.assertReports(completed={1: 3}, started={1: 3})
 
     def test_execute_jobs_within_worker___throws(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -248,7 +240,17 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         self.assertTrue(job.has_tag('a'))
         self.assertFalse(job.has_tag('b'))
 
-    def assertReports(self, completed: Optional[Dict[int, int]] = None, started: Optional[Dict[int, int]] = None, in_progress: Optional[Dict[int, int]] = None, failed: Optional[Dict[int, int]] = None, retried: Optional[Dict[int, int]] = None, cancelled: Optional[Dict[int, int]] = None, pending: int = 0, timed_out: bool = False):
+    def assertReports(self,
+        completed: Optional[Dict[int, int]] = None,
+        started: Optional[Dict[int, int]] = None,
+        in_progress: Optional[Dict[int, int]] = None,
+        failed: Optional[Dict[int, int]] = None,
+        retried: Optional[Dict[int, int]] = None,
+        cancelled: Optional[Dict[int, int]] = None,
+        pending: int = 0,
+        timed_out: bool = False,
+        errors: int = 0,
+    ):
         self.assertEqual({
             'started_jobs': started or completed or {},
             'completed_jobs':completed or {},
@@ -256,7 +258,8 @@ class TestSingleThreadJobSystem(unittest.TestCase):
             'retried_jobs': retried or {},
             'cancelled_jobs': cancelled or {},
             'pending_jobs_amount': pending,
-            'timed_out': timed_out
+            'timed_out': timed_out,
+            'errors': errors
         }, {
             'started_jobs': self.reporter.started_jobs,
             'completed_jobs': self.reporter.completed_jobs,
@@ -264,7 +267,8 @@ class TestSingleThreadJobSystem(unittest.TestCase):
             'retried_jobs': self.reporter.retried_jobs,
             'cancelled_jobs': self.reporter.cancelled_jobs,
             'pending_jobs_amount': self.system.pending_jobs_amount(),
-            'timed_out': self.system.timed_out()
+            'timed_out': self.system.timed_out(),
+            'errors': len(self.system.get_unhandled_exceptions())
         })
 
 

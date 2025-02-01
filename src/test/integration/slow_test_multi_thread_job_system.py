@@ -20,7 +20,7 @@ import time
 import unittest
 from functools import reduce
 from typing import Dict, Optional
-from downloader.job_system import JobSystem, ProgressReporter, Worker, Job, CycleDetectedException
+from downloader.job_system import JobFailPolicy, JobSystem, ProgressReporter, Worker, Job, CycleDetectedException
 from downloader.logger import NoLogger
 from test.unit.test_single_thread_job_system import TestSingleThreadJobSystem, TestJob, TestWorker
 
@@ -28,7 +28,7 @@ from test.unit.test_single_thread_job_system import TestSingleThreadJobSystem, T
 class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
 
     def test_base_provides_tests(self): self.assertGreater(len([m for m in dir(self) if m.startswith('test_')]), 5)
-    def sut(self, reporter: ProgressReporter) -> JobSystem: return JobSystem(reporter, logger=NoLogger(), max_threads=20)
+    def sut(self, fail: JobFailPolicy = JobFailPolicy.FAIL_GRACEFULLY)  -> JobSystem: return JobSystem(self.reporter, logger=NoLogger(), max_threads=20, fail_policy=fail)
 
     def test_cancel_pending_jobs___when_there_are_many_jobs_produced___jobs_in_progress_will_fail_and_no_more_will_start(self):
         self.system = JobSystem(self.reporter, logger=NoLogger(), max_threads=3, max_cycle=100)
@@ -52,7 +52,17 @@ class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
         self.assertReports(started={1: 1}, completed={1: 1}, timed_out=True)
 
 
-    def assertReports(self, completed: Optional[Dict[int, int]] = None, started: Optional[Dict[int, int]] = None, in_progress: Optional[Dict[int, int]] = None, failed: Optional[Dict[int, int]] = None, retried: Optional[Dict[int, int]] = None, cancelled: Optional[Dict[int, int]] = None, pending: int = 0, timed_out: bool = False):
+    def assertReports(self,
+        completed: Optional[Dict[int, int]] = None,
+        started: Optional[Dict[int, int]] = None,
+        in_progress: Optional[Dict[int, int]] = None,
+        failed: Optional[Dict[int, int]] = None,
+        retried: Optional[Dict[int, int]] = None,
+        cancelled: Optional[Dict[int, int]] = None,
+        pending: int = 0,
+        timed_out: bool = False,
+        errors: int = 0
+    ):
         expected = {
             'completed_jobs': completed or {},
             'started_jobs': started or completed or {},
@@ -61,7 +71,8 @@ class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
             'retried_jobs': retried or {},
             'cancelled_jobs': cancelled or {},
             'pending_jobs_amount': pending,
-            'timed_out': timed_out
+            'timed_out': timed_out,
+            'errors': errors
         }
         actual = {
             'completed_jobs': self.reporter.completed_jobs,
@@ -71,7 +82,8 @@ class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
             'retried_jobs': self.reporter.retried_jobs,
             'cancelled_jobs': self.reporter.cancelled_jobs,
             'pending_jobs_amount': self.system.pending_jobs_amount(),
-            'timed_out': self.system.timed_out()
+            'timed_out': self.system.timed_out(),
+            'errors': len(self.system.get_unhandled_exceptions())
         }
         if expected['in_progress_jobs'] is None:
             del expected['in_progress_jobs']
