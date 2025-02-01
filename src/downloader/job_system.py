@@ -169,28 +169,27 @@ class JobSystem(JobContext):
         return None
 
     def _execute_with_threads(self, max_threads: int) -> None:
-        with self._temporary_signal_handlers():
-            with ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
-                futures = []
-                while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
-                    package = self._job_queue.popleft() if self._job_queue else None
-                    if package is not None:
-                        self._assert_there_are_no_cycles(package)
-                        if not self._unhandled_errors:
-                            future = thread_executor.submit(self._operate_on_next_job, package, self._notifications)
-                            futures.append((package, future))
+        with self._temporary_signal_handlers(), ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
+            futures = []
+            while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
+                package = self._job_queue.popleft() if self._job_queue else None
+                if package is not None:
+                    self._assert_there_are_no_cycles(package)
+                    if not self._unhandled_errors:
+                        future = thread_executor.submit(self._operate_on_next_job, package, self._notifications)
+                        futures.append((package, future))
 
-                    self._handle_notifications()
-                    futures = self._remove_done_futures(futures)
-                    self._record_work_in_progress()
-                    self._check_clock()
-                    sys.stdout.flush()
-                    if self._unhandled_errors:
-                        self._are_jobs_cancelled = True
+                self._handle_notifications()
+                futures = self._remove_done_futures(futures)
+                self._record_work_in_progress()
+                self._check_clock()
+                sys.stdout.flush()
+                if self._unhandled_errors:
+                    self._are_jobs_cancelled = True
 
-                if self._are_jobs_cancelled:
-                    self._record_jobs_cancelled([])
-                    self._cancel_futures(futures)
+            if self._are_jobs_cancelled:
+                self._record_jobs_cancelled([])
+                self._cancel_futures(futures)
 
     def _execute_without_threads(self, just_one_tick: bool = False) -> None:
         while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
