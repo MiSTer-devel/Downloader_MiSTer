@@ -159,7 +159,7 @@ class JobSystem(JobContext):
             worker=worker,
             tries=0 if parent_package is None else parent_package.tries,
             parent=parent_package,
-            next_jobs=None
+            next_jobs=[]
         )
         if job.priority:
             self._job_queue.appendleft(package)
@@ -266,13 +266,12 @@ class JobSystem(JobContext):
             elif status == _JobState.JOB_COMPLETED:
                 next_jobs = []
                 if not self._are_jobs_cancelled:
-                    norm_next_jobs = _normalize_jobs(package.next_jobs)
-                    for child_job in norm_next_jobs:
-                        error = self._internal_push_job(child_job, parent_package=package)
-                        if error is None:
+                    for child_job in package.next_jobs:
+                        ex = self._internal_push_job(child_job, parent_package=package)
+                        if ex is None:
                             next_jobs.append(child_job)
                         else:
-                            self._unhandled_errors.append(error)
+                            self._unhandled_errors.append(ex)
 
                 self._record_job_completed(package, next_jobs)
             elif status == _JobState.JOB_STARTED:
@@ -439,27 +438,27 @@ class Job(ABC):
     def retry_job(self) -> Optional['Job']:
         return self
 
-    def add_tag(self, tag: str) -> 'Job':
+    def add_tag(self, tag: Union[str, int]) -> 'Job':
         tags = getattr(self, '_tags', None)
         if tags is None:
             self._tags = set()
         self._tags.add(tag)
         return self
 
-    def has_tag(self, tag: str) -> bool:
+    def has_tag(self, tag: Union[str, int]) -> bool:
         tags = getattr(self, '_tags', None)
         if tags is None: return False
         return tag in tags
 
     @property
-    def tags(self) -> Iterable[str]:
+    def tags(self) -> Iterable[Union[str, int]]:
         return getattr(self, '_tags', set())
 
     @property
     def priority(self): return False
 
 
-WorkerResult = Tuple[Union[List[Job], Optional[Job]], Optional[Exception]]
+WorkerResult = Tuple[List[Job], Optional[Exception]]
 
 
 class Worker(ABC):
@@ -484,7 +483,7 @@ class ProgressReporter(Protocol):
         """Called after each loop."""
 
     def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
-        """Called when all pending jobs are cancelled."""
+        """Called when pending jobs are cancelled. System must interrupt all ongoing activities."""
 
     def notify_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
         """Called when a job is completed. Must not throw exceptions."""
@@ -521,19 +520,11 @@ class _JobPackage:
     job: Job
     worker: Worker
     tries: int
-    next_jobs: Union[Optional[Job], List[Job]]
+    next_jobs: List[Job]
     parent: Optional['_JobPackage']
 
     # Consider removing __str__ at least in non-debug environments
     def __str__(self): return f'JobPackage(job_type_id={self.job.type_id}, job_class={self.job.__class__.__name__}, tries={self.tries})'
-
-def _normalize_jobs(jobs: Optional[Union[Job, List[Job]]]) -> List[Job]:
-    if jobs is None:
-        return []
-    elif isinstance(jobs, Job):
-        return [jobs]
-    else:
-        return jobs
 
 class _JobError(Exception):
     def __init__(self, child: Exception):

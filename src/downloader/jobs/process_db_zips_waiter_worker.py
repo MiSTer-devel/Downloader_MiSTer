@@ -59,7 +59,7 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
             for zip_job in zip_jobs:
                 if isinstance(zip_job, ProcessZipJob):
                     if zip_job.not_enough_space:
-                        return None, None
+                        return [], None
 
                     index.merge_zip_index(zip_job.zip_index)
 
@@ -71,4 +71,4 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
             store=job.store,
             full_resync=job.full_resync,
         )
-        return resulting_job, None
+        return [resulting_job], None

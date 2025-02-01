@@ -95,7 +95,7 @@ class SlowWorker(Worker):
         if job.wait > 0: time.sleep(job.wait)
         if job.counter > job.iterations:
             self.system.cancel_pending_jobs()
-        return TimedJob(job.iterations, counter=job.counter + 1), None
+        return [TimedJob(job.iterations, counter=job.counter + 1)], None
 
 
 if __name__ == '__main__':

@@ -30,9 +30,9 @@ class CopyFileWorker(DownloaderWorkerBase):
     def operate_on(self, job: CopyFileJob) -> WorkerResult:  # type: ignore[override]
         error = self._copy_file(source=job.source, temp_path=job.temp_path, info=job.info)
         if error is not None:
-            return None, error
+            return [], error
 
-        return job.after_job, None
+        return [] if job.after_job is None else [job.after_job], None
 
     def _copy_file(self, source: str, temp_path: str, info: str) -> Optional[FileCopyError]:
         try:
