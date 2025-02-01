@@ -71,14 +71,14 @@ class ProcessDbWorker(DownloaderWorkerBase):
 
             return zip_jobs, None
         else:
-            return ProcessIndexJob(
+            return [ProcessIndexJob(
                 db=job.db,
                 ini_description=job.ini_description,
                 config=config,
                 index=Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url),
                 store=job.store,
                 full_resync=job.full_resync,
-            ), None
+            )], None
 
 
 def build_db_config(input_config: Config, db: DbEntity, ini_description: Dict[str, Any]) -> Config:
