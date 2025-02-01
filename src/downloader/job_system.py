@@ -90,21 +90,22 @@ class JobSystem(JobContext):
 
         self._signals = signals
 
-    def register_worker(self, job_id: int, worker: 'Worker') -> None:
-        self.register_workers({job_id: worker})
-
     def register_workers(self, workers: Dict[int, 'Worker']) -> None:
         with self._lock:
             if self._is_executing_jobs: raise CantRegisterWorkerException('Can not register workers while executing jobs')
 
             self._workers.update(workers)
 
-    def push_job(self, job: 'Job') -> None:
+    def push_jobs(self, jobs: List['Job']) -> None:
         with self._lock:
             if self._is_executing_jobs: raise CantPushJobs('Can not push more jobs while executing jobs')
 
-        error = self._internal_push_job(job, parent_package=None)
-        if error is not None: raise error
+        for job in jobs:
+            error = self._internal_push_job(job, parent_package=None)
+            if error is not None: raise error
+
+    def register_worker(self, job_id: int, worker: 'Worker') -> None: self.register_workers({job_id: worker})
+    def push_job(self, job: 'Job') -> None: self.push_jobs([job])
 
     def execute_jobs(self) -> None:
         """This function executes all the jobs with the registered workers. It must be used in the MAIN THREAD."""
