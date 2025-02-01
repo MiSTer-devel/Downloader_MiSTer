@@ -16,13 +16,14 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+import logging
 import time
 import unittest
 from functools import reduce
 from typing import Dict, Optional
 from downloader.job_system import JobFailPolicy, JobSystem, ProgressReporter, Worker, Job, CycleDetectedException
 from downloader.logger import NoLogger
-from test.unit.test_single_thread_job_system import TestSingleThreadJobSystem, TestJob, TestWorker
+from test.unit.test_single_thread_job_system import TestProgressReporter, TestSingleThreadJobSystem, TestJob, TestWorker
 
 
 class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
@@ -51,6 +52,22 @@ class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
 
         self.assertReports(started={1: 1}, completed={1: 1}, timed_out=True)
 
+    def test_throwing_reporter_during_retries___does_not_incur_in_infinite_loop2(self):
+        class TestThrowingReporter(TestProgressReporter):
+            def notify_job_retried(self, _job: Job, _retry_job: Job, _exception: BaseException):
+                raise Exception('Houston, we have a problem.')
+
+        self.reporter = TestThrowingReporter()
+        self.system = self.sut(fail=JobFailPolicy.FAULT_TOLERANT)
+
+        self.system.register_worker(1, TestWorker(self.system))
+        self.system.push_job(TestJob(1, fails=3))
+
+        logging.getLogger().setLevel(logging.CRITICAL + 1)
+        self.system.execute_jobs()
+        logging.getLogger().setLevel(logging.NOTSET)
+
+        self.assertReports(completed={1: 1}, started={1: 4}, errors=3)
 
     def assertReports(self,
         completed: Optional[Dict[int, int]] = None,
@@ -63,32 +80,27 @@ class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
         timed_out: bool = False,
         errors: int = 0
     ):
-        expected = {
+        self.assertEqual({
             'completed_jobs': completed or {},
             'started_jobs': started or completed or {},
-            'in_progress_jobs': in_progress,
+            'in_progress_jobs': in_progress or {},
             'failed_jobs': failed or {},
             'retried_jobs': retried or {},
             'cancelled_jobs': cancelled or {},
             'pending_jobs_amount': pending,
             'timed_out': timed_out,
             'errors': errors
-        }
-        actual = {
+        }, {
             'completed_jobs': self.reporter.completed_jobs,
             'started_jobs': self.reporter.started_jobs,
-            'in_progress_jobs': self.reporter.in_progress_jobs,
+            'in_progress_jobs': {k: len(v) for k, v in self.reporter.in_progress_jobs.items()},
             'failed_jobs': self.reporter.failed_jobs,
             'retried_jobs': self.reporter.retried_jobs,
             'cancelled_jobs': self.reporter.cancelled_jobs,
             'pending_jobs_amount': self.system.pending_jobs_amount(),
             'timed_out': self.system.timed_out(),
             'errors': len(self.system.get_unhandled_exceptions())
-        }
-        if expected['in_progress_jobs'] is None:
-            del expected['in_progress_jobs']
-            del actual['in_progress_jobs']
-        self.assertEqual(expected, actual)
+        })
 
 
 class TimedJob(Job):

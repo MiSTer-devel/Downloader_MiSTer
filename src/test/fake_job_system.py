@@ -52,6 +52,6 @@ class ProgressReporterTracker(ProgressReporter):
         self.tracks["job_failed"].append((job.__class__.__name__, copy.deepcopy(job.__dict__), exception))
         self._reporter.notify_job_failed(job, exception)
 
-    def notify_job_retried(self, job: Job, exception: Exception) -> None:
+    def notify_job_retried(self, job: Job, retry_job: Job, exception: Exception) -> None:
         self.tracks["job_retried"].append((job.__class__.__name__, copy.deepcopy(job.__dict__), exception))
-        self._reporter.notify_job_retried(job, exception)
+        self._reporter.notify_job_retried(job, retry_job, exception)

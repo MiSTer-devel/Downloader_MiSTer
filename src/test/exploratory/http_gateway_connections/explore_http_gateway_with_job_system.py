@@ -92,7 +92,7 @@ class Reporter(ProgressReporter):
         self._cancelled = False
 
     def notify_work_in_progress(self) -> None: pass
-    def notify_job_retried(self, job: Job, exception: Exception) -> None: pass
+    def notify_job_retried(self, job: Job, retry_job: Job, exception: Exception) -> None: pass
     def notify_job_started(self, job: Job) -> None: pass
 
     completed: List[FetchFileJob2] = []

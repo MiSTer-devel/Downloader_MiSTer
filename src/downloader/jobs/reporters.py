@@ -70,7 +70,7 @@ class DownloaderProgressReporter(ProgressReporter):
         self._failed_jobs.append(job)
         self._logger.debug(exception)
 
-    def notify_job_retried(self, job: Job, exception: BaseException):
+    def notify_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
         pass
 
 
@@ -125,9 +125,6 @@ class _WithLock(Generic[T]):
         self.lock.release()
 
 
-CHILD_TAG: Final[int] = 1
-
-
 # @TODO: Want to remove almost all locks in the report altogether, workers should add intermediate results to the jobs
 #  instead, only exception is tags as workers want to query that in runtime in some scenarios.
 class InstallationReportImpl(InstallationReport):
@@ -155,58 +152,86 @@ class InstallationReportImpl(InstallationReport):
         self._jobs_failed = _WithLock[Dict[int, List[Tuple[Job, BaseException]]]](defaultdict(list), lock)
         self._jobs_retried = _WithLock[Dict[int, List[Tuple[Job, BaseException]]]](defaultdict(list), lock)
         job_tag_lock = threading.Lock()
-        self._jobs_tag_in_progress = _WithLock[Dict[Union[str, int], int]](defaultdict(lambda: 0), job_tag_lock)
+        self._jobs_tag_in_progress = _WithLock[Dict[Union[str, int], Set[int]]](defaultdict(set), job_tag_lock)
         self._jobs_tag_completed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
         self._jobs_tag_failed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
 
+        self._jobs_initiated = _WithLock[Set[int]](set(), job_tag_lock)  # Needs job_tag_lock because they are used for _jobs_tag_in_progress
+        self._jobs_ended = _WithLock[Set[int]](set(), job_tag_lock)  # Needs job_tag_lock because they are used for _jobs_tag_in_progress
+
     def add_job_started(self, job: Job):
         with self._jobs_started as jobs_started: jobs_started[job.type_id].append(job)
-        if job.has_tag(CHILD_TAG): return
-        with self._jobs_tag_in_progress as in_progress:
-            for tag in job.tags:
-                in_progress[tag] += 1
+        with self._jobs_tag_in_progress.lock: self._unsafe_add_job_in_progress(job)
 
     def add_jobs_cancelled(self, jobs: List[Job]) -> None:
         with self._jobs_cancelled as jobs_cancelled:
             for job in jobs:
                 jobs_cancelled[job.type_id].append(job)
-        with self._jobs_tag_in_progress as in_progress:
+        
+        with self._jobs_tag_in_progress.lock:
             for job in jobs:
-                for tag in job.tags:
-                    in_progress[tag] -= 1
+                self._unsafe_remove_job_in_progress(job)
 
     def add_job_completed(self, job: Job, next_jobs: List[Job]):
         with self._jobs_completed as jobs_completed: jobs_completed[job.type_id].append(job)
         with self._jobs_tag_in_progress.lock:
             for c_job in next_jobs:
-                for c_tag in c_job.tags:
-                    self._jobs_tag_in_progress.data[c_tag] += 1
-                c_job.add_tag(CHILD_TAG)
+                self._unsafe_add_job_in_progress(c_job)
+            self._unsafe_remove_job_in_progress(job)
             for tag in job.tags:
-                self._jobs_tag_in_progress.data[tag] -= 1
                 self._jobs_tag_completed.data[tag].append(job)
+
     def add_job_failed(self, job: Job, exception: BaseException):
         with self._jobs_failed as jobs_failed: jobs_failed[job.type_id].append((job, exception))
         with self._jobs_tag_in_progress.lock:
+            self._unsafe_remove_job_in_progress(job)
             for tag in job.tags:
-                self._jobs_tag_in_progress.data[tag] -= 1
                 self._jobs_tag_failed.data[tag].append(job)
-    def add_job_retried(self, job: Job, exception: BaseException):
+
+    def add_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
         with self._jobs_retried as jobs_retried: jobs_retried[job.type_id].append((job, exception))
+        if job != retry_job:
+            with self._jobs_tag_in_progress.lock:
+                self._unsafe_add_job_in_progress(retry_job)
+                self._unsafe_remove_job_in_progress(job)
+
+    def any_in_progress_job_with_tags(self, tags: List[str]) -> bool:
+        if len(tags) == 0: return False
+        with self._jobs_tag_in_progress as in_progress:
+            for tag in tags:
+                if len(in_progress[tag]) > 0: return True
+        return False
+
+    def _unsafe_add_job_in_progress(self, job: Job):  # Needs to be called with lock
+        job_id = id(job)
+        if job_id not in self._jobs_initiated.data:
+            self._jobs_initiated.data.add(job_id)
+        if job_id in self._jobs_ended.data:
+            return
+        
+        for tag in job.tags:
+            self._jobs_tag_in_progress.data[tag].add(job_id)
+
+    def _unsafe_remove_job_in_progress(self, job: Job):  # Needs to be called with lock
+        job_id = id(job)
+        if job_id not in self._jobs_ended.data:
+            self._jobs_ended.data.add(job_id)
+        if job_id not in self._jobs_initiated.data:
+            return
+
+        for tag in job.tags:
+            self._jobs_tag_in_progress.data[tag].remove(job_id)
+
     def get_jobs_completed_by_tags(self, tags: List[str]) -> List[Tuple[str, List[Job]]]:
         if len(tags) == 0: return []
         with self._jobs_tag_completed as tag_completed:
             return [(tag, tag_completed[tag]) for tag in tags if tag in tag_completed]
+
     def get_jobs_failed_by_tags(self, tags: List[str]) -> List[Tuple[str, List[Job]]]:
         if len(tags) == 0: return []
         with self._jobs_tag_failed as tag_failed:
             return [(tag, tag_failed[tag]) for tag in tags if tag in tag_failed]
-    def any_in_progress_job_with_tags(self, tags: List[str]) -> bool:
-        if len(tags) == 0: return False
-        with self._jobs_tag_in_progress as tag_in_progress:
-            for tag in tags:
-                if tag_in_progress[tag] > 0: return True
-        return False
+
     def add_downloaded_file(self, path: str):
         with self._downloaded_files as downloaded_files: downloaded_files.append(path)
     def add_downloaded_files(self, files: List[PathPackage]):
@@ -518,8 +543,8 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             self._report.add_failed_file(path)
         self._handle_job_error(job, exception)
 
-    def notify_job_retried(self, job: Job, exception: BaseException):
-        self._report.add_job_retried(job, exception)
+    def notify_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
+        self._report.add_job_retried(job, retry_job, exception)
         self._handle_job_error(job, exception)
 
     def _handle_job_error(self, job: Job, exception: BaseException):

@@ -16,12 +16,12 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from collections import defaultdict
 import unittest
 from functools import reduce
 
 from downloader.job_system import Job, JobFailPolicy, JobSystem, Worker, CycleDetectedException, ProgressReporter, CantPushJobs, \
     CantRegisterWorkerException, CantExecuteJobs, CantWaitWhenNotExecutingJobs, WorkerResult
-import logging
 from typing import Dict, Optional, List
 
 from downloader.logger import NoLogger
@@ -83,7 +83,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
             self.system.execute_jobs()
 
         self.assertIsInstance(context.exception, CycleDetectedException)
-        self.assertReports(completed={1: 4, 2: 3}, pending=1, errors=1)
+        self.assertReports(completed={1: 4, 2: 3}, failed={2: 1}, errors=1)
 
     def test_cycle_detection___just_below_the_max_cycle_limit___doesnt_throw(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -117,17 +117,17 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         self.system.execute_jobs()
         self.assertReports(started={1: 4}, retried={1: 3}, failed={1: 1})
 
-    def test_failed___when_job_raises_exception_and_system_is_fault_tolerant___and_throws_when_system_has_fail_fast_policy_instead(self):
+    def test_failed___when_job_raises_exception_and_system_is_fault_tolerant___and_throws_when_system_has_fail_gracefully_policy_instead(self):
         def prepare():
             self.system.register_worker(1, TestWorker(self.system))
-            self.system.push_job(TestJob(1, raises_unexpected_exception=True))
+            self.system.push_job(TestJob(1, raises=True))
 
         self.system = self.sut(fail=JobFailPolicy.FAULT_TOLERANT)
         prepare()
         self.system.execute_jobs()
         self.assertReports(started={1: 4}, retried={1: 3}, failed={1: 1}, errors=4)
 
-        self.system = self.sut(fail=JobFailPolicy.FAIL_FAST)
+        self.system = self.sut(fail=JobFailPolicy.FAIL_GRACEFULLY)
         prepare()
         with self.assertRaises(Exception) as context:
             self.system.execute_jobs()
@@ -177,7 +177,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
     def test_throwing_reporter_during_retries___does_not_incur_in_infinite_loop(self):
         class TestThrowingReporter(TestProgressReporter):
-            def notify_job_retried(self, _job: Job, _exception: BaseException):
+            def notify_job_retried(self, _job: Job, _retry_job: Job, _exception: BaseException):
                 raise Exception('Houston, we have a problem.')
 
         self.reporter = TestThrowingReporter()
@@ -186,9 +186,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         self.system.register_worker(1, TestWorker(self.system))
         self.system.push_job(TestJob(1, fails=3))
 
-        logging.getLogger().setLevel(logging.CRITICAL + 1)
         self.system.execute_jobs()
-        logging.getLogger().setLevel(logging.NOTSET)
 
         self.assertReports(completed={1: 1}, started={1: 4}, errors=3)
 
@@ -253,6 +251,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
     ):
         self.assertEqual({
             'started_jobs': started or completed or {},
+            'in_progress_jobs': in_progress or {},
             'completed_jobs':completed or {},
             'failed_jobs': failed or {},
             'retried_jobs': retried or {},
@@ -262,6 +261,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
             'errors': errors
         }, {
             'started_jobs': self.reporter.started_jobs,
+            'in_progress_jobs': {k: len(v) for k, v in self.reporter.in_progress_jobs.items()},
             'completed_jobs': self.reporter.completed_jobs,
             'failed_jobs': self.reporter.failed_jobs,
             'retried_jobs': self.reporter.retried_jobs,
@@ -274,12 +274,12 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
 class TestJob(Job):
     def __init__(self, type_id: int, next_job: Optional['TestJob'] = None, retry_job: Optional['TestJob'] = None, fails: int = 0, register_worker: Optional[Worker] = None,
-                 cancel_pending_jobs: bool = False, raises_unexpected_exception: bool = False, execute_jobs: bool = False, wait_for_other_jobs: bool = False):
+                 cancel_pending_jobs: bool = False, raises: bool = False, execute_jobs: bool = False, wait_for_other_jobs: bool = False):
         self._type_id = type_id
         self._retry_job = retry_job
         self.next_job = next_job
         self.fails = fails
-        self.raises_unexpected_exception = raises_unexpected_exception
+        self.raises = raises
         self.execute_jobs = execute_jobs
         self.wait_for_other_jobs = wait_for_other_jobs
         self.register_worker = register_worker
@@ -305,7 +305,7 @@ class TestWorker(Worker):
             job.fails -= 1
             return [], Exception('Fails!')
 
-        if job.raises_unexpected_exception:
+        if job.raises:
             raise Exception('Raises!')
 
         if job.cancel_pending_jobs:
@@ -330,11 +330,14 @@ class TestProgressReporter(ProgressReporter):
 
     def __init__(self):
         self.started_jobs = {}
-        self.in_progress_jobs = {}
+        self.in_progress_jobs = defaultdict(set)
         self.completed_jobs = {}
         self.failed_jobs = {}
         self.retried_jobs = {}
         self.cancelled_jobs = {}
+
+        self._init = set()
+        self._end = set()
 
     def reset(self): self.__init__()
 
@@ -348,21 +351,37 @@ class TestProgressReporter(ProgressReporter):
 
     def notify_job_started(self, job: Job):
         self.started_jobs[job.type_id] = self.started_jobs.get(job.type_id, 0) + 1
-        self.in_progress_jobs[job.type_id] = self.in_progress_jobs.get(job.type_id, 0) + 1
+        self._add_in_progress(job)
 
     def notify_job_completed(self, job: Job, next_jobs: List[Job]):
         self.completed_jobs[job.type_id] = self.completed_jobs.get(job.type_id, 0) + 1
+        for c_job in next_jobs:
+            self._add_in_progress(c_job)
         self._remove_in_progress(job)
 
     def notify_job_failed(self, job: Job, exception: BaseException):
         self.failed_jobs[job.type_id] = self.failed_jobs.get(job.type_id, 0) + 1
         self._remove_in_progress(job)
 
-    def notify_job_retried(self, job: Job, exception: BaseException):
+    def notify_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
         self.retried_jobs[job.type_id] = self.retried_jobs.get(job.type_id, 0) + 1
-        self._remove_in_progress(job)
+        if job != retry_job:
+            self._add_in_progress(retry_job)
+            self._remove_in_progress(job)
+
+    def _add_in_progress(self, job: Job):
+        if job not in self._init:
+            self._init.add(job)
+        if job in self._end:
+            return
+        self.in_progress_jobs[job.type_id].add(job)
 
     def _remove_in_progress(self, job: Job):
-        self.in_progress_jobs[job.type_id] = self.in_progress_jobs.get(job.type_id, 0) - 1
-        if self.in_progress_jobs[job.type_id] <= 0:
+        if job not in self._end:
+            self._end.add(job)
+        if job not in self._init:
+            return
+
+        self.in_progress_jobs[job.type_id].remove(job)
+        if not self.in_progress_jobs[job.type_id]:
             self.in_progress_jobs.pop(job.type_id)
