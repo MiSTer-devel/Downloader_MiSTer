@@ -85,14 +85,13 @@ class JobSystem(JobContext):
         self._signals = signals
 
     def register_worker(self, job_id: int, worker: 'Worker') -> None:
-        self.register_workers([(job_id, worker)])
+        self.register_workers({job_id: worker})
 
-    def register_workers(self, workers: Iterable[Tuple[int, 'Worker']]) -> None:
+    def register_workers(self, workers: Dict[int, 'Worker']) -> None:
         with self._lock:
             if self._is_executing_jobs: raise CantRegisterWorkerException('Can not register workers while executing jobs')
 
-            for job_id, worker in workers:
-                self._workers[job_id] = worker
+            self._workers.update(workers)
 
     def push_job(self, job: 'Job') -> None:
         with self._lock:
@@ -119,6 +118,10 @@ class JobSystem(JobContext):
                 self._execute_with_threads(self._max_threads)
             else:
                 self._execute_without_threads()
+
+            self._handle_notifications()
+            self._jobs_cancelled.extend([p.job for p in self._job_queue])
+            self._job_queue.clear()
             if self._jobs_cancelled:
                 self._record_jobs_cancelled(self._jobs_cancelled)
             self._handle_unhandled_exceptions(self._unhandled_errors)
@@ -189,10 +192,6 @@ class JobSystem(JobContext):
                     self._record_jobs_cancelled([])
                     self._cancel_futures(futures)
 
-            self._handle_notifications()
-            self._jobs_cancelled.extend([p.job for p in self._job_queue])
-            self._job_queue.clear()
-
     def _execute_without_threads(self, just_one_tick: bool = False) -> None:
         while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
             package = self._job_queue.popleft() if self._job_queue else None
@@ -211,10 +210,6 @@ class JobSystem(JobContext):
             if just_one_tick: return
             if self._unhandled_errors:
                 self._are_jobs_cancelled = True
-
-        self._handle_notifications()
-        self._jobs_cancelled.extend([p.job for p in self._job_queue])
-        self._job_queue.clear()
 
     def _operate_on_next_job(self, package: '_JobPackage', notifications: queue.Queue[Tuple['_JobState', '_JobPackage', Optional['_JobError']]]) -> None:
         if self._are_jobs_cancelled:
