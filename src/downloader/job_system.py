@@ -42,6 +42,12 @@ class JobContext(Protocol):
         """Allows a worker to wait for other jobs to progress."""
 
 
+class JobFailPolicy(Enum):
+    FAIL_FAST = auto()
+    FAIL_GRACEFULLY = auto()
+    FAULT_TOLERANT = auto()
+
+
 class JobSystem(JobContext):
     """Processes jobs through workers concurrently. Workers must use the JobContext interface. Other methods are not thread-safe."""
 
@@ -52,7 +58,7 @@ class JobSystem(JobContext):
         JobSystem._next_job_type_id += 1
         return JobSystem._next_job_type_id
 
-    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', max_threads: int = 6, max_tries: int = 3, wait_timeout: float = 0.1, max_cycle: int = 3, max_timeout: float = 300, retry_unexpected_exceptions: bool = True, raise_report_exceptions: bool = False):
+    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', max_threads: int = 6, max_tries: int = 3, wait_timeout: float = 0.1, max_cycle: int = 3, max_timeout: float = 300, fail_policy: JobFailPolicy = JobFailPolicy.FAULT_TOLERANT):
         self._reporter: ProgressReporter = reporter
         self._logger: JobSystemLogger = logger
         self._max_threads: int = max_threads
@@ -60,8 +66,7 @@ class JobSystem(JobContext):
         self._wait_timeout: float = wait_timeout
         self._max_cycle: int = max_cycle
         self._max_timeout: float = max_timeout
-        self._retry_unexpected_exceptions: bool = retry_unexpected_exceptions
-        self._raise_report_exceptions: bool = raise_report_exceptions
+        self._fail_policy: JobFailPolicy = fail_policy
         self._job_queue: Deque[_JobPackage] = deque()
         self._unhandled_errors: List[BaseException] = []
         self._notifications: queue.Queue[Tuple[_JobState, _JobPackage, Optional[_JobError]]] = queue.Queue()
@@ -124,10 +129,13 @@ class JobSystem(JobContext):
             self._job_queue.clear()
             if self._jobs_cancelled:
                 self._record_jobs_cancelled(self._jobs_cancelled)
-            self._handle_unhandled_exceptions(self._unhandled_errors)
+            if self._fail_policy == JobFailPolicy.FAIL_GRACEFULLY:
+                self._raise_unhandled_exceptions(self._unhandled_errors)
         finally:
             with self._lock:
                 self._is_executing_jobs = False
+
+    def get_unhandled_exceptions(self) -> Iterable[BaseException]: return self._unhandled_errors
 
     def cancel_pending_jobs(self) -> None:
         # This must be thread-safe. We lock so that execution can be interrupted asap.
@@ -174,17 +182,19 @@ class JobSystem(JobContext):
             while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
                 package = self._job_queue.popleft() if self._job_queue else None
                 if package is not None:
-                    self._assert_there_are_no_cycles(package)
-                    if not self._unhandled_errors:
+                    cycle_ex = self._assert_there_are_no_cycles(package)
+                    if cycle_ex is None:
                         future = thread_executor.submit(self._operate_on_next_job, package, self._notifications)
                         futures.append((package, future))
+                    else:
+                        self._add_unhandled_exception(cycle_ex, package=package, ctx='cycle-assert-failed')
 
                 self._handle_notifications()
                 futures = self._remove_done_futures(futures)
                 self._record_work_in_progress()
                 self._check_clock()
                 sys.stdout.flush()
-                if self._unhandled_errors:
+                if self._fail_policy == JobFailPolicy.FAIL_GRACEFULLY and self._unhandled_errors:
                     self._are_jobs_cancelled = True
 
             if self._are_jobs_cancelled:
@@ -195,19 +205,21 @@ class JobSystem(JobContext):
         while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
             package = self._job_queue.popleft() if self._job_queue else None
             if package is not None:
-                self._assert_there_are_no_cycles(package)
-                if not self._unhandled_errors:
+                cycle_ex = self._assert_there_are_no_cycles(package)
+                if cycle_ex is None:
                     try:
                         self._operate_on_next_job(package, self._notifications)
-                    except BaseException as e:
+                    except Exception as e:
                         self._handle_raised_exception(package, e)
 
                     self._handle_notifications()
+                else:
+                    self._add_unhandled_exception(cycle_ex, package=package, ctx='cycle-assert-failed')
 
             self._record_work_in_progress()
             self._check_clock()
             if just_one_tick: return
-            if self._unhandled_errors:
+            if self._fail_policy == JobFailPolicy.FAIL_GRACEFULLY and self._unhandled_errors:
                 self._are_jobs_cancelled = True
 
     def _operate_on_next_job(self, package: '_JobPackage', notifications: queue.Queue[Tuple['_JobState', '_JobPackage', Optional['_JobError']]]) -> None:
@@ -227,13 +239,16 @@ class JobSystem(JobContext):
             notifications.put((_JobState.JOB_COMPLETED, package, None))
 
     def _retry_package(self, package: '_JobPackage') -> bool:
+        if self._are_jobs_cancelled:
+            return False
+
         retry_job = package.job.retry_job()
         if package.tries >= self._max_tries or retry_job is None:
             return False
 
         worker = self._workers.get(retry_job.type_id, None)
         if worker is None:
-            self._unhandled_errors.append(CantPushJobs(f'Retry failed because there no worker is registered for job type id "{retry_job.type_id}" and name "{retry_job.__class__.__name__}"'))
+            self._add_unhandled_exception(CantPushJobs('Retry failed because there no worker is registered for the job.'), ctx='retry-package', package=package, sub_job=('retry', retry_job))
             return False
 
         retry_package = _JobPackage(
@@ -259,7 +274,7 @@ class JobSystem(JobContext):
 
             status, package, error = notification
             if error is not None:
-                if not self._are_jobs_cancelled and self._retry_package(package):
+                if self._retry_package(package):
                     self._record_job_retried(package, error.child)
                 else:
                     self._record_job_failed(package, error.child)
@@ -270,15 +285,15 @@ class JobSystem(JobContext):
                         ex = self._internal_push_job(child_job, parent_package=package)
                         if ex is None:
                             next_jobs.append(child_job)
-                        else:
-                            self._unhandled_errors.append(ex)
+                        else: self._add_unhandled_exception(ex, package=package, sub_job=('child', child_job), ctx='handle-notifications-job-completed')
 
                 self._record_job_completed(package, next_jobs)
             elif status == _JobState.JOB_STARTED:
                 self._record_job_started(package)
             elif status == _JobState.JOB_CANCELLED:
                 self._jobs_cancelled.append(package.job)
-            else: assert False, f'Unhandled JobState notification: {status}'
+            else:
+                self._add_unhandled_exception(ValueError(f'Unhandled JobState notification: {status}'), package=package, ctx='handle-notifications-switch')
 
     def _remove_done_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> List[Tuple['_JobPackage', Future[None]]]:
         still_pending = []
@@ -299,42 +314,58 @@ class JobSystem(JobContext):
                 e = future.exception()
                 if e is None: continue
 
-                self._logger.print(f'Unexpected exception "{type(e).__name__}" while canceling job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
+                self._add_unhandled_exception(e, package=package, ctx='cancel-futures')
                 self._record_job_failed(package, _wrap_unknown_base_error(e))
 
     def _handle_raised_exception(self, package: '_JobPackage', e: BaseException):
+        self._add_unhandled_exception(e, package, ctx='handle-raised-exception')
+
         if isinstance(e, JobSystemAbortException):
-            self._logger.print(f'Unexpected system abort while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
             self._record_job_failed(package, e)
-            self._unhandled_errors.append(e)
             return
 
         e = _wrap_unknown_base_error(e)
-
-        if not self._retry_unexpected_exceptions:
-            self._record_job_failed(package, e)
-            self._unhandled_errors.append(UnknownException(f"Could not handle '{type(e).__name__}' exception", e))
-            return
-
-        self._logger.print(f'Handling unexpected exception "{type(e).__name__}" while operating on job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
-
         if self._retry_package(package):
             self._record_job_retried(package, e)
         else:
             self._record_job_failed(package, e)
 
-    def _handle_unhandled_exceptions(self, errors: List[BaseException]) -> None:
+    def _add_unhandled_exception(self, e: BaseException, package: Optional['_JobPackage'] = None, sub_job: Optional[Tuple[str, 'Job']] = None, ctx: Optional[str] = None, method: Optional[Callable] = None) -> None:
+        if self._fail_policy == JobFailPolicy.FAIL_FAST: raise e
+
+        msg = f'WARNING! {ctx or 'unknown'}: '
+        if isinstance(e, JobSystemAbortException):
+            msg += f'Unexpected system abort '
+        else:
+            msg += f'Unexpected exception '
+
+        msg += f'"{type(e).__name__}"'
+
+        if method is not None:
+            msg += f' at "{method.__qualname__}"'
+
+        if package is not None:
+            info = getattr(package.job, 'info', None)
+            msg += f' while operating on job [{package.job.type_id}|{type(package.job).__name__}{f": {info}" if info else ""}]'
+
+        if sub_job is not None:
+            info = getattr(sub_job[1], 'info', None)
+            msg += f' trying to spawn "{sub_job[0]}" job [{sub_job[1].type_id}|{type(sub_job[1]).__name__}{f": {info}" if info else ""}]'
+
+        self._logger.print(msg)
+        self._logger.debug(f'{msg}:\n{''.join(traceback.TracebackException.from_exception(e).format())}\n')
+
+        self._unhandled_errors.append(e)
+
+    def _raise_unhandled_exceptions(self, errors: List[BaseException]) -> None:
         if not errors: return
 
-        self._logger.debug(f'\nUnhandled Exceptions: {len(errors)}\n')
-        for e in errors[:0:-1]:
-            traceback_str = ''.join(traceback.TracebackException.from_exception(e).format()) + '\n'
-            self._logger.debug(traceback_str)
+        msg = f'Unhandled exceptions: {len(errors)}\n'
+        for i, e in enumerate(errors[:0:-1]):
+            msg += f'  ({len(errors) - i}) {type(e).__name__}: {''.join(traceback.TracebackException.from_exception(e).format())}\n'
 
-        e = errors[0]
-        cause = getattr(e, 'cause', None)
-        if cause is not None: raise e from cause
-        else: raise e
+        self._logger.debug(msg)
+        raise errors[0]
 
     def _update_timeout_clock(self) -> None:  # We only want to update the timeout when the state of the job pipeline changes
         self._timeout_clock = time.monotonic() + self._max_timeout
@@ -347,10 +378,9 @@ class JobSystem(JobContext):
         self._are_jobs_cancelled = True
         self._logger.print(f'WARNING! Jobs timeout reached after {self._max_timeout} seconds!')
 
-    def _assert_there_are_no_cycles(self, package: '_JobPackage') -> None:
+    def _assert_there_are_no_cycles(self, package: '_JobPackage') -> Optional['CycleDetectedException']:
         parent_package = package.parent
-        if parent_package is None:
-            return
+        if parent_package is None: return None
 
         seen: Dict[int, int] = dict()
         current: Optional[_JobPackage] = parent_package
@@ -358,11 +388,12 @@ class JobSystem(JobContext):
         while current is not None:
             seen_value = seen.get(current.job.type_id, 0)
             if seen_value >= self._max_cycle:
-                self._unhandled_errors.append(CycleDetectedException(f'Can not use Job {package.job.type_id}|{package.job.__class__.__name__} because it introduced a cycle of length {seen_value}'))
-                return
+                return CycleDetectedException(f'Can not use Job because it introduced a cycle of length "{seen_value}".')
 
             seen[current.job.type_id] = seen_value + 1
             current = current.parent
+        
+        return None
 
     @contextmanager
     def _temporary_signal_handlers(self):
@@ -375,53 +406,47 @@ class JobSystem(JobContext):
             for sig, cb in previous_handlers: signal.signal(sig, cb)
 
     def _signal_handler(self, previous_handler: Union[Callable[[int, Optional[FrameType]], Any], int, None], sig: int, frame: Optional[FrameType]) -> None:
+        self._logger.print(f"SIGNAL '{signal.strsignal(sig)}' RECEIVED!")
         try:
-            self._logger.print(f"SIGNAL '{signal.strsignal(sig)}' RECEIVED!")
             for thread_name, stack in stacks_from_all_threads().items():
-                self._logger.debug(f"Thread: {thread_name} [{len(stack)}]")
-                for entry in stack: self._logger.debug(f"  {entry['file']}:{entry['line']} ({entry['func']})")
-            self._logger.print('SHUTTING DOWN...')
-            self._are_jobs_cancelled = True
-        except Exception as e:
-            self._logger.print('CANCELING PENDING JOBS FAILED!', sig, e)
+                msg = f"Thread: {thread_name} [{len(stack)}]\n"
+                for entry in stack: msg += f"  {entry['file']}:{entry['line']} ({entry['func']})\n"
+                self._logger.debug(msg)
+        except Exception as _: pass
+        self._logger.print('SHUTTING DOWN...')
+        self._are_jobs_cancelled = True
         try:
-            if callable(previous_handler) and previous_handler not in (signal.SIG_IGN, signal.SIG_DFL):
-                previous_handler(sig, frame)
+            if callable(previous_handler) and previous_handler not in (signal.SIG_IGN, signal.SIG_DFL): previous_handler(sig, frame)
         except Exception as e:
             self._logger.print('PREVIOUS HANDLER FAILED!', sig, e)
 
     def _record_job_started(self, package: '_JobPackage') -> None:
         self._update_timeout_clock()
-        self._try_report('started', self._reporter_for_package(package).notify_job_started, package.job)
+        self._try_report('report-started', self._reporter_for_package(package).notify_job_started, package.job)
 
     def _record_job_completed(self, package: '_JobPackage', next_jobs: List['Job']) -> None:
         self._pending_jobs_amount -= 1
         self._update_timeout_clock()
-        self._try_report('completed', self._reporter_for_package(package).notify_job_completed, package.job, next_jobs)
+        self._try_report('report-completed', self._reporter_for_package(package).notify_job_completed, package.job, next_jobs)
 
     def _record_job_retried(self, package: '_JobPackage', e: Exception) -> None:
         self._update_timeout_clock()
-        self._try_report('retried', self._reporter_for_package(package).notify_job_retried, package.job, e)
+        self._try_report('report-retried', self._reporter_for_package(package).notify_job_retried, package.job, e)
 
     def _record_job_failed(self, package: '_JobPackage', e: Exception) -> None:
         self._pending_jobs_amount -= 1
         self._update_timeout_clock()
-        self._try_report('failed', self._reporter_for_package(package).notify_job_failed, package.job, e)
+        self._try_report('report-failed', self._reporter_for_package(package).notify_job_failed, package.job, e)
 
     def _record_jobs_cancelled(self, jobs: List['Job']) -> None:
         self._update_timeout_clock()
-        self._try_report('cancelled', self._reporter.notify_jobs_cancelled, jobs)
+        self._try_report('report-cancelled', self._reporter.notify_jobs_cancelled, jobs)
 
     def _record_work_in_progress(self) -> None: self._try_report('in-progress', self._reporter.notify_work_in_progress)
 
     def _try_report(self, context: str, method: Callable, *args) -> None:
         try: method(*args)
-        except Exception as e:
-            e_msg = f'CRITICAL! Exception while reporting job "{context}": {type(e).__name__}'
-            self._logger.print(e_msg)
-            self._logger.print(e)
-            if self._raise_report_exceptions:
-                self._unhandled_errors.append(UnknownException(e_msg, e))
+        except Exception as e: self._add_unhandled_exception(e, ctx=context, method=method)
 
     def _reporter_for_package(self, package: '_JobPackage') -> 'ProgressReporter': return package.worker.reporter() or self._reporter
 
@@ -503,10 +528,6 @@ class CantPushJobs(JobSystemAbortException): pass
 class CantWaitWhenNotExecutingJobs(JobSystemAbortException): pass
 class CantWaitWhenTimedOut(JobSystemAbortException): pass
 class CycleDetectedException(JobSystemAbortException): pass
-class UnknownException(JobSystemAbortException):
-    def __init__(self, message: str, cause: BaseException):
-        super().__init__(message)
-        self.cause = cause
 
 class JobSystemLogger(Protocol):
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True): """Prints a message to the logger."""
