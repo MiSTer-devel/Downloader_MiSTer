@@ -299,7 +299,7 @@ class TestWorker(Worker):
     def operate_on(self, job: TestJob) -> WorkerResult:
         if job.fails > 0:
             job.fails -= 1
-            return None, Exception('Fails!')
+            return [], Exception('Fails!')
 
         if job.raises_unexpected_exception:
             raise Exception('Raises!')
@@ -317,9 +317,9 @@ class TestWorker(Worker):
             self.system.wait_for_other_jobs()
 
         if job.next_job is not None:
-            return job.next_job, None
+            return [job.next_job], None
 
-        return None, None
+        return [], None
 
 
 class TestProgressReporter(ProgressReporter):

@@ -41,9 +41,9 @@ class FetchFileWorker2(DownloaderWorker):
     def operate_on(self, job: FetchFileJob2) -> WorkerResult:  # type: ignore[override]
         error = self._fetch_file(url=job.source, download_path=job.temp_path, info=job.info)
         if error is not None:
-            return None, error
+            return [], error
 
-        return job.after_job, None
+        return [] if job.after_job is None else [job.after_job], None
 
     def _fetch_file(self, url: str, download_path: str, info: str) -> Optional[FileDownloadError]:
         try:

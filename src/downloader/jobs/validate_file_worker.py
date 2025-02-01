@@ -31,9 +31,9 @@ class ValidateFileWorker(DownloaderWorkerBase):
         file_path, file_hash, hash_check = job.fetch_job.path, job.fetch_job.description['hash'], job.fetch_job.hash_check
         error = self._validate_file(file_path, file_hash, hash_check)
         if error is not None:
-            return None, error
+            return [], error
 
-        return job.fetch_job.after_validation, None
+        return [] if job.fetch_job.after_validation is None else [job.fetch_job.after_validation], None
 
     def _validate_file(self, file_path: str, file_hash: str, hash_check: bool) -> Optional[Exception]:
         try:
