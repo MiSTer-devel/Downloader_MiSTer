@@ -144,7 +144,7 @@ class OnlineImporter(ProductionOnlineImporter):
 
         local_store = LocalStoreWrapper({'dbs': {db.db_id: store for db, store, _ in self.dbs}})
 
-        self._job_system.register_workers((w.job_type_id(), w) for w in make_workers(self._worker_ctx))
+        self._job_system.register_workers({w.job_type_id(): w for w in make_workers(self._worker_ctx)})
 
         stores = {}
         jobs = []
