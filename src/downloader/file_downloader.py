@@ -150,7 +150,7 @@ class FileDownloader:
                 skip_files.append(file_path)
 
         self._check_downloaded_files(skip_files)
-        self._job_system.register_workers((w.job_type_id(), w) for w in make_workers(self._worker_ctx))
+        self._job_system.register_workers({w.job_type_id(): w for w in make_workers(self._worker_ctx)})
         for path in files_to_download:
             description = self._queued_files[path]
 
