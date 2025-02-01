@@ -34,7 +34,6 @@ from downloader.path_package import PathType
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.logger import NoLogger
 
-from test.debug import is_debugging
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_job_system import ProgressReporterTracker
 from test.fake_local_store_wrapper import StoreWrapper, LocalStoreWrapper

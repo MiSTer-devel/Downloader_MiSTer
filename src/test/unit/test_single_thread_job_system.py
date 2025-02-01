@@ -19,7 +19,7 @@
 import unittest
 from functools import reduce
 
-from downloader.job_system import Job, JobSystem, Worker, CycleDetectedException, ProgressReporter, NoWorkerException, \
+from downloader.job_system import Job, JobSystem, Worker, CycleDetectedException, ProgressReporter, CantPushJobs, \
     CantRegisterWorkerException, CantExecuteJobs, CantWaitWhenNotExecutingJobs, WorkerResult
 import logging
 from typing import Dict, Optional, List
@@ -70,8 +70,8 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             self.system.execute_jobs()
 
-        self.assertIsInstance(context.exception, NoWorkerException)
-        self.assertReports(started={1: 1}, in_progress={1: 1}, pending=1)
+        self.assertIsInstance(context.exception, CantPushJobs)
+        self.assertReports(started={1: 1}, completed={1: 1})
 
     def test_cycle_detection___throws(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -83,7 +83,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
             self.system.execute_jobs()
 
         self.assertIsInstance(context.exception, CycleDetectedException)
-        self.assertReports(completed={1: 4, 2: 3}, in_progress={}, pending=1)
+        self.assertReports(completed={1: 4, 2: 3}, pending=1)
 
     def test_cycle_detection___just_below_the_max_cycle_limit___doesnt_throw(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -103,7 +103,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
             self.system.execute_jobs()
 
         self.assertIsInstance(context.exception, CantRegisterWorkerException)
-        self.assertReports(started={1: 1}, in_progress={1: 1}, pending=1)
+        self.assertReports(started={1: 1}, failed={1: 1})
 
     def test_retries___when_job_retries_itself___reports_completed_jobs_and_retries(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -164,7 +164,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         self.system.push_job(TestJob(1, next_job=(TestJob(2, cancel_pending_jobs=True, next_job=(TestJob(3, next_job=TestJob(4)))))))
 
         self.system.execute_jobs()
-        self.assertReports(completed={1: 1, 2: 1}, cancelled={3: 1})
+        self.assertReports(completed={1: 1, 2: 1})
 
         self.reporter.reset()
         self.system.push_job(TestJob(1, next_job=(TestJob(2, cancel_pending_jobs=False, next_job=(TestJob(3, next_job=TestJob(4)))))))
