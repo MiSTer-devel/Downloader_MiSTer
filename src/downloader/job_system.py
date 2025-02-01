@@ -177,8 +177,8 @@ class JobSystem(JobContext):
                             future = thread_executor.submit(self._operate_on_next_job, package, self._notifications)
                             futures.append((package, future))
 
-                    self._handle_notifications(self._notifications, self._jobs_cancelled)
-                    futures = self._handle_futures(futures)
+                    self._handle_notifications()
+                    futures = self._remove_done_futures(futures)
                     self._record_work_in_progress()
                     self._check_clock()
                     sys.stdout.flush()
@@ -187,9 +187,9 @@ class JobSystem(JobContext):
 
                 if self._are_jobs_cancelled:
                     self._record_jobs_cancelled([])
-                    self._jobs_cancelled.extend(self._cancel_futures(futures))
+                    self._cancel_futures(futures)
 
-            self._handle_notifications(self._notifications, self._jobs_cancelled)
+            self._handle_notifications()
             self._jobs_cancelled.extend([p.job for p in self._job_queue])
             self._job_queue.clear()
 
@@ -204,7 +204,7 @@ class JobSystem(JobContext):
                     except BaseException as e:
                         self._handle_raised_exception(package, e)
 
-                self._handle_notifications(self._notifications, self._jobs_cancelled)
+                    self._handle_notifications()
 
             self._record_work_in_progress()
             self._check_clock()
@@ -212,7 +212,7 @@ class JobSystem(JobContext):
             if self._unhandled_errors:
                 self._are_jobs_cancelled = True
 
-        self._handle_notifications(self._notifications, self._jobs_cancelled)
+        self._handle_notifications()
         self._jobs_cancelled.extend([p.job for p in self._job_queue])
         self._job_queue.clear()
 
@@ -256,13 +256,10 @@ class JobSystem(JobContext):
 
         return True
 
-    def _handle_notifications(self,
-        notification_queue: queue.Queue[Tuple['_JobState', '_JobPackage', Optional['_JobError']]],
-        cancelled: List['_JobPackage']
-    ) -> None:
+    def _handle_notifications(self) -> None:
         while True:
             try:
-                notification = notification_queue.get(block=False)
+                notification = self._notifications.get(block=False)
             except queue.Empty:
                 break
 
@@ -287,10 +284,10 @@ class JobSystem(JobContext):
             elif status == _JobState.JOB_STARTED:
                 self._record_job_started(package)
             elif status == _JobState.JOB_CANCELLED:
-                cancelled.append(package.job)
+                self._jobs_cancelled.append(package.job)
             else: assert False, f'Unhandled JobState notification: {status}'
 
-    def _handle_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> List[Tuple['_JobPackage', Future[None]]]:
+    def _remove_done_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> List[Tuple['_JobPackage', Future[None]]]:
         still_pending = []
         for package, future in futures:
             if future.done():
@@ -301,20 +298,16 @@ class JobSystem(JobContext):
                 still_pending.append((package, future))
         return still_pending
 
-    def _cancel_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> List['_JobPackage']:
-        if len(futures) == 0: return []
-        cancelled = []
+    def _cancel_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> None:
         for package, future in futures:
             if future.cancel():
-                cancelled.append(package.job)
+                self._jobs_cancelled.append(package.job)
             else:
                 e = future.exception()
                 if e is None: continue
 
                 self._logger.print(f'Unexpected exception "{type(e).__name__}" while canceling job {package.job.type_id}|{package.job.__class__.__name__}: {e}')
                 self._record_job_failed(package, _wrap_unknown_base_error(e))
-
-        return cancelled
 
     def _handle_raised_exception(self, package: '_JobPackage', e: BaseException):
         if isinstance(e, JobSystemAbortException):
@@ -340,6 +333,7 @@ class JobSystem(JobContext):
     def _handle_unhandled_exceptions(self, errors: List[BaseException]) -> None:
         if not errors: return
 
+        self._logger.debug(f'\nUnhandled Exceptions: {len(errors)}\n')
         for e in errors[:0:-1]:
             traceback_str = ''.join(traceback.TracebackException.from_exception(e).format()) + '\n'
             self._logger.debug(traceback_str)
