@@ -179,7 +179,7 @@ class JobSystem(JobContext):
     def _execute_with_threads(self, max_threads: int) -> None:
         with self._temporary_signal_handlers(), ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
             futures = []
-            while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
+            while (self._pending_jobs_amount > 0 or futures) and self._are_jobs_cancelled is False:
                 package = self._job_queue.popleft() if self._job_queue else None
                 if package is not None:
                     assert_success = self._assert_there_are_no_cycles(package)
@@ -308,10 +308,7 @@ class JobSystem(JobContext):
         for package, future in futures:
             if future.cancel():
                 self._jobs_cancelled.append(package.job)
-            else:
-                e = future.exception()
-                if e is None: continue
-
+            elif (e := future.exception()) is not None:
                 self._add_unhandled_exception(e, package=package, ctx='cancel-futures')
                 self._record_job_failed(package, _wrap_unknown_base_error(e))
 
