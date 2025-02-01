@@ -280,9 +280,11 @@ class JobSystem(JobContext):
                 if not self._are_jobs_cancelled:
                     for child_job in package.next_jobs:
                         ex = self._internal_push_job(child_job, parent_package=package)
-                        if ex is None:
-                            next_jobs.append(child_job)
-                        else: self._add_unhandled_exception(ex, package=package, sub_job=('child', child_job), ctx='handle-notifications-job-completed')
+                        if ex is not None:
+                            self._add_unhandled_exception(ex, package=package, sub_job=('child', child_job), ctx='handle-notifications-job-completed')
+                            continue
+
+                        next_jobs.append(child_job)
 
                 self._record_job_completed(package, next_jobs)
             elif status == _JobState.JOB_STARTED:
