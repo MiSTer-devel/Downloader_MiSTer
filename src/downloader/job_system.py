@@ -21,6 +21,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
 from enum import Enum, auto
+from contextlib import contextmanager
 import traceback
 from types import FrameType
 from typing import Deque, Dict, Optional, Callable, List, Tuple, Any, Iterable, Protocol, Union
@@ -165,11 +166,7 @@ class JobSystem(JobContext):
         return None
 
     def _execute_with_threads(self, max_threads: int) -> None:
-        previous_handlers = [(s, signal.getsignal(s)) for s in self._signals]
-        try:
-            for sig1, cb in previous_handlers:
-                signal.signal(sig1, lambda sig2, frame: self._signal_handler(cb, sig2, frame))
-
+        with self._temporary_signal_handlers():
             with ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
                 futures = []
                 while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
@@ -195,8 +192,6 @@ class JobSystem(JobContext):
             self._handle_notifications(self._notifications, self._jobs_cancelled)
             self._jobs_cancelled.extend([p.job for p in self._job_queue])
             self._job_queue.clear()
-        finally:
-            for sig, cb in previous_handlers: signal.signal(sig, cb)
 
     def _execute_without_threads(self, just_one_tick: bool = False) -> None:
         while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
@@ -381,6 +376,16 @@ class JobSystem(JobContext):
 
             seen[current.job.type_id] = seen_value + 1
             current = current.parent
+
+    @contextmanager
+    def _temporary_signal_handlers(self):
+        previous_handlers = [(s, signal.getsignal(s)) for s in self._signals]
+        try:
+            for sig1, cb in previous_handlers:
+                signal.signal(sig1, lambda sig2, frame: self._signal_handler(cb, sig2, frame))
+            yield
+        finally:
+            for sig, cb in previous_handlers: signal.signal(sig, cb)
 
     def _signal_handler(self, previous_handler: Union[Callable[[int, Optional[FrameType]], Any], int, None], sig: int, frame: Optional[FrameType]) -> None:
         try:
