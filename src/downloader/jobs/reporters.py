@@ -178,10 +178,10 @@ class InstallationReportImpl(InstallationReport):
     def add_job_completed(self, job: Job, next_jobs: List[Job]):
         with self._jobs_completed as jobs_completed: jobs_completed[job.type_id].append(job)
         with self._jobs_tag_in_progress.lock:
-            for new_job in next_jobs:
-                for tag in new_job.tags:
-                    self._jobs_tag_in_progress.data[tag] += 1
-                new_job.add_tag(CHILD_TAG)
+            for c_job in next_jobs:
+                for c_tag in c_job.tags:
+                    self._jobs_tag_in_progress.data[c_tag] += 1
+                c_job.add_tag(CHILD_TAG)
             for tag in job.tags:
                 self._jobs_tag_in_progress.data[tag] -= 1
                 self._jobs_tag_completed.data[tag].append(job)
