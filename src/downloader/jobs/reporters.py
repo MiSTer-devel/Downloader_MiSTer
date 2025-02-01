@@ -155,7 +155,6 @@ class InstallationReportImpl(InstallationReport):
         self._jobs_tag_in_progress = _WithLock[Dict[Union[str, int], Set[int]]](defaultdict(set), job_tag_lock)
         self._jobs_tag_completed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
         self._jobs_tag_failed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
-
         self._jobs_initiated = _WithLock[Set[int]](set(), job_tag_lock)  # Needs job_tag_lock because they are used for _jobs_tag_in_progress
         self._jobs_ended = _WithLock[Set[int]](set(), job_tag_lock)  # Needs job_tag_lock because they are used for _jobs_tag_in_progress
 

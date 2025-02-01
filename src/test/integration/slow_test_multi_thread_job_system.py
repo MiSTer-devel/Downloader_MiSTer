@@ -16,14 +16,12 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import logging
 import time
 import unittest
-from functools import reduce
 from typing import Dict, Optional
-from downloader.job_system import JobFailPolicy, JobSystem, ProgressReporter, Worker, Job, CycleDetectedException
+from downloader.job_system import JobFailPolicy, JobSystem, Worker, Job
 from downloader.logger import NoLogger
-from test.unit.test_single_thread_job_system import TestProgressReporter, TestSingleThreadJobSystem, TestJob, TestWorker
+from test.unit.test_single_thread_job_system import TestSingleThreadJobSystem
 
 
 class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
@@ -51,23 +49,6 @@ class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
         self.system.execute_jobs()
 
         self.assertReports(started={1: 1}, completed={1: 1}, timed_out=True)
-
-    def test_throwing_reporter_during_retries___does_not_incur_in_infinite_loop2(self):
-        class TestThrowingReporter(TestProgressReporter):
-            def notify_job_retried(self, _job: Job, _retry_job: Job, _exception: BaseException):
-                raise Exception('Houston, we have a problem.')
-
-        self.reporter = TestThrowingReporter()
-        self.system = self.sut(fail=JobFailPolicy.FAULT_TOLERANT)
-
-        self.system.register_worker(1, TestWorker(self.system))
-        self.system.push_job(TestJob(1, fails=3))
-
-        logging.getLogger().setLevel(logging.CRITICAL + 1)
-        self.system.execute_jobs()
-        logging.getLogger().setLevel(logging.NOTSET)
-
-        self.assertReports(completed={1: 1}, started={1: 4}, errors=3)
 
     def assertReports(self,
         completed: Optional[Dict[int, int]] = None,
