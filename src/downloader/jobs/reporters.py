@@ -21,7 +21,7 @@ import dataclasses
 import threading
 import time
 from collections import defaultdict
-from typing import Dict, Final, Optional, Tuple, List, Any, Iterable, Set, TypeVar, Generic, Protocol
+from typing import Dict, Final, Optional, Tuple, List, Any, Iterable, Set, TypeVar, Generic, Protocol, Union
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
@@ -155,9 +155,9 @@ class InstallationReportImpl(InstallationReport):
         self._jobs_failed = _WithLock[Dict[int, List[Tuple[Job, BaseException]]]](defaultdict(list), lock)
         self._jobs_retried = _WithLock[Dict[int, List[Tuple[Job, BaseException]]]](defaultdict(list), lock)
         job_tag_lock = threading.Lock()
-        self._jobs_tag_in_progress = _WithLock[Dict[str, int]](defaultdict(lambda: 0), job_tag_lock)
-        self._jobs_tag_completed = _WithLock[Dict[str, List[Job]]](defaultdict(list), job_tag_lock)
-        self._jobs_tag_failed = _WithLock[Dict[str, List[Job]]](defaultdict(list), job_tag_lock)
+        self._jobs_tag_in_progress = _WithLock[Dict[Union[str, int], int]](defaultdict(lambda: 0), job_tag_lock)
+        self._jobs_tag_completed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
+        self._jobs_tag_failed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
 
     def add_job_started(self, job: Job):
         with self._jobs_started as jobs_started: jobs_started[job.type_id].append(job)

@@ -49,11 +49,11 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
                 # @TODO: Handle this case, it should never raise in any case
                 raise Exception(f"Unknown kind '{kind}' for zip '{job.zip_id}' in db '{job.db.db_id}'")
         except BadFileFilterPartException as e:
-            return None, e
+            return [], e
         except StoragePriorityError as e:
-            return None, e
+            return [], e
 
-        return None, None
+        return [], None
 
     def _extract_all_contents(self, job: OpenZipContentsJob):
         db = job.db

@@ -83,7 +83,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             logger.debug(f"Reserving space '{db.db_id}'...")
             if not self._try_reserve_space(fetch_pkgs):
                 logger.debug(f"Not enough space '{db.db_id}'!")
-                return None, None # @TODO return error instead to retry later?
+                return [], None # @TODO return error instead to retry later?
 
             logger.debug(f"Processing create folder packages '{db.db_id}'...")
             self._process_create_folder_packages(create_folder_pkgs, db, store)  # @TODO maybe move this one after reserve space
@@ -98,9 +98,9 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             next_jobs = self._process_fetch_packages_and_launch_jobs(fetch_pkgs, db.base_files_url)
             return next_jobs, None
         except BadFileFilterPartException as e:
-            return None, e
+            return [], e
         except StoragePriorityError as e:
-            return None, e
+            return [], e
 
     def _create_packages_from_index(self, config: Config, summary: Index, db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[
         List[_CheckFilePackage],

@@ -42,7 +42,7 @@ class DownloadDbWorker(DownloaderWorkerBase):
             full_resync=job.full_resync,
             get_file_job=get_file_job
         )
-        return get_file_job, None
+        return [get_file_job], None
 
     def _get_db_description_from_ini_section(self, ini_section: str, ini_description: Dict[str, str]) -> tuple[str, str]:
         db_url = ini_description[K_DB_URL]

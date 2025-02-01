@@ -44,9 +44,9 @@ class ValidateFileWorker2(DownloaderWorker):
         )
 
         if error is not None:
-            return None, error
+            return [], error
 
-        return job.after_job, None
+        return [] if job.after_job is None else [job.after_job], None
 
     def _validate_file(self, temp_path: str, target_file_path: str, info: str, file_hash: str, backup: Optional[str]) -> Optional[FileDownloadError]:
         try:

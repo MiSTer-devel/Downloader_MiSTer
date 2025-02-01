@@ -31,7 +31,7 @@ class OpenZipIndexWorker(DownloaderWorkerBase):
             index = self._ctx.file_system.load_dict_from_file(job.download_path)
             self._ctx.file_system.unlink(job.download_path)
 
-            return make_process_zip_job(
+            return [make_process_zip_job(
                 zip_id=job.zip_id,
                 zip_description=job.zip_description,
                 zip_index=index,
@@ -41,6 +41,6 @@ class OpenZipIndexWorker(DownloaderWorkerBase):
                 store=job.store,
                 full_resync=job.full_resync,
                 has_new_zip_index=True
-            ), None
+            )], None
         except (FsError, OSError) as e:
-            return None, e
+            return [], e

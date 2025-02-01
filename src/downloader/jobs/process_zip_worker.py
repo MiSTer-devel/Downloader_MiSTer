@@ -41,17 +41,17 @@ class ProcessZipWorker(DownloaderWorkerBase):
         less_file_count = len(job.zip_index.files) < job.config['zip_file_count_threshold']
         less_accumulated_mbs = total_files_size < (1000 * 1000 * job.config['zip_accumulated_mb_threshold'])
 
-        next_job: Optional[Job]
+        next_jobs: List[Job] = []
 
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
-            next_job = ProcessIndexJob(
+            next_jobs.append(ProcessIndexJob(
                 db=job.db,
                 ini_description=job.ini_description,
                 config=job.config,
                 index=job.zip_index,
                 store=job.store,
                 full_resync=job.full_resync
-            )
+            ))
         else:
             zip_index, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(job.db, job.zip_index, job.config).select_filtered_files(job.zip_index)
 
@@ -65,8 +65,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
                 self._ctx.logger.debug(f"Not enough space '{job.db.db_id} zip:{job.zip_id}'!")
                 self._ctx.installation_report.add_failed_files(file_packs)
 
-                job.not_enough_space = True
-                next_job = None  # @TODO return error instead to retry later?
+                job.not_enough_space = True # @TODO return error instead to retry later?
             else:
                 folder_packs: List[PathPackage] = []
                 for folder_path, folder_description in zip_index.folders.items():
@@ -75,19 +74,19 @@ class ProcessZipWorker(DownloaderWorkerBase):
                 already_processed = self._ctx.installation_report.any_file_processed(file_packs)
                 if already_processed is not None:
                     self._ctx.logger.print(f'Skipping zip "{job.zip_id}" because file "{already_processed.pkg.rel_path}" was already processed by db "{already_processed.db_id}"')
-                    return None, None
+                    return [], None
 
-                get_file_job, info = make_open_zip_contents_job(
+                get_file_job, _ = make_open_zip_contents_job(
                     job=job,
                     zip_index=zip_index,
                     file_packs=file_packs,
                     folder_packs=folder_packs,
                     filtered_data=filtered_zip_data[job.zip_id] if job.zip_id in filtered_zip_data else {'files': {}, 'folders': {}}
                 )
-                next_job = get_file_job
+                next_jobs.append(get_file_job)
 
         self._fill_fragment_with_zip_index(job.result_zip_index, job)
-        return next_job, None
+        return next_jobs, None
 
     def _try_reserve_space(self, file_packs: List[PathPackage]) -> bool:
         fits_well, full_partitions = self._ctx.free_space_reservation.reserve_space_for_file_pkgs(file_packs)
