@@ -81,6 +81,7 @@ class JobSystem(JobContext):
         self._signals = [signal.SIGINT]
 
     def timed_out(self) -> bool: return self._timed_out
+    def get_unhandled_exceptions(self) -> Iterable[BaseException]: return self._unhandled_errors
     def pending_jobs_amount(self) -> int: return self._pending_jobs_amount
 
     def set_interfering_signals(self, signals: List[signal.Signals]):
@@ -134,8 +135,6 @@ class JobSystem(JobContext):
         finally:
             with self._lock:
                 self._is_executing_jobs = False
-
-    def get_unhandled_exceptions(self) -> Iterable[BaseException]: return self._unhandled_errors
 
     def cancel_pending_jobs(self) -> None:
         # This must be thread-safe. We lock so that execution can be interrupted asap.
