@@ -262,12 +262,12 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         cancelled: Optional[Dict[int, int]] = None,
         pending: int = 0,
         timed_out: bool = False,
-        errors: int = 0,
+        errors: int = 0
     ):
         self.assertEqual({
             'started_jobs': started or completed or {},
             'in_progress_jobs': in_progress or {},
-            'completed_jobs':completed or {},
+            'completed_jobs': completed or {},
             'failed_jobs': failed or {},
             'retried_jobs': retried or {},
             'cancelled_jobs': cancelled or {},
