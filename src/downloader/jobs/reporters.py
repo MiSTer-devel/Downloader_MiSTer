@@ -111,6 +111,8 @@ class InstallationReport(Protocol):
 
 
 class JobTagTracking:
+    # To avoid errors, the jobs passed here need to be kept alive in memory, since we are using their address as key,
+    # and a new job with the same address of an old one would cause very hard to debug problems.
     def __init__(self):
         self.in_progress: Dict[Union[str, int], Set[int]] = defaultdict(set)
         self._initiated: Set[int] = set()
@@ -171,8 +173,6 @@ class JobTagTracking:
         if job_id in self._initiated: self._initiated.remove(job_id)
         if job_id in self._ended: self._ended.remove(job_id)
 
-
-
 T = TypeVar('T')
 class _WithLock(Generic[T]):
     __slots__ = ("data", "lock")
@@ -186,7 +186,6 @@ class _WithLock(Generic[T]):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
-
 
 # @TODO: Want to remove almost all locks in the report altogether, workers should add intermediate results to the jobs
 #  instead, only exception is tags as workers want to query that in runtime in some scenarios.
