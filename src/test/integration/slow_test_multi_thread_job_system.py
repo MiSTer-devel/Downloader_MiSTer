@@ -50,39 +50,6 @@ class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
 
         self.assertReports(started={1: 1}, completed={1: 1}, timed_out=True)
 
-    def assertReports(self,
-        completed: Optional[Dict[int, int]] = None,
-        started: Optional[Dict[int, int]] = None,
-        in_progress: Optional[Dict[int, int]] = None,
-        failed: Optional[Dict[int, int]] = None,
-        retried: Optional[Dict[int, int]] = None,
-        cancelled: Optional[Dict[int, int]] = None,
-        pending: int = 0,
-        timed_out: bool = False,
-        errors: int = 0
-    ):
-        self.assertEqual({
-            'completed_jobs': completed or {},
-            'started_jobs': started or completed or {},
-            'in_progress_jobs': in_progress or {},
-            'failed_jobs': failed or {},
-            'retried_jobs': retried or {},
-            'cancelled_jobs': cancelled or {},
-            'pending_jobs_amount': pending,
-            'timed_out': timed_out,
-            'errors': errors
-        }, {
-            'completed_jobs': self.reporter.completed_jobs,
-            'started_jobs': self.reporter.started_jobs,
-            'in_progress_jobs': {k: len(v) for k, v in self.reporter.tracker.in_progress.items() if len(v) != 0},
-            'failed_jobs': self.reporter.failed_jobs,
-            'retried_jobs': self.reporter.retried_jobs,
-            'cancelled_jobs': self.reporter.cancelled_jobs,
-            'pending_jobs_amount': self.system.pending_jobs_amount(),
-            'timed_out': self.system.timed_out(),
-            'errors': len(self.system.get_unhandled_exceptions())
-        })
-
 
 class TimedJob(Job):
     @property
