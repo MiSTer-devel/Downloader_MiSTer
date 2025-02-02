@@ -282,7 +282,7 @@ class JobSystem(JobContext):
                     for child_job in package.next_jobs:
                         ex = self._internal_push_job(child_job, parent_package=package)
                         if ex is not None:
-                            self._add_unhandled_exception(ex, package=package, sub_job=('child', child_job), ctx='handle-notifications-job-completed')
+                            self._add_unhandled_exception(ex, package=package, sub_job=('child', child_job), ctx='handle-notifications-push-job')
                             continue
 
                         next_jobs.append(child_job)
@@ -293,7 +293,7 @@ class JobSystem(JobContext):
             elif status == _JobState.JOB_CANCELLED:
                 self._jobs_cancelled.append(package.job)
             else:
-                self._add_unhandled_exception(ValueError(f'Unhandled JobState notification: {status}'), package=package, ctx='handle-notifications-switch')
+                self._add_unhandled_exception(ValueError(f'Unhandled JobState notification: {status}'), package=package, ctx='handle-notifications-switch-status')
 
     def _remove_done_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> List[Tuple['_JobPackage', Future[None]]]:
         still_pending = []
