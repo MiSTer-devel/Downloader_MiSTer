@@ -126,7 +126,7 @@ class TestInstallationReportImpl(unittest.TestCase):
         self.assertTrue(self.tags(['validate_file']))
         self.assertFalse(self.tags(['fetch_file']))
 
-    def test_zip_tag__during_a_smooth_zip_download_lifecycle___returns_true_and_false_accordingly(self):
+    def test_zip_tag___during_a_smooth_zip_download_lifecycle___returns_true_during_the_transaction_and_false_outside(self):
         fetch_index, validate_index, open_zip_index, process_zip, fetch_content, validate_content, unzip_content = job('zip'), job('zip'), job('zip'), job('zip'), job('zip'), job('zip'), job('zip')
 
         self.assertFalse(self.tags(['zip']))
@@ -142,7 +142,7 @@ class TestInstallationReportImpl(unittest.TestCase):
 
         self.assertFalse(self.tags(['zip']))
 
-    def test_different_tag_sequences___after_convoluted_transaction_with_retries(self):
+    def test_different_tag_sequences___after_convoluted_transaction_with_retries___returns_true_and_false_accordingly(self):
         fetch_file, validate_file, process_db = job('fetch_file'), job('validate_file'), job('process_db')
         self.report.add_job_started(fetch_file)
         self.report.add_job_started(process_db)
