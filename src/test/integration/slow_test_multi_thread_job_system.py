@@ -74,7 +74,7 @@ class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
         }, {
             'completed_jobs': self.reporter.completed_jobs,
             'started_jobs': self.reporter.started_jobs,
-            'in_progress_jobs': {k: len(v) for k, v in self.reporter.in_progress_jobs.items()},
+            'in_progress_jobs': {k: len(v) for k, v in self.reporter.tracker.in_progress.items() if len(v) != 0},
             'failed_jobs': self.reporter.failed_jobs,
             'retried_jobs': self.reporter.retried_jobs,
             'cancelled_jobs': self.reporter.cancelled_jobs,
