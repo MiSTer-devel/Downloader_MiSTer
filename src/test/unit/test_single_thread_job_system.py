@@ -95,6 +95,20 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
         self.assertReports(completed={1: 3, 2: 3}, started={1: 3, 2: 3}, in_progress={}, pending=0)
 
+    def test_cycle_detection___with_infinite_self_recursion___throws(self):
+        self.system.register_worker(1, TestWorker(self.system))
+
+        job = TestJob(1)
+        job.next_job = job
+
+        self.system.push_job(job)
+
+        with self.assertRaises(Exception) as context:
+            self.system.execute_jobs()
+
+        self.assertIsInstance(context.exception, CycleDetectedException)
+        self.assertReports(completed={1: 4}, failed={1: 1}, errors=1)
+
     def test_register_worker_during_execute_jobs___throws(self):
         self.system.register_worker(1, TestWorker(self.system))
         self.system.push_job(TestJob(1, register_worker=TestWorker(self.system)))
@@ -355,9 +369,14 @@ class TestProgressReporter(ProgressReporter):
 
     def notify_job_completed(self, job: Job, next_jobs: List[Job]):
         self.completed_jobs[job.type_id] = self.completed_jobs.get(job.type_id, 0) + 1
+        auto_spawn = False
         for c_job in next_jobs:
+            if c_job == job:
+                auto_spawn = True
+                continue
             self._add_in_progress(c_job)
-        self._remove_in_progress(job)
+        if not auto_spawn:
+            self._remove_in_progress(job)
 
     def notify_job_failed(self, job: Job, exception: BaseException):
         self.failed_jobs[job.type_id] = self.failed_jobs.get(job.type_id, 0) + 1
