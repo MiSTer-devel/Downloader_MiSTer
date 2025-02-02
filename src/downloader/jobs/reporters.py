@@ -110,6 +110,69 @@ class InstallationReport(Protocol):
     def filtered_zip_data(self) -> Dict[str, Any]: """Filtered zip data that has been processed."""
 
 
+class JobTagTracking:
+    def __init__(self):
+        self.in_progress: Dict[Union[str, int], Set[int]] = defaultdict(set)
+        self._initiated: Set[int] = set()
+        self._ended: Set[int] = set()
+
+    def add_job_started(self, job: Job):
+        self._add_job_in_progress(job)
+
+    def add_jobs_cancelled(self, jobs: List[Job]) -> None:
+        for job in jobs:
+            self._remove_job_in_progress(job)
+
+    def add_job_completed(self, job: Job, next_jobs: List[Job]):
+        auto_spawn = False
+        for c_job in next_jobs:
+            if c_job == job:
+                auto_spawn = True
+                continue
+            self._reset_lifecycle(c_job)
+            self._add_job_in_progress(c_job)
+
+        if not auto_spawn:
+            self._remove_job_in_progress(job)
+
+    def add_job_failed(self, job: Job):
+        self._remove_job_in_progress(job)
+
+    def add_job_retried(self, job: Job, retry_job: Job):
+        if job != retry_job:
+            self._reset_lifecycle(retry_job)
+            self._add_job_in_progress(retry_job)
+            self._remove_job_in_progress(job)
+
+    def _add_job_in_progress(self, job: Job):  # Needs to be called with lock
+        job_id = id(job)
+        if job_id not in self._initiated:
+            self._initiated.add(job_id)
+        if job_id in self._ended:
+            return
+        
+        for tag in job.tags:
+            self.in_progress[tag].add(job_id)
+
+    def _remove_job_in_progress(self, job: Job):  # Needs to be called with lock
+        job_id = id(job)
+        if job_id not in self._ended:
+            self._ended.add(job_id)
+        if job_id not in self._initiated:
+            return
+
+        for tag in job.tags:
+            if job_id not in self.in_progress[tag]:
+                continue
+            self.in_progress[tag].remove(job_id)
+
+    def _reset_lifecycle(self, job: Job):  # Needs to be called with lock
+        job_id = id(job)
+        if job_id in self._initiated: self._initiated.remove(job_id)
+        if job_id in self._ended: self._ended.remove(job_id)
+
+
+
 T = TypeVar('T')
 class _WithLock(Generic[T]):
     __slots__ = ("data", "lock")
@@ -152,89 +215,46 @@ class InstallationReportImpl(InstallationReport):
         self._jobs_failed = _WithLock[Dict[int, List[Tuple[Job, BaseException]]]](defaultdict(list), lock)
         self._jobs_retried = _WithLock[Dict[int, List[Tuple[Job, BaseException]]]](defaultdict(list), lock)
         job_tag_lock = threading.Lock()
-        self._jobs_tag_in_progress = _WithLock[Dict[Union[str, int], Set[int]]](defaultdict(set), job_tag_lock)
         self._jobs_tag_completed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
         self._jobs_tag_failed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
-        self._jobs_initiated = _WithLock[Set[int]](set(), job_tag_lock)  # Needs job_tag_lock because they are used for _jobs_tag_in_progress
-        self._jobs_ended = _WithLock[Set[int]](set(), job_tag_lock)  # Needs job_tag_lock because they are used for _jobs_tag_in_progress
+        self._jobs_tag_tracking = _WithLock[JobTagTracking](JobTagTracking(), job_tag_lock)
 
     def add_job_started(self, job: Job):
         with self._jobs_started as jobs_started: jobs_started[job.type_id].append(job)
-        with self._jobs_tag_in_progress.lock: self._unsafe_add_job_in_progress(job)
+        with self._jobs_tag_tracking as tracking: tracking.add_job_started(job)
 
     def add_jobs_cancelled(self, jobs: List[Job]) -> None:
         with self._jobs_cancelled as jobs_cancelled:
             for job in jobs:
                 jobs_cancelled[job.type_id].append(job)
         
-        with self._jobs_tag_in_progress.lock:
-            for job in jobs:
-                self._unsafe_remove_job_in_progress(job)
+        with self._jobs_tag_tracking as tracking: tracking.add_jobs_cancelled(jobs)
 
     def add_job_completed(self, job: Job, next_jobs: List[Job]):
         with self._jobs_completed as jobs_completed: jobs_completed[job.type_id].append(job)
-        with self._jobs_tag_in_progress.lock:
-            auto_spawn = False
-            for c_job in next_jobs:
-                if c_job == job:
-                    auto_spawn = True
-                    continue
-                self._unsafe_reset_lifecycle(c_job)
-                self._unsafe_add_job_in_progress(c_job)
-
-            if not auto_spawn:
-                self._unsafe_remove_job_in_progress(job)
+        with self._jobs_tag_tracking as tracking:
+            tracking.add_job_completed(job, next_jobs)
             for tag in job.tags:
                 self._jobs_tag_completed.data[tag].append(job)
 
     def add_job_failed(self, job: Job, exception: BaseException):
         with self._jobs_failed as jobs_failed: jobs_failed[job.type_id].append((job, exception))
-        with self._jobs_tag_in_progress.lock:
-            self._unsafe_remove_job_in_progress(job)
+        with self._jobs_tag_tracking as tracking:
+            tracking.add_job_failed(job)
             for tag in job.tags:
                 self._jobs_tag_failed.data[tag].append(job)
 
     def add_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
         with self._jobs_retried as jobs_retried: jobs_retried[job.type_id].append((job, exception))
-        if job != retry_job:
-            with self._jobs_tag_in_progress.lock:
-                self._unsafe_reset_lifecycle(retry_job)
-                self._unsafe_add_job_in_progress(retry_job)
-                self._unsafe_remove_job_in_progress(job)
+        with self._jobs_tag_tracking as tracking: tracking.add_job_retried(job, retry_job)
 
     def any_in_progress_job_with_tags(self, tags: List[str]) -> bool:
         if len(tags) == 0: return False
-        with self._jobs_tag_in_progress as in_progress:
+        with self._jobs_tag_tracking as tracking:
             for tag in tags:
-                if len(in_progress[tag]) > 0: return True
+                if len(tracking.in_progress[tag]) > 0: return True
+
         return False
-
-    def _unsafe_add_job_in_progress(self, job: Job):  # Needs to be called with lock
-        job_id = id(job)
-        if job_id not in self._jobs_initiated.data:
-            self._jobs_initiated.data.add(job_id)
-        if job_id in self._jobs_ended.data:
-            return
-        
-        for tag in job.tags:
-            self._jobs_tag_in_progress.data[tag].add(job_id)
-
-    def _unsafe_remove_job_in_progress(self, job: Job):  # Needs to be called with lock
-        job_id = id(job)
-        if job_id not in self._jobs_ended.data:
-            self._jobs_ended.data.add(job_id)
-        if job_id not in self._jobs_initiated.data:
-            return
-
-        for tag in job.tags:
-            if job_id not in self._jobs_tag_in_progress.data[tag]:
-                continue
-            self._jobs_tag_in_progress.data[tag].remove(job_id)
-
-    def _unsafe_reset_lifecycle(self, job: Job):  # Needs to be called with lock
-        job_id = id(job)
-        if job_id in self._jobs_initiated.data: self._jobs_initiated.data.remove(job_id)
-        if job_id in self._jobs_ended.data: self._jobs_ended.data.remove(job_id)
 
     def get_jobs_completed_by_tags(self, tags: List[str]) -> List[Tuple[str, List[Job]]]:
         if len(tags) == 0: return []
