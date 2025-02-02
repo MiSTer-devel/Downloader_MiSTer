@@ -144,7 +144,7 @@ class JobTagTracking:
             self._add_job_in_progress(retry_job)
             self._remove_job_in_progress(job)
 
-    def _add_job_in_progress(self, job: Job):  # Needs to be called with lock
+    def _add_job_in_progress(self, job: Job):
         job_id = id(job)
         if job_id not in self._initiated:
             self._initiated.add(job_id)
@@ -154,7 +154,7 @@ class JobTagTracking:
         for tag in job.tags:
             self.in_progress[tag].add(job_id)
 
-    def _remove_job_in_progress(self, job: Job):  # Needs to be called with lock
+    def _remove_job_in_progress(self, job: Job):
         job_id = id(job)
         if job_id not in self._ended:
             self._ended.add(job_id)
@@ -166,7 +166,7 @@ class JobTagTracking:
                 continue
             self.in_progress[tag].remove(job_id)
 
-    def _reset_lifecycle(self, job: Job):  # Needs to be called with lock
+    def _reset_lifecycle(self, job: Job):
         job_id = id(job)
         if job_id in self._initiated: self._initiated.remove(job_id)
         if job_id in self._ended: self._ended.remove(job_id)
