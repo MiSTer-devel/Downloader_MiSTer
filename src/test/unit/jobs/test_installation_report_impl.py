@@ -39,39 +39,39 @@ class TestInstallationReportImpl(unittest.TestCase):
             with self.subTest(tags=wrong_tags):
                 self.assertFalse(self.report.any_in_progress_job_with_tags(wrong_tags))
 
-    def test_any_in_progress_job_with_tags_a_b___after_start_job_with_two_tags_a_b_in_it___returns_true_for_both_tags_separately_and_combined(self):
+    def test_tags_a_b___after_start_job_with_two_tags_a_b_in_it___returns_true_for_both_tags_separately_and_combined(self):
         self.report.add_job_started(job(['a', 'b']))
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['a']))
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['b']))
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['a', 'b']))
+        self.assertTrue(self.tags(['a']))
+        self.assertTrue(self.tags(['b']))
+        self.assertTrue(self.tags(['a', 'b']))
 
-    def test_any_in_progress_job_with_tag_a___after_start_and_complete_job_a___returns_false(self):
+    def test_tag_a___after_start_and_complete_job_a___returns_false(self):
         self.report.add_job_started(self.job_a)
         self.report.add_job_completed(self.job_a, [])
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['a']))
+        self.assertFalse(self.tags(['a']))
     
-    def test_any_in_progress_job_with_tag_a___after_start_job_a_and_complete_another_job_a___return_true_because_they_have_different_identity(self):
+    def test_tag_a___after_start_job_a_and_complete_another_job_a___return_true_because_they_have_different_identity(self):
         self.report.add_job_started(job('a'))
         self.report.add_job_completed(job('a'), [])
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['a']))
+        self.assertTrue(self.tags(['a']))
 
-    def test_any_in_progress_job_with_tag_a___after_fail_job_a_and_then_start_job_a___returns_false_because_we_have_eventual_consistency(self):
+    def test_tag_a___after_fail_job_a_and_then_start_job_a___returns_false_because_we_have_eventual_consistency(self):
         self.report.add_job_failed(self.job_a, self.e)
         self.report.add_job_started(self.job_a)
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['a']))
+        self.assertFalse(self.tags(['a']))
 
-    def test_any_in_progress_job_with_tag_a___after_complete_job_a_with_a_child___returns_true_because_the_child_is_inmediately_active(self):
+    def test_tag_a___after_complete_job_a_with_a_child___returns_true_because_the_child_is_inmediately_active(self):
         self.report.add_job_completed(self.job_a, [job('a')])
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['a']))
+        self.assertTrue(self.tags(['a']))
 
-    def test_any_in_progress_job_with_tag_a_b___after_complete_job_a_with_b_child___returns_false_for_a_and_true_for_b(self):
+    def test_tag_a_b___after_complete_job_a_with_b_child___returns_false_for_a_and_true_for_b(self):
         self.report.add_job_started(self.job_a)
         self.report.add_job_completed(self.job_a, [job('b')])
 
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['a']))
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['b']))
+        self.assertFalse(self.tags(['a']))
+        self.assertTrue(self.tags(['b']))
 
-    def test_any_in_progress_job_with_tag_a___after_complete_job_a_between_many_started___returns_false_because_violations_of_lifecycle_get_ignored(self):
+    def test_tag_a___after_complete_job_a_between_many_started___returns_false_because_violations_of_lifecycle_get_ignored(self):
         self.report.add_job_started(self.job_a)
         self.report.add_job_started(self.job_a)
         self.report.add_job_started(self.job_a)
@@ -80,53 +80,69 @@ class TestInstallationReportImpl(unittest.TestCase):
         self.report.add_job_started(self.job_a)
         self.report.add_job_started(self.job_a)
 
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['a']))
+        self.assertFalse(self.tags(['a']))
 
-    def test_any_in_progress_job_with_tag_a_and_b___after_cancel_job_a_and_b___returns_false_for_both(self):
+    def test_tag_a_and_b___after_cancel_job_a_and_b___returns_false_for_both(self):
         self.report.add_job_started(self.job_a)
         self.report.add_jobs_cancelled([self.job_a, self.job_b])
         self.report.add_job_started(self.job_b)
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['a', 'b']))
+        self.assertFalse(self.tags(['a', 'b']))
 
-    def test_any_in_progress_job_with_tag_a___after_start_job_a_and_retry_itself___returns_true_because_retry_on_itself_changes_nothing(self):
+    def test_tag_a___after_start_job_a_and_retry_itself___returns_true_because_retry_on_itself_changes_nothing(self):
         self.report.add_job_started(self.job_a)
         self.report.add_job_retried(self.job_a, self.job_a, self.e)
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['a']))
+        self.assertTrue(self.tags(['a']))
 
-    def test_any_in_progress_job_with_tag_a_b___after_start_job_a_and_retry_with_job_b___returns_false_on_job_a_and_true_on_job_b(self):
+    def test_tag_a_b___after_start_job_a_and_retry_with_job_b___returns_false_on_job_a_and_true_on_job_b(self):
         self.report.add_job_started(self.job_a)
         self.report.add_job_retried(self.job_a, self.job_b, self.e)
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['a']))
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['b']))
+        self.assertFalse(self.tags(['a']))
+        self.assertTrue(self.tags(['b']))
 
-    def test_any_in_progress_job_with_tags_fetch_and_validate_file___after_retry_validate_back_to_fetch___returns_true_on_fetch_and_false_on_validate(self):
+    def test_tags_fetch_and_validate_file___after_retry_validate_back_to_fetch___returns_true_on_fetch_and_false_on_validate(self):
         fetch_file, validate_file = job('fetch_file'), job('validate_file')
         self.report.add_job_started(fetch_file)
         self.report.add_job_completed(fetch_file, [validate_file])  # End of fetch_file lifecycle
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['fetch_file']))
+        self.assertFalse(self.tags(['fetch_file']))
 
         self.report.add_job_started(fetch_file)  # Get's ignored because the lifecycle is over
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['fetch_file']))
+        self.assertFalse(self.tags(['fetch_file']))
 
         self.report.add_job_retried(validate_file, fetch_file, self.e)  # Retry to a "ended" job should reset its lifecycle
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['fetch_file']))
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['validate_file']))
+        self.assertTrue(self.tags(['fetch_file']))
+        self.assertFalse(self.tags(['validate_file']))
 
-    def test_any_in_progress_job_with_tags_fetch_and_validate_file___after_completed_fetch_spawning_same_validate___returns_true_on_validate_and_false_on_fetch(self):
+    def test_tags_fetch_and_validate_file___after_completed_fetch_spawning_same_validate___returns_true_on_validate_and_false_on_fetch(self):
         fetch_file, validate_file = job('fetch_file'), job('validate_file')
         self.report.add_job_started(fetch_file)
         self.report.add_job_started(validate_file)
         self.report.add_job_completed(validate_file, [])  # End of validate_file lifecycle
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['validate_file']))
+        self.assertFalse(self.tags(['validate_file']))
 
         self.report.add_job_started(validate_file)  # Get's ignored because the lifecycle is over
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['validate_file']))
+        self.assertFalse(self.tags(['validate_file']))
 
         self.report.add_job_completed(fetch_file, [validate_file])  # Comtinuing to a "ended" child job resets its lifecycle
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['validate_file']))
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['fetch_file']))
+        self.assertTrue(self.tags(['validate_file']))
+        self.assertFalse(self.tags(['fetch_file']))
 
-    def test_any_in_progress_job_with_different_tag_sequences___after_typical_downloader_lifecycle_with_retries(self):
+    def test_zip_tag__during_a_smooth_zip_download_lifecycle___returns_true_and_false_accordingly(self):
+        fetch_index, validate_index, open_zip_index, process_zip, fetch_content, validate_content, unzip_content = job('zip'), job('zip'), job('zip'), job('zip'), job('zip'), job('zip'), job('zip')
+
+        self.assertFalse(self.tags(['zip']))
+
+        self.report.add_job_started(fetch_index)                            ;  self.assertTrue(self.tags(['zip']))
+        self.report.add_job_completed(fetch_index, [validate_index])        ;  self.assertTrue(self.tags(['zip']))
+        self.report.add_job_completed(validate_index, [open_zip_index])     ;  self.assertTrue(self.tags(['zip']))
+        self.report.add_job_completed(open_zip_index, [process_zip])        ;  self.assertTrue(self.tags(['zip']))
+        self.report.add_job_completed(process_zip, [fetch_content])         ;  self.assertTrue(self.tags(['zip']))
+        self.report.add_job_completed(fetch_content, [validate_content])    ;  self.assertTrue(self.tags(['zip']))
+        self.report.add_job_completed(validate_content, [unzip_content])    ;  self.assertTrue(self.tags(['zip']))
+        self.report.add_job_completed(unzip_content, [])
+
+        self.assertFalse(self.tags(['zip']))
+
+    def test_different_tag_sequences___after_convoluted_transaction_with_retries(self):
         fetch_file, validate_file, process_db = job('fetch_file'), job('validate_file'), job('process_db')
         self.report.add_job_started(fetch_file)
         self.report.add_job_started(process_db)
@@ -134,19 +150,23 @@ class TestInstallationReportImpl(unittest.TestCase):
         self.report.add_job_completed(fetch_file, [validate_file])
         self.report.add_job_started(validate_file)
         self.report.add_job_retried(validate_file, fetch_file, self.e)
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['validate_file']))
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['fetch_file']))  # Retry to a "ended" job should reset its lifecycle
+        self.assertFalse(self.tags(['validate_file']))
+        self.assertTrue(self.tags(['fetch_file']))  # Retry to a "ended" job should reset its lifecycle
 
         self.report.add_job_started(fetch_file)
         self.report.add_job_completed(fetch_file, [validate_file])  # Comtinuing to a "ended" child job should reset its lifecycle too
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['validate_file']))
+        self.assertTrue(self.tags(['validate_file']))
 
         self.report.add_job_failed(validate_file, self.e)
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['validate_file', 'fetch_file']))
-        self.assertTrue(self.report.any_in_progress_job_with_tags(['validate_file', 'fetch_file', 'process_db']))
+        self.assertFalse(self.tags(['validate_file', 'fetch_file']))
+        self.assertTrue(self.tags(['validate_file', 'fetch_file', 'process_db']))
 
         self.report.add_job_completed(process_db, [])
-        self.assertFalse(self.report.any_in_progress_job_with_tags(['validate_file', 'fetch_file', 'process_db']))
+        self.assertFalse(self.tags(['validate_file', 'fetch_file', 'process_db']))
+
+    def tags(self, tags: List[Union[int, str]]) -> bool:
+        return self.report.any_in_progress_job_with_tags(tags)
+
 
 class TestJob(Job):
     def __init__(self, id: int):

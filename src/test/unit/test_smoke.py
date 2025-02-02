@@ -18,6 +18,7 @@
 
 import unittest
 
+unittest.TestCase.maxDiff = None
 
 class TestSmoke(unittest.TestCase):
 
