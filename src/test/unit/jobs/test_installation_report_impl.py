@@ -39,6 +39,12 @@ class TestInstallationReportImpl(unittest.TestCase):
             with self.subTest(tags=wrong_tags):
                 self.assertFalse(self.report.any_in_progress_job_with_tags(wrong_tags))
 
+    def test_any_in_progress_job_with_tags_a_b___after_start_job_with_two_tags_a_b_in_it___returns_true_for_both_tags_separately_and_combined(self):
+        self.report.add_job_started(job(['a', 'b']))
+        self.assertTrue(self.report.any_in_progress_job_with_tags(['a']))
+        self.assertTrue(self.report.any_in_progress_job_with_tags(['b']))
+        self.assertTrue(self.report.any_in_progress_job_with_tags(['a', 'b']))
+
     def test_any_in_progress_job_with_tag_a___after_start_and_complete_job_a___returns_false(self):
         self.report.add_job_started(self.job_a)
         self.report.add_job_completed(self.job_a, [])
