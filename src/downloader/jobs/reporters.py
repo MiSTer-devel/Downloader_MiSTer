@@ -175,6 +175,7 @@ class InstallationReportImpl(InstallationReport):
         with self._jobs_completed as jobs_completed: jobs_completed[job.type_id].append(job)
         with self._jobs_tag_in_progress.lock:
             for c_job in next_jobs:
+                self._unsafe_reset_lifecycle(c_job)
                 self._unsafe_add_job_in_progress(c_job)
             self._unsafe_remove_job_in_progress(job)
             for tag in job.tags:
@@ -191,6 +192,7 @@ class InstallationReportImpl(InstallationReport):
         with self._jobs_retried as jobs_retried: jobs_retried[job.type_id].append((job, exception))
         if job != retry_job:
             with self._jobs_tag_in_progress.lock:
+                self._unsafe_reset_lifecycle(retry_job)
                 self._unsafe_add_job_in_progress(retry_job)
                 self._unsafe_remove_job_in_progress(job)
 
@@ -219,7 +221,14 @@ class InstallationReportImpl(InstallationReport):
             return
 
         for tag in job.tags:
+            if job_id not in self._jobs_tag_in_progress.data[tag]:
+                continue
             self._jobs_tag_in_progress.data[tag].remove(job_id)
+
+    def _unsafe_reset_lifecycle(self, job: Job):  # Needs to be called with lock
+        job_id = id(job)
+        if job_id in self._jobs_initiated.data: self._jobs_initiated.data.remove(job_id)
+        if job_id in self._jobs_ended.data: self._jobs_ended.data.remove(job_id)
 
     def get_jobs_completed_by_tags(self, tags: List[str]) -> List[Tuple[str, List[Job]]]:
         if len(tags) == 0: return []
