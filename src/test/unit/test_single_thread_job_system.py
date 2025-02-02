@@ -17,10 +17,11 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from collections import defaultdict
+import signal
 import unittest
 from functools import reduce
 
-from downloader.job_system import Job, JobFailPolicy, JobSystem, Worker, CycleDetectedException, ProgressReporter, CantPushJobs, \
+from downloader.job_system import CantSetSignalsException, Job, JobFailPolicy, JobSystem, JobSystemAbortException, Worker, CycleDetectedException, ProgressReporter, CantPushJobs, \
     CantRegisterWorkerException, CantExecuteJobs, CantWaitWhenNotExecutingJobs, WorkerResult
 from typing import Dict, Optional, List
 
@@ -64,15 +65,31 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
         self.assertReports(completed={1: 1, 2: 1, 3: 1, 4: 1, 5: 1})
 
-    def test_job_id_with_not_registered_worker___throws(self):
-        self.system.register_worker(1, TestWorker(self.system))
-        self.system.push_job(TestJob(1, next_job=TestJob(2)))
-
+    def test_wait_for_other_jobs___when_execute_jobs_is_not_called___throws(self):
         with self.assertRaises(Exception) as context:
-            self.system.execute_jobs()
+            self.system.wait_for_other_jobs()
 
-        self.assertIsInstance(context.exception, CantPushJobs)
-        self.assertReports(started={1: 1}, completed={1: 1}, errors=1)
+        self.assertIsInstance(context.exception, JobSystemAbortException)
+        self.assertIsInstance(context.exception, CantWaitWhenNotExecutingJobs)
+
+    def test_system_abortions___when_breaking_api_within_workers___throws(self):
+        for spec, job, ex, result in [
+            ('job_id_with_not_registered_worker', TestJob(1, next_job=TestJob(2)), CantPushJobs, {"completed": {1: 1}}),
+            ('register_worker_during_execute_jobs', TestJob(1, register_worker=TestWorker(self.system)), CantRegisterWorkerException, {"failed": {1: 1}}),
+            ('set_signals_during_execute_jobs', TestJob(1, set_signals=[]), CantSetSignalsException, {"failed": {1: 1}}),
+            ('execute_jobs_within_worker', TestJob(1, execute_jobs=True), CantExecuteJobs, {"failed": {1: 1}}),
+        ]:
+            self.setUp()
+            with self.subTest(spec):
+                self.system.register_worker(1, TestWorker(self.system))
+                self.system.push_job(job)
+
+                with self.assertRaises(Exception) as context:
+                    self.system.execute_jobs()
+
+                self.assertIsInstance(context.exception, JobSystemAbortException)
+                self.assertIsInstance(context.exception, ex)
+                self.assertReports(started={1: 1}, errors=1, **result)
 
     def test_cycle_detection___throws(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -83,6 +100,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             self.system.execute_jobs()
 
+        self.assertIsInstance(context.exception, JobSystemAbortException)
         self.assertIsInstance(context.exception, CycleDetectedException)
         self.assertReports(completed={1: 4, 2: 3}, failed={2: 1}, errors=1)
 
@@ -107,18 +125,9 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             self.system.execute_jobs()
 
+        self.assertIsInstance(context.exception, JobSystemAbortException)
         self.assertIsInstance(context.exception, CycleDetectedException)
         self.assertReports(completed={1: 4}, failed={1: 1}, errors=1)
-
-    def test_register_worker_during_execute_jobs___throws(self):
-        self.system.register_worker(1, TestWorker(self.system))
-        self.system.push_job(TestJob(1, register_worker=TestWorker(self.system)))
-
-        with self.assertRaises(Exception) as context:
-            self.system.execute_jobs()
-
-        self.assertIsInstance(context.exception, CantRegisterWorkerException)
-        self.assertReports(started={1: 1}, failed={1: 1}, errors=1)
 
     def test_retries___when_job_retries_itself___reports_completed_jobs_and_retries(self):
         self.system.register_worker(1, TestWorker(self.system))
@@ -217,30 +226,6 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
         self.assertReports(completed={1: 3}, started={1: 3})
 
-    def test_execute_jobs_within_worker___throws(self):
-        self.system.register_worker(1, TestWorker(self.system))
-
-        self.system.push_job(TestJob(1, execute_jobs=True))
-
-        self.assertEqual(self.system.pending_jobs_amount(), 1)
-
-        with self.assertRaises(Exception) as context:
-            self.system.execute_jobs()
-
-        self.assertIsInstance(context.exception, CantExecuteJobs)
-
-    def test_wait_for_other_jobs___when_execute_jobs_is_not_called___throws(self):
-        self.system.register_worker(1, TestWorker(self.system))
-        self.system.push_job(TestJob(1))
-
-        with self.assertRaises(Exception) as context:
-            self.system.wait_for_other_jobs()
-
-        self.assertIsInstance(context.exception, CantWaitWhenNotExecutingJobs)
-
-    def test_wait_for_jobs___while_a_job_chain_is_executing___waits_until_all_jobs_are_completed(self):
-        pass
-
     def test_job_add_tag_a_b___when_checked_tags___returns_b(self):
         job = TestJob(1)
         job.add_tag('a')
@@ -289,15 +274,15 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
 class TestJob(Job):
     def __init__(self, type_id: int, next_job: Optional['TestJob'] = None, retry_job: Optional['TestJob'] = None, fails: int = 0, register_worker: Optional[Worker] = None,
-                 cancel_pending_jobs: bool = False, raises: bool = False, execute_jobs: bool = False, wait_for_other_jobs: bool = False):
+                 cancel_pending_jobs: bool = False, raises: bool = False, execute_jobs: bool = False, set_signals: Optional[List[signal.Signals]] = None):
         self._type_id = type_id
         self._retry_job = retry_job
         self.next_job = next_job
         self.fails = fails
         self.raises = raises
         self.execute_jobs = execute_jobs
-        self.wait_for_other_jobs = wait_for_other_jobs
         self.register_worker = register_worker
+        self.set_signals = set_signals
         self.cancel_pending_jobs = cancel_pending_jobs
 
     @property
@@ -329,11 +314,11 @@ class TestWorker(Worker):
         if job.register_worker is not None:
             self.system.register_worker(99, job.register_worker)
 
+        if job.set_signals is not None:
+            self.system.set_interfering_signals(job.set_signals)
+
         if job.execute_jobs:
             self.system.execute_jobs()
-
-        if job.wait_for_other_jobs:
-            self.system.wait_for_other_jobs()
 
         if job.next_job is not None:
             return [job.next_job], None

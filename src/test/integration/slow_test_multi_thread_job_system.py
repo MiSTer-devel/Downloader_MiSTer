@@ -18,7 +18,7 @@
 
 import time
 import unittest
-from downloader.job_system import JobFailPolicy, JobSystem, Worker, Job
+from downloader.job_system import CantWaitWhenTimedOut, JobFailPolicy, JobSystem, Worker, Job
 from downloader.logger import NoLogger
 from test.unit.test_single_thread_job_system import TestSingleThreadJobSystem
 
@@ -26,10 +26,11 @@ from test.unit.test_single_thread_job_system import TestSingleThreadJobSystem
 class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
 
     def test_base_provides_tests(self): self.assertGreater(len([m for m in dir(self) if m.startswith('test_')]), 5)
-    def sut(self, fail: JobFailPolicy = JobFailPolicy.FAIL_GRACEFULLY)  -> JobSystem: return JobSystem(self.reporter, logger=NoLogger(), max_threads=20, fail_policy=fail)
+    def sut(self, fail: JobFailPolicy = JobFailPolicy.FAIL_GRACEFULLY, threads: int = 20, max_cycle: int = 3, timeout: int = 0.001)  -> JobSystem:
+        return JobSystem(self.reporter, logger=NoLogger(), max_threads=threads, fail_policy=fail, max_cycle=max_cycle, max_timeout=timeout)
 
     def test_cancel_pending_jobs___when_there_are_many_jobs_produced___jobs_in_progress_will_fail_and_no_more_will_start(self):
-        self.system = JobSystem(self.reporter, logger=NoLogger(), max_threads=3, max_cycle=100)
+        self.system = self.sut(threads=3, max_cycle=100)
         self.system.register_worker(1, SlowWorker(self.system))
         self.system.push_job(TimedJob(iterations=1000))
         self.system.push_job(TimedJob(iterations=10))
@@ -42,21 +43,31 @@ class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
         self.assertFalse(self.system.timed_out())
 
     def test_timeout___when_job_takes_too_long___cancel_remaining_jobs_and_reports_timed_out(self):
-        self.system = JobSystem(self.reporter, logger=NoLogger(), max_threads=3, max_cycle=10000, max_timeout=0.01)
+        self.system = self.sut(threads=3, max_cycle=10000, timeout=0)
         self.system.register_worker(1, SlowWorker(self.system))
-        self.system.push_job(TimedJob(iterations=10000, wait=0.2))
+        self.system.push_job(TimedJob(iterations=10000, wait=0.02))
         self.system.execute_jobs()
 
         self.assertReports(started={1: 1}, completed={1: 1}, timed_out=True)
 
+    def test_wait_for_jobs___when_system_has_timed_out___throws(self):
+        self.system = self.sut(threads=3, timeout=0)
+        self.system.register_worker(1, SlowWorker(self.system))
+        self.system.push_job(TimedJob(1, wait=0.02, wait_for_other_jobs=True))
+
+        with self.assertRaises(Exception) as context:
+            self.system.execute_jobs()
+
+        self.assertIsInstance(context.exception, CantWaitWhenTimedOut)
 
 class TimedJob(Job):
     @property
     def type_id(self): return 1
-    def __init__(self, iterations: int, wait: float = 0, counter: int = 0):
+    def __init__(self, iterations: int, wait: float = 0, counter: int = 0, wait_for_other_jobs: bool = False):
         self.iterations = iterations
         self.wait = wait
         self.counter = counter
+        self.wait_for_other_jobs = wait_for_other_jobs
 
 class SlowWorker(Worker):
     def __init__(self, system: JobSystem):
@@ -64,6 +75,7 @@ class SlowWorker(Worker):
 
     def operate_on(self, job: TimedJob):
         if job.wait > 0: time.sleep(job.wait)
+        if job.wait_for_other_jobs: self.system.wait_for_other_jobs()
         if job.counter > job.iterations:
             self.system.cancel_pending_jobs()
         return [TimedJob(job.iterations, counter=job.counter + 1)], None
