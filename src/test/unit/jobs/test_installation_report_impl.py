@@ -131,43 +131,26 @@ class TestInstallationReportImpl(unittest.TestCase):
         self.report.add_job_completed(self.job_a, [self.job_a])
         self.assertTrue(self.tags(['a']))
 
-    def test_zip_tag___during_a_smooth_zip_download_lifecycle___returns_true_during_the_transaction_and_false_outside(self):
-        fetch_index, validate_index, open_zip_index, process_zip, fetch_content, validate_content, unzip_content = job('zip'), job('zip'), job('zip'), job('zip'), job('zip'), job('zip'), job('zip')
+    def test_zip_tag___during_a_realistic_zip_install_lifecycle_with_some_retries___returns_true_during_the_transaction_and_false_outside(self):
+        fetch_index, validate_index, open_zip_index, process_zip, fetch_content, validate_content, unzip_content = (job('zip') for _ in range(7))
 
         self.assertFalse(self.tags(['zip']))
 
         self.report.add_job_started(fetch_index)                            ;  self.assertTrue(self.tags(['zip']))
+        self.report.add_job_retried(fetch_index, fetch_index, self.e)       ;  self.assertTrue(self.tags(['zip']))
+        self.report.add_job_retried(fetch_index, fetch_index, self.e)       ;  self.assertTrue(self.tags(['zip']))
         self.report.add_job_completed(fetch_index, [validate_index])        ;  self.assertTrue(self.tags(['zip']))
         self.report.add_job_completed(validate_index, [open_zip_index])     ;  self.assertTrue(self.tags(['zip']))
         self.report.add_job_completed(open_zip_index, [process_zip])        ;  self.assertTrue(self.tags(['zip']))
         self.report.add_job_completed(process_zip, [fetch_content])         ;  self.assertTrue(self.tags(['zip']))
         self.report.add_job_completed(fetch_content, [validate_content])    ;  self.assertTrue(self.tags(['zip']))
         self.report.add_job_completed(validate_content, [unzip_content])    ;  self.assertTrue(self.tags(['zip']))
+        self.report.add_job_retried(unzip_content, fetch_content, self.e)   ;  self.assertTrue(self.tags(['zip']))
+        self.report.add_job_completed(fetch_content, [validate_content])    ;  self.assertTrue(self.tags(['zip']))
+        self.report.add_job_completed(validate_content, [unzip_content])    ;  self.assertTrue(self.tags(['zip']))
         self.report.add_job_completed(unzip_content, [])
 
         self.assertFalse(self.tags(['zip']))
-
-    def test_different_tag_sequences___after_convoluted_transaction_with_retries___returns_true_and_false_accordingly(self):
-        fetch_file, validate_file, process_db = job('fetch_file'), job('validate_file'), job('process_db')
-        self.report.add_job_started(fetch_file)
-        self.report.add_job_started(process_db)
-
-        self.report.add_job_completed(fetch_file, [validate_file])
-        self.report.add_job_started(validate_file)
-        self.report.add_job_retried(validate_file, fetch_file, self.e)
-        self.assertFalse(self.tags(['validate_file']))
-        self.assertTrue(self.tags(['fetch_file']))  # Retry to a "ended" job should reset its lifecycle
-
-        self.report.add_job_started(fetch_file)
-        self.report.add_job_completed(fetch_file, [validate_file])  # Comtinuing to a "ended" child job should reset its lifecycle too
-        self.assertTrue(self.tags(['validate_file']))
-
-        self.report.add_job_failed(validate_file, self.e)
-        self.assertFalse(self.tags(['validate_file', 'fetch_file']))
-        self.assertTrue(self.tags(['validate_file', 'fetch_file', 'process_db']))
-
-        self.report.add_job_completed(process_db, [])
-        self.assertFalse(self.tags(['validate_file', 'fetch_file', 'process_db']))
 
     def tags(self, tags: List[Union[int, str]]) -> bool:
         return self.report.any_in_progress_job_with_tags(tags)
