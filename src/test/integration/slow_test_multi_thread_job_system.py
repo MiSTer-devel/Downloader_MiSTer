@@ -18,7 +18,6 @@
 
 import time
 import unittest
-from typing import Dict, Optional
 from downloader.job_system import JobFailPolicy, JobSystem, Worker, Job
 from downloader.logger import NoLogger
 from test.unit.test_single_thread_job_system import TestSingleThreadJobSystem
