@@ -58,12 +58,12 @@ class JobSystem(JobContext):
         JobSystem._next_job_type_id += 1
         return JobSystem._next_job_type_id
 
-    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', max_threads: int = 6, max_tries: int = 3, wait_timeout: float = 0.1, max_cycle: int = 3, max_timeout: float = 300, fail_policy: JobFailPolicy = JobFailPolicy.FAULT_TOLERANT):
+    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', max_threads: int = 6, max_tries: int = 3, wait_time: float = 0.001, max_cycle: int = 3, max_timeout: float = 300, fail_policy: JobFailPolicy = JobFailPolicy.FAULT_TOLERANT):
         self._reporter: ProgressReporter = reporter
         self._logger: JobSystemLogger = logger
         self._max_threads: int = max_threads
         self._max_tries: int = max_tries
-        self._wait_timeout: float = wait_timeout
+        self._wait_time: float = wait_time
         self._max_cycle: int = max_cycle
         self._max_timeout: float = max_timeout
         self._fail_policy: JobFailPolicy = fail_policy
@@ -151,7 +151,7 @@ class JobSystem(JobContext):
         if not self._is_executing_jobs: raise CantWaitWhenNotExecutingJobs('Can not wait when not executing jobs')
 
         if self._max_threads > 1:
-            time.sleep(self._wait_timeout)
+            time.sleep(self._wait_time)
         else:
             # This branch does not need to be thread-safe at all, since concurrency is off.
             self._check_clock()
@@ -186,6 +186,8 @@ class JobSystem(JobContext):
                     if assert_success:
                         future = thread_executor.submit(self._operate_on_next_job, package, self._notifications)
                         futures.append((package, future))
+                else:
+                    time.sleep(self._wait_time)
 
                 self._handle_notifications()
                 futures = self._remove_done_futures(futures)
