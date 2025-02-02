@@ -174,10 +174,16 @@ class InstallationReportImpl(InstallationReport):
     def add_job_completed(self, job: Job, next_jobs: List[Job]):
         with self._jobs_completed as jobs_completed: jobs_completed[job.type_id].append(job)
         with self._jobs_tag_in_progress.lock:
+            auto_spawn = False
             for c_job in next_jobs:
+                if c_job == job:
+                    auto_spawn = True
+                    continue
                 self._unsafe_reset_lifecycle(c_job)
                 self._unsafe_add_job_in_progress(c_job)
-            self._unsafe_remove_job_in_progress(job)
+
+            if not auto_spawn:
+                self._unsafe_remove_job_in_progress(job)
             for tag in job.tags:
                 self._jobs_tag_completed.data[tag].append(job)
 
