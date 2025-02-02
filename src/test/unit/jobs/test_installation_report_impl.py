@@ -126,6 +126,11 @@ class TestInstallationReportImpl(unittest.TestCase):
         self.assertTrue(self.tags(['validate_file']))
         self.assertFalse(self.tags(['fetch_file']))
 
+    def test_tag_a___after_complete_job_a_continuing_on_itself___returns_true_because_self_continuing_does_not_interrupt_lifecycle(self):
+        self.report.add_job_started(self.job_a)
+        self.report.add_job_completed(self.job_a, [self.job_a])
+        self.assertTrue(self.tags(['a']))
+
     def test_zip_tag___during_a_smooth_zip_download_lifecycle___returns_true_during_the_transaction_and_false_outside(self):
         fetch_index, validate_index, open_zip_index, process_zip, fetch_content, validate_content, unzip_content = job('zip'), job('zip'), job('zip'), job('zip'), job('zip'), job('zip'), job('zip')
 
