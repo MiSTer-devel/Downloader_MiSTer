@@ -24,6 +24,7 @@ from downloader.job_system import Job, JobFailPolicy, JobSystem, Worker, CycleDe
     CantRegisterWorkerException, CantExecuteJobs, CantWaitWhenNotExecutingJobs, WorkerResult
 from typing import Dict, Optional, List
 
+from downloader.jobs.reporters import JobTagTracking
 from downloader.logger import NoLogger
 
 
@@ -275,7 +276,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
             'errors': errors
         }, {
             'started_jobs': self.reporter.started_jobs,
-            'in_progress_jobs': {k: len(v) for k, v in self.reporter.in_progress_jobs.items()},
+            'in_progress_jobs': {k: len(v) for k, v in self.reporter.tracker.in_progress.items() if len(v) != 0},
             'completed_jobs': self.reporter.completed_jobs,
             'failed_jobs': self.reporter.failed_jobs,
             'retried_jobs': self.reporter.retried_jobs,
@@ -344,14 +345,11 @@ class TestProgressReporter(ProgressReporter):
 
     def __init__(self):
         self.started_jobs = {}
-        self.in_progress_jobs = defaultdict(set)
         self.completed_jobs = {}
         self.failed_jobs = {}
         self.retried_jobs = {}
         self.cancelled_jobs = {}
-
-        self._init = set()
-        self._end = set()
+        self.tracker = JobTagTracking()
 
     def reset(self): self.__init__()
 
@@ -360,47 +358,28 @@ class TestProgressReporter(ProgressReporter):
 
     def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
         for job in jobs:
+            job.add_tag(job.type_id)
             self.cancelled_jobs[job.type_id] = self.cancelled_jobs.get(job.type_id, 0) + 1
-            self._remove_in_progress(job)
+        self.tracker.add_jobs_cancelled(jobs)
 
     def notify_job_started(self, job: Job):
+        job.add_tag(job.type_id)
         self.started_jobs[job.type_id] = self.started_jobs.get(job.type_id, 0) + 1
-        self._add_in_progress(job)
+        self.tracker.add_job_started(job)
 
     def notify_job_completed(self, job: Job, next_jobs: List[Job]):
+        job.add_tag(job.type_id)
+        for c_job in next_jobs: c_job.add_tag(c_job.type_id)
         self.completed_jobs[job.type_id] = self.completed_jobs.get(job.type_id, 0) + 1
-        auto_spawn = False
-        for c_job in next_jobs:
-            if c_job == job:
-                auto_spawn = True
-                continue
-            self._add_in_progress(c_job)
-        if not auto_spawn:
-            self._remove_in_progress(job)
+        self.tracker.add_job_completed(job, next_jobs)
 
-    def notify_job_failed(self, job: Job, exception: BaseException):
+    def notify_job_failed(self, job: Job, _exception: BaseException):
+        job.add_tag(job.type_id)
         self.failed_jobs[job.type_id] = self.failed_jobs.get(job.type_id, 0) + 1
-        self._remove_in_progress(job)
+        self.tracker.add_job_failed(job)
 
-    def notify_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
+    def notify_job_retried(self, job: Job, retry_job: Job, _exception: BaseException):
+        job.add_tag(job.type_id)
+        retry_job.add_tag(retry_job.type_id)
         self.retried_jobs[job.type_id] = self.retried_jobs.get(job.type_id, 0) + 1
-        if job != retry_job:
-            self._add_in_progress(retry_job)
-            self._remove_in_progress(job)
-
-    def _add_in_progress(self, job: Job):
-        if job not in self._init:
-            self._init.add(job)
-        if job in self._end:
-            return
-        self.in_progress_jobs[job.type_id].add(job)
-
-    def _remove_in_progress(self, job: Job):
-        if job not in self._end:
-            self._end.add(job)
-        if job not in self._init:
-            return
-
-        self.in_progress_jobs[job.type_id].remove(job)
-        if not self.in_progress_jobs[job.type_id]:
-            self.in_progress_jobs.pop(job.type_id)
+        self.tracker.add_job_retried(job, retry_job)
