@@ -29,7 +29,7 @@ from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, 
     K_DB_URL, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER, K_BASE_SYSTEM_PATH, \
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL
-from downloader.db_options import DbOptions, DbOptionsKind, DbOptionsValidationException
+from downloader.db_options import DbOptions, DbOptionsValidationException
 from downloader.logger import Logger
 
 
@@ -111,8 +111,6 @@ class ConfigReader:
         if self._env['FORCED_BASE_PATH'] is not None:
             result['base_path'] = self._env['FORCED_BASE_PATH']
             result['base_system_path'] = self._env['FORCED_BASE_PATH']
-            for section, db in result['databases'].items():
-                if 'options' in db: db['options'].remove_base_path()
 
         result['fail_on_file_error'] = self._env['FAIL_ON_FILE_ERROR'] == 'true'
         result['commit'] = self._valid_max_length('COMMIT', self._env['COMMIT'], 50)
@@ -199,7 +197,7 @@ class ConfigReader:
     def _parse_database_options(self, parser: 'IniParser', section_id: str) -> DbOptions:
         options: Dict[str, Any] = dict()
         if parser.has(K_BASE_PATH):
-            options[K_BASE_PATH] = self._valid_base_path(parser.get_string(K_BASE_PATH, ''), K_BASE_PATH)
+            self._logger.print(f"WARNING! Ignored option for section [{section_id}]: Since Downloader 2.0 'base_path' is no longer a valid option within this block.")
         if parser.has(K_DOWNLOADER_THREADS_LIMIT):
             options[K_DOWNLOADER_THREADS_LIMIT] = parser.get_int(K_DOWNLOADER_THREADS_LIMIT, None)
         if parser.has(K_DOWNLOADER_TIMEOUT):
@@ -210,7 +208,7 @@ class ConfigReader:
             options[K_FILTER] = parser.get_string(K_FILTER, None)
 
         try:
-            return DbOptions(options, kind=DbOptionsKind.INI_SECTION)
+            return DbOptions(options)
         except DbOptionsValidationException as e:
             raise InvalidConfigParameter("Invalid options for section '%s': %s" % (section_id, e.fields_to_string()))
 

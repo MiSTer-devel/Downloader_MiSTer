@@ -16,20 +16,12 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from enum import unique, Enum
 from typing import Set, TypedDict, NotRequired, Dict, Any
 
 from downloader.other import test_only
 
 
-@unique
-class DbOptionsKind(Enum):
-    DEFAULT_OPTIONS = 1
-    INI_SECTION = 2
-
-
 class DbOptionsProps(TypedDict):
-    base_path: NotRequired[str]
     downloader_threads_limit: NotRequired[int]
     downloader_timeout: NotRequired[int]
     downloader_retries: NotRequired[int]
@@ -37,23 +29,8 @@ class DbOptionsProps(TypedDict):
 
 
 class DbOptions:
-    def __init__(self, props: DbOptionsProps, kind: DbOptionsKind):
+    def __init__(self, props: DbOptionsProps):
         present: Set[str] = set()
-
-        if kind == DbOptionsKind.INI_SECTION:
-            if 'base_path' in props:
-                if not isinstance(props['base_path'], str):
-                    raise DbOptionsValidationException(['base_path'])
-                if len(props['base_path']) <= 1:
-                    raise DbOptionsValidationException(['base_path'])
-                if props['base_path'][-1] == '/':
-                    raise DbOptionsValidationException(['base_path'])
-
-                present.add('base_path')
-        elif kind == DbOptionsKind.DEFAULT_OPTIONS:
-            pass
-        else:
-            raise ValueError("Invalid props kind: " + str(kind))
 
         if 'downloader_threads_limit' in props:
             if not isinstance(props['downloader_threads_limit'], int) or props['downloader_threads_limit'] < 1:
@@ -82,9 +59,6 @@ class DbOptions:
 
     def unwrap_props(self) -> DbOptionsProps:
         return self._props
-
-    def remove_base_path(self):
-        del self._props['base_path']
 
     def apply_to_config(self, config: Dict[str, Any]):
         config.update(self._props)
