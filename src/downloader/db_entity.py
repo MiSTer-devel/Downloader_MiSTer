@@ -22,7 +22,7 @@ from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FI
     FILE_downloader_launcher_script, FILE_MiSTer_alt_3_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, \
     FILE_MiSTer_new, FOLDER_linux, FOLDER_saves, FOLDER_savestates, FOLDER_screenshots, FILE_PDFViewer, FILE_lesskey, \
     FILE_glow, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, DISTRIBUTION_MISTER_DB_ID, FILE_gamecontrollerdb_user, FILE_yc_txt
-from downloader.db_options import DbOptionsKind, DbOptions, DbOptionsValidationException
+from downloader.db_options import DbOptions, DbOptionsValidationException
 from downloader.other import test_only, cache
 
 
@@ -49,7 +49,7 @@ class DbEntity:
 
         self.zips: Dict[str, Any] = _optional(db_raw, 'zips', _guard(_zips_validator), {})
         self.db_files: List[str] = _optional(db_raw, 'db_files', _guard(lambda v: isinstance(v, list)), [])
-        self.default_options: DbOptions = _optional(db_raw, 'default_options', lambda v, _: DbOptions(v, kind=DbOptionsKind.DEFAULT_OPTIONS), DbOptions({}, DbOptionsKind.DEFAULT_OPTIONS))
+        self.default_options: DbOptions = _optional(db_raw, 'default_options', lambda v, _: DbOptions(v), DbOptions({}))
         self.base_files_url: str = _optional(db_raw, 'base_files_url', _guard(lambda v: isinstance(v, str)), '')
         self.tag_dictionary: Dict[str, int] = _optional(db_raw, 'tag_dictionary', _guard(lambda v: isinstance(v, dict)), {})
         self.linux: Dict[str, Any] = _optional(db_raw, 'linux', _guard(lambda v: isinstance(v, dict)), None)
