@@ -24,7 +24,7 @@ from collections import defaultdict
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFilterFactory, BadFileFilterPartException, Config
-from downloader.file_system import ReadOnlyFileSystem
+from downloader.file_system import FsError, ReadOnlyFileSystem
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.path_package import PathPackage, PathType
@@ -97,9 +97,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             logger.debug(f"Process fetch packages and launch fetch jobs '{db.db_id}'...")
             next_jobs = self._process_fetch_packages_and_launch_jobs(fetch_pkgs, db.base_files_url)
             return next_jobs, None
-        except BadFileFilterPartException as e:
-            return [], e
-        except StoragePriorityError as e:
+        except (BadFileFilterPartException, StoragePriorityError, FsError, OSError) as e:
             return [], e
 
     def _create_packages_from_index(self, config: Config, summary: Index, db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[
