@@ -30,7 +30,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     K_DEFAULT_DB_ID, MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, K_DB_URL, K_SECTION, K_OPTIONS, K_USER_DEFINED_OPTIONS, KENV_FORCED_BASE_PATH, \
     K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_old
-from downloader.db_options import DbOptions, DbOptionsKind
+from downloader.db_options import DbOptions
 from downloader.other import empty_store_without_base_path
 from test.fake_db_entity import DbEntity
 import copy
@@ -137,7 +137,7 @@ def config_test_with_filters(config_filter=None, ini_filter=None):
         databases={db_test: db_description(
             db_url='https://db.zip',
             section=db_test,
-            options=None if ini_filter is None else DbOptions({K_FILTER: ini_filter}, DbOptionsKind.INI_SECTION)
+            options=None if ini_filter is None else DbOptions({K_FILTER: ini_filter})
         )},
         user_defined_options=[] if config_filter is None else [K_FILTER]
     )
@@ -452,19 +452,14 @@ def raw_db_wrong_descr():
     }
 
 
-def db_options(kind=None, base_path=None, downloader_threads_limit=None, downloader_timeout=None, downloader_retries=None, download_filter=None):
+def db_options(downloader_threads_limit=None, downloader_timeout=None, downloader_retries=None, download_filter=None):
     raw_db_options = {
         K_DOWNLOADER_THREADS_LIMIT: 3 if downloader_threads_limit is None else downloader_threads_limit,
         K_DOWNLOADER_TIMEOUT: 1 if downloader_timeout is None else downloader_timeout,
         K_DOWNLOADER_RETRIES: 100 if downloader_retries is None else downloader_retries,
         K_FILTER: 'all' if download_filter is None else download_filter
     }
-    kind = DbOptionsKind.INI_SECTION if kind is None else kind
-    if base_path is not None:
-        raw_db_options[K_BASE_PATH] = base_path
-    elif kind == DbOptionsKind.INI_SECTION:
-        raw_db_options[K_BASE_PATH] = '/media/usb0'
-    return DbOptions(raw_db_options, kind)
+    return DbOptions(raw_db_options)
 
 
 def file_pdfviewer_descr():
