@@ -29,7 +29,7 @@ from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, 
     K_DB_URL, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER, K_BASE_SYSTEM_PATH, \
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL
-from downloader.db_options import DbOptions, DbOptionsValidationException
+from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
 from downloader.logger import Logger
 
 
@@ -195,17 +195,17 @@ class ConfigReader:
         return description
 
     def _parse_database_options(self, parser: 'IniParser', section_id: str) -> DbOptions:
-        options: Dict[str, Any] = dict()
+        options: DbOptionsProps = dict()
         if parser.has(K_BASE_PATH):
-            self._logger.print(f"WARNING! Ignored option for section [{section_id}]: Since Downloader 2.0 'base_path' is no longer a valid option within this block.")
+            self._logger.print(f"WARNING! Ignored option for section [{section_id}]: Since Downloader 2.0 '{K_BASE_PATH} = {parser.get_string(K_BASE_PATH, '?')}' is no longer a valid option within this block.")
         if parser.has(K_DOWNLOADER_THREADS_LIMIT):
-            options[K_DOWNLOADER_THREADS_LIMIT] = parser.get_int(K_DOWNLOADER_THREADS_LIMIT, None)
+            options['downloader_threads_limit'] = parser.get_int(K_DOWNLOADER_THREADS_LIMIT, None)
         if parser.has(K_DOWNLOADER_TIMEOUT):
-            options[K_DOWNLOADER_TIMEOUT] = parser.get_int(K_DOWNLOADER_TIMEOUT, None)
+            options['downloader_timeout'] = parser.get_int(K_DOWNLOADER_TIMEOUT, None)
         if parser.has(K_DOWNLOADER_RETRIES):
-            options[K_DOWNLOADER_RETRIES] = parser.get_int(K_DOWNLOADER_RETRIES, None)
+            options['downloader_retries'] = parser.get_int(K_DOWNLOADER_RETRIES, None)
         if parser.has(K_FILTER):
-            options[K_FILTER] = parser.get_string(K_FILTER, None)
+            options['filter'] = parser.get_string(K_FILTER, None)
 
         try:
             return DbOptions(options)
