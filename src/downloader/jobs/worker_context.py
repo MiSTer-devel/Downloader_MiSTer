@@ -18,6 +18,7 @@
 
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
+from enum import Enum, auto
 import threading
 from typing import Tuple, Set, List
 
@@ -26,13 +27,17 @@ from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
 from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
-from downloader.job_system import Worker, ProgressReporter, JobContext
-from downloader.path_package import PathPackage
+from downloader.job_system import JobFailPolicy, Worker, ProgressReporter, JobContext
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
 from downloader.logger import Logger
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.target_path_repository import TargetPathRepository
 from downloader.waiter import Waiter
+
+
+class DownloaderWorkerFailPolicy(Enum):
+    FAIL_FAST = auto()
+    FAULT_TOLERANT = auto()
 
 
 @dataclass
@@ -50,9 +55,25 @@ class DownloaderWorkerContext:
     external_drives_repository: ExternalDrivesRepository
     target_paths_calculator_factory: TargetPathsCalculatorFactory
     config: Config
+    fail_policy: DownloaderWorkerFailPolicy
 
 
-def make_downloader_worker_context(job_ctx: JobContext, http_gateway: HttpGateway, logger: Logger, target_path_repository: TargetPathRepository, file_system: FileSystem, waiter: Waiter, progress_reporter: ProgressReporter, file_download_session_logger: FileDownloadSessionLogger, installation_report: InstallationReportImpl, free_space_reservation: FreeSpaceReservation, external_drives_repository: ExternalDrivesRepository, target_paths_calculator_factory: TargetPathsCalculatorFactory, config: Config) -> DownloaderWorkerContext:
+def make_downloader_worker_context(
+        job_ctx: JobContext,
+        http_gateway: HttpGateway,
+        logger: Logger,
+        target_path_repository: TargetPathRepository,
+        file_system: FileSystem,
+        waiter: Waiter,
+        progress_reporter: ProgressReporter,
+        file_download_session_logger: FileDownloadSessionLogger,
+        installation_report: InstallationReportImpl,
+        free_space_reservation: FreeSpaceReservation,
+        external_drives_repository: ExternalDrivesRepository,
+        target_paths_calculator_factory: TargetPathsCalculatorFactory,
+        config: Config,
+        fail_policy: DownloaderWorkerFailPolicy = DownloaderWorkerFailPolicy.FAULT_TOLERANT
+    ) -> DownloaderWorkerContext:
     return DownloaderWorkerContext(
         job_ctx=job_ctx,
         http_gateway=http_gateway,
@@ -67,6 +88,7 @@ def make_downloader_worker_context(job_ctx: JobContext, http_gateway: HttpGatewa
         external_drives_repository=external_drives_repository,
         target_paths_calculator_factory=target_paths_calculator_factory,
         config=config,
+        fail_policy=fail_policy
     )
 
 class DownloaderWorker(Worker):

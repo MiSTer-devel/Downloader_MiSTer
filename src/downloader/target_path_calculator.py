@@ -47,19 +47,21 @@ class TargetPathsCalculator:
         self._lock = lock
         self._priority_top_folders: Dict[str, StoragePriorityRegistryEntry] = dict()
 
-    def deduce_target_path(self, path: str, description: Dict[str, Any], path_type: PathType) -> PathPackage:
+    def deduce_target_path(self, path: str, description: Dict[str, Any], path_type: PathType) -> Tuple[PathPackage, Optional[StoragePriorityError]]:
         is_system_file = 'path' in description and description['path'] == 'system'
         can_be_external = path[0] == '|'
-        if is_system_file and can_be_external:
-            raise StoragePriorityError(f"System Path '{path}' is incorrect because it starts with '|', please contact the database maintainer.")
-        elif can_be_external:
+        if can_be_external:
             rel_path = path[1:]
             full_path, extra = self._deduce_possible_external_target_path(path=rel_path, path_type=path_type)
-            return PathPackage(full_path, rel_path, description, path_type, PathPackageKind.PEXT, extra)
+            pkg = PathPackage(full_path, rel_path, description, path_type, PathPackageKind.PEXT, extra)
+            if is_system_file:
+                return pkg, StoragePriorityError(f"System Path '{path}' is incorrect because it starts with '|', please contact the database maintainer.")
+            else:
+                return pkg, None
         elif is_system_file:
-            return PathPackage(os.path.join(self._config['base_system_path'], path), path, description, path_type, PathPackageKind.SYSTEM, None)
+            return PathPackage(os.path.join(self._config['base_system_path'], path), path, description, path_type, PathPackageKind.SYSTEM, None), None
         else:
-            return PathPackage(os.path.join(self._config['base_path'], path), path, description, path_type, PathPackageKind.STANDARD, None)
+            return PathPackage(os.path.join(self._config['base_path'], path), path, description, path_type, PathPackageKind.STANDARD, None), None
 
     def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> Tuple[str, PextPathProps]:
         path_obj = Path(path)
