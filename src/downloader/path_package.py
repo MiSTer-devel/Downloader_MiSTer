@@ -22,6 +22,7 @@ from enum import unique, Enum
 from typing import Dict, Any, Optional, Tuple
 import os
 
+
 @unique
 class PathType(Enum):
     FILE = 0
@@ -110,3 +111,6 @@ class PextPathProps:
 
     def parent_full_path(self):
         return os.path.join(self.drive, self.parent)
+
+
+RemovedCopy = Tuple[bool, str, str, PathType]

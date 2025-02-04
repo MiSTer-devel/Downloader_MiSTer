@@ -16,15 +16,15 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Optional
 from dataclasses import dataclass
+from typing import Optional
 from abc import ABC
 
 from downloader.job_system import Job
 
 
 @dataclass(eq=False, order=False)
-class GetFileJob(Job, ABC):
+class GetFileJob(ABC):
     temp_path: str
     info: str
     source: str
