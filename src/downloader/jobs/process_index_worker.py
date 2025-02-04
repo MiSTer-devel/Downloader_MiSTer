@@ -68,14 +68,11 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             check_file_pkgs, job.files_to_remove, create_folder_pkgs, job.directories_to_remove = self._create_packages_from_index(config, summary, db, store)
 
             logger.debug(f"Processing check file packages '{db.db_id}'...")
-            fetch_pkgs, validate_pkgs, moved_pkgs, job.present_not_validated_files = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
+            fetch_pkgs, validate_pkgs, job.present_not_validated_files = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
 
             logger.debug(f"Processing validate file packages '{db.db_id}'...")
             job.present_validated_files, job.skipped_updated_files, more_fetch_pkgs = self._process_validate_packages(validate_pkgs)
             fetch_pkgs.extend(more_fetch_pkgs)
-
-            logger.debug(f"Processing moved file packages '{db.db_id}'...")
-            job.removed_copies = self._process_moved_packages(moved_pkgs, store)
 
             self._ctx.file_download_session_logger.print_header(db, nothing_to_download=len(fetch_pkgs) == 0)
 
@@ -166,7 +163,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
     def _process_check_file_packages(self, check_file_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_MovedFilePackage], List[_AlreadyInstalledFilePackage]]:
         if len(check_file_pkgs) == 0:
-            return [], [], [], []
+            return [], [], []
 
         file_system = ReadOnlyFileSystem(self._ctx.file_system)
 
@@ -176,7 +173,6 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
         fetch_pkgs: List[_FetchFilePackage] = []
         validate_pkgs: List[_ValidateFilePackage] = []
-        moved_pkgs: List[_ValidateFilePackage] = []
         already_installed_pkgs: List[_ValidateFilePackage] = []
         for pkg in non_duplicated_pkgs:
             if not file_system.is_file(pkg.full_path):
@@ -191,9 +187,8 @@ class ProcessIndexWorker(DownloaderWorkerBase):
                 already_installed_pkgs.append(pkg)
             else:
                 validate_pkgs.append(pkg)
-                moved_pkgs.append(pkg)
 
-        return fetch_pkgs, validate_pkgs, moved_pkgs, already_installed_pkgs
+        return fetch_pkgs, validate_pkgs, already_installed_pkgs
 
     def _process_validate_packages(self, validate_pkgs: List[_ValidateFilePackage]) -> Tuple[List[PathPackage], List[PathPackage], List[_FetchFilePackage]]:
         if len(validate_pkgs) == 0:
@@ -223,19 +218,6 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             more_fetch_pkgs.append(pkg)
 
         return present_validated_files, skipped_updated_files, more_fetch_pkgs
-
-    def _process_moved_packages(self, moved_pkgs: List[_MovedFilePackage], store: ReadOnlyStoreAdapter) -> List[RemovedCopy]:
-        if len(moved_pkgs) == 0:
-            return []
-
-        moved_files: List[Tuple[bool, str, str, PathType]] = []
-        for pkg in moved_pkgs:
-            for is_external, other_drive in store.list_other_drives_for_file(pkg.rel_path, pkg.drive()):
-                other_file = os.path.join(other_drive, pkg.rel_path)
-                if not self._ctx.file_system.is_file(other_file):
-                    moved_files.append((is_external, pkg.rel_path, other_drive, PathType.FILE))
-
-        return moved_files
 
     def _try_reserve_space(self, fetch_pkgs: List[_FetchFilePackage]) -> List[Tuple[Partition, int]]:
         if len(fetch_pkgs) == 0:

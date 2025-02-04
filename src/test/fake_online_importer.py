@@ -195,14 +195,14 @@ class OnlineImporter(ProductionOnlineImporter):
             box.add_validated_file(job.info)
 
         for job in report.get_completed_jobs(ProcessZipJob):
-            if not job.has_new_zip_index: continue
-            box.add_installed_zip_index(job.db.db_id, job.zip_id, job.result_zip_index, job.zip_description)
             box.add_full_partitions(job.full_partitions)
             box.add_failed_files(job.failed_files_no_space)
+            if job.has_new_zip_index:
+                box.add_installed_zip_index(job.db.db_id, job.zip_id, job.result_zip_index, job.zip_description)
 
         for job in report.get_completed_jobs(OpenZipContentsJob):
             box.add_downloaded_files(job.downloaded_files)
-            box.add_validated_files(job.downloaded_files)
+            box.add_validated_files(job.downloaded_files)  # @TODO: Check the old implementation, didn't we check the hashes after unzipping?
             box.add_failed_files(job.failed_files)
             box.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_data)
             box.add_installed_folders(job.installed_folders)
@@ -276,31 +276,32 @@ class OnlineImporter(ProductionOnlineImporter):
         external_parents_by_db: Dict[str, Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
         parents_by_db: Dict[str, Set[str]] = defaultdict(set)
 
+        def add_parent(el_pkg: PathPackage, db_id: str) -> None:
+            if el_pkg.pext_props is not None:
+                if el_pkg.is_pext_standard:
+                    parents_by_db[db_id].add(el_pkg.pext_props.parent)
+                else:
+                    external_parents_by_db[db_id][el_pkg.pext_props.parent].add(el_pkg.pext_props.drive)
+
         for file_path in box.installed_files():
             file = report.processed_file(file_path)
             if 'reboot' in file.pkg.description and file.pkg.description['reboot']:
                 self._needs_reboot = True
-            if file.pkg.is_pext_external:
-                stores[file.db_id].write_only().add_external_file(file.pkg.pext_props.drive, file.pkg.rel_path, file.pkg.description)
-            else:
-                stores[file.db_id].write_only().add_file(file.pkg.rel_path, file.pkg.description)
 
-            if file.pkg.pext_props is not None:
-                if file.pkg.is_pext_standard:
-                    parents_by_db[file.db_id].add(file.pkg.pext_props.parent)
-                else:
-                    external_parents_by_db[file.db_id][file.pkg.pext_props.parent].add(file.pkg.pext_props.drive)
-
-                for other in file.pkg.pext_props.other_drives:
-                    if self._worker_ctx.file_system.is_file(os.path.join(other, file.pkg.rel_path)):
-                        stores[file.db_id].write_only().add_external_file(other, file.pkg.rel_path, file.pkg.description)
-
-        for file_path in box.present_not_validated_files():
+            add_parent(file.pkg, file.db_id)
+    
+        for file_path in box.present_not_validated_files() + box.installed_files():
             file = report.processed_file(file_path)
-            if file.pkg.is_pext_external:
-                stores[file.db_id].write_only().add_external_file(file.pkg.pext_props.drive, file.pkg.rel_path, file.pkg.description)
-            else:
-                stores[file.db_id].write_only().add_file(file.pkg.rel_path, file.pkg.description)
+
+            for is_external, other_drive in stores[file.db_id].read_only().list_other_drives_for_file(file.pkg.rel_path, file.pkg.drive()):
+                other_file = os.path.join(other_drive, file.pkg.rel_path)
+                if not self._worker_ctx.file_system.is_file(other_file):
+                    if is_external:
+                        stores[file.db_id].write_only().remove_external_file(file.pkg.rel_path)
+                    else:
+                        stores[file.db_id].write_only().remove_local_file(file.pkg.rel_path)
+                        
+            stores[file.db_id].write_only().add_file_pkg(file.pkg)
 
             if file.pkg.pext_props is not None:
                 for other in file.pkg.pext_props.other_drives:
@@ -312,16 +313,8 @@ class OnlineImporter(ProductionOnlineImporter):
                 if folder_pkg.is_pext_parent:
                     continue
 
-                if folder_pkg.is_pext_external:
-                    stores[db_id].write_only().add_external_folder(folder_pkg.pext_props.drive, folder_pkg.rel_path, folder_pkg.description)
-                else:
-                    stores[db_id].write_only().add_folder(folder_pkg.rel_path, folder_pkg.description)
-
-                if folder_pkg.pext_props is not None:
-                    if folder_pkg.is_pext_standard:
-                        parents_by_db[db_id].add(folder_pkg.pext_props.parent)
-                    else:
-                        external_parents_by_db[db_id][folder_pkg.pext_props.parent].add(folder_pkg.pext_props.drive)
+                stores[db_id].write_only().add_folder_pkg(folder_pkg)
+                add_parent(folder_pkg, db_id)
 
         for folder_path in sorted(box.installed_folders(), key=lambda x: len(x), reverse=True):
             for db_id, folder_pkg in report.processed_folder(folder_path).items():

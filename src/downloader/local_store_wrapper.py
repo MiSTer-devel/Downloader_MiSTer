@@ -22,6 +22,8 @@ from downloader.other import empty_store_without_base_path
 from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict
 from collections import defaultdict
 
+from downloader.path_package import PathPackage
+
 NO_HASH_IN_STORE_CODE = 'file_does_not_exist_so_cant_get_hash'
 
 
@@ -114,6 +116,18 @@ class WriteOnlyStoreAdapter:
         self._top_wrapper = top_wrapper
         self._external_additions = external_additions
         self._aggregated_summary = aggregated_summary
+
+    def add_file_pkg(self, file_pkg: PathPackage):
+        if file_pkg.is_pext_external:
+            self.add_external_file(file_pkg.pext_props.drive, file_pkg.rel_path, file_pkg.description)
+        else:
+            self.add_file(file_pkg.rel_path, file_pkg.description)
+
+    def add_folder_pkg(self, folder_pkg: PathPackage):
+        if folder_pkg.is_pext_external:
+            self.add_external_folder(folder_pkg.pext_props.drive, folder_pkg.rel_path, folder_pkg.description)
+        else:
+            self.add_folder(folder_pkg.rel_path, folder_pkg.description)
 
     def add_file(self, file, description):
         self._add_entry('files', file, description)
