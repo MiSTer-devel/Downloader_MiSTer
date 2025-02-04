@@ -17,13 +17,15 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 
 from downloader.config import Config
 from downloader.db_entity import DbEntity
+from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.index import Index
 from downloader.local_store_wrapper import StoreWrapper, StoreFragmentDrivePaths
+from downloader.path_package import PathPackage
 
 
 @dataclass(eq=False, order=False)
@@ -40,8 +42,10 @@ class ProcessZipJob(Job):
     has_new_zip_index: bool
     full_resync: bool
 
-    # results
+    def retry_job(self): return None
+
+    # Results
     result_zip_index: StoreFragmentDrivePaths
     not_enough_space: bool = field(default=False)
-
-    def retry_job(self): return None
+    full_partitions: List[Tuple[Partition, int]] = field(default_factory=list)
+    failed_files_no_space: List[PathPackage] = field(default_factory=list)

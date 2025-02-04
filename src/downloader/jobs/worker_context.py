@@ -50,7 +50,6 @@ class DownloaderWorkerContext:
     external_drives_repository: ExternalDrivesRepository
     target_paths_calculator_factory: TargetPathsCalculatorFactory
     config: Config
-    pending_removals: 'PendingRemovals'
 
 
 def make_downloader_worker_context(job_ctx: JobContext, http_gateway: HttpGateway, logger: Logger, target_path_repository: TargetPathRepository, file_system: FileSystem, waiter: Waiter, progress_reporter: ProgressReporter, file_download_session_logger: FileDownloadSessionLogger, installation_report: InstallationReportImpl, free_space_reservation: FreeSpaceReservation, external_drives_repository: ExternalDrivesRepository, target_paths_calculator_factory: TargetPathsCalculatorFactory, config: Config) -> DownloaderWorkerContext:
@@ -68,7 +67,6 @@ def make_downloader_worker_context(job_ctx: JobContext, http_gateway: HttpGatewa
         external_drives_repository=external_drives_repository,
         target_paths_calculator_factory=target_paths_calculator_factory,
         config=config,
-        pending_removals=PendingRemovals(),
     )
 
 class DownloaderWorker(Worker):
@@ -80,32 +78,3 @@ class DownloaderWorker(Worker):
 class DownloaderWorkerBase(DownloaderWorker, ABC):
     def __init__(self, ctx: DownloaderWorkerContext): self._ctx = ctx
 
-
-class PendingRemovals:
-    def __init__(self):
-        self._directories = dict()
-        self._files = dict()
-        self._lock = threading.Lock()
-
-    def queue_directory_removal(self, dirs: List[PathPackage], db_id: str) -> None:
-        if len(dirs) == 0: return
-        with self._lock:
-            for pkg in dirs:
-                self._directories.setdefault(pkg.rel_path, (pkg, set()))[1].add(db_id)
-    def queue_file_removal(self, files: List[PathPackage], db_id: str) -> None:
-        if len(files) == 0: return
-        with self._lock:
-            for pkg in files:
-                self._files.setdefault(pkg.rel_path, (pkg, set()))[1].add(db_id)
-
-    # Non-thread-safe: Should only be used after threads are out
-    def consume_files(self) -> List[Tuple[PathPackage, Set[str]]]:
-        result = sorted([(x[0], x[1]) for x in self._files.values()], key=lambda x: x[0].rel_path)
-        self._files.clear()
-        return result
-
-    # Non-thread-safe: Should only be used after threads are out
-    def consume_directories(self) -> List[Tuple[PathPackage, Set[str]]]:
-        result = sorted([(x[0], x[1]) for x in self._directories.values()], key=lambda x: len(x[0].rel_path))
-        self._directories.clear()
-        return result
