@@ -36,7 +36,7 @@ from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
-from downloader.jobs.worker_context import make_downloader_worker_context
+from downloader.jobs.worker_context import DownloaderWorkerFailPolicy, make_downloader_worker_context
 from downloader.local_store_wrapper import StoreFragmentDrivePaths
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter, WrongDatabaseOptions
 from downloader.path_package import PathPackage, PathType, RemovedCopy
@@ -107,7 +107,8 @@ class OnlineImporter(ProductionOnlineImporter):
             free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation(),
             external_drives_repository=ExternalDrivesRepository(file_system=self.file_system),
             target_paths_calculator_factory=TargetPathsCalculatorFactory(self.file_system, external_drives_repository),
-            config=self._config
+            config=self._config,
+            fail_policy=DownloaderWorkerFailPolicy.FAIL_FAST
         )
 
     @staticmethod
@@ -203,6 +204,7 @@ class OnlineImporter(ProductionOnlineImporter):
         for job in report.get_completed_jobs(OpenZipContentsJob):
             box.add_downloaded_files(job.downloaded_files)
             box.add_validated_files(job.downloaded_files)  # @TODO: Check the old implementation, didn't we check the hashes after unzipping?
+            # We shoould be able to comment previous line and the test still pass
             box.add_failed_files(job.failed_files)
             box.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_data)
             box.add_installed_folders(job.installed_folders)

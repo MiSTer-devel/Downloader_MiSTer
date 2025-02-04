@@ -103,7 +103,8 @@ class FullRunService(ProductionFullRunService):
                              free_space_reservation=UnlimitedFreeSpaceReservation(),
                              external_drives_repository=external_drives_repository,
                              target_paths_calculator_factory=TargetPathsCalculatorFactory(system_file_system, external_drives_repository),
-                             config=config
+                             config=config,
+                             fail_policy=JobFailPolicy.FAULT_TOLERANT
                          )
                 )
 
