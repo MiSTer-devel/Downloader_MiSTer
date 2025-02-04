@@ -69,7 +69,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
             .deduce_target_path(zip_description['target_folder_path'], {}, PathType.FOLDER)\
             .full_path
 
-        self._process_create_folders_packages(db, job.folders)
+        job.installed_folders = self._process_create_folders_packages(db, job.folders)
 
         # @TODO: self._ctx.file_system.precache_is_file_with_folders() THIS IS MISSING FOR PROPER PERFORMANCE!
         contained_files = []
@@ -88,20 +88,14 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         self._ctx.file_system.unlink(download_path)
 
         if len(job.filtered_data['files']) > 0:
-            self._ctx.pending_removals.queue_file_removal(
-                [PathPackage(full_path=file_path, rel_path=file_path, description=file_description) for file_path, file_description in job.filtered_data['files'].items()],
-                db.db_id
-            )
+            job.files_to_remove = [PathPackage(full_path=file_path, rel_path=file_path, description=file_description) for file_path, file_description in job.filtered_data['files'].items()]
 
         if len(job.filtered_data['folders']) > 0:
-            self._ctx.pending_removals.queue_directory_removal(
-                [PathPackage(full_path=folder_path, rel_path=folder_path, description=folder_description) for folder_path, folder_description in job.filtered_data['folders'].items()],
-                db.db_id
-            )
+            job.directories_to_remove = [PathPackage(full_path=folder_path, rel_path=folder_path, description=folder_description) for folder_path, folder_description in job.filtered_data['folders'].items()]
 
         job.downloaded_files.extend(contained_files)
 
-    def _process_create_folders_packages(self, db: DbEntity, create_folder_pkgs: List[PathPackage]):
+    def _process_create_folders_packages(self, db: DbEntity, create_folder_pkgs: List[PathPackage]) -> List[PathPackage]:
         # @TODO inspired in ProcessIndexWorker._process_create_folders_packages
         folders_to_create: Set[str] = set()
         for pkg in create_folder_pkgs:
@@ -118,7 +112,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         for full_folder_path in sorted(folders_to_create, key=lambda x: len(x), reverse=True):
             self._ctx.file_system.make_dirs(full_folder_path)
         self._ctx.installation_report.add_processed_folders(create_folder_pkgs, db.db_id)
-        self._ctx.installation_report.add_installed_folders(create_folder_pkgs)
+        return create_folder_pkgs
 
     def _extract_single_files(self, job: OpenZipContentsJob):
         zip_id = job.zip_id

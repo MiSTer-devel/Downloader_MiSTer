@@ -44,8 +44,13 @@ class OpenZipContentsJob(Job):
     download_path: str
     config: Config
     get_file_job: GetFileJob
+
+    def retry_job(self): return self.get_file_job
+
+    # Results
     downloaded_files: List[PathPackage] = field(default_factory=list)
     failed_files: List[PathPackage] = field(default_factory=list)
     filtered_data: FileFoldersHolder = field(default_factory=make_file_folders_holder)
-
-    def retry_job(self): return self.get_file_job
+    installed_folders: List[PathPackage] = field(default_factory=list)
+    directories_to_remove: List[PathPackage] = field(default_factory=list)
+    files_to_remove: List[PathPackage] = field(default_factory=list)

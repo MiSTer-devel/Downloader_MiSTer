@@ -25,9 +25,10 @@ from collections import defaultdict
 from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFilterFactory, BadFileFilterPartException, Config
 from downloader.file_system import FsError, ReadOnlyFileSystem
+from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
-from downloader.path_package import PathPackage, PathType
+from downloader.path_package import PathPackage, PathType, RemovedCopy
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
@@ -64,35 +65,30 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
         try:
             logger.debug(f"Processing db '{db.db_id}'...")
-            check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs = self._create_packages_from_index(config, summary, db, store)
+            check_file_pkgs, job.files_to_remove, create_folder_pkgs, job.directories_to_remove = self._create_packages_from_index(config, summary, db, store)
 
             logger.debug(f"Processing check file packages '{db.db_id}'...")
-            fetch_pkgs, validate_pkgs, moved_pkgs, already_installed_pkgs = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
-
-            logger.debug(f"Processing already installed file packages '{db.db_id}'...")
-            self._process_already_installed_packages(already_installed_pkgs)
+            fetch_pkgs, validate_pkgs, moved_pkgs, job.present_not_validated_files = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
 
             logger.debug(f"Processing validate file packages '{db.db_id}'...")
-            fetch_pkgs.extend(self._process_validate_packages(validate_pkgs))
+            job.present_validated_files, job.skipped_updated_files, more_fetch_pkgs = self._process_validate_packages(validate_pkgs)
+            fetch_pkgs.extend(more_fetch_pkgs)
 
             logger.debug(f"Processing moved file packages '{db.db_id}'...")
-            self._process_moved_packages(moved_pkgs, store)
+            job.removed_copies = self._process_moved_packages(moved_pkgs, store)
 
             self._ctx.file_download_session_logger.print_header(db, nothing_to_download=len(fetch_pkgs) == 0)
 
             logger.debug(f"Reserving space '{db.db_id}'...")
-            if not self._try_reserve_space(fetch_pkgs):
+            job.full_partitions = self._try_reserve_space(fetch_pkgs)
+            if len(job.full_partitions) > 0:
+                job.failed_files_no_space = fetch_pkgs
                 logger.debug(f"Not enough space '{db.db_id}'!")
                 return [], None # @TODO return error instead to retry later?
 
             logger.debug(f"Processing create folder packages '{db.db_id}'...")
-            self._process_create_folder_packages(create_folder_pkgs, db, store)  # @TODO maybe move this one after reserve space
-
-            logger.debug(f"Processing remove file packages '{db.db_id}'...")
-            self._process_remove_file_packages(remove_files_pkgs, db.db_id)
-
-            logger.debug(f"Processing delete folder packages '{db.db_id}'...")
-            self._process_delete_folder_packages(delete_folder_pkgs, db.db_id)
+            removed_folders, job.installed_folders = self._process_create_folder_packages(create_folder_pkgs, db, store)  # @TODO maybe move this one after reserve space
+            job.removed_copies.extend(removed_folders)
 
             logger.debug(f"Process fetch packages and launch fetch jobs '{db.db_id}'...")
             next_jobs = self._process_fetch_packages_and_launch_jobs(fetch_pkgs, db.base_files_url)
@@ -199,15 +195,9 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
         return fetch_pkgs, validate_pkgs, moved_pkgs, already_installed_pkgs
 
-    def _process_already_installed_packages(self, already_installed_pkgs: List[_AlreadyInstalledFilePackage]) -> None:
-        if len(already_installed_pkgs) == 0:
-            return
-
-        self._ctx.installation_report.add_present_not_validated_files(already_installed_pkgs)
-
-    def _process_validate_packages(self, validate_pkgs: List[_ValidateFilePackage]) -> List[_FetchFilePackage]:
+    def _process_validate_packages(self, validate_pkgs: List[_ValidateFilePackage]) -> Tuple[List[PathPackage], List[PathPackage], List[_FetchFilePackage]]:
         if len(validate_pkgs) == 0:
-            return []
+            return [], [], []
 
         file_system = ReadOnlyFileSystem(self._ctx.file_system)
 
@@ -232,14 +222,11 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
             more_fetch_pkgs.append(pkg)
 
-        self._ctx.installation_report.add_present_validated_files(present_validated_files)
-        self._ctx.installation_report.add_skipped_updated_files(skipped_updated_files)
+        return present_validated_files, skipped_updated_files, more_fetch_pkgs
 
-        return more_fetch_pkgs
-
-    def _process_moved_packages(self, moved_pkgs: List[_MovedFilePackage], store: ReadOnlyStoreAdapter) -> None:
+    def _process_moved_packages(self, moved_pkgs: List[_MovedFilePackage], store: ReadOnlyStoreAdapter) -> List[RemovedCopy]:
         if len(moved_pkgs) == 0:
-            return
+            return []
 
         moved_files: List[Tuple[bool, str, str, PathType]] = []
         for pkg in moved_pkgs:
@@ -248,27 +235,24 @@ class ProcessIndexWorker(DownloaderWorkerBase):
                 if not self._ctx.file_system.is_file(other_file):
                     moved_files.append((is_external, pkg.rel_path, other_drive, PathType.FILE))
 
-        self._ctx.installation_report.add_removed_copies(moved_files)
+        return moved_files
 
-    def _try_reserve_space(self, fetch_pkgs: List[_FetchFilePackage]) -> bool:
+    def _try_reserve_space(self, fetch_pkgs: List[_FetchFilePackage]) -> List[Tuple[Partition, int]]:
         if len(fetch_pkgs) == 0:
-            return True
+            return []
 
         fits_well, full_partitions = self._ctx.free_space_reservation.reserve_space_for_file_pkgs(fetch_pkgs)
         if fits_well:
-            return True
+            return []
         else:
             for partition, _ in full_partitions:
                 self._ctx.file_download_session_logger.print_progress_line(f"Partition {partition.path} would get full!")
 
-            self._ctx.installation_report.add_full_partitions(full_partitions)
-            self._ctx.installation_report.add_failed_files(fetch_pkgs)
+            return full_partitions
 
-            return False
-
-    def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], db: DbEntity, store: ReadOnlyStoreAdapter):
+    def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[List[RemovedCopy], List[PathPackage]]:
         if len(create_folder_pkgs) == 0:
-            return
+            return [], []
 
         folders_to_create: Set[str] = set()
         folder_copies_to_be_removed: List[Tuple[bool, str, str, PathType]] = []
@@ -297,11 +281,11 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         for full_folder_path in sorted(folders_to_create, key=lambda x: len(x), reverse=True):
             self._ctx.file_system.make_dirs(full_folder_path)
 
-        self._ctx.installation_report.add_removed_copies(folder_copies_to_be_removed)
         # @TODO Why two adds?
         folders = [f for f in create_folder_pkgs if f.db_path() in db.folders]
         self._ctx.installation_report.add_processed_folders(folders, db.db_id)
-        self._ctx.installation_report.add_installed_folders(folders)
+
+        return folder_copies_to_be_removed, folders
 
     def _maybe_add_copies_to_remove(self, copies: List[Tuple[bool, str, str, PathType]], store: ReadOnlyStoreAdapter, folder_path: str, drive: Optional[str]):
         if store.folder_drive(folder_path) == drive: return
@@ -310,18 +294,6 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             for is_external, other_drive in store.list_other_drives_for_folder(folder_path, drive)
             if not self._ctx.file_system.is_folder(os.path.join(other_drive, folder_path))
         ])
-
-    def _process_remove_file_packages(self, remove_files_pkgs: List[_RemoveFilePackage], db_id: str):
-        if len(remove_files_pkgs) == 0:
-            return
-
-        self._ctx.pending_removals.queue_file_removal(remove_files_pkgs, db_id)
-
-    def _process_delete_folder_packages(self, delete_folder_pkgs: List[_DeleteFolderPackage], db_id: str):
-        if len(delete_folder_pkgs) == 0:
-            return
-
-        self._ctx.pending_removals.queue_directory_removal(delete_folder_pkgs, db_id)
 
     @staticmethod
     def _process_fetch_packages_and_launch_jobs(fetch_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:

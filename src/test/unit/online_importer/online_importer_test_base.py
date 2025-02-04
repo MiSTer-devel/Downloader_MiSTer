@@ -28,7 +28,7 @@ class OnlineImporterTestBase(unittest.TestCase):
         self.assertReports(sut, [], save=save, failed_folders=failed_folders, failed_zips=failed_zips)
 
     def assertReports(self, sut, installed=None, errors=None, needs_reboot=False, save=True, failed_folders=None, failed_zips=None, full_partitions=None, validated=None, downloaded=None):
-        report = sut.report()
+        report = sut.box()
         if installed is None and validated is None and downloaded is None:
             installed = []
         if errors is None:

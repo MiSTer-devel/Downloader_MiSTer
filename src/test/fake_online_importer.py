@@ -18,19 +18,28 @@
 
 from collections import defaultdict
 import os
-from typing import Dict, Set
+from typing import Any, Dict, Iterable, List, Set, Tuple
 
 from downloader.constants import MEDIA_USB0
-from downloader.file_filter import FileFilterFactory
-from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
+from downloader.file_filter import BadFileFilterPartException, FileFilterFactory, FileFoldersHolder
+from downloader.free_space_reservation import Partition, UnlimitedFreeSpaceReservation
 from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.interruptions import Interruptions
 from downloader.job_system import JobFailPolicy, JobSystem
+from downloader.jobs.copy_file_job import CopyFileJob
+from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.jobs.process_db_job import ProcessDbJob
+from downloader.jobs.process_index_job import ProcessIndexJob
+from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
+from downloader.jobs.validate_file_job import ValidateFileJob
+from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.jobs.worker_context import make_downloader_worker_context
-from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
-from downloader.path_package import PathType
+from downloader.local_store_wrapper import StoreFragmentDrivePaths
+from downloader.online_importer import OnlineImporter as ProductionOnlineImporter, WrongDatabaseOptions
+from downloader.path_package import PathPackage, PathType, RemovedCopy
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.logger import NoLogger
 
@@ -162,9 +171,63 @@ class OnlineImporter(ProductionOnlineImporter):
         self._job_system.execute_jobs()
 
         report = self._worker_ctx.file_download_session_logger.report()
+        box = InstallationBox()
+        for job in report.get_completed_jobs(ProcessIndexJob):
+            box.add_present_not_validated_files(job.present_not_validated_files)
+            box.add_present_validated_files(job.present_validated_files)
+            box.add_skipped_updated_files(job.skipped_updated_files)
+            box.add_removed_copies(job.removed_copies)
+            box.add_full_partitions(job.full_partitions)
+            box.add_failed_files(job.failed_files_no_space)
+            box.add_installed_folders(job.installed_folders)
+            box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
+            box.queue_file_removal(job.files_to_remove, job.db.db_id)
+
+        for job in report.get_completed_jobs(FetchFileJob2) + report.get_completed_jobs(CopyFileJob):
+            if job.silent: continue
+            box.add_downloaded_file(job.info)
+
+        for job in report.get_completed_jobs(ValidateFileJob):
+            box.add_downloaded_file(job.fetch_job.path)
+
+        for job in report.get_completed_jobs(ValidateFileJob2):
+            if job.after_job is not None: continue
+            box.add_validated_file(job.info)
+
+        for job in report.get_completed_jobs(ProcessZipJob):
+            if not job.has_new_zip_index: continue
+            box.add_installed_zip_index(job.db.db_id, job.zip_id, job.result_zip_index, job.zip_description)
+            box.add_full_partitions(job.full_partitions)
+            box.add_failed_files(job.failed_files_no_space)
+
+        for job in report.get_completed_jobs(OpenZipContentsJob):
+            box.add_downloaded_files(job.downloaded_files)
+            box.add_validated_files(job.downloaded_files)
+            box.add_failed_files(job.failed_files)
+            box.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_data)
+            box.add_installed_folders(job.installed_folders)
+            box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
+            box.queue_file_removal(job.files_to_remove, job.db.db_id)
+
+        for job, _e in report.get_failed_jobs(ValidateFileJob):
+            box.add_failed_file(job.fetch_job.path)
+
+        for job, _e in report.get_failed_jobs(ValidateFileJob2):
+            box.add_failed_file(job.get_file_job.info)
+
+        for job, _e in report.get_failed_jobs(FetchFileJob):
+            box.add_failed_file(job.path)
+
+        for job, _e in report.get_failed_jobs(FetchFileJob2) + report.get_failed_jobs(CopyFileJob):
+            box.add_failed_file(job.info)
+
+        for job, e in report.get_failed_jobs(ProcessIndexJob):
+            if not isinstance(e, BadFileFilterPartException): continue
+            box.add_failed_db_options(WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(e)}' is invalid."))
+
         removed_files = []
         processed_files = defaultdict(list)
-        for pkg, dbs in self._worker_ctx.pending_removals.consume_files():
+        for pkg, dbs in box.consume_files():
             for db_id in dbs:
                 stores[db_id].write_only().remove_file(pkg.rel_path)
                 stores[db_id].write_only().remove_file_from_zips(pkg.rel_path)
@@ -186,10 +249,11 @@ class OnlineImporter(ProductionOnlineImporter):
 
         for db_id, pkgs in processed_files.items():
             self._worker_ctx.installation_report.add_processed_files(pkgs, db_id)
-        self._worker_ctx.installation_report.add_removed_files(removed_files)
 
-        for pkg, dbs in sorted(self._worker_ctx.pending_removals.consume_directories(), key=lambda x: len(x[0].full_path), reverse=True):
-            if report.is_folder_installed(pkg.rel_path):
+        box.add_removed_files(removed_files)
+
+        for pkg, dbs in sorted(box.consume_directories(), key=lambda x: len(x[0].full_path), reverse=True):
+            if box.is_folder_installed(pkg.rel_path):
                 # If a folder got installed by any db...
                 # assert len(dbs) >=1
                 # The for-loop is for when two+ dbs used to have the same folder but one of them has removed it, it should be kept because
@@ -209,10 +273,10 @@ class OnlineImporter(ProductionOnlineImporter):
                 stores[db_id].write_only().remove_folder(pkg.rel_path)
                 stores[db_id].write_only().remove_folder_from_zips(pkg.rel_path)
 
-        external_parents_by_db: Dict[str, Dict[str, Set[str]]] = dict()
-        parents_by_db: Dict[str, Set[str]] = dict()
+        external_parents_by_db: Dict[str, Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
+        parents_by_db: Dict[str, Set[str]] = defaultdict(set)
 
-        for file_path in report.installed_files():
+        for file_path in box.installed_files():
             file = report.processed_file(file_path)
             if 'reboot' in file.pkg.description and file.pkg.description['reboot']:
                 self._needs_reboot = True
@@ -223,15 +287,15 @@ class OnlineImporter(ProductionOnlineImporter):
 
             if file.pkg.pext_props is not None:
                 if file.pkg.is_pext_standard:
-                    parents_by_db.setdefault(file.db_id, set()).add(file.pkg.pext_props.parent)
+                    parents_by_db[file.db_id].add(file.pkg.pext_props.parent)
                 else:
-                    external_parents_by_db.setdefault(file.db_id, dict()).setdefault(file.pkg.pext_props.parent, set()).add(file.pkg.pext_props.drive)
+                    external_parents_by_db[file.db_id][file.pkg.pext_props.parent].add(file.pkg.pext_props.drive)
 
                 for other in file.pkg.pext_props.other_drives:
                     if self._worker_ctx.file_system.is_file(os.path.join(other, file.pkg.rel_path)):
                         stores[file.db_id].write_only().add_external_file(other, file.pkg.rel_path, file.pkg.description)
 
-        for file_path in report.present_not_validated_files():
+        for file_path in box.present_not_validated_files():
             file = report.processed_file(file_path)
             if file.pkg.is_pext_external:
                 stores[file.db_id].write_only().add_external_file(file.pkg.pext_props.drive, file.pkg.rel_path, file.pkg.description)
@@ -243,7 +307,7 @@ class OnlineImporter(ProductionOnlineImporter):
                     if self._worker_ctx.file_system.is_file(os.path.join(other, file.pkg.rel_path)):
                         stores[file.db_id].write_only().add_external_file(other, file.pkg.rel_path, file.pkg.description)
 
-        for folder_path in sorted(report.installed_folders(), key=lambda x: len(x), reverse=True):
+        for folder_path in sorted(box.installed_folders(), key=lambda x: len(x), reverse=True):
             for db_id, folder_pkg in report.processed_folder(folder_path).items():
                 if folder_pkg.is_pext_parent:
                     continue
@@ -255,26 +319,26 @@ class OnlineImporter(ProductionOnlineImporter):
 
                 if folder_pkg.pext_props is not None:
                     if folder_pkg.is_pext_standard:
-                        parents_by_db.setdefault(db_id, set()).add(folder_pkg.pext_props.parent)
+                        parents_by_db[db_id].add(folder_pkg.pext_props.parent)
                     else:
-                        external_parents_by_db.setdefault(db_id, dict()).setdefault(folder_pkg.pext_props.parent, set()).add(folder_pkg.pext_props.drive)
+                        external_parents_by_db[db_id][folder_pkg.pext_props.parent].add(folder_pkg.pext_props.drive)
 
-        for folder_path in sorted(report.installed_folders(), key=lambda x: len(x), reverse=True):
+        for folder_path in sorted(box.installed_folders(), key=lambda x: len(x), reverse=True):
             for db_id, folder_pkg in report.processed_folder(folder_path).items():
                 if not folder_pkg.is_pext_parent:
                     continue
 
-                if folder_pkg.pext_props.parent in parents_by_db.get(db_id, set()):
+                if folder_pkg.pext_props.parent in parents_by_db[db_id]:
                     stores[db_id].write_only().add_folder(folder_pkg.rel_path, folder_pkg.description)
-                if folder_pkg.pext_props.parent in external_parents_by_db.get(db_id, dict()):
+                if folder_pkg.pext_props.parent in external_parents_by_db[db_id]:
                     for drive in external_parents_by_db[db_id][folder_pkg.pext_props.parent]:
                         stores[db_id].write_only().add_external_folder(drive, folder_pkg.rel_path, folder_pkg.description)
 
-        for file_path in report.removed_files():
+        for file_path in box.removed_files():
             file = report.processed_file(file_path)
             stores[file.db_id].write_only().remove_file(file.pkg.rel_path)
 
-        for is_external, el_path, drive, ty in report.removed_copies():
+        for is_external, el_path, drive, ty in box.removed_copies():
             if ty == PathType.FILE:
                 file = report.processed_file(el_path)
                 if is_external:
@@ -289,23 +353,23 @@ class OnlineImporter(ProductionOnlineImporter):
                     else:
                         stores[db_id].write_only().remove_local_folder(el_path)
 
-        for file_path in report.failed_files():
+        for file_path in box.failed_files():
             if not report.is_file_processed(file_path):
                 continue
             file = report.processed_file(file_path)
             stores[file.db_id].write_only().remove_file(file.pkg.rel_path)
 
-        for file_path in report.skipped_updated_files():
+        for file_path in box.skipped_updated_files():
             file = report.processed_file(file_path)
             if file.db_id not in self._new_files_not_overwritten:
                 self._new_files_not_overwritten[file.db_id] = []
             self._new_files_not_overwritten[file.db_id].append(file.pkg.rel_path)
 
-        for db_id, zip_id, zip_index, zip_description in report.installed_zip_indexes():
+        for db_id, zip_id, zip_index, zip_description in box.installed_zip_indexes():
             stores[db_id].write_only().add_zip_index(zip_id, zip_index, zip_description)
 
         filtered_zip_data = {}
-        for db_id, zip_id, files, folders in report.filtered_zip_data():
+        for db_id, zip_id, files, folders in box.filtered_zip_data():
             if db_id not in filtered_zip_data:
                 filtered_zip_data[db_id] = {}
 
@@ -329,9 +393,13 @@ class OnlineImporter(ProductionOnlineImporter):
         for db, store, _ in self.dbs:
             self._clean_store(store)
 
-        for e in report.wrong_db_options():
+        for e in box.wrong_db_options():
             raise e
 
+        self._failed_files = box.failed_files()
+        self._installed_files = box.installed_files()
+        self._box = box
+    
         return self
 
     def new_files_not_overwritten(self):
@@ -341,11 +409,11 @@ class OnlineImporter(ProductionOnlineImporter):
         return self._needs_reboot
 
     def full_partitions(self):
-        return [p for p, s in self._worker_ctx.file_download_session_logger.report().full_partitions_iter()]
+        return [p for p, s in self._box.full_partitions_iter()]
 
     def free_space(self):
         actual_remaining_space = dict(self._free_space_reservation.free_space())
-        for p, reservation in self._worker_ctx.file_download_session_logger.report().full_partitions_iter():
+        for p, reservation in self._box.full_partitions_iter():
             actual_remaining_space[p] -= reservation
         return actual_remaining_space
 
@@ -360,13 +428,16 @@ class OnlineImporter(ProductionOnlineImporter):
         return store
 
     def correctly_installed_files(self):
-        return self._worker_ctx.file_download_session_logger.report().installed_files()
+        return self._installed_files
 
     def files_that_failed(self):
-        return self._worker_ctx.file_download_session_logger.report().failed_files()
+        return self._failed_files
 
     def report(self) -> InstallationReport:
         return self._worker_ctx.file_download_session_logger.report()
+    
+    def box(self) -> 'InstallationBox':
+        return self._box
 
     @staticmethod
     def _clean_store(store):
@@ -461,3 +532,118 @@ class ImporterCommandFactorySpy(ImporterCommandFactory):
 
     def commands(self):
         return [[(x.testable, y.unwrap_store(), z) for x, y, z in c.read_dbs()] for c in self._commands]
+
+
+class InstallationBox:
+    def __init__(self):
+        self._downloaded_files: List[str] = []
+        self._validated_files: List[str] = []
+        self._present_validated_files: List[str] = []
+        self._present_not_validated_files: List[str] = []
+        self._fetch_started_files: List[str] = []
+        self._failed_files: List[str] = []
+        self._full_partitions: Dict[str, int] = dict()
+        self._failed_db_options: List[WrongDatabaseOptions] = []
+        self._removed_files: List[str] = []
+        self._removed_copies: List[RemovedCopy] = []
+        self._skipped_updated_files: List[str] = []
+        self._filtered_zip_data: List[Tuple[str, str, Dict[str, Any], Dict[str, Any]]] = []
+        self._installed_zip_indexes: List[Tuple[str, str, StoreFragmentDrivePaths, Dict[str, Any]]] = []
+        self._installed_folders: Set[str] = set()
+        self._directories = dict()
+        self._files = dict()
+
+    def add_downloaded_file(self, path: str):
+        self._downloaded_files.append(path)
+    def add_downloaded_files(self, files: List[PathPackage]):
+        if len(files) == 0: return
+        for pkg in files:
+            self._downloaded_files.append(pkg.rel_path)
+    def add_validated_file(self, path: str):
+        self._validated_files.append(path)
+    def add_validated_files(self, files: List[PathPackage]):
+        if len(files) == 0: return
+        for pkg in files:
+            self._validated_files.append(pkg.rel_path)
+    def add_installed_zip_index(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]):
+        self._installed_zip_indexes.append((db_id, zip_id, fragment, description))
+    def add_present_validated_files(self, paths: List[PathPackage]):
+        if len(paths) == 0: return
+        self._present_validated_files.extend([p.rel_path for p in paths])
+    def add_present_not_validated_files(self, paths: List[PathPackage]):
+        if len(paths) == 0: return
+        self._present_not_validated_files.extend([p.rel_path for p in paths])
+    def add_skipped_updated_files(self, paths: List[PathPackage]):
+        if len(paths) == 0: return
+        self._skipped_updated_files.extend([p.rel_path for p in paths])
+    def add_file_fetch_started(self, path: str):
+        self._fetch_started_files.append(path)
+    def add_failed_file(self, path: str):
+        self._failed_files.append(path)
+    def add_failed_files(self, file_pkgs: List[PathPackage]):
+        if len(file_pkgs) == 0: return
+        for pkg in file_pkgs:
+            self._failed_files.append(pkg.rel_path)
+    def add_full_partitions(self, full_partitions: List[Tuple[Partition, int]]):
+        if len(full_partitions) == 0: return
+        for partition, failed_reserve in full_partitions:
+            if partition.path not in self._full_partitions:
+                self._full_partitions[partition.path] = failed_reserve
+            else:
+                self._full_partitions[partition.path] += failed_reserve
+
+    def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
+        files, folders = filtered_data['files'], filtered_data['folders']
+        #if len(files) == 0 and len(folders) == 0: return
+        self._filtered_zip_data.append((db_id, zip_id, files, folders))
+
+    def add_failed_db_options(self, exception: WrongDatabaseOptions):
+        self._failed_db_options.append(exception)
+    def add_removed_files(self, files: List[PathPackage]):
+        if len(files) == 0: return
+        for pkg in files:
+            self._removed_files.append(pkg.rel_path)
+    def add_removed_copies(self, copies: List[RemovedCopy]):
+        if len(copies) == 0: return
+        self._removed_copies.extend(copies)
+    def add_installed_folders(self, folders: List[PathPackage]):
+        if len(folders) == 0: return
+        for pkg in folders:
+            self._installed_folders.add(pkg.rel_path)
+
+    def is_folder_installed(self, path: str) -> bool:  return path in self._installed_folders
+    def downloaded_files(self): return self._downloaded_files
+    def present_validated_files(self): return self._present_validated_files
+    def present_not_validated_files(self): return self._present_not_validated_files
+    def fetch_started_files(self): return self._fetch_started_files
+    def failed_files(self): return self._failed_files
+    def removed_files(self): return self._removed_files
+    def removed_copies(self): return self._removed_copies
+    def installed_files(self): return list(set(self._present_validated_files) | set(self._validated_files))
+    def installed_folders(self): return list(self._installed_folders)
+    def uninstalled_files(self): return self._removed_files + self._failed_files
+    def wrong_db_options(self): return self._failed_db_options
+    def installed_zip_indexes(self): return self._installed_zip_indexes
+    def skipped_updated_files(self): return self._skipped_updated_files
+    def filtered_zip_data(self): return self._filtered_zip_data
+    def full_partitions_iter(self) -> Iterable[Tuple[str, int]]: return self._full_partitions.items()
+
+    def queue_directory_removal(self, dirs: List[PathPackage], db_id: str) -> None:
+        if len(dirs) == 0: return
+        for pkg in dirs:
+            self._directories.setdefault(pkg.rel_path, (pkg, set()))[1].add(db_id)
+    def queue_file_removal(self, files: List[PathPackage], db_id: str) -> None:
+        if len(files) == 0: return
+        for pkg in files:
+            self._files.setdefault(pkg.rel_path, (pkg, set()))[1].add(db_id)
+
+    def consume_files(self) -> List[Tuple[PathPackage, Set[str]]]:
+        result = sorted([(x[0], x[1]) for x in self._files.values()], key=lambda x: x[0].rel_path)
+        self._files.clear()
+        return result
+
+    def consume_directories(self) -> List[Tuple[PathPackage, Set[str]]]:
+        result = sorted([(x[0], x[1]) for x in self._directories.values()], key=lambda x: len(x[0].rel_path))
+        self._directories.clear()
+        return result
+    

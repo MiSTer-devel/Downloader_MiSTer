@@ -17,13 +17,15 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 
 from downloader.config import Config
 from downloader.db_entity import DbEntity
+from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.index import Index
 from downloader.local_store_wrapper import StoreWrapper
+from downloader.path_package import PathPackage, RemovedCopy
 
 
 @dataclass(eq=False, order=False)
@@ -38,3 +40,14 @@ class ProcessIndexJob(Job):
     config: Config
 
     def retry_job(self): return None
+
+    # Results
+    present_not_validated_files: List[PathPackage] = field(default_factory=list)
+    present_validated_files: List[PathPackage] = field(default_factory=list)
+    skipped_updated_files: List[PathPackage] = field(default_factory=list)
+    removed_copies: List[RemovedCopy] = field(default_factory=list)
+    full_partitions: List[Tuple[Partition, int]] = field(default_factory=list)
+    failed_files_no_space: List[PathPackage] = field(default_factory=list)
+    installed_folders: List[PathPackage] = field(default_factory=list)
+    directories_to_remove: List[PathPackage] = field(default_factory=list)
+    files_to_remove: List[PathPackage] = field(default_factory=list)

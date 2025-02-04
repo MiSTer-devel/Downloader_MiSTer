@@ -16,9 +16,10 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from downloader.file_filter import FileFilterFactory
+from downloader.free_space_reservation import Partition
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_open_zip_contents_job
 from downloader.local_store_wrapper import StoreFragmentDrivePaths
@@ -61,10 +62,10 @@ class ProcessZipWorker(DownloaderWorkerBase):
                 file_packs.append(target_paths_calculator.deduce_target_path(file_path, file_description, PathType.FILE))
 
             self._ctx.logger.debug(f"Reserving space '{job.db.db_id}'...")
-            if not self._try_reserve_space(file_packs):
+            job.full_partitions = self._try_reserve_space(file_packs)
+            if len(job.full_partitions) > 0:
                 self._ctx.logger.debug(f"Not enough space '{job.db.db_id} zip:{job.zip_id}'!")
-                self._ctx.installation_report.add_failed_files(file_packs)
-
+                job.failed_files_no_space = file_packs
                 job.not_enough_space = True # @TODO return error instead to retry later?
             else:
                 folder_packs: List[PathPackage] = []
@@ -88,17 +89,15 @@ class ProcessZipWorker(DownloaderWorkerBase):
         self._fill_fragment_with_zip_index(job.result_zip_index, job)
         return next_jobs, None
 
-    def _try_reserve_space(self, file_packs: List[PathPackage]) -> bool:
+    def _try_reserve_space(self, file_packs: List[PathPackage]) -> List[Tuple[Partition, int]]:
         fits_well, full_partitions = self._ctx.free_space_reservation.reserve_space_for_file_pkgs(file_packs)
         if fits_well:
-            return True
+            return []
         else:
             for partition, _ in full_partitions:
                 self._ctx.file_download_session_logger.print_progress_line(f"Partition {partition.path} would get full!")
 
-            self._ctx.installation_report.add_full_partitions(full_partitions)
-
-            return False
+            return full_partitions
 
     def _fill_fragment_with_zip_index(self, fragment: StoreFragmentDrivePaths, job: ProcessZipJob):
         path = None
