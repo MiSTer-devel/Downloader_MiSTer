@@ -16,27 +16,19 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import abc
 import dataclasses
 import threading
 import time
 from collections import defaultdict
-from typing import Dict, Final, Optional, Tuple, List, Any, Iterable, Set, TypeVar, Generic, Protocol, Union
+from typing import Dict, Optional, Tuple, List, Set, Type, TypeVar, Generic, Protocol, Union
 
 from downloader.db_entity import DbEntity
-from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
-from downloader.free_space_reservation import Partition
 from downloader.interruptions import Interruptions
 from downloader.jobs.get_file_job import GetFileJob
-from downloader.local_store_wrapper import StoreFragmentDrivePaths
-from downloader.path_package import PathPackage, PathType
-from downloader.jobs.process_index_job import ProcessIndexJob
-from downloader.jobs.process_zip_job import ProcessZipJob
+from downloader.path_package import PathPackage
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
-from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
-from downloader.online_importer import WrongDatabaseOptions
 from downloader.waiter import Waiter
 from downloader.job_system import ProgressReporter, Job
 from downloader.logger import Logger
@@ -85,29 +77,16 @@ class ProcessedFolder:
     pkg: PathPackage
     dbs: Set[str]
 
-
+TJob = TypeVar("TJob", bound=Job)
 class InstallationReport(Protocol):
-    def get_completed_jobs(self, job_id: int) -> List[Job]: """Return all successful jobs with that id"""
-    def get_failed_jobs(self, job_id: int) ->  List[Tuple[Job, BaseException]]: """Return all failed jobs with that id"""
-    def get_full_partitions(self) -> Iterable[Tuple[str, int]]: """Return all full partitions."""
+    def get_completed_jobs(self, type_class: Type[TJob]) -> List[TJob]: """Return all successful jobs for a job class."""
+    def get_started_jobs(self, type_class: Type[TJob]) -> List[TJob]: """Return all started jobs for a job class."""
+    def get_failed_jobs(self, type_class: Type[TJob]) ->  List[Tuple[TJob, BaseException]]: """Return all failed jobs for a job class."""
+    def get_retried_jobs    (self, job_class: Type[TJob]) -> List[Tuple[TJob, BaseException]]: """Return all retried jobs for a job class."""
+    def get_cancelled_jobs  (self, job_class: Type[TJob]) -> List[TJob]: """Return all cancelled jobs for a job class."""
     def is_file_processed(self, path: str) -> bool: """Returns True if the file has been processed."""
-    def is_folder_installed(self, path: str) -> bool: """Returns True if the file has been processed."""
     def processed_file(self, path: str) -> ProcessedFile: """File that a database is currently processing."""
     def processed_folder(self, path: str) -> Dict[str, PathPackage]: """File that a database is currently processing."""
-    def downloaded_files(self) -> List[str]: """Files that has just been downloaded and validated."""
-    def present_not_validated_files(self) -> List[str]: """File previously in the system, that were in the store, and have NOT been validated."""
-    def present_validated_files(self) -> List[str]: """File previously in the system, that were NOT in the store, and now have been validated."""
-    def fetch_started_files(self) -> List[str]: """Files that have been queued for download."""
-    def failed_files(self) -> List[str]: """Files that couldn't be downloaded properly or didn't pass validation."""
-    def removed_files(self) -> List[str]: """Files that have just been removed."""
-    def removed_copies(self) -> List[Tuple[bool, str, str]]: """Files that were copies and were removed."""
-    def installed_files(self) -> List[str]: """Files that have just been installed and need to be updated in the store."""
-    def installed_folders(self) -> List[str]: """Folders that have just been installed and need to be updated in the store."""
-    def uninstalled_files(self) -> List[str]: """Files that have just been uninstalled for various reasons and need to be removed from the store."""
-    def wrong_db_options(self) -> List[WrongDatabaseOptions]: """Databases that have been unprocessed because of their database."""
-    def installed_zip_indexes(self) -> Iterable[Tuple[str, str, StoreFragmentDrivePaths, Dict[str, Any]]]: """Zip indexes that have been installed and need to be updated in the store."""
-    def skipped_updated_files(self) -> List[str]: """File with an available update that didn't get updated because it has override false in its file description."""
-    def filtered_zip_data(self) -> Dict[str, Any]: """Filtered zip data that has been processed."""
 
 
 class JobTagTracking:
@@ -187,64 +166,53 @@ class _WithLock(Generic[T]):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
 
+
 # @TODO: Want to remove almost all locks in the report altogether, workers should add intermediate results to the jobs
 #  instead, only exception is tags as workers want to query that in runtime in some scenarios.
 class InstallationReportImpl(InstallationReport):
-    def __init__(self, lock: Optional[threading.Lock] = None):
-        lock = lock or threading.Lock()
-        self._downloaded_files = _WithLock[List[str]]([], lock)
-        self._validated_files =  _WithLock[List[str]]([], lock)
-        self._present_validated_files = _WithLock[List[str]]([], lock)
-        self._present_not_validated_files = _WithLock[List[str]]([], lock)
-        self._fetch_started_files = _WithLock[List[str]]([], lock)
-        self._failed_files = _WithLock[List[str]]([], lock)
-        self._full_partitions = _WithLock[Dict[str, int]](dict(), lock)
-        self._failed_db_options = _WithLock[List[WrongDatabaseOptions]]([], lock)
-        self._removed_files = _WithLock[List[str]]([], lock)
-        self._removed_copies = _WithLock[List[Tuple[bool, str, str, PathType]]]([], lock)
-        self._skipped_updated_files = _WithLock[List[str]]([], lock)
-        self._processed_files = _WithLock[Dict[str, ProcessedFile]]({}, lock)
-        self._processed_folders = _WithLock[Dict[str, Dict[str, PathPackage]]]({}, lock)
-        self._installed_zip_indexes = _WithLock[List[Tuple[str, str, StoreFragmentDrivePaths, Dict[str, Any]]]]([], lock)
-        self._installed_folders = _WithLock[Set[str]](set(), lock)
-        self._filtered_zip_data = _WithLock[List[Tuple[str, str, Dict[str, Any], Dict[str, Any]]]]([], lock)
-        self._jobs_started = _WithLock[Dict[int, List[Job]]](defaultdict(list), lock)
-        self._jobs_completed = _WithLock[Dict[int, List[Job]]](defaultdict(list), lock)
-        self._jobs_cancelled = _WithLock[Dict[int, List[Job]]](defaultdict(list), lock)
-        self._jobs_failed = _WithLock[Dict[int, List[Tuple[Job, BaseException]]]](defaultdict(list), lock)
-        self._jobs_retried = _WithLock[Dict[int, List[Tuple[Job, BaseException]]]](defaultdict(list), lock)
+    def __init__(self):
+        # These are only accessed in the main thread
+        self._jobs_started: Dict[int, List[Job]] = defaultdict(list)
+        self._jobs_completed: Dict[int, List[Job]] = defaultdict(list)
+        self._jobs_cancelled: Dict[int, List[Job]] = defaultdict(list)
+        self._jobs_failed: Dict[int, List[Tuple[Job, BaseException]]] = defaultdict(list)
+        self._jobs_retried: Dict[int, List[Tuple[Job, BaseException]]] = defaultdict(list)
+
+        # Following might be modified by multiple threads, but read only in the main thread
+        processed_lock = threading.Lock()
+        self._processed_files = _WithLock[Dict[str, ProcessedFile]]({}, processed_lock)
+        self._processed_folders = _WithLock[Dict[str, Dict[str, PathPackage]]]({}, processed_lock)
         job_tag_lock = threading.Lock()
-        self._jobs_tag_completed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
-        self._jobs_tag_failed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
         self._jobs_tag_tracking = _WithLock[JobTagTracking](JobTagTracking(), job_tag_lock)
 
+        # Following might be modified and read in multiple threads
+        self._jobs_tag_completed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
+        self._jobs_tag_failed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
+
     def add_job_started(self, job: Job):
-        with self._jobs_started as jobs_started: jobs_started[job.type_id].append(job)
+        self._jobs_started[job.type_id].append(job)
         with self._jobs_tag_tracking as tracking: tracking.add_job_started(job)
 
     def add_jobs_cancelled(self, jobs: List[Job]) -> None:
-        with self._jobs_cancelled as jobs_cancelled:
-            for job in jobs:
-                jobs_cancelled[job.type_id].append(job)
-        
+        for job in jobs: self._jobs_cancelled[job.type_id].append(job)
         with self._jobs_tag_tracking as tracking: tracking.add_jobs_cancelled(jobs)
 
     def add_job_completed(self, job: Job, next_jobs: List[Job]):
-        with self._jobs_completed as jobs_completed: jobs_completed[job.type_id].append(job)
+        self._jobs_completed[job.type_id].append(job)
         with self._jobs_tag_tracking as tracking:
             tracking.add_job_completed(job, next_jobs)
             for tag in job.tags:
                 self._jobs_tag_completed.data[tag].append(job)
 
     def add_job_failed(self, job: Job, exception: BaseException):
-        with self._jobs_failed as jobs_failed: jobs_failed[job.type_id].append((job, exception))
+        self._jobs_failed[job.type_id].append((job, exception))
         with self._jobs_tag_tracking as tracking:
             tracking.add_job_failed(job)
             for tag in job.tags:
                 self._jobs_tag_failed.data[tag].append(job)
 
     def add_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
-        with self._jobs_retried as jobs_retried: jobs_retried[job.type_id].append((job, exception))
+        self._jobs_retried[job.type_id].append((job, exception))
         with self._jobs_tag_tracking as tracking: tracking.add_job_retried(job, retry_job)
 
     def any_in_progress_job_with_tags(self, tags: List[str]) -> bool:
@@ -265,70 +233,6 @@ class InstallationReportImpl(InstallationReport):
         with self._jobs_tag_failed as tag_failed:
             return [(tag, tag_failed[tag]) for tag in tags if tag in tag_failed]
 
-    def add_downloaded_file(self, path: str):
-        with self._downloaded_files as downloaded_files: downloaded_files.append(path)
-    def add_downloaded_files(self, files: List[PathPackage]):
-        if len(files) == 0: return
-        with self._downloaded_files as downloaded_files:
-            for pkg in files:
-                downloaded_files.append(pkg.rel_path)
-    def add_validated_file(self, path: str):
-        with self._validated_files as validated_files: validated_files.append(path)
-    def add_validated_files(self, files: List[PathPackage]):
-        if len(files) == 0: return
-        with self._validated_files as validated_files:
-            for pkg in files:
-                validated_files.append(pkg.rel_path)
-    def add_installed_zip_index(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]):
-        with self._installed_zip_indexes as installed_zip_indexes: installed_zip_indexes.append((db_id, zip_id, fragment, description))
-    def add_present_validated_files(self, paths: List[PathPackage]):
-        if len(paths) == 0: return
-        with self._present_validated_files as present_validated_files: present_validated_files.extend([p.rel_path for p in paths])
-    def add_present_not_validated_files(self, paths: List[PathPackage]):
-        if len(paths) == 0: return
-        with self._present_not_validated_files as present_not_validated_files: present_not_validated_files.extend([p.rel_path for p in paths])
-    def add_skipped_updated_files(self, paths: List[PathPackage]):
-        if len(paths) == 0: return
-        with self._skipped_updated_files as skipped_updated_files: skipped_updated_files.extend([p.rel_path for p in paths])
-    def add_file_fetch_started(self, path: str):
-        with self._fetch_started_files as fetch_started_files: fetch_started_files.append(path)
-    def add_failed_file(self, path: str):
-        with self._failed_files as failed_files: failed_files.append(path)
-    def add_failed_files(self, file_pkgs: List[PathPackage]):
-        if len(file_pkgs) == 0: return
-        with self._failed_files as failed_files:
-            for pkg in file_pkgs:
-                failed_files.append(pkg.rel_path)
-    def add_full_partitions(self, full_partitions: List[Tuple[Partition, int]]):
-        if len(full_partitions) == 0: return
-        with self._full_partitions as partitions:
-            for partition, failed_reserve in full_partitions:
-                if partition.path not in partitions:
-                    partitions[partition.path] = failed_reserve
-                else:
-                    partitions[partition.path] += failed_reserve
-
-    def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
-        with self._filtered_zip_data as filtered_zip_data:
-            files, folders = filtered_data['files'], filtered_data['folders']
-            #if len(files) == 0 and len(folders) == 0: return
-            filtered_zip_data.append((db_id, zip_id, files, folders))
-
-    def add_failed_db_options(self, exception: WrongDatabaseOptions):
-        with self._failed_db_options as failed_db_options: failed_db_options.append(exception)
-    def add_removed_files(self, files: List[PathPackage]):
-        if len(files) == 0: return
-        with self._removed_files as removed_files:
-            for pkg in files:
-                removed_files.append(pkg.rel_path)
-    def add_removed_copies(self, copies: List[Tuple[bool, str, str, PathType]]):
-        if len(copies) == 0: return
-        with self._removed_copies as removed_copies: removed_copies.extend(copies)
-    def add_installed_folders(self, folders: List[PathPackage]):
-        if len(folders) == 0: return
-        with self._installed_folders as installed_folders:
-            for pkg in folders:
-                installed_folders.add(pkg.rel_path)
     def add_processed_files(self, files: List[PathPackage], db_id: str) -> Tuple[List[PathPackage], List[ProcessedFile]]:
         if len(files) == 0: return [], []
         non_duplicates = []
@@ -341,6 +245,7 @@ class InstallationReportImpl(InstallationReport):
                     processed_files[pkg.rel_path] = ProcessedFile(pkg, db_id)
                     non_duplicates.append(pkg)
         return non_duplicates, duplicates
+
     def any_file_processed(self, files: List[PathPackage]) -> Optional[ProcessedFile]:
         if len(files) == 0: return None
         with self._processed_files as processed_files:
@@ -357,96 +262,63 @@ class InstallationReportImpl(InstallationReport):
                     processed_folders[pkg.rel_path][db_id].description.update(pkg.description)
                 else:
                     processed_folders.setdefault(pkg.rel_path, dict())[db_id] = pkg
-    def get_completed_jobs(self, job_id: int) -> List[Job]:
-        with self._jobs_completed as jobs_completed: return list(jobs_completed[job_id])
-    def get_failed_jobs(self, job_id: int) -> List[Tuple[Job, BaseException]]:
-        with self._jobs_failed as jobs_failed:
-            return list(jobs_failed[job_id])
-    def is_file_processed(self, path: str) -> bool:
-        with self._processed_files as processed_files: return path in processed_files
-    def is_folder_installed(self, path: str) -> bool:
-        with self._installed_folders as installed_folders: return path in installed_folders
-    def processed_file(self, path: str) -> ProcessedFile:
-        with self._processed_files as processed_files: return processed_files[path]
-    def processed_folder(self, path: str) -> Dict[str, PathPackage]:
-        with self._processed_folders as processed_folders: return processed_folders[path]
+
+    def get_started_jobs    (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_started   [job_class.type_id]
+    def get_completed_jobs  (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_completed [job_class.type_id]
+    def get_failed_jobs     (self, job_class: Type[TJob]) -> List[Tuple[TJob, BaseException]]:  return self._jobs_failed    [job_class.type_id]
+    def get_retried_jobs    (self, job_class: Type[TJob]) -> List[Tuple[TJob, BaseException]]:  return self._jobs_retried   [job_class.type_id]
+    def get_cancelled_jobs  (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_cancelled [job_class.type_id]
 
     # All the rest are Non-thread-safe: Should only be used after threads are out
-    def downloaded_files(self): return self._downloaded_files.data
-    def present_validated_files(self): return self._present_validated_files.data
-    def present_not_validated_files(self): return self._present_not_validated_files.data
-    def fetch_started_files(self): return self._fetch_started_files.data
-    def failed_files(self): return self._failed_files.data
-    def removed_files(self): return self._removed_files.data
-    def removed_copies(self): return self._removed_copies.data
-    def installed_files(self): return list(set(self._present_validated_files.data) | set(self._validated_files.data))
-    def installed_folders(self): return list(self._installed_folders.data)
-    def uninstalled_files(self): return self._removed_files.data + self._failed_files.data
-    def wrong_db_options(self): return self._failed_db_options.data
-    def installed_zip_indexes(self): return self._installed_zip_indexes.data
-    def skipped_updated_files(self): return self._skipped_updated_files.data
-    def filtered_zip_data(self): return self._filtered_zip_data.data
-    def full_partitions_iter(self) -> Iterable[Tuple[str, int]]: return self._full_partitions.data.items()
+    def is_file_processed(self, path: str) -> bool: return path in self._processed_files.data
+    def processed_file(self, path: str) -> ProcessedFile: return self._processed_files.data[path]
+    def processed_folder(self, path: str) -> Dict[str, PathPackage]: return self._processed_folders.data[path]
 
 
-class FileDownloadSessionLogger:
-    @abc.abstractmethod
+class FileDownloadSessionLogger(Protocol):
     def start_session(self):
         '''Starts a new session.'''
 
-    @abc.abstractmethod
     def print_progress_line(self, line):
         '''Prints a progress line.'''
 
-    @abc.abstractmethod
     def print_pending(self):
         '''Prints pending progress.'''
 
-    @abc.abstractmethod
     def print_header(self, db: DbEntity, nothing_to_download: bool = False):
         '''Prints a header.'''
 
-    @abc.abstractmethod
     def report(self) -> InstallationReport:
         '''Returns the report.'''
 
 
-class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
+class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
 
-    def __init__(self, logger: Logger, waiter: Waiter, interrupts: Interruptions, report: InstallationReportImpl):
+    def __init__(self, logger: Logger, waiter: Waiter):
         self._logger = logger
         self._waiter = waiter
-        self._interrupts = interrupts
-        self._report = report
         self._check_time: float = 0
-        self._active_jobs: Dict[int, int] = {}
         self._deactivated: bool = False
         self._needs_newline: bool = False
         self._need_clear_header: bool = False
         self._symbols: List[str] = []
 
     def start_session(self):
-        self.__init__(self._logger, self._waiter, self._interrupts, InstallationReportImpl())
+        self.__init__(self._logger, self._waiter)
 
     def _deactivate(self):
         self._deactivated = True
 
-    def report(self) -> InstallationReport:
-        return self._report
-
-    def notify_job_started(self, job: Job):
-        self._report.add_job_started(job)
+    def print_job_started(self, job: Job):
         if isinstance(job, FetchFileJob):
             self._print_line(job.path)
-            self._report.add_file_fetch_started(job.path)
+
         if isinstance(job, GetFileJob) and not job.silent:
             self._print_line(job.info)
-            self._report.add_file_fetch_started(job.info)
 
-        self._active_jobs[job.type_id] = self._active_jobs.get(job.type_id, 0) + 1
         self._check_time = time.time() + 2.0
 
-    def notify_work_in_progress(self):
+    def print_work_in_progress(self):
         if self._deactivated:
             return
         now = time.time()
@@ -454,47 +326,19 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             self._symbols.append('*')
             self._print_symbols()
 
-    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
-        self._report.add_jobs_cancelled(jobs)
+    def print_jobs_cancelled(self, jobs: List[Job]) -> None:
         self._logger.print(f"Cancelled {len(jobs)} jobs.")
-        try:
-            self._interrupts.interrupt()
-        except Exception as e:
-            self._logger.debug(e)
 
-    def notify_job_completed(self, job: Job, next_jobs: List[Job]):
-        self._report.add_job_completed(job, next_jobs)
+    def print_job_completed(self, job: Job, _next_jobs: List[Job]):
         if isinstance(job, FetchFileJob) or (isinstance(job, GetFileJob) and not job.silent):
             self._symbols.append('.')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
-            if isinstance(job, GetFileJob) and not job.silent:
-                self._report.add_downloaded_file(job.info)
-
-        elif isinstance(job, ValidateFileJob):
+        elif isinstance(job, ValidateFileJob) or (isinstance(job, ValidateFileJob2) and job.after_job is None):
             self._symbols.append('+')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
-
-            self._report.add_downloaded_file(job.fetch_job.path)
-        elif isinstance(job, ValidateFileJob2) and job.after_job is None:
-            self._symbols.append('+')
-            if self._needs_newline or self._check_time < time.time():
-                self._print_symbols()
-
-            self._report.add_validated_file(job.info)
-
-        elif isinstance(job, ProcessZipJob) and job.has_new_zip_index:
-            self._report.add_installed_zip_index(job.db.db_id, job.zip_id, job.result_zip_index, job.zip_description)
-
-        elif isinstance(job, OpenZipContentsJob):
-            self._report.add_downloaded_files(job.downloaded_files)
-            self._report.add_validated_files(job.downloaded_files)
-            self._report.add_failed_files(job.failed_files)
-            self._report.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_data)
-
-        self._remove_in_progress(job)
 
     def _print_symbols(self):
         if len(self._symbols) == 0:
@@ -565,40 +409,59 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         self._need_clear_header = True
         self._check_time = time.time() + 2.0
 
-    def notify_job_failed(self, job: Job, exception: BaseException):
-        self._report.add_job_failed(job, exception)
-        if isinstance(job, ProcessIndexJob) and isinstance(exception, BadFileFilterPartException):
-            self._report.add_failed_db_options(
-                WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(exception)}' is invalid.")
-            )
-        path = self._file_path_from_job(job)
-        if path is not None:
-            self._report.add_failed_file(path)
-        self._handle_job_error(job, exception)
+    def print_job_failed(self, job: Job, exception: BaseException):
+        self._print_job_error(job, exception)
 
-    def notify_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
-        self._report.add_job_retried(job, retry_job, exception)
-        self._handle_job_error(job, exception)
+    def print_job_retried(self, job: Job, _retry_job: Job, exception: BaseException):
+        self._print_job_error(job, exception)
 
-    def _handle_job_error(self, job: Job, exception: BaseException):
+    def _print_job_error(self, _job: Job, exception: BaseException):
         self._logger.debug(exception)
         self._symbols.append('~')
         self._print_symbols()
-        self._remove_in_progress(job)
 
-    def _file_path_from_job(self, job: Job) -> Optional[str]:
-        if isinstance(job, ValidateFileJob):
-            job = job.fetch_job
-        elif isinstance(job, ValidateFileJob2):
-            job = job.get_file_job
-        if isinstance(job, FetchFileJob):
-            return job.path
-        elif isinstance(job, GetFileJob):
-            return job.info
-        else:
-            return None
 
-    def _remove_in_progress(self, job: Job):
-        self._active_jobs[job.type_id] = self._active_jobs.get(job.type_id, 0) - 1
-        if self._active_jobs[job.type_id] <= 0:
-            self._active_jobs.pop(job.type_id)
+class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
+    def __init__(self, logger: Logger, waiter: Waiter, interrupts: Interruptions, report: InstallationReportImpl):
+        self._logger = logger
+        self._interrupts = interrupts
+        self._report = report
+        self._session_logger = FileDownloadSessionLoggerImpl(logger, waiter)
+
+    def session_logger(self) -> FileDownloadSessionLogger:
+        return self._session_logger
+
+    def report(self) -> InstallationReport:
+        return self._report
+
+    def notify_job_started(self, job: Job):
+        self._report.add_job_started(job)
+        self._session_logger.print_job_started(job)
+
+    def notify_work_in_progress(self):
+        self._session_logger.print_work_in_progress()
+
+    def notify_job_completed(self, job: Job, next_jobs: List[Job]):
+        self._report.add_job_completed(job, next_jobs)
+        self._session_logger.print_job_completed(job, next_jobs)
+
+    def notify_job_failed(self, job: Job, exception: BaseException):
+        self._report.add_job_failed(job, exception)
+        self._session_logger.print_job_failed(job, exception)
+
+    def notify_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
+        self._report.add_job_retried(job, retry_job, exception)
+        self._session_logger.print_job_retried(job, retry_job, exception)
+
+    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
+        self._report.add_jobs_cancelled(jobs)
+        self._session_logger.print_jobs_cancelled(jobs)
+        try:
+            self._interrupts.interrupt()
+        except Exception as e:
+            self._logger.debug(e)
+
+    def start_session(self): self._session_logger.start_session()
+    def print_progress_line(self, line): self._session_logger.print_progress_line(line)
+    def print_pending(self): self._session_logger.print_pending()
+    def print_header(self, db: DbEntity, nothing_to_download: bool = False):  self._session_logger.print_header(db, nothing_to_download)

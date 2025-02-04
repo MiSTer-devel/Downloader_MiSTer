@@ -16,11 +16,12 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import field
+from dataclasses import dataclass, field
 
-from downloader.job_system import JobSystem
+from downloader.job_system import Job, JobSystem
 from downloader.jobs.get_file_job import GetFileJob
 
 
-class CopyFileJob(GetFileJob):
+@dataclass(eq=False, order=False)
+class CopyFileJob(Job, GetFileJob):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())

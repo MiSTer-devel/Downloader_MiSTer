@@ -18,7 +18,7 @@
 
 import sys
 import ssl
-from typing import Dict, Any
+from typing import Dict, Any, cast
 
 from downloader.constants import FILE_MiSTer_new, FILE_MiSTer, FILE_MiSTer_old
 from downloader.external_drives_repository import ExternalDrivesRepository
@@ -26,8 +26,10 @@ from downloader.file_system import FolderCreationError
 from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import JobSystem
+from downloader.jobs.copy_file_job import CopyFileJob
 from downloader.jobs.db_header_job import DbHeaderJob
 from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
 from downloader.jobs.worker_context import make_downloader_worker_context, DownloaderWorkerContext
 from downloader.logger import DebugOnlyLoggerDecorator
@@ -200,7 +202,11 @@ class FileDownloader:
         return self._correct_files
 
     def run_files(self):
-        return self._file_session_logger.report().fetch_started_files()
+        report = self._file_session_logger.report()
+        result  = [job.path for job in report.get_started_jobs(FetchFileJob)]
+        result += [job.info for job in report.get_started_jobs(FetchFileJob2)]
+        result += [job.info for job in report.get_started_jobs(CopyFileJob)]
+        return result
 
 
 def context_from_curl_ssl(curl_ssl):
