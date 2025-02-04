@@ -32,7 +32,7 @@ from downloader.path_package import PathPackage, PathType, RemovedCopy
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
-from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext, DownloaderWorkerFailPolicy
 from downloader.constants import FILE_MiSTer, FILE_MiSTer_old
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 from downloader.other import calculate_url
@@ -148,12 +148,17 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         else:
             return index.folders
 
-    @staticmethod
-    def _translate_items(calculator: TargetPathsCalculator, items: Dict[str, Dict[str, Any]], path_type: PathType, exclude: Set[str]) -> Tuple[List[PathPackage], Set[str]]:
+    def _translate_items(self, calculator: TargetPathsCalculator, items: Dict[str, Dict[str, Any]], path_type: PathType, exclude: Set[str]) -> Tuple[List[PathPackage], Set[str]]:
         translated = []
         rel_set = set()
         for path, description in items.items():
-            pkg = calculator.deduce_target_path(path, description, path_type)
+            pkg, error = calculator.deduce_target_path(path, description, path_type)
+            if error is not None:
+                if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
+                    raise error
+
+                self._ctx.logger.print(f"ERROR: {error}")
+
             if pkg.rel_path in exclude: continue
 
             translated.append(pkg)
