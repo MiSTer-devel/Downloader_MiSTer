@@ -25,7 +25,7 @@ from downloader.jobs.jobs_factory import make_open_zip_contents_job
 from downloader.local_store_wrapper import StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_zip_job import ProcessZipJob
-from downloader.jobs.worker_context import DownloaderWorkerBase
+from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerFailPolicy
 from downloader.jobs.process_index_job import ProcessIndexJob
 
 
@@ -59,7 +59,14 @@ class ProcessZipWorker(DownloaderWorkerBase):
             file_packs: List[PathPackage] = []
             target_paths_calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(job.config)
             for file_path, file_description in zip_index.files.items():
-                file_packs.append(target_paths_calculator.deduce_target_path(file_path, file_description, PathType.FILE))
+                file_pkg, file_error = target_paths_calculator.deduce_target_path(file_path, file_description, PathType.FILE)
+                if file_error is not None:
+                     if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
+                         raise file_error
+
+                     self._ctx.logger.print(f'Error: {file_error}')
+
+                file_packs.append(file_pkg)
 
             self._ctx.logger.debug(f"Reserving space '{job.db.db_id}'...")
             job.full_partitions = self._try_reserve_space(file_packs)
@@ -70,7 +77,13 @@ class ProcessZipWorker(DownloaderWorkerBase):
             else:
                 folder_packs: List[PathPackage] = []
                 for folder_path, folder_description in zip_index.folders.items():
-                    folder_packs.append(target_paths_calculator.deduce_target_path(folder_path, folder_description, PathType.FOLDER))
+                    folder_pkg, folder_error = target_paths_calculator.deduce_target_path(folder_path, folder_description, PathType.FOLDER)
+                    if folder_error is not None:
+                        if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
+                            raise folder_error
+
+                        self._ctx.logger.print(f'Error: {folder_error}')
+                    folder_packs.append(folder_pkg)
 
                 already_processed = self._ctx.installation_report.any_file_processed(file_packs)
                 if already_processed is not None:
@@ -124,8 +137,14 @@ class ProcessZipWorker(DownloaderWorkerBase):
         if path is None:
             return
 
-        path_pkg = self._ctx.target_paths_calculator_factory.target_paths_calculator(job.config)\
+        path_pkg, path_error = self._ctx.target_paths_calculator_factory.target_paths_calculator(job.config)\
             .deduce_target_path(path, {}, PathType.FOLDER)
+
+        if path_error is not None:
+            if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
+                raise path_error
+
+            self._ctx.logger.print(f"ERROR: {path_error}")
 
         if path_pkg.pext_props and path_pkg.is_pext_external:
             drive = path_pkg.pext_props.drive

@@ -16,7 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, List, Set
+from configparser import Error
+from typing import Dict, Any, List, Optional, Set
 from pathlib import Path
 
 from downloader.db_entity import DbEntity
@@ -24,7 +25,7 @@ from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
 from downloader.job_system import WorkerResult
 from downloader.jobs.index import Index
 from downloader.path_package import PathPackage, PathType
-from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext, DownloaderWorkerFailPolicy
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.file_system import FileCopyError
 from downloader.storage_priority_resolver import StoragePriorityError
@@ -55,7 +56,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         return [], None
 
-    def _extract_all_contents(self, job: OpenZipContentsJob):
+    def _extract_all_contents(self, job: OpenZipContentsJob) -> None:
         db = job.db
         config = job.config
         zip_description = job.zip_description
@@ -64,10 +65,17 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         self._ctx.logger.print(zip_description['description'])
 
-        target_folder_path = self._ctx.target_paths_calculator_factory\
+        target_pkg, target_error = self._ctx.target_paths_calculator_factory\
             .target_paths_calculator(config)\
-            .deduce_target_path(zip_description['target_folder_path'], {}, PathType.FOLDER)\
-            .full_path
+            .deduce_target_path(zip_description['target_folder_path'], {}, PathType.FOLDER)
+
+        if target_error is not None:
+            if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
+                raise target_error
+
+            self._ctx.logger.print(f"ERROR: {target_error}")
+
+        target_folder_path = target_pkg.full_path
 
         job.installed_folders = self._process_create_folders_packages(db, job.folders)
 
