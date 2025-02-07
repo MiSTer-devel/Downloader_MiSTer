@@ -27,8 +27,8 @@ from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
 from downloader.file_system import FsError, ReadOnlyFileSystem
 from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, WorkerResult
+from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
-from downloader.online_importer import WrongDatabaseOptions
 from downloader.path_package import PathPackage, PathType, RemovedCopy
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
