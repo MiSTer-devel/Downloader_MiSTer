@@ -24,6 +24,7 @@ from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
 from downloader.job_system import WorkerResult
 from downloader.jobs.index import Index
+from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext, DownloaderWorkerFailPolicy
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
@@ -43,9 +44,9 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         try:
             kind = job.zip_description.get('kind', None)
             if kind == 'extract_all_contents':
-                self._extract_all_contents(job)
+                return self._extract_all_contents(job)
             elif kind == 'extract_single_files':
-                self._extract_single_files(job)
+                return self._extract_single_files(job)
             else:
                 # @TODO: Handle this case, it should never raise in any case
                 raise Exception(f"Unknown kind '{kind}' for zip '{job.zip_id}' in db '{job.db.db_id}'")
@@ -54,9 +55,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         except StoragePriorityError as e:
             return [], e
 
-        return [], None
-
-    def _extract_all_contents(self, job: OpenZipContentsJob) -> None:
+    def _extract_all_contents(self, job: OpenZipContentsJob) -> WorkerResult:
         db = job.db
         config = job.config
         zip_description = job.zip_description
@@ -90,8 +89,8 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
                 contained_files.append(pkg)
 
         if len(contained_files) > 0:
+            self._ctx.installation_report.add_processed_files(contained_files, job.db.db_id)  # @TODO: this needs to be moved to process_zip_worker and as much as possible of the previous lines
             self._ctx.file_system.unzip_contents(download_path, target_folder_path, [pkg.full_path for pkg in contained_files])
-            self._ctx.installation_report.add_processed_files(contained_files, job.db.db_id)
 
         self._ctx.file_system.unlink(download_path)
 
@@ -101,7 +100,27 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         if len(job.filtered_data['folders']) > 0:
             job.directories_to_remove = [PathPackage(full_path=folder_path, rel_path=folder_path, description=folder_description) for folder_path, folder_description in job.filtered_data['folders'].items()]
 
-        job.downloaded_files.extend(contained_files)
+        invalid_files: List[PathPackage] = []
+        validated_files: List[PathPackage] = []
+        for file_pkg in contained_files:
+            if self._ctx.file_system.hash(file_pkg.full_path) == file_pkg.description['hash']:
+                validated_files.append(file_pkg)
+            else:
+                invalid_files.append(file_pkg)
+
+        job.downloaded_files.extend(validated_files)
+        if len(invalid_files) > 0:
+            self._ctx.installation_report.unmark_processed_files(invalid_files, job.db.db_id)
+            return [ProcessIndexJob(
+                db=job.db,
+                ini_description=job.ini_description,
+                config=job.config,
+                index=Index(files={file.rel_path: file.description for file in invalid_files}, folders={}),
+                store=job.store.select(files=invalid_files),  # @TODO: This store needs to be a fragment only for the invalid files...
+                full_resync=job.full_resync
+            )], None
+        else:
+            return [], None
 
     def _process_create_folders_packages(self, db: DbEntity, create_folder_pkgs: List[PathPackage]) -> List[PathPackage]:
         # @TODO inspired in ProcessIndexWorker._process_create_folders_packages
@@ -122,7 +141,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         self._ctx.installation_report.add_processed_folders(create_folder_pkgs, db.db_id)
         return create_folder_pkgs
 
-    def _extract_single_files(self, job: OpenZipContentsJob):
+    def _extract_single_files(self, job: OpenZipContentsJob) -> WorkerResult:
         zip_id = job.zip_id
         zip_description = job.zip_description
         download_path = job.download_path
@@ -157,3 +176,4 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         self._ctx.file_system.unlink(download_path)
         self._ctx.file_system.remove_non_empty_folder(tmp_path)
         temp_filename.close()
+        return [], None

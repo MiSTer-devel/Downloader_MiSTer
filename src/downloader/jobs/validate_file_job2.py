@@ -34,4 +34,5 @@ class ValidateFileJob2(Job):
     after_job: Optional[Job] = None
     priority: bool = True
 
-    def retry_job(self): return self.get_file_job
+    def retry_job(self) -> Optional[Job]: return self.get_file_job
+    def backup_job(self) -> Optional[Job]: return None if self.after_job is None else self.after_job.backup_job()

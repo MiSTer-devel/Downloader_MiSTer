@@ -16,7 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.job_system import WorkerResult
+from typing import Optional
+from downloader.job_system import Job, WorkerResult
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.index import Index
 from downloader.jobs.open_zip_index_job import OpenZipIndexJob
@@ -32,7 +33,6 @@ from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 # in the job system, so that we can centralize scheduling there.
 
 class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
-    _wait = 0
     def job_type_id(self) -> int: return ProcessDbZipsWaiterJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
@@ -41,34 +41,26 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
         while self._ctx.installation_report.any_in_progress_job_with_tags(job.zip_job_tags):
             self._ctx.job_ctx.wait_for_other_jobs()
 
-        for tag, zip_jobs in self._ctx.installation_report.get_jobs_failed_by_tags(job.zip_job_tags):
-            for zip_job in zip_jobs:
-                if (
-                    isinstance(zip_job, FetchFileJob2) and
-                    isinstance(zip_job.after_job, ValidateFileJob2) and
-                    isinstance(zip_job.after_job.after_job, OpenZipIndexJob) and
-                    zip_job.after_job.after_job.backup_job is not None
-                ):
-                    backup_job = zip_job.after_job.after_job.backup_job
-                    zip_job.after_job.after_job.backup_job = None
-                    return [backup_job, job], None
-
         index = Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url)
 
-        for tag, zip_jobs in self._ctx.installation_report.get_jobs_completed_by_tags(job.zip_job_tags):
+        store = job.store
+        for _tag, zip_jobs in self._ctx.installation_report.get_jobs_completed_by_tags(job.zip_job_tags):
             for zip_job in zip_jobs:
                 if isinstance(zip_job, ProcessZipJob):
                     if zip_job.not_enough_space:
                         return [], None
 
-                    index.merge_zip_index(zip_job.zip_index)
+                    if zip_job.skip_unzip:
+                        index.merge_zip_index(zip_job.zip_index)
+                    else:
+                        store = job.store.deselect(zip_job.zip_index)
 
         resulting_job = ProcessIndexJob(
             db=job.db,
             ini_description=job.ini_description,
             config=job.config,
             index=index,
-            store=job.store,
+            store=store,
             full_resync=job.full_resync,
         )
         return [resulting_job], None

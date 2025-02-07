@@ -1,63 +1,102 @@
-# This script generates a jobs flow diagram for the documentation
-
 from graphviz import Digraph
 
-# Initialize the Digraph object with some graph attributes
-dot = Digraph(comment='Workflow Diagram',
-                            graph_attr={'rankdir': 'TB'},  # TB for top to bottom diagram
-                            node_attr={'shape': 'box', 'style': 'rounded,filled', 'fillcolor': 'lightgrey', 'fontname': 'Helvetica'},
-                            edge_attr={'color': 'black'})  # Use a neutral color for edges
+# Initialize the Digraph
+dot = Digraph(
+    comment='Workflow Diagram',
+    graph_attr={'rankdir': 'TB'},
+    node_attr={
+        'shape': 'box',
+        'style': 'rounded,filled',
+        'fillcolor': 'lightgrey',
+        'fontname': 'Helvetica'
+    },
+    edge_attr={'color': 'black'}
+)
 
-# Adding nodes (steps) with specific pastel colors for START and END
+# NON-ZIP NODES
+dot.node('START', 'START', shape='ellipse', fillcolor='black', fontcolor='white')
+dot.node('END', 'END', shape='ellipse', fillcolor='#77DD77')
 dot.node('A', 'FetchFileJob [db]')
 dot.node('B', 'ValidateFileJob [db]', fillcolor='#ffefd5')
+dot.node('C', 'OpenDbJob', fillcolor='#ffefd5')
+dot.node('D', 'ProcessDbJob', fillcolor='#B0E0E6')
+dot.node('E', 'ProcessIndexJob', fillcolor='#B0E0E6')
+dot.node('M', 'FetchFileJob [file]')
+dot.node('N', 'ValidateFileJob [file]', fillcolor='#ffefd5')
+
+# Example "legend" nodes
 dot.node('0', 'CPU', fillcolor='#B0E0E6')
 dot.node('1', 'File System', fillcolor='#ffefd5')
 dot.node('2', 'Network')
-dot.node('C', 'OpenDbJob', fillcolor='#ffefd5')
-dot.node('D', 'ProcessDbJob', fillcolor='#B0E0E6')
-dot.node('O', 'ProcessDbZipsWaiterJob', fillcolor='#B0E0E6')
-dot.node('E', 'ProcessIndexJob', fillcolor='#B0E0E6')
-dot.node('F', 'ProcessZipJob', fillcolor='#B0E0E6')
-dot.node('G', 'FetchFileJob [zip index]')
-dot.node('H', 'ValidateFileJob [zip index]', fillcolor='#ffefd5')
-dot.node('I', 'OpenZipIndexJob', fillcolor='#ffefd5')
-dot.node('J', 'FetchFileJob [zip contents]')
-dot.node('K', 'ValidateFileJob [zip contents]', fillcolor='#ffefd5')
-dot.node('L', 'OpenZipContentsJob', fillcolor='#ffefd5')
-dot.node('M', 'FetchFileJob [file]')
-dot.node('N', 'ValidateFileJob [file]', fillcolor='#ffefd5')
-dot.node('START', 'START', shape='ellipse', fillcolor='black', fontcolor='white')  # Pastel blue for START
-dot.node('END', 'END', shape='ellipse', fillcolor='#77DD77')  # Pastel green for END
 
-# Adding edges (transitions)
-# The normal workflow without labeled edges
-dot.edges(['AB', 'BC', 'CD', 'DE', 'DO', 'OE', 'FJ', 'FE', 'IF', 'GH', 'HI', 'JK', 'KL', 'MN'])
-
-dot.edge('F', 'O', style='dotted', label='wait')
-dot.edge('G', 'O', style='dotted', label='wait')
-dot.edge('H', 'O', style='dotted', label='wait')
-dot.edge('I', 'O', style='dotted', label='wait')
-#dot.edge('F', 'O', style='dotted', label='N to 1')
-#dot.edge('X', 'F', style='dotted')
-
-# The workflow with labeled edges "1 to N"
 dot.edge('START', 'A', label='1 to N')
-dot.edge('D', 'G', label='1 to N')
-dot.edge('D', 'F', label='1 to N')
+
+dot.edge('A', 'B', weight='10')
+dot.edge('B', 'C', weight='10')
+dot.edge('C', 'D', weight='10')
+dot.edge('D', 'E', weight='10')
+
 dot.edge('E', 'M', label='1 to N')
+dot.edge('M', 'N')
 
-# End edges
-dot.edge('L', 'END')
-dot.edge('N', 'END')
+dot.edge('B', 'A', label=' r', style='dashed', constraint='true')
+dot.edge('C', 'A', label=' retry', style='dashed', constraint='true')
+dot.edge('N', 'M', label=' r', style='dashed', constraint='false')
 
-# Backward "retry" edges
-dot.edge('B', 'A', label=' retry', constraint='false', minlen='10')
-dot.edge('C', 'A', label=' retry', constraint='false', minlen='10')
-dot.edge('H', 'G', label=' retry', constraint='false', minlen='10')
-dot.edge('I', 'G', label=' retry', constraint='false', minlen='10')
-dot.edge('K', 'J', label=' retry', constraint='false', minlen='10')
-dot.edge('L', 'J', label=' retry', constraint='false', minlen='10')
-dot.edge('N', 'M', label=' retry', constraint='false', minlen='10')
+dot.edge('N', 'END', weight='20', constraint='true')
+
+dot.render('jobs_diagram_no_zip', format='png', cleanup=True)
+
+# ZIP NODES in a subgraph cluster
+with dot.subgraph(name='cluster_zip') as c:
+    c.attr(style='filled', color='#f5f5ff', penwidth='1.0')
+    c.node('3', 'Zip Feature', style='filled', fillcolor='#8f8fff', fontcolor='white', penwidth='0')
+
+    c.node('O', 'ProcessDbZipsWaiterJob', fillcolor='#B0E0E6')
+    c.node('F', 'ProcessZipJob', fillcolor='#B0E0E6')
+    c.node('G', 'FetchFileJob [zip index]')
+    c.node('H', 'ValidateFileJob [zip index]', fillcolor='#ffefd5')
+    c.node('I', 'OpenZipIndexJob', fillcolor='#ffefd5')
+    c.node('J', 'FetchFileJob [zip contents]')
+    c.node('K', 'ValidateFileJob [zip contents]', fillcolor='#ffefd5')
+    c.node('L', 'OpenZipContentsJob', fillcolor='#ffefd5')
+
+#
+# EDGES
+#
+dot.edge('D', 'O', weight='10')
+dot.edge('O', 'E', weight='10')
+dot.edge('D', 'G', label='1 to N')
+
+dot.edge('F', 'J')
+dot.edge('I', 'F')
+dot.edge('G', 'H')
+dot.edge('H', 'I')
+dot.edge('J', 'K')
+dot.edge('K', 'L')
+dot.edge('L', 'E', label='inv[]', minlen='4', weight='2')
+
+# “Wait” edges
+dot.edge('F', 'O', style='dotted', constraint='true', label='wait')
+
+# Labeled “1 to N” edges
+dot.edge('D', 'F', label='1 to N', weight='5')
+
+# Edges to END
+dot.edge('L', 'END', weight='20', constraint='true')
+
+# “Retry” edges
+dot.edge('H', 'G', label=' r', style='dashed', constraint='false')
+dot.edge('I', 'G', label=' r', style='dashed', constraint='false')
+dot.edge('K', 'J', label=' r', style='dashed', constraint='false')
+dot.edge('L', 'J', label=' r', style='dashed', constraint='false')
+
+# "Backup" edges
+dot.edge('G', 'F', label='backup if stored', style='dashed', constraint='false')
+#dot.edge('H', 'I', label='b', style='dashed', constraint='false', dir='none')
+#dot.edge('I', 'F', label='b', style='dashed', constraint='false')
+dot.edge('J', 'E', label='b', style='dashed', constraint='false')
+#dot.edge('K', 'L', label='b', style='dashed', constraint='false', dir='none')
+#dot.edge('L', 'E', label='b', style='dashed', constraint='false')
 
 dot.render('jobs_diagram', format='png', cleanup=True)

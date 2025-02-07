@@ -26,7 +26,6 @@ from downloader.local_store_wrapper import StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerFailPolicy
-from downloader.jobs.process_index_job import ProcessIndexJob
 
 
 class ProcessZipWorker(DownloaderWorkerBase):
@@ -42,17 +41,9 @@ class ProcessZipWorker(DownloaderWorkerBase):
         less_file_count = len(job.zip_index.files) < job.config['zip_file_count_threshold']
         less_accumulated_mbs = total_files_size < (1000 * 1000 * job.config['zip_accumulated_mb_threshold'])
 
-        next_jobs: List[Job] = []
-
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
-            next_jobs.append(ProcessIndexJob(
-                db=job.db,
-                ini_description=job.ini_description,
-                config=job.config,
-                index=job.zip_index,
-                store=job.store,
-                full_resync=job.full_resync
-            ))
+            job.skip_unzip = True
+            next_jobs: List[Job] = []
         else:
             zip_index, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(job.db, job.zip_index, job.config).select_filtered_files(job.zip_index)
 
@@ -74,6 +65,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
                 self._ctx.logger.debug(f"Not enough space '{job.db.db_id} zip:{job.zip_id}'!")
                 job.failed_files_no_space = file_packs
                 job.not_enough_space = True # @TODO return error instead to retry later?
+                next_jobs = []
             else:
                 folder_packs: List[PathPackage] = []
                 for folder_path, folder_description in zip_index.folders.items():
@@ -97,7 +89,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
                     folder_packs=folder_packs,
                     filtered_data=filtered_zip_data[job.zip_id] if job.zip_id in filtered_zip_data else {'files': {}, 'folders': {}}
                 )
-                next_jobs.append(get_file_job)
+                next_jobs: List[Job] = [get_file_job]
 
         self._fill_fragment_with_zip_index(job.result_zip_index, job)
         return next_jobs, None
