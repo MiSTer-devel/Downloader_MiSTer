@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.get_file_job import GetFileJob
@@ -24,3 +25,4 @@ from downloader.jobs.get_file_job import GetFileJob
 @dataclass(eq=False, order=False)
 class FetchFileJob2(Job, GetFileJob):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
+    def backup_job(self) -> Optional[Job]: return None if self.after_job is None else self.after_job.backup_job()

@@ -245,6 +245,16 @@ class InstallationReportImpl(InstallationReport):
                     processed_files[pkg.rel_path] = ProcessedFile(pkg, db_id)
                     non_duplicates.append(pkg)
         return non_duplicates, duplicates
+    
+    def unmark_processed_files(self, files: List[PathPackage], db_id: str) -> None:
+        if len(files) == 0: return
+        with self._processed_files as processed_files:
+            for file in files:
+                if file.rel_path not in processed_files:
+                    continue
+                if processed_files[file.rel_path].db_id != db_id:
+                    continue
+                processed_files.pop(file.rel_path)
 
     def any_file_processed(self, files: List[PathPackage]) -> Optional[ProcessedFile]:
         if len(files) == 0: return None

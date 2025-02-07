@@ -58,7 +58,7 @@ from test.fake_file_downloader_factory import FileDownloaderFactory
 
 
 class OnlineImporter(ProductionOnlineImporter):
-    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, path_resolver_factory=None, local_repository=None, free_space_reservation=None, waiter=None, logger=None, path_dictionary=None, network_state=None, file_system_state=None):
+    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, path_resolver_factory=None, local_repository=None, free_space_reservation=None, waiter=None, logger=None, path_dictionary=None, network_state=None, file_system_state=None, fail_policy=None):
         self._config = config or config_with(base_system_path=MEDIA_USB0)
         if isinstance(file_system_factory, FileSystemFactory):
             self.fs_factory = file_system_factory
@@ -108,7 +108,7 @@ class OnlineImporter(ProductionOnlineImporter):
             external_drives_repository=ExternalDrivesRepository(file_system=self.file_system),
             target_paths_calculator_factory=TargetPathsCalculatorFactory(self.file_system, external_drives_repository),
             config=self._config,
-            fail_policy=DownloaderWorkerFailPolicy.FAIL_FAST
+            fail_policy=fail_policy or DownloaderWorkerFailPolicy.FAIL_FAST
         )
 
     @staticmethod
@@ -169,10 +169,12 @@ class OnlineImporter(ProductionOnlineImporter):
 
         for job in jobs: self._job_system.push_job(job)
 
+        box = InstallationBox()
+        self._box = box
+
         self._job_system.execute_jobs()
 
         report = self._worker_ctx.file_download_session_logger.report()
-        box = InstallationBox()
         for job in report.get_completed_jobs(ProcessIndexJob):
             box.add_present_not_validated_files(job.present_not_validated_files)
             box.add_present_validated_files(job.present_validated_files)
@@ -196,6 +198,8 @@ class OnlineImporter(ProductionOnlineImporter):
             box.add_validated_file(job.info)
 
         for job in report.get_completed_jobs(ProcessZipJob):
+            if job.summary_download_failed is not None:
+                box.add_failed_file(job.summary_download_failed)
             box.add_full_partitions(job.full_partitions)
             box.add_failed_files(job.failed_files_no_space)
             if job.has_new_zip_index:
@@ -393,7 +397,6 @@ class OnlineImporter(ProductionOnlineImporter):
 
         self._failed_files = box.failed_files()
         self._installed_files = box.installed_files()
-        self._box = box
     
         return self
 

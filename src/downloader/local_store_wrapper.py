@@ -42,28 +42,31 @@ def new_store_fragment_drive_paths(): return {"base_paths": new_store_fragment_p
 
 
 class LocalStoreWrapper:
-    def __init__(self, local_store):
+    def __init__(self, local_store: Dict[str, Any]):
         self._local_store = local_store
         self._dirty = False
 
-    def unwrap_local_store(self):
+    def unwrap_local_store(self) -> Dict[str, Any]:
         return self._local_store
 
-    def mark_force_save(self):
+    def mark_force_save(self) -> None:
         self._dirty = True
 
-    def store_by_id(self, db_id):
+    def store_by_id(self, db_id: str) -> 'StoreWrapper':
         if db_id not in self._local_store['dbs']:
             self._local_store['dbs'][db_id] = empty_store_without_base_path()
 
         return StoreWrapper(self._local_store['dbs'][db_id], self)
 
-    def needs_save(self):
+    def needs_save(self) -> bool:
         return self._dirty
 
 
+class ReadOnlyStoreException(Exception): pass
+
+
 class StoreWrapper:
-    def __init__(self, store, local_store_wrapper):
+    def __init__(self, store: Dict[str, Any], local_store_wrapper: LocalStoreWrapper, readonly: bool = False):
         self._aggregated_summary = {'files': dict(), 'folders': dict(), 'files_no_pext': dict(), 'folders_no_pext': dict()}
         if 'files' in store:
             for file_path, file_description in store['files'].items():
@@ -99,15 +102,52 @@ class StoreWrapper:
         self._local_store_wrapper = local_store_wrapper
         self._read_only = ReadOnlyStoreAdapter(self._store, self._aggregated_summary)
         self._write_only = WriteOnlyStoreAdapter(self._store, self._local_store_wrapper, self._external_additions, self._aggregated_summary)
+        self._readonly = readonly
 
-    def unwrap_store(self):
+    def unwrap_store(self) -> Dict[str, Any]:
         return self._store
 
-    def write_only(self):
+    def write_only(self) -> 'WriteOnlyStoreAdapter':
+        if self._readonly: raise ReadOnlyStoreException('Cannot get write only store adapter from read only store wrapper')
         return self._write_only
 
-    def read_only(self):
+    def read_only(self) -> 'ReadOnlyStoreAdapter':
         return self._read_only
+    
+    def select(self, files: List[PathPackage] = [], folders: List[PathPackage] = [], zips: List[str] = []) -> 'StoreWrapper':
+        new_store = {
+            'files': {},
+            'folders': {},
+            'base_path': self._store['base_path']
+        }
+
+        for file in files:
+            if file.rel_path not in self._store['files']:
+                continue
+            new_store['files'][file.rel_path] = self._store['files'][file.rel_path]
+        for folder in folders:
+            if folder.rel_path not in self._store['folders']:
+                continue
+            new_store['folders'][folder.rel_path] = self._store['folders'][folder.rel_path]
+
+        return StoreWrapper(new_store, self._local_store_wrapper, readonly=True)
+
+    def deselect(self, index: Index) -> 'StoreWrapper':
+        new_store = {
+            'files': {},
+            'folders': {},
+            'base_path': self._store['base_path']
+        }
+
+        for file in self._store['files']:
+            if file not in index.files:
+                new_store['files'][file] = self._store['files'][file]
+
+        for folder in self._store['folders']:
+            if folder not in index.folders:
+                new_store['folders'][folder] = self._store['folders'][folder]
+
+        return StoreWrapper(new_store, self._local_store_wrapper, readonly=True)
 
 
 class WriteOnlyStoreAdapter:

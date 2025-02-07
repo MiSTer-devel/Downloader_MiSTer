@@ -242,27 +242,37 @@ class JobSystem(JobContext):
             return None
 
         retry_job = package.job.retry_job()
-        if package.tries >= self._max_tries or retry_job is None:
+        backup_job = package.job.backup_job()
+        tries = package.tries
+
+        if tries < self._max_tries and retry_job is not None:
+            job = retry_job
+            tries += 1
+        else:
+            job = backup_job
+            tries = 0
+
+        if job is None:
             return None
 
-        worker = self._workers.get(retry_job.type_id, None)
+        worker = self._workers.get(job.type_id, None)
         if worker is None:
-            self._add_unhandled_exception(CantPushJobs('Retry failed because there no worker is registered for the job.'), ctx='retry-package', package=package, sub_job=('retry', retry_job))
+            self._add_unhandled_exception(CantPushJobs('Retry failed because there no worker is registered for the job.'), ctx='retry-package', package=package, sub_job=('retry', job))
             return None
 
         retry_package = _JobPackage(
-            job=retry_job,
+            job=job,
             worker=worker,
-            tries=package.tries + 1,
+            tries=tries,
             parent=None,
             next_jobs=package.next_jobs
         )
-        if retry_job.priority:
+        if job.priority:
             self._job_queue.appendleft(retry_package)
         else:
             self._job_queue.append(retry_package)
 
-        return retry_job
+        return job
 
     def _handle_notifications(self) -> None:
         while True:
@@ -273,11 +283,7 @@ class JobSystem(JobContext):
 
             status, package, error = notification
             if error is not None:
-                retry_job =  self._retry_package(package)
-                if retry_job is not None:
-                    self._record_job_retried(package, retry_job, error.child)
-                else:
-                    self._record_job_failed(package, error.child)
+                self._handle_returned_error(package, error)
             elif status == _JobState.JOB_COMPLETED:
                 next_jobs = []
                 if not self._are_jobs_cancelled:
@@ -296,6 +302,13 @@ class JobSystem(JobContext):
                 self._jobs_cancelled.append(package.job)
             else:
                 self._add_unhandled_exception(ValueError(f'Unhandled JobState notification: {status}'), package=package, ctx='handle-notifications-switch-status')
+
+    def _handle_returned_error(self, package: '_JobPackage', e: Exception) -> None:
+        retry_job = self._retry_package(package)
+        if retry_job is not None:
+            self._record_job_retried(package, retry_job, e)
+        else:
+            self._record_job_failed(package, e)
 
     def _remove_done_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> List[Tuple['_JobPackage', Future[None]]]:
         still_pending = []
@@ -323,12 +336,7 @@ class JobSystem(JobContext):
             self._record_job_failed(package, e)
             return
 
-        e = _wrap_unknown_base_error(e)
-        retry_job =  self._retry_package(package)
-        if retry_job is not None:
-            self._record_job_retried(package, retry_job, e)
-        else:
-            self._record_job_failed(package, e)
+        self._handle_returned_error(package, _wrap_unknown_base_error(e))
 
     def _add_unhandled_exception(self, e: BaseException, package: Optional['_JobPackage'] = None, sub_job: Optional[Tuple[str, 'Job']] = None, ctx: Optional[str] = None, method: Optional[Callable] = None) -> None:
         if self._fail_policy == JobFailPolicy.FAIL_FAST: raise e
@@ -466,6 +474,9 @@ class Job(ABC):
 
     def retry_job(self) -> Optional['Job']:
         return self
+    
+    def backup_job(self) -> Optional['Job']:
+        return None
 
     def add_tag(self, tag: Union[str, int]) -> 'Job':
         tags = getattr(self, '_tags', None)

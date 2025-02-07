@@ -193,7 +193,7 @@ def zipped_files_from_cheats_folder():
 
 def file_nes_palette_a_descr_zipped():
     return {
-        "hash": file_nes_palette_a,
+        "hash": file_nes_palette_a[1:],
         "size": 2905020,
         "url": "https://a.pal",
         "zip_id": zipped_nes_palettes_id

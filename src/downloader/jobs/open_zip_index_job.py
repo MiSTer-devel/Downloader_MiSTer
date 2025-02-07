@@ -40,6 +40,7 @@ class OpenZipIndexJob(Job):
     download_path: str
     config: Config
     get_file_job: GetFileJob
-    backup_job: Optional[ProcessZipJob]
+    process_zip_backup: ProcessZipJob
 
     def retry_job(self) -> Optional[Job]: return self.get_file_job
+    def backup_job(self) -> Optional[Job]: return self.process_zip_backup
