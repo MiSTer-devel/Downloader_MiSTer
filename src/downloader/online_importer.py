@@ -16,12 +16,10 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, List, Optional, Union, Any, Iterable, Set, Tuple
+from typing import Dict, List, Optional, Any, Iterable, Set, Tuple
 from collections import defaultdict
 import os
 
-from downloader.file_system import FileSystemFactory
-from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.importer_command import ImporterCommand
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.errors import WrongDatabaseOptions
@@ -29,11 +27,9 @@ from downloader.jobs.jobs_factory import make_get_file_job
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 from downloader.jobs.workers_factory import make_workers
-from downloader.local_repository import LocalRepository
 from downloader.logger import Logger
-from downloader.waiter import Waiter
 from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
-from downloader.free_space_reservation import Partition
+from downloader.free_space_reservation import FreeSpaceReservation, Partition
 from downloader.importer_command import ImporterCommand
 from downloader.job_system import JobSystem
 from downloader.jobs.copy_file_job import CopyFileJob
@@ -48,42 +44,17 @@ from downloader.local_store_wrapper import LocalStoreWrapper, StoreFragmentDrive
 from downloader.path_package import PathPackage, PathType, RemovedCopy
 
 
-class _Session:
-    def __init__(self):
-        self.files_that_failed = []
-        self.files_that_failed_from_zip = []
-        self.folders_that_failed = []
-        self.zips_that_failed = []
-        self.correctly_installed_files = []
-        self.new_files_not_overwritten = {}
-        self.processed_files = {}
-        self.needs_reboot = False
-        self.file_system = None
-
-    def add_new_file_not_overwritten(self, db_id, file):
-        if db_id not in self.new_files_not_overwritten:
-            self.new_files_not_overwritten[db_id] = []
-        self.new_files_not_overwritten[db_id].append(file)
-
-
 class OnlineImporter:
-    def __init__(self, file_filter_factory, file_system_factory: FileSystemFactory, file_downloader_factory, path_resolver_factory,
-                 local_repository: LocalRepository, external_drives_repository, free_space_reservation: FreeSpaceReservation, waiter: Waiter, logger: Logger, job_system: JobSystem, worker_ctx: DownloaderWorkerContext):
-        self._file_filter_factory = file_filter_factory
-        self._file_system_factory = file_system_factory
-        self._file_downloader_factory = file_downloader_factory
-        self._path_resolver_factory = path_resolver_factory
-        self._local_repository = local_repository
-        self._external_drives_repository = external_drives_repository
-        self._free_space_reservation = free_space_reservation
-        self._waiter = waiter
+    def __init__(self, logger: Logger, job_system: JobSystem, worker_ctx: DownloaderWorkerContext, free_space_reservation: FreeSpaceReservation):
         self._logger = logger
-        self._worker_ctx = worker_ctx
         self._job_system = job_system
+        self._worker_ctx = worker_ctx
+        self._free_space_reservation = free_space_reservation
         self._local_store: Optional[LocalStoreWrapper] = None
-        self._unused_filter_tags: List[Union[str, int]] = []
-        self._full_partitions: List[str] = []
-        self._base_session = _Session()
+        self._box = InstallationBox()
+        self._needs_reboot = False
+        self._needs_save = False
+        self._new_files_not_overwritten: Dict[str, List[str]] = dict()
 
     def set_local_store(self, local_store: LocalStoreWrapper):
         self._local_store = local_store
@@ -96,10 +67,9 @@ class OnlineImporter:
         self._job_system.register_workers(self._make_workers(self._worker_ctx))
         self._job_system.push_jobs(self._make_jobs(importer_command, local_store, full_resync))
 
-        box = InstallationBox()
-        self._box = box
         self._job_system.execute_jobs()
 
+        box = self._box
         report = self._worker_ctx.file_download_session_logger.report()
         for job in report.get_completed_jobs(ProcessIndexJob):
             box.add_present_not_validated_files(job.present_not_validated_files)
@@ -317,16 +287,13 @@ class OnlineImporter:
         for store in stores.values():
             store.write_only().cleanup_externals()
 
-        self.needs_save = local_store.needs_save()
+        self._needs_save = local_store.needs_save()
 
         for db, store, _ in self.dbs:
             self._clean_store(store)
 
         for e in box.wrong_db_options():
             raise e
-
-        self._failed_files = box.failed_files()
-        self._installed_files = box.installed_files()
     
         return self
 
@@ -363,32 +330,55 @@ class OnlineImporter:
             if 'internal_summary' in zip_description:
                 zip_description.pop('internal_summary')
 
-    def files_that_failed(self) -> List[str]:
-        return self._base_session.files_that_failed
-
     def folders_that_failed(self) -> List[str]:
-        return self._base_session.folders_that_failed
+        return []
 
     def zips_that_failed(self) -> List[str]:
-        return self._base_session.zips_that_failed
+        return []
 
     def unused_filter_tags(self) -> List[str]:
-        return self._unused_filter_tags
-
-    def correctly_installed_files(self) -> List[str]:
-        return self._base_session.correctly_installed_files
-
-    def needs_reboot(self) -> bool:
-        return self._base_session.needs_reboot
+        return []
 
     def full_partitions(self) -> List[str]:
-        return [p.partition_path for p in self._free_space_reservation.get_full_partitions()]
+        return []
 
     def free_space(self) -> int:
-        return self._free_space_reservation.free_space()
+        return 0
+    
+    def new_files_not_overwritten(self):
+        return self._new_files_not_overwritten
 
-    def new_files_not_overwritten(self) -> List[str]:
-        return self._base_session.new_files_not_overwritten
+    def needs_reboot(self):
+        return self._needs_reboot
+
+    def full_partitions(self):
+        return [p for p, s in self._box.full_partitions_iter()]
+
+    def free_space(self):
+        actual_remaining_space = dict(self._free_space_reservation.free_space())
+        for p, reservation in self._box.full_partitions_iter():
+            actual_remaining_space[p] -= reservation
+        return actual_remaining_space
+
+    def add_db(self, db, store, description=None):
+        self.dbs.append((db, store, {} if description is None else description))
+        return self
+
+    def download_db(self, db, store, full_resync=False):
+        self.add_db(db, store)
+        self.download(full_resync)
+        self._clean_store(store)
+        return store
+
+    def correctly_installed_files(self):
+        return self._box.installed_files()
+
+    def files_that_failed(self):
+        return self._box.failed_files()
+    
+    @property
+    def needs_save(self) -> bool:
+        return self._needs_save
 
 
 def is_system_path(description: Dict[str, str]) -> bool:

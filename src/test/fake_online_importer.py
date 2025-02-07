@@ -17,7 +17,6 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.constants import MEDIA_USB0
-from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.interruptions import Interruptions
@@ -33,8 +32,6 @@ from test.fake_http_gateway import FakeHttpGateway
 from test.fake_job_system import ProgressReporterTracker
 from test.fake_local_store_wrapper import LocalStoreWrapper
 from test.fake_external_drives_repository import ExternalDrivesRepository
-from test.fake_local_repository import LocalRepository
-from test.fake_path_resolver import PathResolverFactory
 from test.fake_workers_factory import make_workers
 from test.objects import config_with
 from test.fake_waiter import NoWaiter
@@ -44,7 +41,7 @@ from test.fake_file_downloader_factory import FileDownloaderFactory
 
 
 class OnlineImporter(ProductionOnlineImporter):
-    def __init__(self, file_downloader_factory=None, config=None, file_system_factory=None, path_resolver_factory=None, local_repository=None, free_space_reservation=None, waiter=None, logger=None, path_dictionary=None, network_state=None, file_system_state=None, fail_policy=None):
+    def __init__(self, config=None, file_system_factory=None, free_space_reservation=None, waiter=None, logger=None, path_dictionary=None, network_state=None, file_system_state=None, fail_policy=None):
         self._config = config or config_with(base_system_path=MEDIA_USB0)
         if isinstance(file_system_factory, FileSystemFactory):
             self.fs_factory = file_system_factory
@@ -53,12 +50,7 @@ class OnlineImporter(ProductionOnlineImporter):
             self.file_system_state = file_system_state or FileSystemState(config=self._config, path_dictionary=path_dictionary)
             self.fs_factory = file_system_factory or FileSystemFactory(state=self.file_system_state)
 
-        file_downloader_factory = file_downloader_factory or FileDownloaderFactory(config=self._config, file_system_factory=self.fs_factory, state=self.file_system_state)
         self.file_system = self.fs_factory.create_for_system_scope()
-        path_resolver_factory = path_resolver_factory or PathResolverFactory(path_dictionary=self.file_system_state.path_dictionary, file_system_factory=self.fs_factory)
-        self.needs_save = False
-        self._needs_reboot = False
-        self._new_files_not_overwritten = {}
         waiter = NoWaiter() if waiter is None else waiter
         logger = NoLogger() if logger is None else logger
         installation_report = InstallationReportImpl()
@@ -85,32 +77,20 @@ class OnlineImporter(ProductionOnlineImporter):
         )
 
         super().__init__(
-            FileFilterFactory(logger),
-            self.fs_factory,
-            file_downloader_factory,
-            path_resolver_factory,
-            LocalRepository(config=self._config, file_system=self.file_system, file_system_factory=self.fs_factory) if local_repository is None else local_repository,
-            ExternalDrivesRepository(file_system=self.file_system),
-            free_space_reservation or UnlimitedFreeSpaceReservation(),
-            waiter,
             logger,
             job_system=self._job_system,
-            worker_ctx=self._worker_ctx
-            )
+            worker_ctx=self._worker_ctx,
+            free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation()
+        )
 
         self.dbs = []
 
     @staticmethod
     def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs, free_space_reservation=None):
-        file_downloader_factory, file_system_factory, config = FileDownloaderFactory.from_implicit_inputs(implicit_inputs)
-
-        path_resolver_factory = PathResolverFactory.from_file_system_state(implicit_inputs.file_system_state)
-
+        _, file_system_factory, config = FileDownloaderFactory.from_implicit_inputs(implicit_inputs)
         return OnlineImporter(
             config=config,
             file_system_factory=file_system_factory,
-            file_downloader_factory=file_downloader_factory,
-            path_resolver_factory=path_resolver_factory,
             free_space_reservation=free_space_reservation,
             network_state=implicit_inputs.network_state,
             file_system_state=implicit_inputs.file_system_state
@@ -118,71 +98,40 @@ class OnlineImporter(ProductionOnlineImporter):
 
     @property
     def fs_data(self):
-        return self._file_system_factory.data
+        return self.fs_factory.data
 
     @property
     def fs_records(self):
-        return self._file_system_factory.records
+        return self.fs_factory.records
 
     @property
     def jobs_tracks(self):
         return self._report_tracker.tracks
-    
-    def _make_workers(self, ctx):
-        return {w.job_type_id(): w for w in make_workers(ctx)}
-    
-    def _make_jobs(self, importer_command, local_store, full_resync):
-        jobs = []
-        for db, store, ini_description in self.dbs:
-            jobs.append(ProcessDbJob(db=db, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
-        return jobs
 
     def download(self, full_resync):
         self.set_local_store(LocalStoreWrapper({'dbs': {db.db_id: store for db, store, _ in self.dbs}}))
 
         importer_command = ImporterCommand('')
-        for db, store, ini_description in self.dbs:
+        for db, _store, ini_description in self.dbs:
             importer_command.add_db(db.db_id, ini_description)
         self.download_dbs_contents(importer_command, full_resync)
     
         return self
-
-    def new_files_not_overwritten(self):
-        return self._new_files_not_overwritten
-
-    def needs_reboot(self):
-        return self._needs_reboot
-
-    def full_partitions(self):
-        return [p for p, s in self._box.full_partitions_iter()]
-
-    def free_space(self):
-        actual_remaining_space = dict(self._free_space_reservation.free_space())
-        for p, reservation in self._box.full_partitions_iter():
-            actual_remaining_space[p] -= reservation
-        return actual_remaining_space
-
-    def add_db(self, db, store, description=None):
-        self.dbs.append((db, store, {} if description is None else description))
-        return self
-
-    def download_db(self, db, store, full_resync=False):
-        self.add_db(db, store)
-        self.download(full_resync)
-        self._clean_store(store)
-        return store
-
-    def correctly_installed_files(self):
-        return self._installed_files
-
-    def files_that_failed(self):
-        return self._failed_files
 
     def report(self) -> InstallationReport:
         return self._worker_ctx.file_download_session_logger.report()
     
     def box(self) -> InstallationBox:
         return self._box
+
+    def _make_workers(self, ctx):
+        return {w.job_type_id(): w for w in make_workers(ctx)}
+    
+    def _make_jobs(self, _importer_command, local_store, full_resync):
+        jobs = []
+        for db, store, ini_description in self.dbs:
+            jobs.append(ProcessDbJob(db=db, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
+        return jobs
 
 
 class ImporterCommandFactorySpy(ImporterCommandFactory):
