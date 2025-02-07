@@ -17,7 +17,6 @@ dot = Digraph(
 dot.node('START', 'START', shape='ellipse', fillcolor='black', fontcolor='white')
 dot.node('END', 'END', shape='ellipse', fillcolor='#77DD77')
 dot.node('A', 'FetchFileJob [db]')
-dot.node('B', 'ValidateFileJob [db]', fillcolor='#ffefd5')
 dot.node('C', 'OpenDbJob', fillcolor='#ffefd5')
 dot.node('D', 'ProcessDbJob', fillcolor='#B0E0E6')
 dot.node('E', 'ProcessIndexJob', fillcolor='#B0E0E6')
@@ -29,19 +28,17 @@ dot.node('0', 'CPU', fillcolor='#B0E0E6')
 dot.node('1', 'File System', fillcolor='#ffefd5')
 dot.node('2', 'Network')
 
-dot.edge('START', 'A', label='1 to N')
+dot.edge('START', 'A', label='1:N')
 
-dot.edge('A', 'B', weight='10')
-dot.edge('B', 'C', weight='10')
+dot.edge('A', 'C', weight='10')
 dot.edge('C', 'D', weight='10')
 dot.edge('D', 'E', weight='10')
 
-dot.edge('E', 'M', label='1 to N')
+dot.edge('E', 'M', label='1:N')
 dot.edge('M', 'N')
 
-dot.edge('B', 'A', label=' r', style='dashed', constraint='true')
 dot.edge('C', 'A', label=' retry', style='dashed', constraint='true')
-dot.edge('N', 'M', label=' r', style='dashed', constraint='false')
+dot.edge('N', 'M', label=' retry', style='dashed', constraint='false')
 
 dot.edge('N', 'END', weight='20', constraint='true')
 
@@ -66,7 +63,7 @@ with dot.subgraph(name='cluster_zip') as c:
 #
 dot.edge('D', 'O', weight='10')
 dot.edge('O', 'E', weight='10')
-dot.edge('D', 'G', label='1 to N')
+dot.edge('D', 'G', label='1:N')
 
 dot.edge('F', 'J')
 dot.edge('I', 'F')
@@ -79,8 +76,8 @@ dot.edge('L', 'E', label='inv[]', minlen='4', weight='2')
 # “Wait” edges
 dot.edge('F', 'O', style='dotted', constraint='true', label='wait')
 
-# Labeled “1 to N” edges
-dot.edge('D', 'F', label='1 to N', weight='5')
+# Labeled “1:N” edges
+dot.edge('D', 'F', label='1:N', weight='5')
 
 # Edges to END
 dot.edge('L', 'END', weight='20', constraint='true')

@@ -20,7 +20,7 @@ import unittest
 
 from test.fake_file_system_factory import fs_data
 from test.fake_online_importer import OnlineImporter
-from test.objects import remove_all_priority_paths, db_entity, db_reboot_descr, empty_test_store
+from test.objects import remove_all_priority_paths, db_reboot_descr, empty_test_store
 
 
 class OnlineImporterTestBase(unittest.TestCase):
