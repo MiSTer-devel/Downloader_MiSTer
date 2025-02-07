@@ -20,3 +20,4 @@
 class GetFileError(Exception): pass
 class FileDownloadError(GetFileError): pass
 class FileCopyError(GetFileError): pass
+class WrongDatabaseOptions(Exception): pass
