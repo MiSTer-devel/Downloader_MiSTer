@@ -22,7 +22,6 @@ from downloader.constants import K_FILTER
 from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_file_system_factory import first_fake_temp_file, FileSystemFactory
 from test.fake_full_run_service import FullRunService
-from test.fake_online_importer import ImporterCommandFactorySpy
 from test.objects import config_test_with_filters, db_test_with_default_filter_descr
 
 
@@ -77,6 +76,19 @@ class TestFullProducedImporterCommands(unittest.TestCase):
         actual = first_filter(importer_factory)
         self.assertEqual('' if actual is None else actual.lower().strip(), '' if output_filter is None else output_filter.lower().strip())
 
+
+class ImporterCommandFactorySpy(ImporterCommandFactory):
+    def __init__(self, config):
+        super().__init__(config)
+        self._commands = []
+
+    def create(self):
+        command = super().create()
+        self._commands.append(command)
+        return command
+
+    def commands(self):
+        return [[(x.testable, y.unwrap_store(), z) for x, y, z in c.read_dbs()] for c in self._commands]
 
 def first_filter(spy: ImporterCommandFactorySpy):
     return spy.commands()[0][0][2][K_FILTER]
