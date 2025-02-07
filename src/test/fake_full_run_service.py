@@ -40,7 +40,6 @@ from test.fake_linux_updater import LinuxUpdater
 from test.fake_local_repository import LocalRepository
 from downloader.logger import NoLogger
 from test.fake_online_importer import OnlineImporter
-from test.fake_offline_importer import OfflineImporter
 from test.fake_reboot_calculator import RebootCalculator
 from test.objects import db_empty
 from test.fake_certificates_fix import CertificatesFix
@@ -79,7 +78,6 @@ class FullRunService(ProductionFullRunService):
                          NoLogger(),
                          LocalRepository(config=config, file_system=system_file_system),
                          db_gateway or DbGateway(config, file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory),
-                         OfflineImporter(file_downloader_factory=file_downloader_factory),
                          OnlineImporter(file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory),
                          linux_updater,
                          RebootCalculator(file_system=system_file_system),

@@ -40,7 +40,6 @@ from downloader.storage_priority_resolver import StoragePriorityResolver
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository
 from downloader.migrations import migrations
-from downloader.offline_importer import OfflineImporter
 from downloader.online_importer import OnlineImporter
 from downloader.path_resolver import PathResolverFactory
 from downloader.reboot_calculator import RebootCalculator
@@ -98,8 +97,6 @@ class FullRunServiceFactory:
         free_space_reservation = LinuxFreeSpaceReservation(logger=self._logger, config=config) if system_file_system.is_file(FILE_MiSTer_version) else UnlimitedFreeSpaceReservation()
         file_downloader_factory = FileDownloaderFactory(file_system_factory, waiter, self._logger, job_system, file_download_reporter, file_download_reporter, http_gateway, free_space_reservation, external_drives_repository)
         db_gateway = DbGateway(config, system_file_system, file_downloader_factory, self._logger)
-        offline_importer = OfflineImporter(file_system_factory, file_downloader_factory, self._logger)
-        online_importer = OnlineImporter(file_filter_factory, file_system_factory, file_downloader_factory, path_resolver_factory, local_repository, external_drives_repository, free_space_reservation, waiter, self._logger)
         linux_updater = LinuxUpdater(config, system_file_system, file_downloader_factory, self._logger)
 
         workers_ctx = make_downloader_worker_context(
@@ -117,6 +114,7 @@ class FullRunServiceFactory:
             target_paths_calculator_factory=TargetPathsCalculatorFactory(system_file_system, external_drives_repository),
             config=config
         )
+        online_importer = OnlineImporter(logger=self._logger, job_system=job_system, worker_ctx=workers_ctx, free_space_reservation=free_space_reservation)
 
         instance = FullRunService(
             config,
@@ -125,7 +123,6 @@ class FullRunServiceFactory:
             self._printlog_manager,
             local_repository,
             db_gateway,
-            offline_importer,
             online_importer,
             linux_updater,
             RebootCalculator(config, self._logger, system_file_system),

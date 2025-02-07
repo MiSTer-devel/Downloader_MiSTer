@@ -31,7 +31,7 @@ from downloader.other import format_files_message, format_folders_message, forma
 
 
 class FullRunService:
-    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: PrintLogManager, local_repository, db_gateway, offline_importer, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter, importer_command_factory: ImporterCommandFactory, job_system: JobSystem, workers_ctx: DownloaderWorkerContext):
+    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: PrintLogManager, local_repository, db_gateway, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter, importer_command_factory: ImporterCommandFactory, job_system: JobSystem, workers_ctx: DownloaderWorkerContext):
         self._importer_command_factory = importer_command_factory
         self._waiter = waiter
         self._os_utils = os_utils
@@ -41,7 +41,6 @@ class FullRunService:
         self._reboot_calculator = reboot_calculator
         self._linux_updater = linux_updater
         self._online_importer = online_importer
-        self._offline_importer = offline_importer
         self._db_gateway = db_gateway
         self._local_repository = local_repository
         self._logger = logger
@@ -127,7 +126,6 @@ class FullRunService:
             self._base_path_relocator.relocate_non_system_files(relocation_package)
             self._local_repository.save_store(local_store)
 
-        self._offline_importer.apply_offline_databases(importer_command)
         self._online_importer.download_dbs_contents(importer_command, full_resync)
 
         self._local_repository.save_store(local_store)

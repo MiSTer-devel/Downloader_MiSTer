@@ -19,6 +19,7 @@
 import unittest
 
 from downloader.constants import K_FILTER
+from downloader.importer_command import ImporterCommandFactory
 from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_file_system_factory import first_fake_temp_file, FileSystemFactory
 from test.fake_full_run_service import FullRunService
