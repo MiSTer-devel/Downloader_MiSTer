@@ -43,13 +43,13 @@ class LocalRepository(FilelogSaver):
     @property
     def _storage_save_path(self):
         if self._storage_path_save_value is None:
-            self._storage_path_save_value = f'{self._config['base_system_path']}/{FILE_downloader_storage_json}'
+            self._storage_path_save_value = os.path.join(self._config['base_system_path'], FILE_downloader_storage_json)
         return self._storage_path_save_value
 
     @property
     def _storage_old_path(self):
         if self._storage_path_old_value is None:
-            self._storage_path_old_value = f'{self._config['base_system_path']}/{FILE_downloader_storage_zip}'
+            self._storage_path_old_value = os.path.join(self._config['base_system_path'], FILE_downloader_storage_zip)
         return self._storage_path_old_value
 
     @property
