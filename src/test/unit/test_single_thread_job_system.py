@@ -141,6 +141,20 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         self.system.execute_jobs()
         self.assertReports(started={1: 4}, retried={1: 3}, failed={1: 1})
 
+    def test_backup___when_job_retries_itself_and_then_runs_backup___reports_completed_backup_instead(self):
+        self.system.register_worker(1, TestWorker(self.system))
+        self.system.register_worker(2, TestWorker(self.system))
+        self.system.push_job(TestJob(1, fails=4, backup_job=TestJob(2)))
+        self.system.execute_jobs()
+        self.assertReports(started={1: 4, 2: 1}, completed={2: 1}, retried={1: 4}, failed={})
+
+    def test_backup___when_job_retries_itself_and_then_runs_backup_but_it_also_fails___reports_failed_backup(self):
+        self.system.register_worker(1, TestWorker(self.system))
+        self.system.register_worker(2, TestWorker(self.system))
+        self.system.push_job(TestJob(1, fails=4, backup_job=TestJob(2, fails=4)))
+        self.system.execute_jobs()
+        self.assertReports(started={1: 4, 2: 4}, retried={1: 4, 2: 3}, failed={2: 1})
+
     def test_failed___when_job_raises_exception_and_system_is_fault_tolerant___and_throws_when_system_has_fail_gracefully_policy_instead(self):
         def prepare():
             self.system.register_worker(1, TestWorker(self.system))
@@ -273,10 +287,11 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
 
 class TestJob(Job):
-    def __init__(self, type_id: int, next_job: Optional['TestJob'] = None, retry_job: Optional['TestJob'] = None, fails: int = 0, register_worker: Optional[Worker] = None,
+    def __init__(self, type_id: int, next_job: Optional['TestJob'] = None, retry_job: Optional['TestJob'] = None, backup_job: Optional['TestJob'] = None, fails: int = 0, register_worker: Optional[Worker] = None,
                  cancel_pending_jobs: bool = False, raises: bool = False, execute_jobs: bool = False, set_signals: Optional[List[signal.Signals]] = None):
         self._type_id = type_id
         self._retry_job = retry_job
+        self._backup_job = backup_job
         self.next_job = next_job
         self.fails = fails
         self.raises = raises
@@ -294,6 +309,12 @@ class TestJob(Job):
             return self._retry_job
 
         return super().retry_job()
+
+    def backup_job(self):
+        if self._backup_job is not None:
+            return self._backup_job
+
+        return super().backup_job()
 
 
 class TestWorker(Worker):
