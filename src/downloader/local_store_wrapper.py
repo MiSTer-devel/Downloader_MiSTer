@@ -114,21 +114,21 @@ class StoreWrapper:
     def read_only(self) -> 'ReadOnlyStoreAdapter':
         return self._read_only
     
-    def select(self, files: List[PathPackage] = [], folders: List[PathPackage] = [], zips: List[str] = []) -> 'StoreWrapper':
+    def select(self, files: List[str] = [], folders: List[str] = []) -> 'StoreWrapper':
         new_store = {
             'files': {},
             'folders': {},
             'base_path': self._store['base_path']
         }
 
-        for file in files:
-            if file.rel_path not in self._store['files']:
+        for file_path in files:
+            if file_path not in self._store['files']:
                 continue
-            new_store['files'][file.rel_path] = self._store['files'][file.rel_path]
-        for folder in folders:
-            if folder.rel_path not in self._store['folders']:
+            new_store['files'][file_path] = self._store['files'][file_path]
+        for folder_path in folders:
+            if folder_path not in self._store['folders']:
                 continue
-            new_store['folders'][folder.rel_path] = self._store['folders'][folder.rel_path]
+            new_store['folders'][folder_path] = self._store['folders'][folder_path]
 
         return StoreWrapper(new_store, self._local_store_wrapper, readonly=True)
 
@@ -139,13 +139,13 @@ class StoreWrapper:
             'base_path': self._store['base_path']
         }
 
-        for file in self._store['files']:
-            if file not in index.files:
-                new_store['files'][file] = self._store['files'][file]
+        for file_path in self._store['files']:
+            if file_path not in index.files:
+                new_store['files'][file_path] = self._store['files'][file_path]
 
-        for folder in self._store['folders']:
-            if folder not in index.folders:
-                new_store['folders'][folder] = self._store['folders'][folder]
+        for folder_path in self._store['folders']:
+            if folder_path not in index.folders:
+                new_store['folders'][folder_path] = self._store['folders'][folder_path]
 
         return StoreWrapper(new_store, self._local_store_wrapper, readonly=True)
 

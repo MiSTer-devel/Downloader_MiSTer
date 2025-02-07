@@ -50,10 +50,7 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
                     if zip_job.not_enough_space:
                         return [], None
 
-                    if zip_job.skip_unzip:
-                        index.merge_zip_index(zip_job.zip_index)
-                    else:
-                        store = job.store.deselect(zip_job.zip_index)
+                    store = job.store.deselect(zip_job.zip_index)
 
         resulting_job = ProcessIndexJob(
             db=job.db,

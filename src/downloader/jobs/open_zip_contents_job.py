@@ -17,12 +17,13 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import Dict, Any, List
+from typing import Callable, Dict, Any, List, Tuple
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFoldersHolder, Config, make_file_folders_holder
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.get_file_job import GetFileJob
+from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.path_package import PathPackage
 from downloader.jobs.index import Index
 from downloader.local_store_wrapper import StoreWrapper
@@ -44,8 +45,10 @@ class OpenZipContentsJob(Job):
     download_path: str
     config: Config
     get_file_job: GetFileJob
+    make_process_index_backup: Callable[[], ProcessIndexJob]
 
     def retry_job(self): return self.get_file_job
+    def backup_job(self): return self.make_process_index_backup()
 
     # Results
     downloaded_files: List[PathPackage] = field(default_factory=list)

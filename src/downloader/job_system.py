@@ -241,15 +241,20 @@ class JobSystem(JobContext):
         if self._are_jobs_cancelled:
             return None
 
-        retry_job = package.job.retry_job()
-        backup_job = package.job.backup_job()
+        job: Optional[Job] = None
         tries = package.tries
-
-        if tries < self._max_tries and retry_job is not None:
-            job = retry_job
+        if tries < self._max_tries:
+            try:
+                job = package.job.retry_job()
+            except Exception as e:
+                self._add_unhandled_exception(e)
             tries += 1
-        else:
-            job = backup_job
+
+        if job is None:
+            try:
+                job = package.job.backup_job()
+            except Exception as e:
+                self._add_unhandled_exception(e)
             tries = 0
 
         if job is None:
