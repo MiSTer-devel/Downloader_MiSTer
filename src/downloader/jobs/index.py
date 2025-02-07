@@ -30,3 +30,13 @@ class Index:
         self.files.update(zip_index.files)
         self.folders.update(zip_index.folders)
 
+    def subtract(self, other: 'Index'):
+        for key in other.files:
+            if key in self.files:
+                del self.files[key]
+
+        for key in other.folders:
+            if key in self.folders:
+                del self.folders[key]
+
+

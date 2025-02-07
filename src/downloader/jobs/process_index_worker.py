@@ -28,6 +28,7 @@ from downloader.file_system import FsError, ReadOnlyFileSystem
 from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.online_importer import WrongDatabaseOptions
 from downloader.path_package import PathPackage, PathType, RemovedCopy
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
@@ -91,6 +92,10 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             next_jobs = self._process_fetch_packages_and_launch_jobs(fetch_pkgs, db.base_files_url)
             return next_jobs, None
         except (BadFileFilterPartException, StoragePriorityError, FsError, OSError) as e:
+            if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
+                if isinstance(e, BadFileFilterPartException):
+                    raise WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e)))
+                raise e
             return [], e
 
     def _create_packages_from_index(self, config: Config, summary: Index, db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[
