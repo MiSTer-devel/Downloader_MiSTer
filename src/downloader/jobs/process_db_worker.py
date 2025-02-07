@@ -60,25 +60,26 @@ class ProcessDbWorker(DownloaderWorkerBase):
                 zip_job_tags.append(make_zip_tag(job.db, zip_id))
                 zip_jobs.append(zip_job)
 
-            zip_jobs.append(ProcessDbZipsWaiterJob(
+            waiter_job = ProcessDbZipsWaiterJob(
                 db=job.db,
                 config=config,
                 store=job.store,
                 ini_description=job.ini_description,
                 full_resync=job.full_resync,
                 zip_job_tags=zip_job_tags
-            ))
+            )
 
-            return zip_jobs, None
+            return [*zip_jobs, waiter_job], None
         else:
-            return [ProcessIndexJob(
+            index_job = ProcessIndexJob(
                 db=job.db,
                 ini_description=job.ini_description,
                 config=config,
                 index=Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url),
                 store=job.store,
                 full_resync=job.full_resync,
-            )], None
+            )
+            return [index_job], None
 
 
 def build_db_config(input_config: Config, db: DbEntity, ini_description: Dict[str, Any]) -> Config:
