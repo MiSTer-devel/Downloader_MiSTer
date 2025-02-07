@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 
-from typing import Optional, Dict, Any, Tuple, List
+from typing import Callable, Optional, Dict, Any, Tuple, List
 from dataclasses import dataclass
 
 from downloader.config import Config
@@ -31,6 +31,7 @@ from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.index import Index
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.jobs.open_zip_index_job import OpenZipIndexJob
+from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.path_package import PathPackage
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.process_zip_job import ProcessZipJob
@@ -89,7 +90,7 @@ def make_open_zip_index_job(z: ZipJobContext, file_description: Dict[str, Any], 
     return get_file_job, info
 
 
-def make_open_zip_contents_job(job: ProcessZipJob, zip_index: Index, file_packs: List[PathPackage], folder_packs: List[PathPackage], filtered_data: FileFoldersHolder) -> Tuple[GetFileJob, str]:
+def make_open_zip_contents_job(job: ProcessZipJob, zip_index: Index, file_packs: List[PathPackage], folder_packs: List[PathPackage], filtered_data: FileFoldersHolder, make_process_index_backup: Callable[[], ProcessIndexJob]) -> Tuple[GetFileJob, str]:
     get_file_job, validate_job, info = make_get_zip_file_jobs(db=job.db, zip_id=job.zip_id, description=job.zip_description['contents_file'])
     open_zip_contents_job = OpenZipContentsJob(
         zip_id=job.zip_id,
@@ -104,7 +105,8 @@ def make_open_zip_contents_job(job: ProcessZipJob, zip_index: Index, file_packs:
         config=job.config,
         index=zip_index,
         get_file_job=get_file_job,
-        filtered_data=filtered_data
+        filtered_data=filtered_data,
+        make_process_index_backup=make_process_index_backup
     )
     open_zip_contents_job.add_tag(make_zip_tag(job.db, job.zip_id))
     validate_job.after_job = open_zip_contents_job

@@ -22,6 +22,7 @@ from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import Partition
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_open_zip_contents_job
+from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.local_store_wrapper import StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_zip_job import ProcessZipJob
@@ -43,7 +44,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
 
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
             job.skip_unzip = True
-            next_jobs: List[Job] = []
+            next_jobs: List[Job] = [_make_process_index_job(job)]
         else:
             zip_index, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(job.db, job.zip_index, job.config).select_filtered_files(job.zip_index)
 
@@ -87,7 +88,8 @@ class ProcessZipWorker(DownloaderWorkerBase):
                     zip_index=zip_index,
                     file_packs=file_packs,
                     folder_packs=folder_packs,
-                    filtered_data=filtered_zip_data[job.zip_id] if job.zip_id in filtered_zip_data else {'files': {}, 'folders': {}}
+                    filtered_data=filtered_zip_data[job.zip_id] if job.zip_id in filtered_zip_data else {'files': {}, 'folders': {}},
+                    make_process_index_backup=lambda: _make_process_index_job(job)
                 )
                 next_jobs: List[Job] = [get_file_job]
 
@@ -159,3 +161,14 @@ class ProcessZipWorker(DownloaderWorkerBase):
 
             for folder_path, folder_description in job.zip_index.folders.items():
                 fragment['base_paths']['folders'][folder_path] = folder_description
+
+
+def _make_process_index_job(job: ProcessZipJob) -> ProcessIndexJob:
+    return ProcessIndexJob(
+            db=job.db,
+            ini_description=job.ini_description,
+            config=job.config,
+            index=job.zip_index,
+            store=job.store.select(files=list(job.zip_index.files), folders=list(job.zip_index.folders)),
+            full_resync=job.full_resync,
+        )

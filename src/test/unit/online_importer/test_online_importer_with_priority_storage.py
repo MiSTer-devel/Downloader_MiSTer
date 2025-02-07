@@ -19,9 +19,10 @@ from downloader.jobs.worker_context import DownloaderWorkerFailPolicy
 from downloader.storage_priority_resolver import StoragePriorityError
 from test.fake_file_system_factory import fs_data
 from test.fake_online_importer import OnlineImporter
-from test.objects import empty_test_store, file_nes_smb1, db_test, db_entity, file_nes_smb1_descr, files_smb1, folder_games, folder_games_nes, media_fat, store_descr
+from test.objects import empty_test_store, file_nes_palette_a, file_nes_smb1, db_test, db_entity, file_nes_smb1_descr, files_smb1, folder_games, folder_games_nes, folder_games_nes_palettes\
+    , media_fat, store_descr, zip_desc
 from test.unit.online_importer.online_importer_with_priority_storage_test_base import OnlineImporterWithPriorityStorageTestBase
-from test.zip_objects import cheats_folder_files, cheats_folder_folders, cheats_folder_nes_file_descr, cheats_folder_sms_file_descr, cheats_folder_zip_desc, cheats_folder_nes_file_path, summary_json_from_cheats_folder, cheats_folder_name, cheats_folder_id, cheats_folder_sms_folder_name, cheats_folder_nes_folder_name, cheats_folder_sms_file_path
+from test.zip_objects import file_nes_palette_a_descr_zipped,  zipped_nes_palettes_id
 
 
 class TestOnlineImporterWithPriorityStorage(OnlineImporterWithPriorityStorageTestBase):
@@ -29,57 +30,56 @@ class TestOnlineImporterWithPriorityStorage(OnlineImporterWithPriorityStorageTes
         sut = OnlineImporter(fail_policy=DownloaderWorkerFailPolicy.FAULT_TOLERANT)
         store = empty_test_store()
 
-        db = db_entity(
-            db_id=db_test,
-            files={file_nes_smb1: {**file_nes_smb1_descr(), 'path': 'system'}},
-            folders={folder_games: {'path': 'system'}, folder_games_nes: {'path': 'system'}},
-            zips={cheats_folder_id: {**cheats_folder_zip_desc(summary=summary_json_from_cheats_folder()), 'path': 'system'}}
-        )
-
-        sut.add_db(db, store).download(False)
+        sut.add_db(self._db_with_smb1_and_nes_palettes(), store).download(False)
 
         self.assertEqual(fs_data(files={
             **files_smb1(),
-            **cheats_folder_files()
+            file_nes_palette_a: file_nes_palette_a_descr_zipped(),
         }, folders={
-            media_fat(cheats_folder_name),
-            media_fat(cheats_folder_nes_folder_name),
-            media_fat(cheats_folder_sms_folder_name),
+            media_fat(folder_games_nes_palettes),
             media_fat(folder_games), media_fat(folder_games_nes)
         }), sut.fs_data)
         self.assertEqual(store_descr(
-            zips={
-                cheats_folder_id: {**cheats_folder_zip_desc(), 'path': 'system'}
-            },
+            zips={zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes)},
             files={
-                cheats_folder_nes_file_path: cheats_folder_nes_file_descr(url=False),
-                cheats_folder_sms_file_path: cheats_folder_sms_file_descr(url=False),
+                file_nes_palette_a: {**file_nes_palette_a_descr_zipped(), 'path': 'system'},
                 file_nes_smb1: {**file_nes_smb1_descr(), 'path': 'system'}
             },
             folders={
-                **cheats_folder_folders(),
-                folder_games: {'path': 'system'},
-                folder_games_nes: {'path': 'system'}
+                folder_games: {"zip_id": zipped_nes_palettes_id, 'path': 'system'},
+                folder_games_nes: {"zip_id": zipped_nes_palettes_id, 'path': 'system'},
+                folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id, 'path': 'system'},
             }
         ), store)
-        self.assertReports(sut, [cheats_folder_nes_file_path, cheats_folder_sms_file_path, file_nes_smb1])
+        self.assertReports(sut, [file_nes_palette_a, file_nes_smb1])
 
     def test_download_dbs_contents___with_wrong_db_including_system_and_external_paths_simultaneously___when_fail_fast___ignores_system_attribute_and_installs_files(self):
         sut = OnlineImporter(fail_policy=DownloaderWorkerFailPolicy.FAIL_FAST)
         store = empty_test_store()
 
-        db = db_entity(
-            db_id=db_test,
-            files={file_nes_smb1: {**file_nes_smb1_descr(), 'path': 'system'}},
-            folders={folder_games: {'path': 'system'}, folder_games_nes: {'path': 'system'}},
-            zips={cheats_folder_id: {**cheats_folder_zip_desc(summary=summary_json_from_cheats_folder()), 'path': 'system'}}
-        )
-
         with self.assertRaises(Exception) as context:
-            sut.add_db(db, store).download(False)
+            sut.add_db(self._db_with_smb1_and_nes_palettes(), store).download(False)
 
         self.assertIsInstance(context.exception, StoragePriorityError)
         self.assertEqual(fs_data(), sut.fs_data)
         self.assertEqual(empty_test_store(), store)
         self.assertReports(sut, [], save=False)
 
+    def _db_with_smb1_and_nes_palettes(self):
+        return db_entity(
+            db_id=db_test,
+            files={file_nes_smb1: {**file_nes_smb1_descr(), 'path': 'system'}},
+            folders={folder_games: {'path': 'system'}, folder_games_nes: {'path': 'system'}},
+            zips={
+                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes,
+                    summary={
+                        "files": {file_nes_palette_a: {**file_nes_palette_a_descr_zipped(), 'path': 'system'}},
+                        "folders": {
+                            folder_games: {"zip_id": zipped_nes_palettes_id, 'path': 'system'},
+                            folder_games_nes: {"zip_id": zipped_nes_palettes_id, 'path': 'system'},
+                            folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id, 'path': 'system'},
+                        }
+                    }
+                )
+            }
+        )
