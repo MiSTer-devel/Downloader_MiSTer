@@ -132,17 +132,3 @@ class OnlineImporter(ProductionOnlineImporter):
         for db, store, ini_description in self.dbs:
             jobs.append(ProcessDbJob(db=db, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
         return jobs
-
-
-class ImporterCommandFactorySpy(ImporterCommandFactory):
-    def __init__(self, config):
-        super().__init__(config)
-        self._commands = []
-
-    def create(self):
-        command = super().create()
-        self._commands.append(command)
-        return command
-
-    def commands(self):
-        return [[(x.testable, y.unwrap_store(), z) for x, y, z in c.read_dbs()] for c in self._commands]
