@@ -15,53 +15,32 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from typing import Dict, Any, Tuple, List
+from typing import Tuple, List
 
-from downloader.config import Config
-from downloader.constants import K_OPTIONS, K_USER_DEFINED_OPTIONS, K_FILTER
-from downloader.db_entity import DbEntity
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.config import Config, ConfigDatabaseSection
 
 
 class ImporterCommand:
-    def __init__(self, config: Config, user_defined_options):
-        self._config = config
-        self._user_defined_options = user_defined_options
-        self._parameters: List[Tuple[DbEntity, StoreWrapper, Config]] = []
+    def __init__(self, default_db_id: str):
+        self._default_db_id = default_db_id
+        self._parameters: List[Tuple[str, ConfigDatabaseSection]] = []
 
-    def add_db(self, db: DbEntity, store: StoreWrapper, ini_description: Dict[str, Any]):
-        config = self._config.copy()
-
-        for key, option in db.default_options.items():
-            if key not in self._user_defined_options or (key == K_FILTER and '[mister]' in option.lower()):
-                config[key] = option
-
-        if K_OPTIONS in ini_description:
-            ini_description[K_OPTIONS].apply_to_config(config)
-
-        if not store.read_only().has_base_path():
-            store.write_only().set_base_path(config['base_path'])
-
-        if config['filter'] is not None and '[mister]' in config['filter'].lower():
-            mister_filter = '' if 'filter' not in self._config or self._config['filter'] is None else self._config['filter'].lower()
-            config['filter'] = config['filter'].lower().replace('[mister]', mister_filter).strip()
-
-        entry = (db, store, config)
-
-        if db.db_id == self._config['default_db_id']:
+    def add_db(self, db_id: str, ini_description: ConfigDatabaseSection):
+        entry = (db_id, ini_description)
+        if db_id == self._default_db_id:
             self._parameters = [entry, *self._parameters]
         else:
             self._parameters.append(entry)
 
         return self
 
-    def read_dbs(self) -> List[Tuple[DbEntity, StoreWrapper, Config]]:
+    def read_dbs(self) -> List[Tuple[str, ConfigDatabaseSection]]:
         return self._parameters
 
 
 class ImporterCommandFactory:
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self._config = config
 
     def create(self) -> ImporterCommand:
-        return ImporterCommand(self._config, self._config[K_USER_DEFINED_OPTIONS])
+        return ImporterCommand(self._config['default_db_id'])
