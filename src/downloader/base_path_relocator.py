@@ -37,6 +37,9 @@ class BasePathRelocator:
     def relocating_base_paths(self, db_pkgs: List[DbSectionPackage]) -> List['BasePathRelocatorPackage']:
         result = []
         for pkg in db_pkgs:
+            if not pkg.store.read_only().has_base_path():
+                pkg.store.write_only().set_base_path(self._config[K_BASE_PATH])
+
             from_base_path = pkg.store.read_only().base_path
             to_base_path = self._config[K_BASE_PATH]
 
