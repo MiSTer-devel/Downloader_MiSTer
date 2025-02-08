@@ -25,31 +25,39 @@ from downloader.jobs.errors import FileDownloadError
 import socket
 from urllib.error import URLError
 from http.client import HTTPException
-from typing import Optional
+from typing import Optional, TypedDict
+
+from downloader.logger import Logger
+from downloader.waiter import Waiter
 
 
 class FetchFileWorker2(DownloaderWorker):
     def __init__(self, progress_reporter: ProgressReporter, http_gateway: HttpGateway, file_system: FileSystem, timeout: int):
         self._progress_reporter = progress_reporter
-        self._http_gateway = http_gateway
-        self._file_system = file_system
-        self._timeout = timeout
+        self._fetcher = FileFetcher(http_gateway=http_gateway, file_system=file_system, timeout=timeout)
 
     def job_type_id(self) -> int: return FetchFileJob2.type_id
     def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: FetchFileJob2) -> WorkerResult:  # type: ignore[override]
-        error = self._fetch_file(url=job.source, download_path=job.temp_path, info=job.info)
+        error = self._fetcher.fetch_file(url=job.source, download_path=job.temp_path)
         if error is not None:
             return [], error
 
         return [] if job.after_job is None else [job.after_job], None
 
-    def _fetch_file(self, url: str, download_path: str, info: str) -> Optional[FileDownloadError]:
+
+class FileFetcher:
+    def __init__(self, http_gateway: HttpGateway, file_system: FileSystem, timeout: int):
+        self._http_gateway = http_gateway
+        self._file_system = file_system
+        self._timeout = timeout
+
+    def fetch_file(self, url: str, download_path: str) -> Optional[FileDownloadError]:
         try:
             with self._http_gateway.open(url) as (final_url, in_stream):
                 if in_stream.status != 200:
-                    return FileDownloadError(f'Bad http status! {info}: {in_stream.status}')
+                    return FileDownloadError(f'Bad http status! {final_url}: {in_stream.status}')
 
                 self._file_system.write_incoming_stream(in_stream, download_path, timeout=self._timeout)
 
@@ -67,6 +75,46 @@ class FetchFileWorker2(DownloaderWorker):
             return FileDownloadError(f'Exception during download! {url}: {str(e)}')
 
         if not self._file_system.is_file(download_path, use_cache=False):
-            return FileDownloadError(f'Missing {info}')
+            return FileDownloadError(f'File from {url} could not be stored.')
 
         return None
+
+
+class SafeFetchInfo(TypedDict):
+    url: str
+    hash: str
+    size: int
+
+class SafeFetcherConfig(TypedDict):
+    downloader_timeout: int
+    downloader_retries: int
+
+class SafeFileFetcher:
+    def __init__(self, config: SafeFetcherConfig, file_system: FileSystem, logger: Logger, http_gateway: HttpGateway, waiter: Waiter):
+        self._retries = config['downloader_retries']
+        self._logger = logger
+        self._file_system = file_system
+        self._waiter = waiter
+        self._fetcher = FileFetcher(http_gateway, file_system, config['downloader_timeout'])
+
+    def fetch_file(self, description: SafeFetchInfo, path: str) -> Optional[FileDownloadError]:
+        i = self._retries
+        while True:
+            error = self._fetcher.fetch_file(description['url'], path)
+            if error is None:
+                calculated_hash = self._file_system.hash(path)
+                if calculated_hash != description['hash']:
+                    error = FileDownloadError(f'Hash mismatch! {description['url']}: calculated hash {calculated_hash} != {description['hash']}')
+
+            if error is None:
+                calculated_size = self._file_system.size(path)
+                if calculated_size != description['size']:
+                    error = FileDownloadError(f'Size mismatch! {description['url']}: calculated size {calculated_size} != {description['size']}')
+
+            i -= 1
+            if error is None or i <= 0:
+                break
+            self._logger.print(f'Retrying {description['url']}...')
+            self._waiter.sleep(10)
+
+        return error

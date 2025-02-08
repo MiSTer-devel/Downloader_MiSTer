@@ -21,8 +21,8 @@ from downloader.config import Config, ConfigDatabaseSection
 
 
 class ImporterCommand:
-    def __init__(self, default_db_id: str):
-        self._default_db_id = default_db_id
+    def __init__(self, config: Config):
+        self._default_db_id = config['default_db_id']
         self._parameters: List[Tuple[str, ConfigDatabaseSection]] = []
 
     def add_db(self, db_id: str, ini_description: ConfigDatabaseSection):
