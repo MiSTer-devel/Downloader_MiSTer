@@ -20,7 +20,7 @@ from typing import Optional
 import unittest
 
 from downloader.constants import K_SECTION, K_DB_URL, MEDIA_FAT
-from downloader.db_section_package import DbSectionPackage
+from downloader.db_utils import DbSectionPackage
 from test.fake_importer_implicit_inputs import NetworkState
 from test.fake_local_store_wrapper import LocalStoreWrapper
 from test.fake_online_importer import OnlineImporter

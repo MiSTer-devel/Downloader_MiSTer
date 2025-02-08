@@ -21,7 +21,7 @@ import unittest
 from downloader.base_path_relocator import RelocatorError
 from downloader.config import default_config
 from downloader.constants import MEDIA_FAT, MEDIA_USB0
-from downloader.db_section_package import DbSectionPackage
+from downloader.db_utils import DbSectionPackage
 from test.fake_local_store_wrapper import StoreWrapper
 from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_base_path_relocator import BasePathRelocator

@@ -19,7 +19,7 @@
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from downloader.config import Config, ConfigDatabaseSection
 from downloader.constants import MEDIA_USB0
-from downloader.db_section_package import DbSectionPackage
+from downloader.db_utils import DbSectionPackage
 from downloader.free_space_reservation import FreeSpaceReservation, UnlimitedFreeSpaceReservation
 from downloader.interruptions import Interruptions
 from downloader.job_system import Job, JobFailPolicy, JobSystem

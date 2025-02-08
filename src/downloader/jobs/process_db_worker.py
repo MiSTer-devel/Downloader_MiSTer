@@ -16,17 +16,15 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, Literal
+from typing import Dict, Any
 
-from downloader.config import Config
-from downloader.db_entity import DbEntity
+from downloader.db_utils import build_db_config
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_index_job, make_zip_tag, ZipJobContext
 from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.worker_context import DownloaderWorkerBase
-from downloader.constants import K_OPTIONS
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE
 
@@ -81,23 +79,6 @@ class ProcessDbWorker(DownloaderWorkerBase):
             )
             return [index_job], None
 
-
-def build_db_config(input_config: Config, db: DbEntity, ini_description: Dict[str, Any]) -> Config:
-    config = input_config.copy()
-    user_defined_options = config['user_defined_options']
-
-    for key, option in db.default_options.items():
-        if key not in user_defined_options or (key == 'filter' and '[mister]' in option.lower()):
-            config[key] = option
-
-    if K_OPTIONS in ini_description:
-        ini_description[K_OPTIONS].apply_to_config(config)
-
-    if config['filter'] is not None and '[mister]' in config['filter'].lower():
-        mister_filter = '' if 'filter' not in config or config['filter'] is None else config['filter'].lower()
-        config['filter'] = config['filter'].lower().replace('[mister]', mister_filter).strip()
-
-    return config
 
 def _make_zip_job(z: ZipJobContext) -> Job:
     if 'summary_file' in z.zip_description:
