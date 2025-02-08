@@ -124,18 +124,14 @@ class FullRunServiceFactory:
             self._filelog_manager,
             self._printlog_manager,
             local_repository,
-            db_gateway,
             online_importer,
             linux_updater,
             RebootCalculator(config, self._logger, system_file_system),
-            BasePathRelocator(file_system_factory, waiter, self._logger),
+            BasePathRelocator(config, file_system_factory, waiter, self._logger),
             CertificatesFix(config, system_file_system, waiter, self._logger),
             external_drives_repository,
             LinuxOsUtils(),
-            waiter,
-            importer_command_factory,
-            job_system,
-            workers_ctx
+            waiter
         )
         instance.configure_components()
         return instance

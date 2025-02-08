@@ -49,13 +49,11 @@ class FullRunService(ProductionFullRunService):
     def __init__(
             self,
             config=None,
-            db_gateway=None,
             file_system_factory=None,
             linux_updater=None,
             os_utils=None,
             certificates_fix=None,
             external_drives_repository=None,
-            importer_command_factory=None,
             file_downloader_factory=None,
             job_system=None,
             file_download_reporter=None,
@@ -67,7 +65,7 @@ class FullRunService(ProductionFullRunService):
         file_system_factory = FileSystemFactory(config=config) if file_system_factory is None else file_system_factory
         system_file_system = file_system_factory.create_for_system_scope()
         file_downloader_factory = file_downloader_factory or FileDownloaderFactory(file_system_factory=file_system_factory)
-        linux_updater = linux_updater or LinuxUpdater(file_system=system_file_system, file_downloader_factory=file_downloader_factory)
+        linux_updater = linux_updater or LinuxUpdater(file_system=system_file_system)
         file_download_reporter = file_download_reporter if file_download_reporter is not None else FileDownloadProgressReporter(
             NoLogger(), NoWaiter(), Interruptions(file_system_factory), installation_report
         )
@@ -77,33 +75,14 @@ class FullRunService(ProductionFullRunService):
                          NoLogger(),
                          NoLogger(),
                          LocalRepository(config=config, file_system=system_file_system),
-                         db_gateway or DbGateway(config, file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory),
-                         OnlineImporter(file_system_factory=file_system_factory, file_downloader_factory=file_downloader_factory),
+                         OnlineImporter(file_system_factory=file_system_factory),
                          linux_updater,
                          RebootCalculator(file_system=system_file_system),
                          BasePathRelocator(),
                          certificates_fix or CertificatesFix(file_system_factory=file_system_factory),
                          external_drives_repository or ExternalDrivesRepository(file_system=system_file_system),
                          os_utils or SpyOsUtils(),
-                         NoWaiter(),
-                         importer_command_factory or ImporterCommandFactory(config),
-                         job_system,
-                         make_downloader_worker_context(
-                             job_ctx=job_system,
-                             waiter=NoWaiter(),
-                             logger=NoLogger(),
-                             http_gateway=FakeHttpGateway(config=config, network_state=NetworkState()),
-                             file_system=system_file_system,
-                             target_path_repository=None,
-                             progress_reporter=file_download_reporter,
-                             file_download_session_logger=file_download_reporter,
-                             installation_report=installation_report,
-                             free_space_reservation=UnlimitedFreeSpaceReservation(),
-                             external_drives_repository=external_drives_repository,
-                             target_paths_calculator_factory=TargetPathsCalculatorFactory(system_file_system, external_drives_repository),
-                             config=config,
-                             fail_policy=JobFailPolicy.FAULT_TOLERANT
-                         )
+                         NoWaiter()
                 )
 
     @staticmethod
@@ -128,7 +107,7 @@ class FullRunService(ProductionFullRunService):
 
         return FullRunService(
             config,
-            DbGateway(config, file_system_factory=file_system_factory),
+#            DbGateway(config, file_system_factory=file_system_factory),
             file_system_factory=file_system_factory
         )
 
@@ -138,7 +117,7 @@ class FullRunService(ProductionFullRunService):
         file_system_factory = file_system_factory or FileSystemFactory(config=config, state=FileSystemState(config=config, files={db_id: {'unzipped_json': db_descr}}))
         return FullRunService(
             config=config,
-            db_gateway=DbGateway(config=config, file_system_factory=file_system_factory),
+#            db_gateway=DbGateway(config=config, file_system_factory=file_system_factory),
             linux_updater=linux_updater,
             os_utils=os_utils,
             certificates_fix=certificates_fix,
@@ -174,5 +153,5 @@ class FullRunService(ProductionFullRunService):
         })
         return FullRunService(
             config,
-            DbGateway(config),
+#            DbGateway(config),
         )

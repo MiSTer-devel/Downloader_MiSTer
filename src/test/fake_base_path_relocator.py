@@ -16,12 +16,14 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.base_path_relocator import BasePathRelocator as ProductionBasePathRelocator
+from downloader.config import default_config
 from test.fake_file_system_factory import FileSystemFactory
 from downloader.logger import NoLogger
 from test.fake_waiter import NoWaiter
 
 
 class BasePathRelocator(ProductionBasePathRelocator):
-    def __init__(self, file_system_factory=None):
-        file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
-        super().__init__(file_system_factory, NoWaiter(), NoLogger())
+    def __init__(self, config=None, file_system_factory=None):
+        config = config or default_config()
+        file_system_factory = FileSystemFactory(config=config) if file_system_factory is None else file_system_factory
+        super().__init__(config, file_system_factory, NoWaiter(), NoLogger())

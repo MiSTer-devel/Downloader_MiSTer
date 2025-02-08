@@ -24,7 +24,7 @@ from test.fake_file_system_factory import FileSystemFactory
 from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_os_utils import SpyOsUtils
 from test.fake_full_run_service import FullRunService
-from test.objects import raw_db_empty_descr, raw_db_empty_with_linux_descr, raw_db_wrong_descr, db_empty, db_test_with_file_a, db_test, db_with_folders, raw_db_descr
+from test.objects import raw_db_empty_descr, raw_db_empty_with_linux_descr, raw_db_wrong_descr, db_empty, db_test, raw_db_descr
 
 
 class TestFullRunService(unittest.TestCase):

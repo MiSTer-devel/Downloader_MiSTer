@@ -560,33 +560,33 @@ class ReadOnlyStoreAdapter:
         return self._store['filtered_zip_data']
 
     @property
-    def zips(self):
+    def zips(self) -> Dict[str, Dict[str, Any]]:
         return self._store['zips']
 
     @property
-    def files(self):
+    def files(self) -> Dict[str, Dict[str, Any]]:
         return self._aggregated_summary['files']
 
     @property
-    def folders(self):
+    def folders(self) -> Dict[str, Dict[str, Any]]:
         return self._aggregated_summary['folders']
 
     @property
-    def has_externals(self):
+    def has_externals(self) -> bool:
         return 'external' in self._store
 
     @property
-    def external_drives(self):
+    def external_drives(self) -> List[str]:
         return list(self._store['external'])
 
-    def external_files(self, drive):
+    def external_files(self, drive) -> Dict[str, Dict[str, Any]]:
         external = self._store['external'][drive]
         if 'files' in external:
             return external['files']
         else:
             return {}
 
-    def external_folders(self, drive):
+    def external_folders(self, drive) -> List[str]:
         external = self._store['external'][drive]
         if 'folders' in external:
             return external['folders']
