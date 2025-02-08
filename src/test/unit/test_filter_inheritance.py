@@ -18,15 +18,11 @@
 
 import unittest
 
-from downloader.constants import K_FILTER
-from downloader.importer_command import ImporterCommandFactory
-from test.fake_file_downloader_factory import FileDownloaderFactory
-from test.fake_file_system_factory import first_fake_temp_file, FileSystemFactory
-from test.fake_full_run_service import FullRunService
-from test.objects import config_test_with_filters, db_test_with_default_filter_descr
+from downloader.db_utils import build_db_config
+from test.objects import config_test_with_filters, db_test, db_test_with_default_filter_descr
 
 
-class TestFullProducedImporterCommands(unittest.TestCase):
+class TestFilterInheritance(unittest.TestCase):
 
     def test_config_filter_SNES___with_no_overrides___forwards_SNES_to_output_filter(self):
         self.assertForwardsToOutputFilter('SNES', config_filter='SNES')
@@ -67,29 +63,5 @@ class TestFullProducedImporterCommands(unittest.TestCase):
     def assertForwardsToOutputFilter(self, output_filter, config_filter, ini_filter=None, db_default_option_filter=None):
         self.maxDiff = None
         config = config_test_with_filters(config_filter, ini_filter)
-        fsf = FileSystemFactory()
-        file_downloader_factory = FileDownloaderFactory.with_remote_files(fsf, config, [
-            (first_fake_temp_file, db_test_with_default_filter_descr(db_default_option_filter).testable)
-        ])
-        importer_factory = ImporterCommandFactorySpy(config)
-        service = FullRunService(file_system_factory=fsf, config=config, importer_command_factory=importer_factory, file_downloader_factory=file_downloader_factory)
-        service.full_run()
-        actual = first_filter(importer_factory)
-        self.assertEqual('' if actual is None else actual.lower().strip(), '' if output_filter is None else output_filter.lower().strip())
-
-
-class ImporterCommandFactorySpy(ImporterCommandFactory):
-    def __init__(self, config):
-        super().__init__(config)
-        self._commands = []
-
-    def create(self):
-        command = super().create()
-        self._commands.append(command)
-        return command
-
-    def commands(self):
-        return [[(x.testable, y.unwrap_store(), z) for x, y, z in c.read_dbs()] for c in self._commands]
-
-def first_filter(spy: ImporterCommandFactorySpy):
-    return spy.commands()[0][0][2][K_FILTER]
+        actual = build_db_config(config, db_test_with_default_filter_descr(db_default_option_filter), config['databases'][db_test])
+        self.assertEqual(actual['filter'], '' if output_filter is None else output_filter.lower().strip())

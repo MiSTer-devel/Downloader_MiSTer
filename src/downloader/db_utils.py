@@ -48,18 +48,19 @@ def sorted_db_sections(config: Config) -> List[Tuple[str, ConfigDatabaseSection]
 
 
 def build_db_config(input_config: Config, db: DbEntity, ini_description: ConfigDatabaseSection) -> Config:
-    config = input_config.copy()
-    user_defined_options = config['user_defined_options']
+    result = input_config.copy()
 
     for key, option in db.default_options.items():
-        if key not in user_defined_options or (key == 'filter' and '[mister]' in option.lower()):
-            config[key] = option
+        if key not in input_config['user_defined_options'] or (key == 'filter' and '[mister]' in option.lower()):
+            result[key] = option
 
     if 'options' in ini_description:
-        ini_description['options'].apply_to_config(config)
+        ini_description['options'].apply_to_config(result)
 
-    if config['filter'] is not None and '[mister]' in config['filter'].lower():
-        mister_filter = '' if 'filter' not in config or config['filter'] is None else config['filter'].lower()
-        config['filter'] = config['filter'].lower().replace('[mister]', mister_filter).strip()
+    if result['filter'] is not None:
+        result['filter'] = result['filter'].lower()
+        if '[mister]' in result['filter']:
+            mister_filter = '' if 'filter' not in input_config or input_config['filter'] is None else input_config['filter'].lower()
+            result['filter'] = result['filter'].lower().replace('[mister]', mister_filter).strip()
 
-    return config
+    return result
