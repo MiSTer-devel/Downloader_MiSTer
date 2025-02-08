@@ -18,17 +18,10 @@
 
 import unittest
 
-from downloader.constants import DISTRIBUTION_MISTER_DB_ID, FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old
-from downloader.local_repository import LocalRepository as ProductionLocalRepository
-from downloader.target_path_repository import downloader_in_progress_postfix
-from test.fake_local_store_wrapper import LocalStoreWrapper
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old, SUFFIX_file_in_progress
 from test.fake_online_importer import OnlineImporter
-from test.fake_store_migrator import StoreMigrator
-from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_importer_implicit_inputs import NetworkState, FileSystemState
-from downloader.logger import NoLogger
 from test.fake_file_system_factory import fs_data, FileSystemFactory, fs_records
-from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.objects import db_entity, empty_store, file_menu_rbf, hash_menu_rbf, file_one, hash_one, hash_big, file_big, \
     hash_updated_big, big_size, config_with, file_mister_descr, hash_MiSTer_old, hash_MiSTer
 
@@ -79,7 +72,7 @@ class TestOnlineImporterFileOps(unittest.TestCase):
         self.assertEqual([{"scope": "write_incoming_stream", "data": on_installed(file_one)}], self.file_system.write_records)
 
     def test_download_big_file___when_big_file_already_present_with_different_hash___gets_downloaded_through_a_downloader_in_progress_file_and_then_correctly_installed(self):
-        downloader_in_progress_file = file_big + downloader_in_progress_postfix
+        downloader_in_progress_file = file_big + SUFFIX_file_in_progress
         self.file_system_state.add_file(self.installed_path, file_big, {'hash': hash_big})
 
         self.download_big_file(hash_updated_big)

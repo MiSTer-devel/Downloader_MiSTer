@@ -24,7 +24,6 @@ from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.jobs.worker_context import DownloaderWorkerContext, DownloaderWorker
 from downloader.jobs.workers_factory import make_workers as production_make_workers
 from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
-from downloader.jobs.fetch_file_worker import FetchFileWorker
 from test.fake_http_gateway import FakeHttpGateway
 
 
@@ -36,7 +35,6 @@ def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
             FakeWorkerDecorator(FetchFileWorker2(
                 progress_reporter=ctx.progress_reporter, http_gateway=fake_http, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout'],
             ), fake_http),
-            FakeWorkerDecorator(FetchFileWorker(ctx), fake_http)
         ])
 
     replacement_type_ids = {r.job_type_id() for r in replacement_workers}

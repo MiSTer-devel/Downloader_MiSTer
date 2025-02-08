@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from downloader.config import Config, ConfigDatabaseSection
 from downloader.constants import MEDIA_USB0
 from downloader.db_entity import DbEntity
@@ -26,7 +26,7 @@ from downloader.interruptions import Interruptions
 from downloader.job_system import Job, JobFailPolicy, JobSystem
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext, DownloaderWorkerFailPolicy, make_downloader_worker_context
+from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerFailPolicy, make_downloader_worker_context
 from downloader.local_store_wrapper import StoreWrapper
 from downloader.online_importer import InstallationBox, OnlineImporter as ProductionOnlineImporter
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
@@ -42,7 +42,6 @@ from test.objects import config_with
 from test.fake_waiter import NoWaiter
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs, FileSystemState, NetworkState
 from test.fake_file_system_factory import FileSystemFactory
-from test.fake_file_downloader_factory import FileDownloaderFactory
 
 
 class OnlineImporter(ProductionOnlineImporter):
@@ -117,7 +116,8 @@ class OnlineImporter(ProductionOnlineImporter):
 
     @staticmethod
     def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs, free_space_reservation=None):
-        _, file_system_factory, config = FileDownloaderFactory.from_implicit_inputs(implicit_inputs)
+        config = implicit_inputs.config
+        file_system_factory = FileSystemFactory(state=implicit_inputs.file_system_state, config=config)
         return OnlineImporter(
             config=config,
             file_system_factory=file_system_factory,

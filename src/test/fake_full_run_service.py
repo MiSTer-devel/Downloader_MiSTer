@@ -19,20 +19,14 @@
 from pathlib import Path
 
 from downloader.config import default_config
-from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
 from downloader.full_run_service import FullRunService as ProductionFullRunService
-from downloader.importer_command import ImporterCommandFactory
 from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
-from downloader.jobs.worker_context import make_downloader_worker_context
-from downloader.target_path_calculator import TargetPathsCalculatorFactory
-from test.fake_http_gateway import FakeHttpGateway
 from test.fake_os_utils import SpyOsUtils
 from test.fake_waiter import NoWaiter
 from test.fake_external_drives_repository import ExternalDrivesRepository
-from test.fake_file_downloader_factory import FileDownloaderFactory
-from test.fake_importer_implicit_inputs import FileSystemState, NetworkState
+from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_linux_updater import LinuxUpdater
@@ -53,7 +47,6 @@ class FullRunService(ProductionFullRunService):
             os_utils=None,
             certificates_fix=None,
             external_drives_repository=None,
-            file_downloader_factory=None,
             job_system=None,
             file_download_reporter=None,
             installation_report=None,
@@ -63,7 +56,6 @@ class FullRunService(ProductionFullRunService):
         installation_report = installation_report if installation_report is not None else InstallationReportImpl()
         file_system_factory = FileSystemFactory(config=config) if file_system_factory is None else file_system_factory
         system_file_system = file_system_factory.create_for_system_scope()
-        file_downloader_factory = file_downloader_factory or FileDownloaderFactory(file_system_factory=file_system_factory)
         linux_updater = linux_updater or LinuxUpdater(file_system=system_file_system)
         file_download_reporter = file_download_reporter if file_download_reporter is not None else FileDownloadProgressReporter(
             NoLogger(), NoWaiter(), Interruptions(file_system_factory), installation_report

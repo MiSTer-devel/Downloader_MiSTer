@@ -17,10 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from pathlib import Path
+import sys
 from typing import Dict, List, Optional, Any, Iterable, Set, Tuple
 from collections import defaultdict
 import os
 
+from downloader.constants import FILE_MiSTer
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.job_system import Job, JobSystem
@@ -35,12 +37,10 @@ from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
 from downloader.free_space_reservation import FreeSpaceReservation, Partition
 from downloader.job_system import JobSystem
 from downloader.jobs.copy_file_job import CopyFileJob
-from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.process_zip_job import ProcessZipJob
-from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.local_store_wrapper import LocalStoreWrapper, StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType, RemovedCopy
@@ -92,6 +92,30 @@ class OnlineImporter:
 
         box = self._box
         report = self._worker_ctx.file_download_session_logger.report()
+        for job, e in report.get_failed_jobs(ValidateFileJob2):
+            if job.info != FILE_MiSTer:
+                continue
+
+            self._logger.debug(e)
+            fs = self._worker_ctx.file_system
+            if fs.is_file(job.target_file_path):
+                continue
+
+            if fs.is_file(job.backup_job):
+                fs.move(job.backup_job, job.target_file_path)
+            elif fs.is_file(job.temp_path) and fs.hash(job.temp_path) == job.description['hash']:
+                fs.move(job.temp_path, job.target_file_path)
+
+            if fs.is_file(job.target_file_path):
+                continue
+
+            # This error message should never happen.
+            # If it happens it would be an unexpected case where file_system is not moving files correctly
+            self._logger.print('CRITICAL ERROR!!! Could not restore the MiSTer binary!')
+            self._logger.print('Please manually rename the file MiSTer.new as MiSTer')
+            self._logger.print('Your system won\'nt be able to boot until you do so!')
+            sys.exit(1)
+
         for job in report.get_completed_jobs(ProcessDbJob):
             box.add_installed_db(job.db)
 
@@ -112,9 +136,6 @@ class OnlineImporter:
         for job in report.get_completed_jobs(FetchFileJob2) + report.get_completed_jobs(CopyFileJob):
             if job.silent: continue
             box.add_downloaded_file(job.info)
-
-        for job in report.get_completed_jobs(ValidateFileJob):
-            box.add_downloaded_file(job.fetch_job.path)
 
         for job in report.get_completed_jobs(ValidateFileJob2):
             if job.after_job is not None: continue
@@ -138,14 +159,8 @@ class OnlineImporter:
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
 
-        for job, _e in report.get_failed_jobs(ValidateFileJob):
-            box.add_failed_file(job.fetch_job.path)
-
         for job, _e in report.get_failed_jobs(ValidateFileJob2):
             box.add_failed_file(job.get_file_job.info)
-
-        for job, _e in report.get_failed_jobs(FetchFileJob):
-            box.add_failed_file(job.path)
 
         for job, _e in report.get_failed_jobs(FetchFileJob2) + report.get_failed_jobs(CopyFileJob):
             box.add_failed_file(job.info)

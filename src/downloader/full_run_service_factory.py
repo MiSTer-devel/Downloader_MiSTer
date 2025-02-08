@@ -16,18 +16,17 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+import ssl
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config
 from downloader.constants import FILE_MiSTer_version
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
-from downloader.file_downloader import FileDownloaderFactory, context_from_curl_ssl
 from downloader.file_filter import FileFilterFactory
 from downloader.file_system import FileSystemFactory
 from downloader.free_space_reservation import LinuxFreeSpaceReservation, UnlimitedFreeSpaceReservation
 from downloader.full_run_service import FullRunService
 from downloader.http_gateway import HttpGateway
-from downloader.importer_command import ImporterCommandFactory
 from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem
 from downloader.jobs.fetch_file_worker2 import SafeFileFetcher
@@ -72,8 +71,6 @@ class FullRunServiceFactory:
         store_migrator = StoreMigrator(migrations(config, file_system_factory, path_resolver_factory), self._logger)
         local_repository = LocalRepository(config, self._logger, system_file_system, store_migrator, external_drives_repository)
 
-        importer_command_factory = ImporterCommandFactory(config)
-
         http_connection_timeout = config['downloader_timeout'] / 4 if config['downloader_timeout'] > 60 else 15
 
         http_gateway = HttpGateway(
@@ -96,7 +93,6 @@ class FullRunServiceFactory:
 
         file_filter_factory = FileFilterFactory(self._logger)
         free_space_reservation = LinuxFreeSpaceReservation(logger=self._logger, config=config) if system_file_system.is_file(FILE_MiSTer_version) else UnlimitedFreeSpaceReservation()
-        file_downloader_factory = FileDownloaderFactory(file_system_factory, waiter, self._logger, job_system, file_download_reporter, file_download_reporter, http_gateway, free_space_reservation, external_drives_repository)
         linux_updater = LinuxUpdater(self._logger, config, system_file_system, safe_file_fetcher)
 
         workers_ctx = make_downloader_worker_context(
@@ -132,3 +128,16 @@ class FullRunServiceFactory:
         )
         instance.configure_components()
         return instance
+
+
+def context_from_curl_ssl(curl_ssl):
+    context = ssl.create_default_context()
+
+    if curl_ssl.startswith('--cacert '):
+        cacert_file = curl_ssl[len('--cacert '):]
+        context.load_verify_locations(cacert_file)
+    elif curl_ssl == '--insecure':
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
+    return context

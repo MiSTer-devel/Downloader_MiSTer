@@ -75,8 +75,6 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             job.present_validated_files, job.skipped_updated_files, more_fetch_pkgs = self._process_validate_packages(validate_pkgs)
             fetch_pkgs.extend(more_fetch_pkgs)
 
-            self._ctx.file_download_session_logger.print_header(db, nothing_to_download=len(fetch_pkgs) == 0)
-
             logger.debug(f"Reserving space '{db.db_id}'...")
             job.full_partitions = self._try_reserve_space(fetch_pkgs)
             if len(job.full_partitions) > 0:

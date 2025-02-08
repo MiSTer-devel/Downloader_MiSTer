@@ -23,7 +23,6 @@ from test.fake_file_system_factory import FileSystemFactory
 from test.fake_importer_implicit_inputs import NetworkState, FileSystemState
 from test.fake_linux_updater import LinuxUpdater
 from test.objects import db_entity
-from test.fake_file_downloader_factory import FileDownloaderFactory
 
 
 class TestLinuxUpdater(unittest.TestCase):
