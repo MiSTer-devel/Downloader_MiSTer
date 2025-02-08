@@ -26,8 +26,6 @@ from downloader.db_entity import DbEntity
 from downloader.interruptions import Interruptions
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.path_package import PathPackage
-from downloader.jobs.validate_file_job import ValidateFileJob
-from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.waiter import Waiter
 from downloader.job_system import ProgressReporter, Job
@@ -299,7 +297,7 @@ class FileDownloadSessionLogger(Protocol):
     def print_pending(self):
         '''Prints pending progress.'''
 
-    def print_header(self, db: DbEntity, nothing_to_download: bool = False):
+    def print_header(self, db: DbEntity):
         '''Prints a header.'''
 
     def report(self) -> InstallationReport:
@@ -324,9 +322,6 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._deactivated = True
 
     def print_job_started(self, job: Job):
-        if isinstance(job, FetchFileJob):
-            self._print_line(job.path)
-
         if isinstance(job, GetFileJob) and not job.silent:
             self._print_line(job.info)
 
@@ -344,12 +339,12 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._logger.print(f"Cancelled {len(jobs)} jobs.")
 
     def print_job_completed(self, job: Job, _next_jobs: List[Job]):
-        if isinstance(job, FetchFileJob) or (isinstance(job, GetFileJob) and not job.silent):
+        if isinstance(job, GetFileJob) and not job.silent:
             self._symbols.append('.')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
-        elif isinstance(job, ValidateFileJob) or (isinstance(job, ValidateFileJob2) and job.after_job is None):
+        elif isinstance(job, ValidateFileJob2) and job.after_job is None:
             self._symbols.append('+')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
@@ -384,7 +379,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
             self._logger.print()
             self._needs_newline = False
 
-    def print_header(self, db: DbEntity, nothing_to_download: bool = False):
+    def print_header(self, db: DbEntity):
         self._print_symbols()
         first_line = '\n' if self._needs_newline else ''
         self._needs_newline = False
@@ -408,7 +403,6 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
                 else:
                     text += line
 
-            if nothing_to_download: text += "\n\nNothing new to download from given sources."
             if len(text) > 0: self._logger.print(text)
 
         else:
@@ -416,8 +410,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
                 first_line +
                 '\n' +
                 '################################################################################\n' +
-                f'SECTION: {db.db_id}' +
-                ("\n\nNothing new to download from given sources." if nothing_to_download else '')
+                f'SECTION: {db.db_id}'
             )
 
         self._need_clear_header = True
@@ -478,4 +471,4 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
     def start_session(self): self._session_logger.start_session()
     def print_progress_line(self, line): self._session_logger.print_progress_line(line)
     def print_pending(self): self._session_logger.print_pending()
-    def print_header(self, db: DbEntity, nothing_to_download: bool = False):  self._session_logger.print_header(db, nothing_to_download)
+    def print_header(self, db: DbEntity):  self._session_logger.print_header(db)
