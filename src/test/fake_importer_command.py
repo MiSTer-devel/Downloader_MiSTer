@@ -15,7 +15,6 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.config import default_config
 from downloader.importer_command import ImporterCommand as ProductionImporterCommand
 from downloader.local_store_wrapper import StoreWrapper
 from test.fake_local_store_wrapper import StoreWrapper as FakeStoreWrapper
