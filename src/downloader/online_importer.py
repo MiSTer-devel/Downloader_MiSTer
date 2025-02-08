@@ -21,6 +21,7 @@ from collections import defaultdict
 import os
 
 from downloader.config import ConfigDatabaseSection
+from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.jobs_factory import make_get_file_job
@@ -368,12 +369,18 @@ class OnlineImporter:
         self.download(full_resync)
         self._clean_store(store)
         return store
+    
+    def correctly_downloaded_dbs(self) -> List[DbEntity]:
+        return []
 
     def correctly_installed_files(self):
         return self._box.installed_files()
 
     def files_that_failed(self):
         return self._box.failed_files()
+    
+    def dbs_that_failed(self):
+        return []
     
     @property
     def needs_save(self) -> bool:

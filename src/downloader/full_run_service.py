@@ -21,18 +21,25 @@ import json
 import sys
 import time
 from pathlib import Path
+from typing import List, Tuple
 
-from downloader.config import Config
-from downloader.importer_command import ImporterCommandFactory
-from downloader.job_system import JobSystem
-from downloader.jobs.worker_context import DownloaderWorkerContext
+from downloader.base_path_relocator import BasePathRelocator
+from downloader.certificates_fix import CertificatesFix
+from downloader.config import Config, ConfigDatabaseSection
+from downloader.db_section_package import DbSectionPackage
+from downloader.external_drives_repository import ExternalDrivesRepository
+from downloader.linux_updater import LinuxUpdater
+from downloader.local_repository import LocalRepository
 from downloader.logger import FilelogManager, Logger, PrintLogManager
+from downloader.online_importer import OnlineImporter
+from downloader.os_utils import OsUtils
 from downloader.other import format_files_message, format_folders_message, format_zips_message
+from downloader.reboot_calculator import RebootCalculator
+from downloader.waiter import Waiter
 
 
 class FullRunService:
-    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: PrintLogManager, local_repository, db_gateway, online_importer, linux_updater, reboot_calculator, base_path_relocator, certificates_fix, external_drives_repository, os_utils, waiter, importer_command_factory: ImporterCommandFactory, job_system: JobSystem, workers_ctx: DownloaderWorkerContext):
-        self._importer_command_factory = importer_command_factory
+    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: PrintLogManager, local_repository: LocalRepository, online_importer: OnlineImporter, linux_updater: LinuxUpdater, reboot_calculator: RebootCalculator, base_path_relocator: BasePathRelocator, certificates_fix: CertificatesFix, external_drives_repository: ExternalDrivesRepository, os_utils: OsUtils, waiter: Waiter):
         self._waiter = waiter
         self._os_utils = os_utils
         self._external_drives_repository = external_drives_repository
@@ -41,14 +48,11 @@ class FullRunService:
         self._reboot_calculator = reboot_calculator
         self._linux_updater = linux_updater
         self._online_importer = online_importer
-        self._db_gateway = db_gateway
         self._local_repository = local_repository
         self._logger = logger
         self._filelog_manager = filelog_manager
         self._printlog_manager = printlog_manager
         self._config = config
-        self._job_system = job_system
-        self._workers_ctx = workers_ctx
 
     def configure_components(self):
         self._printlog_manager.configure(self._config)
@@ -100,35 +104,19 @@ class FullRunService:
             return 1
 
         local_store = self._local_repository.load_store()
-        full_resync = not self._local_repository.has_last_successful_run()
 
-        # self._workers_factory.prepare_workers()
-        # for section, ini_description in self._config['databases'].items():
-        #     self._job_system.push_job(DownloadDbJob(
-        #         ini_section=section,
-        #         ini_description=ini_description,
-        #         store=local_store.store_by_id(section),
-        #         full_resync=full_resync
-        #     ))
-        #
-        # self._logger.print()
-        # self._job_system.execute_jobs()
-        # failed_dbs = []
+        db_pkgs = [DbSectionPackage(db_id, section, local_store.store_by_id(db_id)) for db_id, section in sorted_db_sections(self._config)]
 
-        databases, failed_dbs = self._db_gateway.fetch_all(self._config['databases'])
-
-        importer_command = self._importer_command_factory.create()
-        for db in databases:
-            description = self._config['databases'][db.db_id]
-            importer_command.add_db(db, local_store.store_by_id(db.db_id), description)
-
-        for relocation_package in self._base_path_relocator.relocating_base_paths(importer_command):
+        for relocation_package in self._base_path_relocator.relocating_base_paths(db_pkgs):
             self._base_path_relocator.relocate_non_system_files(relocation_package)
             self._local_repository.save_store(local_store)
 
-        self._online_importer.download_dbs_contents(importer_command, full_resync)
+        full_resync = not self._local_repository.has_last_successful_run()
+        self._online_importer.download_dbs_contents(db_pkgs, full_resync)
 
         self._local_repository.save_store(local_store)
+
+        failed_dbs = self._online_importer.dbs_that_failed()
 
         self._display_summary(self._online_importer.correctly_installed_files(),
                               self._online_importer.files_that_failed() + failed_dbs,
@@ -139,10 +127,8 @@ class FullRunService:
                               self._online_importer.full_partitions(),
                               self._config['start_time'])
 
-        self._logger.print()
-
         if self._config['update_linux']:
-            self._linux_updater.update_linux(importer_command)
+            self._linux_updater.update_linux(self._online_importer.correctly_downloaded_dbs())
 
         if self._config['fail_on_file_error']:
             failure_count = len(self._online_importer.files_that_failed()) + len(self._online_importer.folders_that_failed()) + len(self._online_importer.zips_that_failed())
@@ -221,6 +207,22 @@ class FullRunService:
             self._logger.print('Free some space and try again. [Waiting 10 seconds...]')
             self._waiter.sleep(10)
 
+        self._logger.print()
 
     def _needs_reboot(self):
         return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.needs_reboot())
+
+
+def sorted_db_sections(config: Config) -> List[Tuple[str, ConfigDatabaseSection]]:
+    result = []
+    first = None
+    for db_id, db_section in config['databases'].items():
+        if db_id == config['default_db_id']:
+            first = (db_id, db_section)
+        else:
+            result.append((db_id, db_section))
+
+    if first is not None:
+        result = [first, *result]
+
+    return result

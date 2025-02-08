@@ -15,42 +15,51 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.config import config_with_base_path
+
+from typing import Any, Dict, List, Tuple
+from downloader.config import Config, config_with_base_path
 from downloader.constants import K_BASE_PATH
+from downloader.db_section_package import DbSectionPackage
+from downloader.file_system import FileSystem
+from downloader.local_store_wrapper import StoreWrapper
+from downloader.logger import Logger
+from downloader.waiter import Waiter
+from test.fake_file_system_factory import FileSystemFactory
 
 
 class BasePathRelocator:
-    def __init__(self, file_system_factory, waiter, logger):
+    def __init__(self, config: Config, file_system_factory: FileSystemFactory, waiter: Waiter, logger: Logger):
+        self._config = config
         self._file_system_factory = file_system_factory
         self._waiter = waiter
         self._logger = logger
 
-    def relocating_base_paths(self, importer_command):
+    def relocating_base_paths(self, db_pkgs: List[DbSectionPackage]) -> List['BasePathRelocatorPackage']:
         result = []
-        for db, store, config in importer_command.read_dbs():
-            from_base_path = store.read_only().base_path
-            to_base_path = config[K_BASE_PATH]
+        for pkg in db_pkgs:
+            from_base_path = pkg.store.read_only().base_path
+            to_base_path = self._config[K_BASE_PATH]
 
             if to_base_path == from_base_path:
-                self._logger.debug('%s still uses base_path: %s' % (db.db_id, config[K_BASE_PATH]))
+                self._logger.debug('%s still uses base_path: %s' % (pkg.db_id, self._config[K_BASE_PATH]))
                 continue
 
-            from_file_system = self._file_system_factory.create_for_config(config_with_base_path(config, from_base_path))
-            to_file_system = self._file_system_factory.create_for_config(config_with_base_path(config, to_base_path))
+            from_file_system = self._file_system_factory.create_for_config(config_with_base_path(self._config, from_base_path))
+            to_file_system = self._file_system_factory.create_for_config(config_with_base_path(self._config, to_base_path))
 
             result.append(BasePathRelocatorPackage(
-                store,
-                config,
+                pkg.store,
+                self._config,
                 from_file_system,
                 to_file_system,
                 self._logger,
                 self._waiter,
-                db.db_id
+                pkg.db_id
             ))
 
         return result
 
-    def relocate_non_system_files(self, package):
+    def relocate_non_system_files(self, package: 'BasePathRelocatorPackage') -> None:
         self._logger.bench('Base Path Relocator start.')
 
         package.relocate_non_system_files()
@@ -60,7 +69,7 @@ class BasePathRelocator:
 
 
 class BasePathRelocatorPackage:
-    def __init__(self, store, config, from_file_system, to_file_system, logger, waiter, db_id):
+    def __init__(self, store: StoreWrapper, config: Config, from_file_system: FileSystem, to_file_system: FileSystem, logger: Logger, waiter: Waiter, db_id: str):
         self._store = store
         self._config = config
         self._from_file_system = from_file_system
@@ -69,8 +78,8 @@ class BasePathRelocatorPackage:
         self._waiter = waiter
         self._db_id = db_id
 
-    def relocate_non_system_files(self):
-        files_to_relocate = []
+    def relocate_non_system_files(self) -> None:
+        files_to_relocate: Tuple[str, Dict[str, Any]] = []
         for file, description in self._store.read_only().files.items():
             if 'path' in description and description['path'] == 'system':
                 continue
@@ -92,7 +101,7 @@ class BasePathRelocatorPackage:
         self._logger.print()
 
         old_files = []
-        for (file, description) in files_to_relocate:
+        for file, description in files_to_relocate:
             source_path = self._from_file_system.download_target_path(file)
             source_hash = self._from_file_system.hash(file)
 
@@ -133,7 +142,7 @@ class BasePathRelocatorPackage:
         for folder in folders_to_clean:
             self._from_file_system.remove_folder(folder)
 
-    def _rollback_changes(self, old_files):
+    def _rollback_changes(self, old_files) -> None:
         self._logger.print()
         self._logger.print()
         self._logger.print('ERROR: Relocation could not be completed!')
@@ -145,15 +154,15 @@ class BasePathRelocatorPackage:
             self._to_file_system.unlink(file, verbose=False)
             self._logger.print('Restored: %s' % file)
 
-    def update_store(self):
+    def update_store(self) -> None:
         self._store.write_only().set_base_path(self._to_base_path)
 
     @property
-    def _from_base_path(self):
+    def _from_base_path(self) -> str:
         return self._store.read_only().base_path
 
     @property
-    def _to_base_path(self):
+    def _to_base_path(self) -> str:
         return self._config[K_BASE_PATH]
 
 
