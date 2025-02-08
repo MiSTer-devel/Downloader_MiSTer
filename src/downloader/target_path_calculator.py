@@ -52,22 +52,44 @@ class TargetPathsCalculator:
         can_be_external = path[0] == '|'
         if can_be_external:
             rel_path = path[1:]
-            full_path, extra = self._deduce_possible_external_target_path(path=rel_path, path_type=path_type)
-            pkg = PathPackage(full_path, rel_path, description, path_type, PathPackageKind.PEXT, extra)
+            drive, extra = self._deduce_possible_external_target_path(path=rel_path, path_type=path_type)
+            pkg = PathPackage(
+                full_path=os.path.join(drive, rel_path),
+                rel_path=rel_path,
+                drive=drive,
+                description=description,
+                ty=path_type,
+                kind=PathPackageKind.PEXT,
+                pext_props=extra
+            )
             if is_system_file:
                 return pkg, StoragePriorityError(f"System Path '{path}' is incorrect because it starts with '|', please contact the database maintainer.")
             else:
                 return pkg, None
         elif is_system_file:
-            return PathPackage(os.path.join(self._config['base_system_path'], path), path, description, path_type, PathPackageKind.SYSTEM, None), None
+            return PathPackage(
+                full_path=os.path.join(self._config['base_system_path'], path),
+                rel_path=path,
+                drive=self._config['base_system_path'],
+                description=description,
+                ty=path_type,
+                kind=PathPackageKind.SYSTEM,
+            ), None
         else:
-            return PathPackage(os.path.join(self._config['base_path'], path), path, description, path_type, PathPackageKind.STANDARD, None), None
+            return PathPackage(
+                full_path=os.path.join(self._config['base_path'], path),
+                rel_path=path,
+                drive=self._config['base_path'],
+                description=description,
+                ty=path_type,
+                kind=PathPackageKind.STANDARD,
+            ), None
 
     def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> Tuple[str, PextPathProps]:
         path_obj = Path(path)
         parts_len = len(path_obj.parts)
         if path_type == PathType.FOLDER and parts_len <= 1:
-            return os.path.join(self._config['base_path'], path), PextPathProps(kind=PextKind.PEXT_PARENT, parent=path, drive=self._config['base_path'], other_drives=())
+            return self._config['base_path'], PextPathProps(kind=PextKind.PEXT_PARENT, parent=path, drive=self._config['base_path'], other_drives=())
         elif path_type == PathType.FILE and parts_len <= 2:
             raise StoragePriorityError(f"File Path '|{path}' is incorrect, please contact the database maintainer.")
         else:
@@ -89,7 +111,7 @@ class TargetPathsCalculator:
                 registry.drives.add(drive)
 
         drive, external, others = registry.folders[first_two_folders]
-        return os.path.join(drive, source_path), PextPathProps(kind=external, parent=first_folder, drive=drive, other_drives=others, is_subfolder=len(path_obj.parts) == 2)
+        return drive, PextPathProps(kind=external, parent=first_folder, drive=drive, other_drives=others, is_subfolder=len(path_obj.parts) == 2)
 
     def _search_drive_for_directory(self, first_folder: str, second_folder: str) -> Tuple[str, PextKind, Tuple[str, ...]]:
         base_path, priority = self._config['base_path'], self._config['storage_priority']

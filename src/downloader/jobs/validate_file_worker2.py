@@ -40,7 +40,7 @@ class ValidateFileWorker2(DownloaderWorker):
             target_file_path=job.target_file_path,
             info=job.info,
             file_hash=job.description['hash'],
-            backup=job.description.get('backup', None)
+            backup_path=job.backup_path
         )
 
         if error is not None:
@@ -48,7 +48,7 @@ class ValidateFileWorker2(DownloaderWorker):
 
         return [] if job.after_job is None else [job.after_job], None
 
-    def _validate_file(self, temp_path: str, target_file_path: str, info: str, file_hash: str, backup: Optional[str]) -> Optional[FileDownloadError]:
+    def _validate_file(self, temp_path: str, target_file_path: str, info: str, file_hash: str, backup_path: Optional[str]) -> Optional[FileDownloadError]:
         try:
             fs_hash = self._file_system.hash(temp_path)
             if fs_hash != file_hash:
@@ -56,8 +56,8 @@ class ValidateFileWorker2(DownloaderWorker):
                 return FileDownloadError(f'Bad hash on {info} ({file_hash} != {fs_hash})')
 
             if temp_path != target_file_path:
-                if backup is not None and self._file_system.is_file(target_file_path, use_cache=False):
-                    self._file_system.move(target_file_path, str(Path(target_file_path).parent / backup))
+                if backup_path is not None and self._file_system.is_file(target_file_path, use_cache=False):
+                    self._file_system.move(target_file_path, backup_path)
                 self._file_system.move(temp_path, target_file_path)
 
         except BaseException as e:

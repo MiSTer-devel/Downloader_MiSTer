@@ -30,6 +30,9 @@ DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB: Final[int] = 128
 DISTRIBUTION_MISTER_DB_URL: Final[str] = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'
 DISTRIBUTION_MISTER_DB_ID: Final[str] = 'distribution_mister'
 
+# File System affixes
+SUFFIX_file_in_progress: Final[str] = '._downloader_in_progress'
+
 # Firmware files
 FILE_MiSTer: Final[str] = 'MiSTer'
 FILE_PDFViewer: Final[str] = 'linux/pdfviewer'

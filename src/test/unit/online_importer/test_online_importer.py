@@ -412,8 +412,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
 
         self.assertEqual([
             {'data': '/media/fat/a', 'scope': 'make_dirs'},
-            {'data': '/media/fat/a/a.new', 'scope': 'write_incoming_stream'},
-            {'data': ['/media/fat/a/a.new', '/media/fat/a/a'], 'scope': 'move'}
+            {'data': '/media/fat/a/a', 'scope': 'write_incoming_stream'}
         ], sut.fs_records)
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_test_with_file_a_descr(), store1)
@@ -444,8 +443,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
 
         self.assertEqual([
             {'data': '/media/fat/a', 'scope': 'make_dirs'},
-            {'data': '/media/fat/a/a.new', 'scope': 'write_incoming_stream'},
-            {'data': ['/media/fat/a/a.new', '/media/fat/a/a'], 'scope': 'move'}
+            {'data': '/media/fat/a/a', 'scope': 'write_incoming_stream'},
         ], sut.fs_records)
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(empty_test_store(), store1)

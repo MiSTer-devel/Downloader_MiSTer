@@ -18,36 +18,44 @@
 
 
 from dataclasses import dataclass
-from enum import unique, Enum
+from enum import auto, unique, Enum
 from typing import Dict, Any, Optional, Tuple
 import os
 
 
 @unique
 class PathType(Enum):
-    FILE = 0
-    FOLDER = 1
+    FILE = auto()
+    FOLDER = auto()
 
 @unique
 class PathPackageKind(Enum):
-    STANDARD = 0
-    SYSTEM = 1
-    PEXT = 2
+    STANDARD = auto()
+    SYSTEM = auto()
+    PEXT = auto()
 
 @unique
 class PextKind(Enum):
-    PEXT_EXTERNAL = 10
-    PEXT_STANDARD = 11
-    PEXT_PARENT = 12
+    PEXT_EXTERNAL = auto()
+    PEXT_STANDARD = auto()
+    PEXT_PARENT = auto()
+
+@unique
+class PathExists(Enum):
+    UNCHECKED = auto()
+    EXISTS = auto()
+    DOES_NOT_EXIST = auto()
 
 @dataclass
 class PathPackage:
     full_path: str
     rel_path: str
+    drive: Optional[str]
     description: Dict[str, Any]
+    pext_props: Optional['PextPathProps'] = None
     ty: PathType = PathType.FILE
     kind: PathPackageKind = PathPackageKind.STANDARD
-    pext_props: Optional['PextPathProps'] = None
+    exists: PathExists = PathExists.UNCHECKED
 
     def __post_init__(self):
         assert (self.kind == PathPackageKind.PEXT) == (self.pext_props is not None), "PathPackage is not consistent according to its kind"
@@ -94,12 +102,11 @@ class PathPackage:
         else:
             return self.rel_path
 
-    def drive(self) -> Optional[str]:
+    def pext_drive(self) -> Optional[str]:
         if self.kind == PathPackageKind.PEXT and self.pext_props is not None:
             return self.pext_props.drive
         else:
             return None
-
 
 @dataclass
 class PextPathProps:

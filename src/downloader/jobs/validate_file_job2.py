@@ -31,6 +31,7 @@ class ValidateFileJob2(Job):
     info: str
     temp_path: str
     get_file_job: GetFileJob
+    backup_path: Optional[str] = None
     after_job: Optional[Job] = None
     priority: bool = True
 

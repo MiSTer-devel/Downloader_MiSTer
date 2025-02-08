@@ -18,7 +18,7 @@
 
 import unittest
 
-from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from downloader.target_path_repository import downloader_in_progress_postfix
 from test.fake_local_store_wrapper import LocalStoreWrapper
@@ -64,16 +64,19 @@ class TestOnlineImporterFileOps(unittest.TestCase):
     def test_download_nothing___from_scratch_no_issues___nothing_downloaded_no_errors(self):
         self.download_nothing()
         self.assertDownloaded([])
+        self.assertEqual([], self.file_system.write_records)
 
     def test_download_files_one___from_scratch_no_issues___returns_correctly_downloaded_one_and_no_errors(self):
         self.download_one()
         self.assertDownloaded([file_one], [file_one])
         self.assertTrue(self.file_system.is_file(on_installed(file_one)))
+        self.assertEqual([{"scope": "write_incoming_stream", "data": on_installed(file_one)}], self.file_system.write_records)
 
     def test_download_files_one___from_scratch_with_retry___returns_correctly_downloaded_one_and_no_errors(self):
         self.network_state.remote_failures[file_one] = 2
         self.download_one()
         self.assertDownloaded([file_one], [file_one, file_one])
+        self.assertEqual([{"scope": "write_incoming_stream", "data": on_installed(file_one)}], self.file_system.write_records)
 
     def test_download_big_file___when_big_file_already_present_with_different_hash___gets_downloaded_through_a_downloader_in_progress_file_and_then_correctly_installed(self):
         downloader_in_progress_file = file_big + downloader_in_progress_postfix
@@ -89,24 +92,35 @@ class TestOnlineImporterFileOps(unittest.TestCase):
         )
         self.assertEqual([
             {"scope": "write_incoming_stream", "data": on_installed(downloader_in_progress_file)},
-            {"scope": "copy", "data": [on_installed(downloader_in_progress_file), on_installed(file_big)]},
-            {"scope": "unlink", "data": on_installed(downloader_in_progress_file)},
+            {"scope": "move", "data": [on_installed(downloader_in_progress_file), on_installed(file_big)]}
         ], self.file_system.write_records)
 
     def test_download_files_one___from_scratch_could_not_download___return_errors(self):
         self.network_state.remote_failures[file_one] = 99
         self.download_one()
         self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
+        self.assertEqual([], self.file_system.write_records)
 
     def test_download_files_one___from_scratch_no_matching_hash___return_errors(self):
         self.network_state.remote_files[file_one] = {'hash': 'wrong',  'size': 1}
         self.download_one()
         self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
+        self.assertEqual([
+            {'data': on_installed(file_one), 'scope': 'write_incoming_stream'},
+            {'data': on_installed(file_one), 'scope': 'unlink'},
+            {'data': on_installed(file_one), 'scope': 'write_incoming_stream'},
+            {'data': on_installed(file_one), 'scope': 'unlink'},
+            {'data': on_installed(file_one), 'scope': 'write_incoming_stream'},
+            {'data': on_installed(file_one), 'scope': 'unlink'},
+            {'data': on_installed(file_one), 'scope': 'write_incoming_stream'},
+            {'data': on_installed(file_one), 'scope': 'unlink'}
+        ], self.file_system.write_records)
 
     def test_download_files_one___from_scratch_no_file_exists___return_errors(self):
         self.network_state.storing_problems.add(file_one)
         self.download_one()
         self.assertDownloaded([], run=[file_one, file_one, file_one, file_one], errors=[file_one])
+        self.assertEqual([], self.file_system.write_records)
 
     def test_download_mister_file___with_old_mister_file_present___stores_it_as_mister_and_moves_old_one_to_mister_old(self):
         self.file_system_state.add_old_mister_binary(self.installed_system_path)
@@ -146,7 +160,7 @@ class TestOnlineImporterFileOps(unittest.TestCase):
         self.sut.download(False)
 
     def download_mister_binary(self):
-        self.sut.add_db(db_entity(files={FILE_MiSTer: file_mister_descr()}), empty_store(self.installed_path))
+        self.sut.add_db(db_entity(db_id=DISTRIBUTION_MISTER_DB_ID, files={FILE_MiSTer: file_mister_descr()}), empty_store(self.installed_path))
         self.sut.download(False)
 
     def assertDownloaded(self, oks, run=None, errors=None):

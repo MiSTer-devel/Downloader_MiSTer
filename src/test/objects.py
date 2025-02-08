@@ -483,6 +483,7 @@ def file_mister_descr(hash_code=None):
         "path": "system",
         "reboot": True,
         "size": 2915040,
+        "tmp": FILE_MiSTer_new,
         "url": "https://MiSTer",
     }
 
