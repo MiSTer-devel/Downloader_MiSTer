@@ -22,7 +22,7 @@ from collections import defaultdict
 import os
 
 from downloader.db_entity import DbEntity
-from downloader.db_section_package import DbSectionPackage
+from downloader.db_utils import DbSectionPackage
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.jobs_factory import make_get_file_job

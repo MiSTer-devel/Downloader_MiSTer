@@ -21,12 +21,11 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import List, Tuple
 
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
-from downloader.config import Config, ConfigDatabaseSection
-from downloader.db_section_package import DbSectionPackage
+from downloader.config import Config
+from downloader.db_utils import DbSectionPackage, sorted_db_sections
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository
@@ -211,18 +210,3 @@ class FullRunService:
 
     def _needs_reboot(self):
         return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.needs_reboot())
-
-
-def sorted_db_sections(config: Config) -> List[Tuple[str, ConfigDatabaseSection]]:
-    result = []
-    first = None
-    for db_id, db_section in config['databases'].items():
-        if db_id == config['default_db_id']:
-            first = (db_id, db_section)
-        else:
-            result.append((db_id, db_section))
-
-    if first is not None:
-        result = [first, *result]
-
-    return result
