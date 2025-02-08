@@ -16,14 +16,15 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from typing import Dict, List, Tuple
+from downloader.config import ConfigDatabaseSection
 from downloader.constants import MEDIA_USB0
 from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
-from downloader.importer_command import ImporterCommand, ImporterCommandFactory
 from downloader.interruptions import Interruptions
-from downloader.job_system import JobFailPolicy, JobSystem
+from downloader.job_system import Job, JobFailPolicy, JobSystem
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
-from downloader.jobs.worker_context import DownloaderWorkerFailPolicy, make_downloader_worker_context
+from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext, DownloaderWorkerFailPolicy, make_downloader_worker_context
 from downloader.online_importer import InstallationBox, OnlineImporter as ProductionOnlineImporter
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.logger import NoLogger
@@ -108,13 +109,12 @@ class OnlineImporter(ProductionOnlineImporter):
     def jobs_tracks(self):
         return self._report_tracker.tracks
 
-    def download(self, full_resync):
+    def download(self, full_resync: bool):
         self.set_local_store(LocalStoreWrapper({'dbs': {db.db_id: store for db, store, _ in self.dbs}}))
-
-        importer_command = ImporterCommand('')
+        db_sections: List[Tuple[str, ConfigDatabaseSection]] = []
         for db, _store, ini_description in self.dbs:
-            importer_command.add_db(db.db_id, ini_description)
-        self.download_dbs_contents(importer_command, full_resync)
+            db_sections.append((db.db_id, ini_description))
+        self.download_dbs_contents(db_sections, full_resync)
     
         return self
 
@@ -124,11 +124,11 @@ class OnlineImporter(ProductionOnlineImporter):
     def box(self) -> InstallationBox:
         return self._box
 
-    def _make_workers(self, ctx):
+    def _make_workers(self, ctx: DownloaderWorkerContext) -> Dict[int, DownloaderWorker]:
         return {w.job_type_id(): w for w in make_workers(ctx)}
     
-    def _make_jobs(self, _importer_command, local_store, full_resync):
+    def _make_jobs(self, _db_sections: List[Tuple[str, ConfigDatabaseSection]], local_store: LocalStoreWrapper, full_resync: bool) -> List[Job]:
         jobs = []
-        for db, store, ini_description in self.dbs:
+        for db, _store, ini_description in self.dbs:
             jobs.append(ProcessDbJob(db=db, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
         return jobs

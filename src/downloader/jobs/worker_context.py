@@ -19,15 +19,13 @@
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from enum import Enum, auto
-import threading
-from typing import Tuple, Set, List
 
 from downloader.config import Config
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
 from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
-from downloader.job_system import JobFailPolicy, Worker, ProgressReporter, JobContext
+from downloader.job_system import Worker, ProgressReporter, JobContext
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
 from downloader.logger import Logger
 from downloader.target_path_calculator import TargetPathsCalculatorFactory

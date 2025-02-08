@@ -122,6 +122,9 @@ class FakeFileSystem(ProductionFileSystem):
     def hash(self, path):
         return self.state.files[self._path(path)]['hash']
 
+    def size(self, path):
+        return self.state.files[self._path(path)]['size']
+
     def resolve(self, path):
         return self._path(path)
 

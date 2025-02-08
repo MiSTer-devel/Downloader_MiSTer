@@ -18,7 +18,7 @@
 
 import unittest
 
-from downloader.constants import FILE_MiSTer_version
+from downloader.constants import FILE_Linux_compressed, FILE_MiSTer_version
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_importer_implicit_inputs import NetworkState, FileSystemState
 from test.fake_linux_updater import LinuxUpdater
@@ -66,8 +66,7 @@ class TestLinuxUpdater(unittest.TestCase):
         self.assertEqual(self.sut.file_system.read_file_contents(FILE_MiSTer_version), "222222")
 
     def test_update_linux___new_linux_but_failed_download___no_need_to_reboot(self):
-        factory = FileDownloaderFactory(network_state=NetworkState(remote_failures={"linux.7z": 99}))
-        self.sut = LinuxUpdater(file_downloader_factory=factory)
+        self.sut = LinuxUpdater(network_state=NetworkState(remote_failures={FILE_Linux_compressed: 99}))
         self.sut.add_db(db_entity(db_id='new', linux=linux_description()))
         self.sut.update()
         self.assertFalse(self.sut.needs_reboot())

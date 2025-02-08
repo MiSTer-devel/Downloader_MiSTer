@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Any, Iterable, Set, Tuple
 from collections import defaultdict
 import os
 
-from downloader.importer_command import ImporterCommand
+from downloader.config import ConfigDatabaseSection
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.jobs_factory import make_get_file_job
@@ -30,7 +30,6 @@ from downloader.jobs.workers_factory import make_workers
 from downloader.logger import Logger
 from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
 from downloader.free_space_reservation import FreeSpaceReservation, Partition
-from downloader.importer_command import ImporterCommand
 from downloader.job_system import JobSystem
 from downloader.jobs.copy_file_job import CopyFileJob
 from downloader.jobs.fetch_file_job import FetchFileJob
@@ -56,16 +55,16 @@ class OnlineImporter:
         self._needs_save = False
         self._new_files_not_overwritten: Dict[str, List[str]] = dict()
 
-    def set_local_store(self, local_store: LocalStoreWrapper):
+    def set_local_store(self, local_store: LocalStoreWrapper) -> None:
         self._local_store = local_store
 
-    def download_dbs_contents(self, importer_command: ImporterCommand, full_resync: bool):
+    def download_dbs_contents(self, db_sections: List[Tuple[str, ConfigDatabaseSection]], full_resync: bool):
         if self._local_store is None: raise Exception("Local store is not set")
         
         local_store: LocalStoreWrapper = self._local_store
 
         self._job_system.register_workers(self._make_workers(self._worker_ctx))
-        self._job_system.push_jobs(self._make_jobs(importer_command, local_store, full_resync))
+        self._job_system.push_jobs(self._make_jobs(db_sections, local_store, full_resync))
 
         self._job_system.execute_jobs()
 
@@ -128,7 +127,7 @@ class OnlineImporter:
             box.add_failed_db_options(WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(e)}' is invalid."))
 
         stores = {}
-        for db_id, _ in importer_command.read_dbs():
+        for db_id, _ in db_sections:
             stores[db_id] = local_store.store_by_id(db_id)
 
         removed_files = []
@@ -300,9 +299,9 @@ class OnlineImporter:
     def _make_workers(self, ctx: DownloaderWorkerContext) -> Dict[int, DownloaderWorker]:
         return {w.job_type_id(): w for w in make_workers(ctx)}
 
-    def _make_jobs(self, importer_command: ImporterCommand, local_store: LocalStoreWrapper, full_resync: bool) -> List[Job]:
+    def _make_jobs(self, db_sections: List[Tuple[str, ConfigDatabaseSection]], local_store: LocalStoreWrapper, full_resync: bool) -> List[Job]:
         jobs: List[Job] = []
-        for db_id, db_section in importer_command.read_dbs():
+        for db_id, db_section in db_sections:
             temp_path = '/tmp/downloader.' + db_id + '.database'
             get_db_job = make_get_file_job(db_section['url'], target=temp_path, info=f'db {db_id}', silent=False, logger=self._logger)
             get_db_job.after_job = OpenDbJob(

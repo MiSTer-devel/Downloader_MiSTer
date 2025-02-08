@@ -16,43 +16,36 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, Tuple, Generator, Optional
+from typing import Dict, Any, NotRequired, Tuple, Generator, Optional, TypedDict
 from contextlib import contextmanager
 import ssl
 
 from downloader.http_gateway import HttpGateway
-from downloader.job_system import Job
-from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
-from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from test.objects import binary_content
 
+
+class FileContext(TypedDict):
+    description: Dict[str, Any]
+    path: str
+    info: NotRequired[str]
 
 class FakeHttpGateway(HttpGateway):
     def __init__(self, config, network_state):
         super().__init__(ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT), 200, None)
         self._config = config
         self._network_state = network_state
-        self._job: Optional[Job] = None
+        self._file_ctx: Optional[FileContext] = None
 
-    def set_job(self, job: Optional[Job]) -> None:
-        self._job = job
+    def set_file_ctx(self, file_ctx: Optional[Tuple[FileContext, str]]) -> None:
+        self._file_ctx = file_ctx
 
     @contextmanager
     def open(self, url: str, _method: str = None, _body: Any = None, _headers: Any = None) -> Generator[Tuple[str, 'FakeHTTPResponse'], None, None]:
         description = None
         target_file_path = None
         info_path = None
-        if isinstance(self._job, FetchFileJob):
-            description = {**self._job.description}
-            target_file_path = self._job.path
-        elif isinstance(self._job, FetchFileJob2):
-            if isinstance(self._job.after_job, ValidateFileJob2):
-                description = {**self._job.after_job.description}
-
-            if info_path is None:
-                info_path = self._job.info
-            target_file_path = self._job.temp_path
+        if self._file_ctx is not None:
+            description, target_file_path, info_path = self._file_ctx['description'], self._file_ctx['path'], self._file_ctx.get('info', None)
 
         match_path = info_path if info_path is not None else target_file_path if target_file_path is not None else url
 

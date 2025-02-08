@@ -22,14 +22,6 @@ from test.fake_local_store_wrapper import StoreWrapper as FakeStoreWrapper
 
 
 class ImporterCommand(ProductionImporterCommand):
-    def __init__(self, input_config):
-        user_defined_config = []
-        for key, value in default_config().items():
-            if key in input_config and value != input_config[key]:
-                user_defined_config.append(key)
-
-        super().__init__(input_config, user_defined_config)
-
     def add_db(self, db, store, ini_description):
         if isinstance(store, StoreWrapper):
             return super().add_db(db, store, ini_description)

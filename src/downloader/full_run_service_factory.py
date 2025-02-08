@@ -31,6 +31,7 @@ from downloader.http_gateway import HttpGateway
 from downloader.importer_command import ImporterCommandFactory
 from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem
+from downloader.jobs.fetch_file_worker2 import SafeFileFetcher
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import make_downloader_worker_context
 from downloader.logger import DebugOnlyLoggerDecorator, Logger, FilelogManager, PrintLogManager, FileLoggerDecorator, \
@@ -82,6 +83,7 @@ class FullRunServiceFactory:
             logger=DebugOnlyLoggerDecorator(self._logger) if config['debug'] else None
         )
         atexit.register(http_gateway.cleanup)
+        safe_file_fetcher = SafeFileFetcher(config, system_file_system, self._logger, http_gateway, waiter)
         installation_report = InstallationReportImpl()
         interrupts = Interruptions(file_system_factory)
         file_download_reporter = FileDownloadProgressReporter(self._logger, waiter, interrupts, installation_report)
@@ -97,7 +99,7 @@ class FullRunServiceFactory:
         free_space_reservation = LinuxFreeSpaceReservation(logger=self._logger, config=config) if system_file_system.is_file(FILE_MiSTer_version) else UnlimitedFreeSpaceReservation()
         file_downloader_factory = FileDownloaderFactory(file_system_factory, waiter, self._logger, job_system, file_download_reporter, file_download_reporter, http_gateway, free_space_reservation, external_drives_repository)
         db_gateway = DbGateway(config, system_file_system, file_downloader_factory, self._logger)
-        linux_updater = LinuxUpdater(config, system_file_system, file_downloader_factory, self._logger)
+        linux_updater = LinuxUpdater(self._logger, config, system_file_system, safe_file_fetcher)
 
         workers_ctx = make_downloader_worker_context(
             job_ctx=job_system,

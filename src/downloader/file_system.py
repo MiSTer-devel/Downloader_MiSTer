@@ -115,6 +115,10 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
+    def size(self, path: str) -> int:
+        """interface"""
+
+    @abstractmethod
     def make_dirs(self, path: str) -> None:
         """interface"""
 
@@ -198,6 +202,9 @@ class ReadOnlyFileSystem:
 
     def hash(self, path):
         return self._fs.hash(path)
+
+    def size(self, path):
+        return self._fs.size(path)
 
     def unique_temp_filename(self):
         return self._fs.unique_temp_filename()
@@ -322,6 +329,13 @@ class _FileSystem(FileSystem):
         except FileNotFoundError as e:
             self._logger.debug(e)
             return HASH_file_does_not_exist
+
+    def size(self, path: str) -> int:
+        try:
+            return os.path.getsize(self._path(path))
+        except FileNotFoundError as e:
+            self._logger.debug(e)
+            return -1
 
     def make_dirs(self, path: str) -> None:
         self._makedirs(self._path(path))

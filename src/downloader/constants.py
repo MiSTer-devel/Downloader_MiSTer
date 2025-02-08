@@ -67,7 +67,14 @@ FILE_downloader_launcher_script: Final[str] = 'Scripts/downloader.sh'
 
 # Linux Update files
 FILE_MiSTer_version: Final[str] = '/MiSTer.version'
-FILE_Linux_7z: Final[str] = '/media/fat/linux/7za'
+FILE_Linux_compressed: Final[str] = '/media/fat/linux.7z'
+FILE_Linux_7z_util: Final[str] = '/media/fat/linux/7za'
+FILE_Linux_7z_util_uninstalled: Final[str] = '/media/fat/linux/7za.gz'
+def FILE_Linux_7z_util_uninstalled_description(): return {
+    'url': 'https://github.com/MiSTer-devel/SD-Installer-Win64_MiSTer/raw/master/7za.gz',
+    'hash': 'ed1ad5185fbede55cd7fd506b3c6c699',
+    'size': 465600
+}
 FILE_Linux_user_files: Final[List[Tuple[str, str]]] = [
     # source -> destination
     ('/media/fat/linux/hostname', '/etc/hostname'),

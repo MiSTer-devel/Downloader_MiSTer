@@ -19,6 +19,8 @@
 from typing import List
 
 from downloader.job_system import WorkerResult, Job
+from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.jobs.worker_context import DownloaderWorkerContext, DownloaderWorker
 from downloader.jobs.workers_factory import make_workers as production_make_workers
 from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
@@ -49,8 +51,17 @@ class FakeWorkerDecorator(DownloaderWorker):
 
     def job_type_id(self) -> int: return self._worker.job_type_id()
     def operate_on(self, job: Job) -> WorkerResult:
-        self._fake_http.set_job(job)
+        if isinstance(job, FetchFileJob2):
+            if isinstance(job.after_job, ValidateFileJob2):
+                description = {**job.after_job.description}
+            else:
+                description = None
+            self._fake_http.set_file_ctx({
+                'description': description,
+                'path': job.temp_path,
+                'info': job.info
+            })
         try:
             return self._worker.operate_on(job)
         finally:
-            self._fake_http.set_job(None)
+            self._fake_http.set_file_ctx(None)
