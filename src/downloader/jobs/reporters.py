@@ -87,6 +87,8 @@ class InstallationReport(Protocol):
     def is_file_processed(self, path: str) -> bool: """Returns True if the file has been processed."""
     def processed_file(self, path: str) -> ProcessedFile: """File that a database is currently processing."""
     def processed_folder(self, path: str) -> Dict[str, PathPackage]: """File that a database is currently processing."""
+    def all_processed_files(self) -> List[str]: """Returns all processed files."""
+    def all_processed_folders(self) -> List[str]: """Returns all processed folders."""
 
 
 class JobTagTracking:
@@ -283,6 +285,8 @@ class InstallationReportImpl(InstallationReport):
     def is_file_processed(self, path: str) -> bool: return path in self._processed_files.data
     def processed_file(self, path: str) -> ProcessedFile: return self._processed_files.data[path]
     def processed_folder(self, path: str) -> Dict[str, PathPackage]: return self._processed_folders.data[path]
+    def all_processed_files(self) -> List[str]: return list(self._processed_files.data.keys())
+    def all_processed_folders(self) -> List[str]: return list(self._processed_folders.data.keys())
 
 
 class FileDownloadSessionLogger(Protocol):

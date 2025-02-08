@@ -95,6 +95,9 @@ class OnlineImporter:
         for job in report.get_completed_jobs(ProcessDbJob):
             box.add_installed_db(job.db)
 
+        for job in report.get_started_jobs(FetchFileJob2):
+            box.add_file_fetch_started(job.info)
+
         for job in report.get_completed_jobs(ProcessIndexJob):
             box.add_present_not_validated_files(job.present_not_validated_files)
             box.add_present_validated_files(job.present_validated_files)
@@ -373,6 +376,9 @@ class OnlineImporter:
 
     def files_that_failed(self):
         return self._box.failed_files()
+    
+    def run_files(self):
+        return self._box.fetch_started_files()
     
     def dbs_that_failed(self):
         return []

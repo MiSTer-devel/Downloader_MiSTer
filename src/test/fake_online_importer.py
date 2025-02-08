@@ -19,6 +19,7 @@
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from downloader.config import Config, ConfigDatabaseSection
 from downloader.constants import MEDIA_USB0
+from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.free_space_reservation import FreeSpaceReservation, UnlimitedFreeSpaceReservation
 from downloader.interruptions import Interruptions
@@ -26,6 +27,7 @@ from downloader.job_system import Job, JobFailPolicy, JobSystem
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext, DownloaderWorkerFailPolicy, make_downloader_worker_context
+from downloader.local_store_wrapper import StoreWrapper
 from downloader.online_importer import InstallationBox, OnlineImporter as ProductionOnlineImporter
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.logger import Logger, NoLogger
@@ -80,7 +82,6 @@ class OnlineImporter(ProductionOnlineImporter):
             logger=logger,
             http_gateway=http_gateway,
             file_system=self.file_system,
-            target_path_repository=None,
             progress_reporter=self._report_tracker,
             file_download_session_logger=self._file_download_reporter,
             installation_report=installation_report,
@@ -146,8 +147,8 @@ class OnlineImporter(ProductionOnlineImporter):
     
         return self
 
-    def add_db(self, db, store, description=None):
-        self.dbs.append((db, store, {} if description is None else description))
+    def add_db(self, db: DbEntity, store: StoreWrapper=None, description: ConfigDatabaseSection=None):
+        self.dbs.append((db, store or self._local_store.store_by_id(db.db_id), {} if description is None else description))
         return self
 
     def download_db(self, db, store, full_resync=False):

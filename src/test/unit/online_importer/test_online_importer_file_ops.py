@@ -21,13 +21,15 @@ import unittest
 from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old
 from downloader.local_repository import LocalRepository as ProductionLocalRepository
 from downloader.target_path_repository import downloader_in_progress_postfix
+from test.fake_local_store_wrapper import LocalStoreWrapper
+from test.fake_online_importer import OnlineImporter
 from test.fake_store_migrator import StoreMigrator
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_importer_implicit_inputs import NetworkState, FileSystemState
 from downloader.logger import NoLogger
 from test.fake_file_system_factory import fs_data, FileSystemFactory, fs_records
 from test.fake_file_downloader_factory import FileDownloaderFactory
-from test.objects import file_menu_rbf, hash_menu_rbf, file_one, hash_one, hash_big, file_big, \
+from test.objects import db_entity, empty_store, file_menu_rbf, hash_menu_rbf, file_one, hash_one, hash_big, file_big, \
     hash_updated_big, big_size, config_with, file_mister_descr, hash_MiSTer_old, hash_MiSTer
 
 
@@ -43,7 +45,7 @@ def on_tmp(path):
     return '/tmp/' + path
 
 
-class TestFileDownloader(unittest.TestCase):
+class TestOnlineImporterFileOps(unittest.TestCase):
 
     installed_path = '/installed'
     installed_system_path = '/installed_system'
@@ -56,14 +58,11 @@ class TestFileDownloader(unittest.TestCase):
         self.file_system_state.set_non_base_path(self.installed_system_path, FILE_MiSTer_new)
         self.file_system_state.set_non_base_path(self.installed_system_path, FILE_MiSTer_old)
         file_system_factory = FileSystemFactory(state=self.file_system_state)
-        self.file_downloader_factory = FileDownloaderFactory(file_system_factory=file_system_factory, network_state=self.network_state, state=self.file_system_state)
-        self.file_system = file_system_factory.create_for_config(config)
-        external_drives_repository = ExternalDrivesRepository(file_system=self.file_system)
-        self.local_repository = ProductionLocalRepository(config, NoLogger(), self.file_system, StoreMigrator(), external_drives_repository)
-        self.sut = self.file_downloader_factory.create(config, True)
+        self.file_system = file_system_factory.create_for_system_scope()
+        self.sut = OnlineImporter(config=config, file_system_factory=file_system_factory, network_state=self.network_state)
 
     def test_download_nothing___from_scratch_no_issues___nothing_downloaded_no_errors(self):
-        self.sut.download_files(False)
+        self.download_nothing()
         self.assertDownloaded([])
 
     def test_download_files_one___from_scratch_no_issues___returns_correctly_downloaded_one_and_no_errors(self):
@@ -111,8 +110,7 @@ class TestFileDownloader(unittest.TestCase):
 
     def test_download_mister_file___with_old_mister_file_present___stores_it_as_mister_and_moves_old_one_to_mister_old(self):
         self.file_system_state.add_old_mister_binary(self.installed_system_path)
-        self.sut.queue_file(file_mister_descr(), FILE_MiSTer)
-        self.sut.download_files(False)
+        self.download_mister_binary()
         self.assertDownloaded([FILE_MiSTer], [FILE_MiSTer])
         self.assertEqual(hash_MiSTer, self.file_system.hash(FILE_MiSTer))
         self.assertEqual(hash_MiSTer_old, self.file_system.hash(FILE_MiSTer_old))
@@ -123,8 +121,7 @@ class TestFileDownloader(unittest.TestCase):
         ]), self.file_system.write_records)
 
     def test_download_mister_file___from_scratch___stores_it_as_mister_and_mister_old_doesnt_exist(self):
-        self.sut.queue_file(file_mister_descr(), FILE_MiSTer)
-        self.sut.download_files(False)
+        self.download_mister_binary()
         self.assertDownloaded([FILE_MiSTer], [FILE_MiSTer])
         self.assertEqual(hash_MiSTer, self.file_system.hash(FILE_MiSTer))
         self.assertFalse(self.file_system.is_file(FILE_MiSTer_old))
@@ -133,19 +130,26 @@ class TestFileDownloader(unittest.TestCase):
             {'scope': 'move', 'data': (on_installed_system(FILE_MiSTer_new), on_installed_system(FILE_MiSTer))},
         ]), self.file_system.write_records)
 
-    def assertDownloaded(self, oks, run=None, errors=None):
-        self.assertEqual(oks, self.sut.correctly_downloaded_files())
-        self.assertEqual(errors if errors is not None else [], self.sut.errors())
-        self.assertEqual(run if run is not None else [], self.sut.run_files())
+    def download_nothing(self):
+        self.sut.download(False)
 
     def download_one(self):
-        self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_one, 'size': 1}, file_one)
-        self.sut.download_files(False)
+        self.sut.add_db(db_entity(files={file_one: {'url': 'https://fake.com/bar', 'hash': hash_one, 'size': 1}}), empty_store(self.installed_path))
+        self.sut.download(False)
 
     def download_big_file(self, hash_value):
-        self.sut.queue_file({'url': 'https://fake.com/huge', 'hash': hash_value, 'size': big_size}, file_big)
-        self.sut.download_files(False)
+        self.sut.add_db(db_entity(files={file_big: {'url': 'https://fake.com/huge', 'hash': hash_value, 'size': big_size}}), empty_store(self.installed_path))
+        self.sut.download(False)
 
     def download_reboot(self):
-        self.sut.queue_file({'url': 'https://fake.com/bar', 'hash': hash_menu_rbf, 'reboot': True, 'path': 'system', 'size': 23}, file_menu_rbf)
-        self.sut.download_files(False)
+        self.sut.add_db(db_entity(files={file_menu_rbf: {'url': 'https://fake.com/bar', 'hash': hash_menu_rbf, 'reboot': True, 'path': 'system', 'size': 23}}), empty_store(self.installed_path))
+        self.sut.download(False)
+
+    def download_mister_binary(self):
+        self.sut.add_db(db_entity(files={FILE_MiSTer: file_mister_descr()}), empty_store(self.installed_path))
+        self.sut.download(False)
+
+    def assertDownloaded(self, oks, run=None, errors=None):
+        self.assertEqual(oks, self.sut.correctly_installed_files())
+        self.assertEqual(errors if errors is not None else [], self.sut.files_that_failed())
+        self.assertEqual(run if run is not None else [], self.sut.run_files())
