@@ -105,7 +105,6 @@ class FullRunServiceFactory:
             logger=self._logger,
             http_gateway=http_gateway,
             file_system=system_file_system,
-            target_path_repository=None,
             installation_report=installation_report,
             progress_reporter=file_download_reporter,
             file_download_session_logger=file_download_reporter,

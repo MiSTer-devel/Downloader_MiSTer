@@ -53,7 +53,7 @@ class LocalStoreWrapper:
         self._dirty = True
 
     def store_by_id(self, db_id: str) -> 'StoreWrapper':
-        if db_id not in self._local_store['dbs']:
+        if db_id not in self._local_store['dbs'] or self._local_store['dbs'] is None:
             self._local_store['dbs'][db_id] = empty_store_without_base_path()
 
         return StoreWrapper(self._local_store['dbs'][db_id], self)

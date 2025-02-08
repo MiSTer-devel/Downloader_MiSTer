@@ -29,7 +29,6 @@ from downloader.job_system import Worker, ProgressReporter, JobContext
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
 from downloader.logger import Logger
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
-from downloader.target_path_repository import TargetPathRepository
 from downloader.waiter import Waiter
 
 
@@ -43,7 +42,6 @@ class DownloaderWorkerContext:
     job_ctx: JobContext
     http_gateway: HttpGateway
     logger: Logger
-    target_path_repository: TargetPathRepository
     file_system: FileSystem
     waiter: Waiter
     file_download_session_logger: FileDownloadSessionLogger
@@ -60,7 +58,6 @@ def make_downloader_worker_context(
         job_ctx: JobContext,
         http_gateway: HttpGateway,
         logger: Logger,
-        target_path_repository: TargetPathRepository,
         file_system: FileSystem,
         waiter: Waiter,
         progress_reporter: ProgressReporter,
@@ -76,7 +73,6 @@ def make_downloader_worker_context(
         job_ctx=job_ctx,
         http_gateway=http_gateway,
         logger=logger,
-        target_path_repository=target_path_repository,
         file_system=file_system,
         waiter=waiter,
         progress_reporter=progress_reporter,
