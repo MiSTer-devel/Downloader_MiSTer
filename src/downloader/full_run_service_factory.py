@@ -20,7 +20,6 @@ from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config
 from downloader.constants import FILE_MiSTer_version
-from downloader.db_gateway import DbGateway
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from downloader.file_downloader import FileDownloaderFactory, context_from_curl_ssl
 from downloader.file_filter import FileFilterFactory
@@ -98,7 +97,6 @@ class FullRunServiceFactory:
         file_filter_factory = FileFilterFactory(self._logger)
         free_space_reservation = LinuxFreeSpaceReservation(logger=self._logger, config=config) if system_file_system.is_file(FILE_MiSTer_version) else UnlimitedFreeSpaceReservation()
         file_downloader_factory = FileDownloaderFactory(file_system_factory, waiter, self._logger, job_system, file_download_reporter, file_download_reporter, http_gateway, free_space_reservation, external_drives_repository)
-        db_gateway = DbGateway(config, system_file_system, file_downloader_factory, self._logger)
         linux_updater = LinuxUpdater(self._logger, config, system_file_system, safe_file_fetcher)
 
         workers_ctx = make_downloader_worker_context(
