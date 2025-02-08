@@ -226,7 +226,7 @@ class OnlineImporter:
         for file_path in box.present_not_validated_files() + box.installed_files():
             file = report.processed_file(file_path)
 
-            for is_external, other_drive in stores[file.db_id].read_only().list_other_drives_for_file(file.pkg.rel_path, file.pkg.drive()):
+            for is_external, other_drive in stores[file.db_id].read_only().list_other_drives_for_file(file.pkg.rel_path, file.pkg.pext_drive()):
                 other_file = os.path.join(other_drive, file.pkg.rel_path)
                 if not self._worker_ctx.file_system.is_file(other_file):
                     if is_external:

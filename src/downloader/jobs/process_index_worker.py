@@ -29,12 +29,12 @@ from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_file_job2 import FetchFileJob2
-from downloader.path_package import PathPackage, PathType, RemovedCopy
+from downloader.path_package import PathExists, PathPackage, PathType, RemovedCopy
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job2 import ValidateFileJob2
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext, DownloaderWorkerFailPolicy
-from downloader.constants import FILE_MiSTer, FILE_MiSTer_old
+from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old, SUFFIX_file_in_progress
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 from downloader.other import calculate_url
 from downloader.storage_priority_resolver import StoragePriorityError
@@ -128,7 +128,9 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
         # @TODO commenting these 2 lines make the test still pass, why?
         for pkg in check_file_pkgs:
-            if pkg.rel_path is FILE_MiSTer: pkg.description['backup'] = FILE_MiSTer_old
+            if pkg.rel_path is FILE_MiSTer:
+                pkg.description['backup'] = FILE_MiSTer_old
+                pkg.description['tmp'] = FILE_MiSTer_new
 
         return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs
 
@@ -185,7 +187,8 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         validate_pkgs: List[_ValidateFilePackage] = []
         already_installed_pkgs: List[_ValidateFilePackage] = []
         for pkg in non_duplicated_pkgs:
-            if not file_system.is_file(pkg.full_path):
+            pkg.exists = PathExists.EXISTS if file_system.is_file(pkg.full_path) else PathExists.DOES_NOT_EXIST
+            if pkg.exists == PathExists.DOES_NOT_EXIST:
                 fetch_pkgs.append(pkg)
                 continue
 
@@ -193,7 +196,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
                 validate_pkgs.append(pkg)
                 continue
 
-            if store.is_file_in_drive(pkg.rel_path, pkg.drive()):
+            if store.is_file_in_drive(pkg.rel_path, pkg.pext_drive()):
                 already_installed_pkgs.append(pkg)
             else:
                 validate_pkgs.append(pkg)
@@ -259,7 +262,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
                 folders_to_create.add(pkg.pext_props.parent_full_path())
 
             folders_to_create.add(pkg.full_path)
-            self._maybe_add_copies_to_remove(folder_copies_to_be_removed, store, pkg.rel_path, pkg.drive())
+            self._maybe_add_copies_to_remove(folder_copies_to_be_removed, store, pkg.rel_path, pkg.pext_drive())
 
         for parent_path, drives in parents.items():
             for d in drives:
@@ -294,7 +297,16 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
         jobs: List[Job] = []
         for pkg in fetch_pkgs:
-            download_path = pkg.full_path + '.new'
+            if 'tmp' in pkg.description:
+                download_path = os.path.join(pkg.drive, pkg.description['tmp']) if pkg.drive is not None else pkg.description['tmp']
+            else:
+                download_path = pkg.full_path if pkg.exists == PathExists.DOES_NOT_EXIST else pkg.full_path + SUFFIX_file_in_progress
+
+            if 'backup' in pkg.description:
+                backup_path = os.path.join(pkg.drive, pkg.description['backup']) if pkg.drive is not None else pkg.description['backup']
+            else:
+                backup_path = None
+
             fetch_job = FetchFileJob2(
                 source=_url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url),
                 info=pkg.rel_path,
@@ -306,6 +318,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
                 target_file_path=pkg.full_path,
                 description=pkg.description,
                 info=pkg.rel_path,
+                backup_path=backup_path,
                 get_file_job=fetch_job
             )
             jobs.append(fetch_job)

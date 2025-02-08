@@ -95,10 +95,10 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         self._ctx.file_system.unlink(download_path)
 
         if len(job.filtered_data['files']) > 0:
-            job.files_to_remove = [PathPackage(full_path=file_path, rel_path=file_path, description=file_description) for file_path, file_description in job.filtered_data['files'].items()]
+            job.files_to_remove = [PathPackage(full_path=file_path, rel_path=file_path, drive=None, description=file_description) for file_path, file_description in job.filtered_data['files'].items()]
 
         if len(job.filtered_data['folders']) > 0:
-            job.directories_to_remove = [PathPackage(full_path=folder_path, rel_path=folder_path, description=folder_description) for folder_path, folder_description in job.filtered_data['folders'].items()]
+            job.directories_to_remove = [PathPackage(full_path=folder_path, rel_path=folder_path, drive=None, description=folder_description) for folder_path, folder_description in job.filtered_data['folders'].items()]
 
         invalid_files: List[PathPackage] = []
         validated_files: List[PathPackage] = []
