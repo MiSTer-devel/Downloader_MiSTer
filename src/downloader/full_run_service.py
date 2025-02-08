@@ -111,6 +111,7 @@ class FullRunService:
             self._local_repository.save_store(local_store)
 
         full_resync = not self._local_repository.has_last_successful_run()
+        self._online_importer.set_local_store(local_store)
         self._online_importer.download_dbs_contents(db_pkgs, full_resync)
 
         self._local_repository.save_store(local_store)
