@@ -85,7 +85,7 @@ def execute_full_run(full_run_service_factory: FullRunServiceFactory, config_rea
     if len(argv) == 2 and (argv[1] == '--print-drives' or argv[1] == '-pd'):
         exit_code = runner.print_drives()
     else:
-        # The heart of this execution is the method "download_all" in downloader_core.py
+        # The heart of this execution is the method "download_dbs_contents" in online_importer.py
         exit_code = runner.full_run()
 
     return exit_code

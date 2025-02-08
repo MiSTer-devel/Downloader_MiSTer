@@ -16,10 +16,11 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, List, Tuple
-from downloader.config import ConfigDatabaseSection
+from typing import Any, Callable, Dict, List, Optional, Tuple
+from downloader.config import Config, ConfigDatabaseSection
 from downloader.constants import MEDIA_USB0
-from downloader.free_space_reservation import UnlimitedFreeSpaceReservation
+from downloader.db_section_package import DbSectionPackage
+from downloader.free_space_reservation import FreeSpaceReservation, UnlimitedFreeSpaceReservation
 from downloader.interruptions import Interruptions
 from downloader.job_system import Job, JobFailPolicy, JobSystem
 from downloader.jobs.process_db_job import ProcessDbJob
@@ -27,8 +28,9 @@ from downloader.jobs.reporters import FileDownloadProgressReporter, Installation
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext, DownloaderWorkerFailPolicy, make_downloader_worker_context
 from downloader.online_importer import InstallationBox, OnlineImporter as ProductionOnlineImporter
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
-from downloader.logger import NoLogger
+from downloader.logger import Logger, NoLogger
 
+from downloader.waiter import Waiter
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_job_system import ProgressReporterTracker
 from test.fake_local_store_wrapper import LocalStoreWrapper
@@ -42,7 +44,19 @@ from test.fake_file_downloader_factory import FileDownloaderFactory
 
 
 class OnlineImporter(ProductionOnlineImporter):
-    def __init__(self, config=None, file_system_factory=None, free_space_reservation=None, waiter=None, logger=None, path_dictionary=None, network_state=None, file_system_state=None, fail_policy=None):
+    def __init__(
+        self,
+        config: Optional[Config] = None,
+        file_system_factory: Optional[FileSystemFactory] = None,
+        free_space_reservation: Optional[FreeSpaceReservation] = None,
+        waiter: Optional[Waiter] = None,
+        logger: Optional[Logger] = None,
+        path_dictionary: Optional[Dict[str, Any]] = None,
+        network_state: Optional[NetworkState] = None,
+        file_system_state: Optional[FileSystemState] = None,
+        fail_policy: Optional[DownloaderWorkerFailPolicy] = None,
+        start_on_db_processing: bool = True
+    ):
         self._config = config or config_with(base_system_path=MEDIA_USB0)
         if isinstance(file_system_factory, FileSystemFactory):
             self.fs_factory = file_system_factory
@@ -77,6 +91,8 @@ class OnlineImporter(ProductionOnlineImporter):
             fail_policy=fail_policy or DownloaderWorkerFailPolicy.FAIL_FAST
         )
 
+        self._start_on_db_processing = start_on_db_processing
+
         super().__init__(
             logger,
             job_system=self._job_system,
@@ -85,6 +101,18 @@ class OnlineImporter(ProductionOnlineImporter):
         )
 
         self.dbs = []
+
+    def _make_workers(self) -> Dict[int, DownloaderWorker]:
+        return {w.job_type_id(): w for w in make_workers(self._worker_ctx)}
+
+    def _make_jobs(self, db_pkgs: List[DbSectionPackage], local_store: LocalStoreWrapper, full_resync: bool) -> List[Job]:
+        if not self._start_on_db_processing:
+            return super()._make_jobs(db_pkgs, local_store, full_resync)
+
+        jobs = []
+        for db, _store, ini_description in self.dbs:
+            jobs.append(ProcessDbJob(db=db, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
+        return jobs
 
     @staticmethod
     def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs, free_space_reservation=None):
@@ -111,24 +139,25 @@ class OnlineImporter(ProductionOnlineImporter):
 
     def download(self, full_resync: bool):
         self.set_local_store(LocalStoreWrapper({'dbs': {db.db_id: store for db, store, _ in self.dbs}}))
-        db_sections: List[Tuple[str, ConfigDatabaseSection]] = []
-        for db, _store, ini_description in self.dbs:
-            db_sections.append((db.db_id, ini_description))
-        self.download_dbs_contents(db_sections, full_resync)
+        db_pkgs: List[DbSectionPackage] = []
+        for db, store, ini_description in self.dbs:
+            db_pkgs.append(DbSectionPackage(db_id=db.db_id, section=ini_description, store=store))
+        self.download_dbs_contents(db_pkgs, full_resync)
     
         return self
+
+    def add_db(self, db, store, description=None):
+        self.dbs.append((db, store, {} if description is None else description))
+        return self
+
+    def download_db(self, db, store, full_resync=False):
+        self.add_db(db, store)
+        self.download(full_resync)
+        self._clean_store(store)
+        return store
 
     def report(self) -> InstallationReport:
         return self._worker_ctx.file_download_session_logger.report()
     
     def box(self) -> InstallationBox:
         return self._box
-
-    def _make_workers(self, ctx: DownloaderWorkerContext) -> Dict[int, DownloaderWorker]:
-        return {w.job_type_id(): w for w in make_workers(ctx)}
-    
-    def _make_jobs(self, _db_sections: List[Tuple[str, ConfigDatabaseSection]], local_store: LocalStoreWrapper, full_resync: bool) -> List[Job]:
-        jobs = []
-        for db, _store, ini_description in self.dbs:
-            jobs.append(ProcessDbJob(db=db, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
-        return jobs

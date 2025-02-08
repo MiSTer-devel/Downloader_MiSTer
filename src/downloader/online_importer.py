@@ -16,16 +16,18 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from pathlib import Path
 from typing import Dict, List, Optional, Any, Iterable, Set, Tuple
 from collections import defaultdict
 import os
 
-from downloader.config import ConfigDatabaseSection
 from downloader.db_entity import DbEntity
+from downloader.db_section_package import DbSectionPackage
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.jobs_factory import make_get_file_job
 from downloader.jobs.open_db_job import OpenDbJob
+from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 from downloader.jobs.workers_factory import make_workers
 from downloader.logger import Logger
@@ -56,21 +58,43 @@ class OnlineImporter:
         self._needs_save = False
         self._new_files_not_overwritten: Dict[str, List[str]] = dict()
 
+    def _make_workers(self) -> Dict[int, DownloaderWorker]:
+        return {w.job_type_id(): w for w in make_workers(self._worker_ctx)}
+
+    def _make_jobs(self, db_pkgs: List[DbSectionPackage], local_store: LocalStoreWrapper, full_resync: bool) -> List[Job]:
+        jobs: List[Job] = []
+        for pkg in db_pkgs:
+            temp_path = str(Path(self._worker_ctx.file_system.persistent_temp_dir()) / pkg.db_id.replace('/', '_')) + Path(pkg.section['db_url']).suffix.lower()
+            get_db_job = make_get_file_job(pkg.section['db_url'], target=temp_path, info=f'db {pkg.db_id}', silent=True, logger=self._logger)
+            get_db_job.after_job = OpenDbJob(
+                get_file_job=get_db_job,
+                temp_path=temp_path,
+                section=pkg.db_id,
+                ini_description=pkg.section,
+                store=local_store.store_by_id(pkg.db_id),
+                full_resync=full_resync,
+            )
+            jobs.append(get_db_job)
+        return jobs
+
     def set_local_store(self, local_store: LocalStoreWrapper) -> None:
         self._local_store = local_store
 
-    def download_dbs_contents(self, db_sections: List[Tuple[str, ConfigDatabaseSection]], full_resync: bool):
+    def download_dbs_contents(self, db_pkgs: List[DbSectionPackage], full_resync: bool):
         if self._local_store is None: raise Exception("Local store is not set")
         
         local_store: LocalStoreWrapper = self._local_store
 
-        self._job_system.register_workers(self._make_workers(self._worker_ctx))
-        self._job_system.push_jobs(self._make_jobs(db_sections, local_store, full_resync))
+        self._job_system.register_workers(self._make_workers())
+        self._job_system.push_jobs(self._make_jobs(db_pkgs, local_store, full_resync))
 
         self._job_system.execute_jobs()
 
         box = self._box
         report = self._worker_ctx.file_download_session_logger.report()
+        for job in report.get_completed_jobs(ProcessDbJob):
+            box.add_installed_db(job.db)
+
         for job in report.get_completed_jobs(ProcessIndexJob):
             box.add_present_not_validated_files(job.present_not_validated_files)
             box.add_present_validated_files(job.present_validated_files)
@@ -128,8 +152,8 @@ class OnlineImporter:
             box.add_failed_db_options(WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(e)}' is invalid."))
 
         stores = {}
-        for db_id, _ in db_sections:
-            stores[db_id] = local_store.store_by_id(db_id)
+        for pkg in db_pkgs:
+            stores[pkg.db_id] = local_store.store_by_id(pkg.db_id)
 
         removed_files = []
         processed_files = defaultdict(list)
@@ -296,25 +320,6 @@ class OnlineImporter:
             raise e
     
         return self
-
-    def _make_workers(self, ctx: DownloaderWorkerContext) -> Dict[int, DownloaderWorker]:
-        return {w.job_type_id(): w for w in make_workers(ctx)}
-
-    def _make_jobs(self, db_sections: List[Tuple[str, ConfigDatabaseSection]], local_store: LocalStoreWrapper, full_resync: bool) -> List[Job]:
-        jobs: List[Job] = []
-        for db_id, db_section in db_sections:
-            temp_path = '/tmp/downloader.' + db_id + '.database'
-            get_db_job = make_get_file_job(db_section['url'], target=temp_path, info=f'db {db_id}', silent=False, logger=self._logger)
-            get_db_job.after_job = OpenDbJob(
-                get_file_job=get_db_job,
-                temp_path=temp_path,
-                section=db_id,
-                ini_description=db_section,
-                store=local_store.store_by_id(db_id),
-                full_resync=full_resync,
-            )
-            jobs.append(get_db_job)
-        return jobs
  
     @staticmethod
     def _clean_store(store):
@@ -359,16 +364,6 @@ class OnlineImporter:
         for p, reservation in self._box.full_partitions_iter():
             actual_remaining_space[p] -= reservation
         return actual_remaining_space
-
-    def add_db(self, db, store, description=None):
-        self.dbs.append((db, store, {} if description is None else description))
-        return self
-
-    def download_db(self, db, store, full_resync=False):
-        self.add_db(db, store)
-        self.download(full_resync)
-        self._clean_store(store)
-        return store
     
     def correctly_downloaded_dbs(self) -> List[DbEntity]:
         return []
@@ -409,6 +404,7 @@ class InstallationBox:
         self._installed_folders: Set[str] = set()
         self._directories = dict()
         self._files = dict()
+        self._installed_dbs: List[DbEntity] = []
 
     def add_downloaded_file(self, path: str):
         self._downloaded_files.append(path)
@@ -449,6 +445,9 @@ class InstallationBox:
             else:
                 self._full_partitions[partition.path] += failed_reserve
 
+    def add_installed_db(self, db: DbEntity):
+        self._installed_dbs.append(db)
+
     def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
         files, folders = filtered_data['files'], filtered_data['folders']
         #if len(files) == 0 and len(folders) == 0: return
@@ -484,6 +483,7 @@ class InstallationBox:
     def skipped_updated_files(self): return self._skipped_updated_files
     def filtered_zip_data(self): return self._filtered_zip_data
     def full_partitions_iter(self) -> Iterable[Tuple[str, int]]: return self._full_partitions.items()
+    def installed_dbs(self) -> List[DbEntity]: return self._installed_dbs
 
     def queue_directory_removal(self, dirs: List[PathPackage], db_id: str) -> None:
         if len(dirs) == 0: return

@@ -34,7 +34,6 @@ from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_file_downloader_factory import FileDownloaderFactory
 from test.fake_importer_implicit_inputs import FileSystemState, NetworkState
 from test.fake_base_path_relocator import BasePathRelocator
-from test.fake_db_gateway import DbGateway
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_linux_updater import LinuxUpdater
 from test.fake_local_repository import LocalRepository
@@ -107,7 +106,6 @@ class FullRunService(ProductionFullRunService):
 
         return FullRunService(
             config,
-#            DbGateway(config, file_system_factory=file_system_factory),
             file_system_factory=file_system_factory
         )
 
@@ -117,7 +115,6 @@ class FullRunService(ProductionFullRunService):
         file_system_factory = file_system_factory or FileSystemFactory(config=config, state=FileSystemState(config=config, files={db_id: {'unzipped_json': db_descr}}))
         return FullRunService(
             config=config,
-#            db_gateway=DbGateway(config=config, file_system_factory=file_system_factory),
             linux_updater=linux_updater,
             os_utils=os_utils,
             certificates_fix=certificates_fix,
@@ -151,7 +148,4 @@ class FullRunService(ProductionFullRunService):
             'databases': {}, 'verbose': False, 'config_path': Path(''), 'user_defined_options': [],
             'commit': 'test', 'fail_on_file_error': True
         })
-        return FullRunService(
-            config,
-#            DbGateway(config),
-        )
+        return FullRunService(config)

@@ -16,28 +16,25 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from typing import Optional
 import unittest
 
-from downloader.constants import K_SECTION, K_DB_URL
+from downloader.constants import K_SECTION, K_DB_URL, MEDIA_FAT
+from downloader.db_section_package import DbSectionPackage
 from test.fake_importer_implicit_inputs import NetworkState
-from test.fake_file_downloader_factory import FileDownloaderFactory
-from test.objects import db_test_descr, db_test
-from test.fake_db_gateway import DbGateway
-from test.fake_file_system_factory import first_fake_temp_file, FileSystemFactory
+from test.fake_local_store_wrapper import LocalStoreWrapper
+from test.fake_online_importer import OnlineImporter
+from test.objects import db_test_descr, db_test, empty_store
+from test.fake_file_system_factory import FileSystemFactory
 
 http_db_url = 'https://this_is_my_uri.json.zip'
 fs_db_path = 'this_is_my_uri.json.zip'
 
 
-class TestDbGateway(unittest.TestCase):
+class TestOnlineImporterDbFetching(unittest.TestCase):
     def test_fetch_all___db_with_working_http_uri___returns_expected_db(self):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
-
-        file_system_factory = FileSystemFactory()
-        factory = FileDownloaderFactory(file_system_factory=file_system_factory, network_state=NetworkState(
-            remote_files={first_fake_temp_file: db_description}))
-
-        self.assertEqual(db_test_descr().testable, fetch_all(http_db_url, file_system_factory, factory))
+        self.assertEqual(db_test_descr().testable, fetch_all(http_db_url, network_state=NetworkState(remote_files={'db test': db_description})))
 
     def test_fetch_all___db_with_fs_path___returns_expected_db(self):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
@@ -50,16 +47,24 @@ class TestDbGateway(unittest.TestCase):
         self.assertEqual(None, fetch_all(http_db_url))
 
     def test_fetch_all___db_with_failing_http_uri___returns_none(self):
-        factory = FileDownloaderFactory(network_state=NetworkState(storing_problems={first_fake_temp_file: 99}))
-        self.assertEqual(None, fetch_all(http_db_url, factory=factory))
+        self.assertEqual(None, fetch_all(http_db_url, network_state=NetworkState(storing_problems={'db test': 99})))
 
 
-def fetch_all(db_url, file_system_factory=None, factory=None):
-    dbs, errors = DbGateway(file_system_factory=file_system_factory, file_downloader_factory=factory).fetch_all(test_db(db_url))
+def fetch_all(db_url: str, file_system_factory: Optional[FileSystemFactory] = None, network_state: Optional[NetworkState] = None):
+    file_system_factory = file_system_factory or FileSystemFactory()
+    sut = OnlineImporter(file_system_factory=file_system_factory, network_state=network_state, start_on_db_processing=False)
+    local_store = LocalStoreWrapper({'dbs': {db_test: empty_store(MEDIA_FAT)}})
+    db_pkg = DbSectionPackage(
+        db_id=db_test,
+        section={'db_url': db_url},
+        store=local_store.store_by_id(db_test),
+    )
+    sut.set_local_store(local_store)
+    sut.download_dbs_contents([db_pkg], False)
+    dbs = sut.box().installed_dbs()
     if len(dbs) == 0:
         return None
     return dbs[0].testable
-
 
 def test_db(db_uri):
     return {db_test: {K_SECTION: db_test, K_DB_URL: db_uri}}

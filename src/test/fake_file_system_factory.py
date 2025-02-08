@@ -20,10 +20,9 @@ from pathlib import Path
 from typing import Any
 
 from downloader.constants import K_BASE_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE
-from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
+from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, FsError, \
     absolute_parent_folder, is_windows, FolderCreationError, FsSharedState, FileCopyError
-from downloader.other import ClosableValue, UnreachableException
+from downloader.other import ClosableValue
 from test.fake_importer_implicit_inputs import FileSystemState
 from downloader.logger import NoLogger
 
@@ -283,7 +282,7 @@ class FakeFileSystem(ProductionFileSystem):
         elif 'json' in file_description:
             return file_description['json']
         else:
-            raise UnreachableException('Should not reach this!')
+            raise FsError(f'File {path} does not have a json content.')
 
     def save_json_on_zip(self, db, path):
         if self._path(path) not in self.state.files:
