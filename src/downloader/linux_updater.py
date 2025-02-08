@@ -23,7 +23,7 @@ import tempfile
 import os.path
 from typing import Dict, List
 from downloader.config import Config
-from downloader.constants import FILE_Linux_7z_util_uninstalled, FILE_Linux_7z_util_uninstalled_description, FILE_Linux_compressed, FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version, FILE_Linux_7z_util, FILE_Linux_user_files
+from downloader.constants import FILE_7z_util_uninstalled, FILE_7z_util_uninstalled_description, FILE_Linux_uninstalled, FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version, FILE_7z_util, FILE_Linux_user_files
 from downloader.db_entity import DbEntity
 from downloader.file_system import FileSystem
 from downloader.jobs.fetch_file_worker2 import SafeFileFetcher
@@ -86,15 +86,15 @@ class LinuxUpdater:
         self._logger.print()
 
         self._logger.print('Fetching the new Linux image...')
-        error = self._fetcher.fetch_file(linux, FILE_Linux_compressed)
+        error = self._fetcher.fetch_file(linux, FILE_Linux_uninstalled)
         if error is not None:
             self._logger.print('ERROR! Could not fetch the Linux image.')
             self._logger.print(error)
             return
 
-        if not self._file_system.is_file(FILE_Linux_7z_util):
+        if not self._file_system.is_file(FILE_7z_util):
             self._logger.print('Fetching 7za.gz file...')
-            error = self._fetcher.fetch_file(FILE_Linux_7z_util_uninstalled_description(), FILE_Linux_7z_util_uninstalled)
+            error = self._fetcher.fetch_file(FILE_7z_util_uninstalled_description(), FILE_7z_util_uninstalled)
             if error is not None:
                 self._logger.print('ERROR! Could not fetch the 7za.gz file.')
                 self._logger.print(error)
@@ -106,17 +106,17 @@ class LinuxUpdater:
         return self._file_system.read_file_contents(FILE_MiSTer_version) if self._file_system.is_file(FILE_MiSTer_version) else 'unknown'
 
     def _run_subprocesses(self, linux: Dict[str, str]) -> None:
-        if self._file_system.is_file(FILE_Linux_7z_util_uninstalled):
+        if self._file_system.is_file(FILE_7z_util_uninstalled):
             sys.stdout.flush()
-            result = subprocess.run(f'gunzip "{FILE_Linux_7z_util_uninstalled}"', shell=True, stderr=subprocess.STDOUT)
-            self._file_system.unlink(FILE_Linux_7z_util_uninstalled)
+            result = subprocess.run(f'gunzip "{FILE_7z_util_uninstalled}"', shell=True, stderr=subprocess.STDOUT)
+            self._file_system.unlink(FILE_7z_util_uninstalled)
             if result.returncode != 0:
                 self._logger.print('ERROR! Could not install 7z.')
                 self._logger.print('Error code: %d' % result.returncode)
                 self._logger.print()
                 return
 
-        if not self._file_system.is_file(FILE_Linux_7z_util):
+        if not self._file_system.is_file(FILE_7z_util):
             self._logger.print('ERROR! 7z is not present in the system.')
             self._logger.print('Aborting Linux update.')
             self._logger.print()
@@ -145,7 +145,7 @@ class LinuxUpdater:
                 fi
                 rm "{1}" > /dev/null 2>&1
                 exit $RET_CODE
-        '''.format(FILE_Linux_7z_util, FILE_Linux_compressed), shell=True, stderr=subprocess.STDOUT)
+        '''.format(FILE_7z_util, FILE_Linux_uninstalled), shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
             self._logger.print('ERROR! Could not uncompress the linux installer.')
