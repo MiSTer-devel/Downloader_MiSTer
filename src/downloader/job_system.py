@@ -570,6 +570,7 @@ class _JobError(Exception):
     def __init__(self, child: Exception):
         super().__init__(child)
         self.child = child
+        self.__cause__ = child
 
 def _wrap_unknown_base_error(e: BaseException) -> Exception:
     if isinstance(e, Exception): return e

@@ -58,7 +58,13 @@ class PrintLogger(Logger, PrintLogManager):
             if len(exceptions) > 0:
                 args = list(set(args) - set(exceptions))
                 for e in exceptions:
-                    _do_print("".join(traceback.format_exception(type(e), e, e.__traceback__)), sep=sep, end=end, file=sys.stdout, flush=flush)
+                    _do_print(''.join(traceback.TracebackException.from_exception(e).format()), sep=sep, end=end, file=sys.stdout, flush=flush)
+                    padding = ' ' * 4
+                    while e.__cause__ is not None:
+                        e = e.__cause__
+                        _do_print(padding.join(traceback.TracebackException.from_exception(e).format()), sep=sep, end=end, file=sys.stdout, flush=flush)
+                        padding += ' ' * 4
+
             _do_print(*args, sep=sep, end=end, file=sys.stdout, flush=flush)
 
     def bench(self, label: str):

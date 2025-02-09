@@ -80,6 +80,14 @@ class LocalRepository(FilelogSaver):
     def set_logfile_path(self, value):
         self._logfile_path_value = value
 
+    def ensure_base_paths(self) -> None:
+        if not self._file_system.is_folder(self._config['base_path']):
+            self._logger.print(f'WARNING! Base path "{self._config['base_path']}" does not exist. Creating it...')
+            self._file_system.make_dirs(self._config['base_path'])
+        if not self._file_system.is_folder(self._config['base_system_path']):
+            self._logger.print(f'WARNING! Base system path "{self._config['base_system_path']}" does not exist. Creating it...')
+            self._file_system.make_dirs(self._config['base_system_path'])
+
     def load_store(self):
         self._logger.bench('Loading store...')
 
