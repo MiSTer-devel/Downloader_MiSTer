@@ -23,8 +23,8 @@ import os
 from collections import defaultdict
 
 from downloader.db_entity import DbEntity
-from downloader.file_filter import FileFilterFactory, BadFileFilterPartException, Config
-from downloader.file_system import FsError, ReadOnlyFileSystem
+from downloader.file_filter import BadFileFilterPartException, Config
+from downloader.file_system import FileWriteError, FolderCreationError, FsError, ReadOnlyFileSystem
 from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.errors import WrongDatabaseOptions
@@ -34,7 +34,7 @@ from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext, DownloaderWorkerFailPolicy
-from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old, SUFFIX_file_in_progress
+from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 from downloader.other import calculate_url
 from downloader.target_path_calculator import TargetPathsCalculator, StoragePriorityError
@@ -79,10 +79,13 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             if len(job.full_partitions) > 0:
                 job.failed_files_no_space = fetch_pkgs
                 logger.debug(f"Not enough space '{db.db_id}'!")
-                return [], None # @TODO return error instead to retry later?
+                return [], FileWriteError(f"Could not allocate space for {len(fetch_pkgs)} files.")
 
             logger.debug(f"Processing create folder packages '{db.db_id}'...")
-            removed_folders, job.installed_folders = self._process_create_folder_packages(create_folder_pkgs, db, store)  # @TODO maybe move this one after reserve space
+            removed_folders, job.installed_folders, job.failed_folders = self._process_create_folder_packages(create_folder_pkgs, db, store)
+            if len(job.failed_folders) > 0:
+                return [], FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
+
             job.removed_copies.extend(removed_folders)
 
             logger.debug(f"Process fetch packages and launch fetch jobs '{db.db_id}'...")
@@ -104,9 +107,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         logger = self._ctx.logger
 
         logger.bench('Filtering Database...')
-        filtered_summary, _ = FileFilterFactory(self._ctx.logger)\
-            .create(db, summary, config)\
-            .select_filtered_files(summary)
+        filtered_summary, _ = self._ctx.file_filter_factory.create(db, summary, config).select_filtered_files(summary)
 
         logger.bench('Translating paths...')
         summary_folders = self._folders_with_missing_parents(filtered_summary, store, db)
@@ -117,13 +118,11 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         create_folder_pkgs, folders_set = self._translate_items(calculator, summary_folders, PathType.FOLDER, set())
         delete_folder_pkgs, _ = self._translate_items(calculator, store.folders, PathType.FOLDER, folders_set)
 
-        # @TODO REFACTOR: This looks wrong
+        # @TODO Why did I let this here? It breaks 2 tests.
         # remove_files_pkgs = [pkg for pkg in remove_files_pkgs if 'zip_id' not in pkg.description]
-
-        # @TODO REFACTOR: This looks wrong
         # delete_folder_pkgs = [pkg for pkg in delete_folder_pkgs if 'zip_id' not in pkg.description]
 
-        # @TODO commenting these 2 lines make the test still pass, why?
+        # @TODO remove these 4 lines after distribution mister is updated
         for pkg in check_file_pkgs:
             if pkg.rel_path is FILE_MiSTer:
                 pkg.description['backup'] = FILE_MiSTer_old
@@ -242,9 +241,9 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
             return full_partitions
 
-    def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[List[RemovedCopy], List[PathPackage]]:
+    def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[List[RemovedCopy], List[PathPackage], List[str]]:
         if len(create_folder_pkgs) == 0:
-            return [], []
+            return [], [], []
 
         folders_to_create: Set[str] = set()
         folder_copies_to_be_removed: List[Tuple[bool, str, str, PathType]] = []
@@ -270,14 +269,19 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             if len(folders_to_create) > 0:
                 self._folders_created.update(folders_to_create)
 
+        errors = []
         for full_folder_path in sorted(folders_to_create, key=lambda x: len(x), reverse=True):
-            self._ctx.file_system.make_dirs(full_folder_path)
+            try:
+                self._ctx.file_system.make_dirs(full_folder_path)
+            except FolderCreationError as e:
+                self._ctx.logger.print(f'ERROR: Folder "{full_folder_path}" could not be created.')
+                errors.append(full_folder_path)
 
         # @TODO Why two adds?
         folders = [f for f in create_folder_pkgs if f.db_path() in db.folders]
         self._ctx.installation_report.add_processed_folders(folders, db.db_id)
 
-        return folder_copies_to_be_removed, folders
+        return folder_copies_to_be_removed, folders, errors
 
     def _maybe_add_copies_to_remove(self, copies: List[Tuple[bool, str, str, PathType]], store: ReadOnlyStoreAdapter, folder_path: str, drive: Optional[str]):
         if store.folder_drive(folder_path) == drive: return
@@ -294,28 +298,19 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
         jobs: List[Job] = []
         for pkg in fetch_pkgs:
-            if 'tmp' in pkg.description:
-                download_path = os.path.join(pkg.drive, pkg.description['tmp']) if pkg.drive is not None else pkg.description['tmp']
-            else:
-                download_path = pkg.full_path if pkg.exists == PathExists.DOES_NOT_EXIST else pkg.full_path + SUFFIX_file_in_progress
-
-            if 'backup' in pkg.description:
-                backup_path = os.path.join(pkg.drive, pkg.description['backup']) if pkg.drive is not None else pkg.description['backup']
-            else:
-                backup_path = None
-
+            temp_path = pkg.temp_path()
             fetch_job = FetchFileJob(
                 source=_url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url),
                 info=pkg.rel_path,
-                temp_path=download_path,
+                temp_path=temp_path,
                 silent=False
             )
             fetch_job.after_job = ValidateFileJob(
-                temp_path=download_path,
+                temp_path=temp_path,
                 target_file_path=pkg.full_path,
                 description=pkg.description,
                 info=pkg.rel_path,
-                backup_path=backup_path,
+                backup_path=pkg.backup_path(),
                 get_file_job=fetch_job
             )
             fetch_job.add_tag(db_id)

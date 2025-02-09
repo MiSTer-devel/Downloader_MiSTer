@@ -30,6 +30,7 @@ class Environment(TypedDict):
     DOWNLOADER_LAUNCHER_PATH: Optional[str]
     DOWNLOADER_INI_PATH: Optional[str]
     LOGFILE: Optional[str]
+    LOGLEVEL: str
     CURL_SSL: str
     COMMIT: str
     ALLOW_REBOOT: Optional[str]
@@ -93,6 +94,7 @@ class Config(ConfigMisterSection):
     commit: str
     fail_on_file_error: bool
     curl_ssl: str
+    http_logging: bool
     environment: NotRequired[Environment]  # This should never be used. It's there just to be debug-logged.
 
 
@@ -105,6 +107,7 @@ def config_with_base_path(config: Config, base_path: str) -> Config:
 def default_config() -> Config:
     return {
         'curl_ssl': '',
+        'http_logging': False,
         'databases': {},
         'config_path': Path(FILE_downloader_ini),
         'base_path': MEDIA_FAT,

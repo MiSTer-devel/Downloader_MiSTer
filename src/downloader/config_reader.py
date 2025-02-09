@@ -149,6 +149,14 @@ class ConfigReader:
             result['logfile'] = str(launcher_path.with_suffix('.log'))
             result['curl_ssl'] = ''
 
+        if self._env['LOGLEVEL'] != '':
+            if 'info' in self._env['LOGLEVEL']:
+                result['verbose'] = False
+            if 'debug' in self._env['LOGLEVEL']:
+                result['verbose'] = True
+            if 'http' in self._env['LOGLEVEL']:
+                result['http_logging'] = True
+
         result['environment'] = self._env
         return result
 
@@ -245,11 +253,11 @@ class ConfigReader:
     def _valid_base_path(self, path: str, key: str) -> str:
         if self._env['DEBUG'] != 'true':
             if path == '' or path[0] == '.' or path[0] == '\\':
-                raise InvalidConfigParameter("Invalid path '%s', %s paths should start with '/media/*/'" % (path, key))
+                raise InvalidConfigParameter(f"Invalid path '{path}', {key} paths should start with '/media/*/'")
 
             parts = path.lower().split('/')
             if '..' in parts or len(parts) < 3 or parts[0] != '' or parts[1] != 'media':
-                raise InvalidConfigParameter("Invalid path '%s', %s paths should start with '/media/*/'" % (path, key))
+                raise InvalidConfigParameter(f"Invalid path '{path}', {key} paths should start with '/media/*/'")
 
         if len(path) > 1 and path[-1] == '/':
             path = path[0:-1]
@@ -260,7 +268,7 @@ class ConfigReader:
         if len(value) <= max_limit:
             return value
 
-        raise InvalidConfigParameter("Invalid %s with value '%s'. Too long string (max is %s)." % (key, value, max_limit))
+        raise InvalidConfigParameter(f"Invalid {key} with value '{value}'. Too long string (max is {max_limit}).")
 
     def _valid_db_id(self, key: str, value: str) -> str:
         value = self._valid_max_length(key, value, 255)
@@ -269,7 +277,7 @@ class ConfigReader:
         if regex.match(value):
             return value.lower()
 
-        raise InvalidConfigParameter("Invalid %s with value '%s'. Not matching ID regex." % (key, value))
+        raise InvalidConfigParameter(f"Invalid {key} with value '{value}'. Not matching ID regex.")
 
     def _valid_storage_priority(self, parameter: str) -> str:
         lower_parameter = parameter.lower()

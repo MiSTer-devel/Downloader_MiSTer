@@ -119,8 +119,6 @@ class OnlineImporter:
             box.add_present_validated_files(job.present_validated_files)
             box.add_skipped_updated_files(job.skipped_updated_files)
             box.add_removed_copies(job.removed_copies)
-            box.add_full_partitions(job.full_partitions)
-            box.add_failed_files(job.failed_files_no_space)
             box.add_installed_folders(job.installed_folders)
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
@@ -152,6 +150,9 @@ class OnlineImporter:
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
 
         for job, e in report.get_failed_jobs(ProcessIndexJob):
+            box.add_full_partitions(job.full_partitions)
+            box.add_failed_files(job.failed_files_no_space)
+            box.add_failed_folders(job.failed_folders)
             if not isinstance(e, BadFileFilterPartException): continue
             box.add_failed_db_options(WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(e)}' is invalid."))
 
@@ -368,13 +369,13 @@ class OnlineImporter:
                 zip_description.pop('internal_summary')
 
     def folders_that_failed(self) -> List[str]:
-        return []
+        return self._box.failed_folders()
 
     def zips_that_failed(self) -> List[str]:
         return []
 
     def unused_filter_tags(self) -> List[str]:
-        return []
+        return self._worker_ctx.file_filter_factory.unused_filter_parts()
 
     def free_space(self) -> int:
         return 0
@@ -426,6 +427,7 @@ class InstallationBox:
         self._present_not_validated_files: List[str] = []
         self._fetch_started_files: List[str] = []
         self._failed_files: List[str] = []
+        self._failed_folders: List[str] = []
         self._full_partitions: Dict[str, int] = dict()
         self._failed_db_options: List[WrongDatabaseOptions] = []
         self._removed_files: List[str] = []
@@ -472,6 +474,8 @@ class InstallationBox:
         if len(file_pkgs) == 0: return
         for pkg in file_pkgs:
             self._failed_files.append(pkg.rel_path)
+    def add_failed_folders(self, folders: List[str]):
+        self._failed_folders.extend(folders)
     def add_full_partitions(self, full_partitions: List[Tuple[Partition, int]]):
         if len(full_partitions) == 0: return
         for partition, failed_reserve in full_partitions:
@@ -508,6 +512,7 @@ class InstallationBox:
     def present_not_validated_files(self): return self._present_not_validated_files
     def fetch_started_files(self): return self._fetch_started_files
     def failed_files(self): return self._failed_files
+    def failed_folders(self): return self._failed_folders
     def removed_files(self): return self._removed_files
     def removed_copies(self): return self._removed_copies
     def installed_files(self): return list(set(self._present_validated_files) | set(self._validated_files))

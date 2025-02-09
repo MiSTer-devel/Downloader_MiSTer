@@ -46,8 +46,11 @@ class ProcessIndexJob(Job):
     present_validated_files: List[PathPackage] = field(default_factory=list)
     skipped_updated_files: List[PathPackage] = field(default_factory=list)
     removed_copies: List[RemovedCopy] = field(default_factory=list)
-    full_partitions: List[Tuple[Partition, int]] = field(default_factory=list)
-    failed_files_no_space: List[PathPackage] = field(default_factory=list)
     installed_folders: List[PathPackage] = field(default_factory=list)
     directories_to_remove: List[PathPackage] = field(default_factory=list)
     files_to_remove: List[PathPackage] = field(default_factory=list)
+
+    # Failure results
+    full_partitions: List[Tuple[Partition, int]] = field(default_factory=list)
+    failed_files_no_space: List[PathPackage] = field(default_factory=list)
+    failed_folders: List[str] = field(default_factory=list)

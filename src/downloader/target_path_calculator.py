@@ -142,14 +142,15 @@ class TargetPathsCalculator:
             #   They should be the actual behavior instead of the legacy behavior we are using right now. We'll need to fix it in a later release
             #   where the following code would be uncommented and these tests would replace the current passing test.
             #
-            # result, others = self._first_drive_with_existing_directory_prefer_external(first_folder)
-            # if result is not None:
-            #    return result, PextKind.PEXT_EXTERNAL, others
+            result, others = self._first_drive_with_existing_directory_prefer_sd(os.path.join(first_folder, second_folder))
+            if result is not None:
+               return result, PextKind.PEXT_EXTERNAL, others
 
-            if len(self._drives):
-                return self._drives[0], PextKind.PEXT_EXTERNAL, ()
-            else:
-                return base_path, PextKind.PEXT_STANDARD, ()
+            result, others = self._first_external_alternative()
+            if result is not None:
+                return result, PextKind.PEXT_EXTERNAL, others
+
+            return base_path, PextKind.PEXT_STANDARD, ()
         else:
             raise StoragePriorityError('%s "%s" not valid!' % (K_STORAGE_PRIORITY, priority))
 
@@ -168,25 +169,16 @@ class TargetPathsCalculator:
 
         return result, tuple(others) if others is not None else ()
 
-    def _first_drive_with_existing_directory_prefer_external(self, directory: str) -> Tuple[Optional[str], Tuple[str, ...]]:
+    def _first_external_alternative(self) -> Tuple[Optional[str], Tuple[str, ...]]:
         result = None
         others = None
-        for drive in self._drives:
-            absolute_directory = os.path.join(drive, directory)
-            if self._file_system.is_folder(absolute_directory):
-                if result is None:
-                    result = drive
-                elif others is None:
-                    others = [drive]
-                else:
-                    others.append(drive)
 
-        if result is None and len(self._drives) > 0:
+        if len(self._drives) > 0:
             result = self._drives[0]
             if len(self._drives) > 1:
-                others = self._drives[1:]
+                others = tuple(self._drives[1:])
 
-        return result, tuple(others) if others is not None else ()
+        return result, () if others is None else others
 
 
 class StoragePriorityError(Exception): pass
