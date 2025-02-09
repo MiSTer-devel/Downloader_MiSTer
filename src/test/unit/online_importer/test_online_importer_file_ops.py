@@ -119,8 +119,8 @@ class TestOnlineImporterFileOps(unittest.TestCase):
         self.file_system_state.add_old_mister_binary(self.installed_system_path)
         self.download_mister_binary()
         self.assertDownloaded([FILE_MiSTer], [FILE_MiSTer])
-        self.assertEqual(hash_MiSTer, self.file_system.hash(FILE_MiSTer))
-        self.assertEqual(hash_MiSTer_old, self.file_system.hash(FILE_MiSTer_old))
+        self.assertEqual(hash_MiSTer, self.file_system.hash(on_installed_system(FILE_MiSTer)))
+        self.assertEqual(hash_MiSTer_old, self.file_system.hash(on_installed_system(FILE_MiSTer_old)))
         self.assertEqual(fs_records([
             {'scope': 'write_incoming_stream', 'data': on_installed_system(FILE_MiSTer_new)},
             {'scope': 'move', 'data': (on_installed_system(FILE_MiSTer), on_installed_system(FILE_MiSTer_old))},
@@ -130,8 +130,8 @@ class TestOnlineImporterFileOps(unittest.TestCase):
     def test_download_mister_file___from_scratch___stores_it_as_mister_and_mister_old_doesnt_exist(self):
         self.download_mister_binary()
         self.assertDownloaded([FILE_MiSTer], [FILE_MiSTer])
-        self.assertEqual(hash_MiSTer, self.file_system.hash(FILE_MiSTer))
-        self.assertFalse(self.file_system.is_file(FILE_MiSTer_old))
+        self.assertEqual(hash_MiSTer, self.file_system.hash(on_installed_system(FILE_MiSTer)))
+        self.assertFalse(self.file_system.is_file(on_installed_system(FILE_MiSTer_old)))
         self.assertEqual(fs_records([
             {'scope': 'write_incoming_stream', 'data': on_installed_system(FILE_MiSTer_new)},
             {'scope': 'move', 'data': (on_installed_system(FILE_MiSTer_new), on_installed_system(FILE_MiSTer))},

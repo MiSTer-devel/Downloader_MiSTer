@@ -39,7 +39,7 @@ class OpenDbWorker(DownloaderWorkerBase):
                 raise e
 
         ini_description, store, full_resync = job.ini_description, job.store, job.full_resync
-        return [ProcessDbJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync)], None
+        return [ProcessDbJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync).add_tag(f'db:{job.section}')], None
 
     def _open_db(self, section: str, temp_path: str) -> DbEntity:
         db_raw = self._ctx.file_system.load_dict_from_file(temp_path)

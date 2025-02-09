@@ -87,6 +87,8 @@ class InstallationReport(Protocol):
     def processed_folder(self, path: str) -> Dict[str, PathPackage]: """File that a database is currently processing."""
     def all_processed_files(self) -> List[str]: """Returns all processed files."""
     def all_processed_folders(self) -> List[str]: """Returns all processed folders."""
+    def get_jobs_completed_by_tag(self, tag: str) -> List[Job]: """Returns all jobs completed by a tag."""
+    def get_jobs_failed_by_tag(self, tag: str) -> List[Job]: """Returns all jobs failed by a tag."""
 
 
 class JobTagTracking:
@@ -223,15 +225,13 @@ class InstallationReportImpl(InstallationReport):
 
         return False
 
-    def get_jobs_completed_by_tags(self, tags: List[str]) -> List[Tuple[str, List[Job]]]:
-        if len(tags) == 0: return []
+    def get_jobs_completed_by_tag(self, tag: str) -> List[Job]:
         with self._jobs_tag_completed as tag_completed:
-            return [(tag, tag_completed[tag]) for tag in tags if tag in tag_completed]
+            return tag_completed[tag]
 
-    def get_jobs_failed_by_tags(self, tags: List[str]) -> List[Tuple[str, List[Job]]]:
-        if len(tags) == 0: return []
+    def get_jobs_failed_by_tag(self, tag: str) -> List[Job]:
         with self._jobs_tag_failed as tag_failed:
-            return [(tag, tag_failed[tag]) for tag in tags if tag in tag_failed]
+            return tag_failed[tag]
 
     def add_processed_files(self, files: List[PathPackage], db_id: str) -> Tuple[List[PathPackage], List[ProcessedFile]]:
         if len(files) == 0: return [], []

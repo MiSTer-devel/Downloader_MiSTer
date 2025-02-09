@@ -74,6 +74,9 @@ class OnlineImporter:
                 store=local_store.store_by_id(pkg.db_id),
                 full_resync=full_resync,
             )
+            db_tag = f'db:{pkg.db_id}'
+            get_db_job.add_tag(db_tag)
+            get_db_job.after_job.add_tag(db_tag)
             jobs.append(get_db_job)
         return jobs
 
@@ -92,35 +95,24 @@ class OnlineImporter:
 
         box = self._box
         report = self._worker_ctx.file_download_session_logger.report()
-        for job, e in report.get_failed_jobs(ValidateFileJob):
-            if job.info != FILE_MiSTer:
-                continue
-
-            self._logger.debug(e)
-            fs = self._worker_ctx.file_system
-            if fs.is_file(job.target_file_path):
-                continue
-
-            if fs.is_file(job.backup_job):
-                fs.move(job.backup_job, job.target_file_path)
-            elif fs.is_file(job.temp_path) and fs.hash(job.temp_path) == job.description['hash']:
-                fs.move(job.temp_path, job.target_file_path)
-
-            if fs.is_file(job.target_file_path):
-                continue
-
-            # This error message should never happen.
-            # If it happens it would be an unexpected case where file_system is not moving files correctly
-            self._logger.print('CRITICAL ERROR!!! Could not restore the MiSTer binary!')
-            self._logger.print('Please manually rename the file MiSTer.new as MiSTer')
-            self._logger.print('Your system won\'nt be able to boot until you do so!')
-            sys.exit(1)
-
-        for job in report.get_completed_jobs(ProcessDbJob):
-            box.add_installed_db(job.db)
 
         for job in report.get_started_jobs(FetchFileJob):
             box.add_file_fetch_started(job.info)
+
+        no_changes_msg = ''
+        for pkg in db_pkgs:
+            changes = len(report.get_jobs_completed_by_tag(pkg.db_id))
+            if changes == 0:
+                no_changes_msg += f"Nothing new to download from {pkg.db_id}.\n"
+
+            failures = len(report.get_jobs_failed_by_tag(f'db:{pkg.db_id}'))
+            if failures > 0:
+                box.add_failed_db(pkg.db_id)
+
+        if no_changes_msg != '': self._logger.print('\n' + no_changes_msg + '\n')
+
+        for job in report.get_completed_jobs(ProcessDbJob):
+            box.add_installed_db(job.db)
 
         for job in report.get_completed_jobs(ProcessIndexJob):
             box.add_present_not_validated_files(job.present_not_validated_files)
@@ -159,15 +151,37 @@ class OnlineImporter:
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
 
-        for job, _e in report.get_failed_jobs(ValidateFileJob):
-            box.add_failed_file(job.get_file_job.info)
+        for job, e in report.get_failed_jobs(ProcessIndexJob):
+            if not isinstance(e, BadFileFilterPartException): continue
+            box.add_failed_db_options(WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(e)}' is invalid."))
 
         for job, _e in report.get_failed_jobs(FetchFileJob) + report.get_failed_jobs(CopyFileJob):
             box.add_failed_file(job.info)
 
-        for job, e in report.get_failed_jobs(ProcessIndexJob):
-            if not isinstance(e, BadFileFilterPartException): continue
-            box.add_failed_db_options(WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(e)}' is invalid."))
+        for job, _e in report.get_failed_jobs(ValidateFileJob):
+            box.add_failed_file(job.get_file_job.info)
+            if job.info != FILE_MiSTer:
+                continue
+
+            self._logger.debug(e)
+            fs = self._worker_ctx.file_system
+            if fs.is_file(job.target_file_path):
+                continue
+
+            if fs.is_file(job.backup_job):
+                fs.move(job.backup_job, job.target_file_path)
+            elif fs.is_file(job.temp_path) and fs.hash(job.temp_path) == job.description['hash']:
+                fs.move(job.temp_path, job.target_file_path)
+
+            if fs.is_file(job.target_file_path):
+                continue
+
+            # This error message should never happen.
+            # If it happens it would be an unexpected case where file_system is not moving files correctly
+            self._logger.print('CRITICAL ERROR!!! Could not restore the MiSTer binary!')
+            self._logger.print('Please manually rename the file MiSTer.new as MiSTer')
+            self._logger.print('Your system won\'nt be able to boot until you do so!')
+            sys.exit(1)
 
         stores = {}
         for pkg in db_pkgs:
@@ -362,9 +376,6 @@ class OnlineImporter:
     def unused_filter_tags(self) -> List[str]:
         return []
 
-    def full_partitions(self) -> List[str]:
-        return []
-
     def free_space(self) -> int:
         return 0
     
@@ -384,7 +395,7 @@ class OnlineImporter:
         return actual_remaining_space
     
     def correctly_downloaded_dbs(self) -> List[DbEntity]:
-        return []
+        return self._box.installed_dbs()
 
     def correctly_installed_files(self):
         return self._box.installed_files()
@@ -396,7 +407,7 @@ class OnlineImporter:
         return self._box.fetch_started_files()
     
     def dbs_that_failed(self):
-        return []
+        return self._box.failed_dbs()
     
     @property
     def needs_save(self) -> bool:
@@ -426,6 +437,7 @@ class InstallationBox:
         self._directories = dict()
         self._files = dict()
         self._installed_dbs: List[DbEntity] = []
+        self._failed_dbs: List[str] = []
 
     def add_downloaded_file(self, path: str):
         self._downloaded_files.append(path)
@@ -454,6 +466,8 @@ class InstallationBox:
         self._fetch_started_files.append(path)
     def add_failed_file(self, path: str):
         self._failed_files.append(path)
+    def add_failed_db(self, db_id: str):
+        self._failed_dbs.append(db_id)
     def add_failed_files(self, file_pkgs: List[PathPackage]):
         if len(file_pkgs) == 0: return
         for pkg in file_pkgs:
@@ -505,6 +519,7 @@ class InstallationBox:
     def filtered_zip_data(self): return self._filtered_zip_data
     def full_partitions_iter(self) -> Iterable[Tuple[str, int]]: return self._full_partitions.items()
     def installed_dbs(self) -> List[DbEntity]: return self._installed_dbs
+    def failed_dbs(self) -> List[str]: return self._failed_dbs
 
     def queue_directory_removal(self, dirs: List[PathPackage], db_id: str) -> None:
         if len(dirs) == 0: return

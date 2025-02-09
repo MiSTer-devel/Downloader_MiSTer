@@ -16,6 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -325,24 +326,11 @@ class FakeFileSystem(ProductionFileSystem):
 
         return False
 
-    def _path(self, path):
-        if is_windows:
-            path = path.replace('\\', '/')
-            if len(path) > 2 and path[0].lower() == 'c' and path[1] == ':' and path[2] == '/':
-                path = path[2:]
+    def _path(self, path: str) -> str:
+        if path[0] == '/' or os.path.isabs(path):
+            return path.lower()
 
-        path = path.lower()
-
-        if path[0] == '/':
-            return path
-
-        if path in self.state.path_dictionary:
-            return '%s/%s' % (self.state.path_dictionary[path], path)
-
-        return ('%s/%s' % (self._base_path(path), path))
-
-    def _base_path(self, path):
-        return self._config[K_BASE_PATH]
+        return os.path.join(self._config['base_path'], path).lower()
 
 
 class _Record:
@@ -353,11 +341,3 @@ class _Record:
     def not_ignored(self):
         if not isinstance(self.data, str): return True
         return not self.data.endswith('.test_downloader')
-
-
-class _FakeTempFile:
-    def __init__(self, name):
-        self.name = name
-
-    def close(self):
-        pass

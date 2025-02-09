@@ -28,7 +28,7 @@ from test.objects import db_test_descr, db_test, empty_store
 from test.fake_file_system_factory import FileSystemFactory
 
 http_db_url = 'https://this_is_my_uri.json.zip'
-fs_db_path = 'this_is_my_uri.json.zip'
+fs_db_path = '/this_is_my_uri.json.zip'
 
 
 class TestOnlineImporterDbFetching(unittest.TestCase):

@@ -502,25 +502,10 @@ class _FileSystem(FileSystem):
             return False
 
     def _path(self, path: str) -> str:
-        base_path = self._base_path(path)
-        if base_path is None:
+        if path[0] == '/' or os.path.isabs(path):
             return path
-        else:
-            return os.path.join(base_path, path)
 
-    def _base_path(self, path: str) -> Optional[str]:
-        if path[0] == '/':
-            return None
-
-        if is_windows and len(path) > 2 and path[1:2] == ':\\':
-            return None
-
-        path_lower = path.lower()
-
-        if path_lower in self._path_dictionary:
-            return self._path_dictionary[path_lower]
-
-        return self._config['base_path']
+        return os.path.join(self._config['base_path'], path)
 
 
 class InvalidFileResolution(Exception):

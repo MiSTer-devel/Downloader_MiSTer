@@ -23,6 +23,7 @@ from downloader.full_run_service import FullRunService as ProductionFullRunServi
 from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
+from downloader.jobs.worker_context import DownloaderWorkerFailPolicy
 from test.fake_os_utils import SpyOsUtils
 from test.fake_waiter import NoWaiter
 from test.fake_external_drives_repository import ExternalDrivesRepository
@@ -50,6 +51,8 @@ class FullRunService(ProductionFullRunService):
             job_system=None,
             file_download_reporter=None,
             installation_report=None,
+            start_on_db_processing: bool = False,
+            fail_policy: DownloaderWorkerFailPolicy = DownloaderWorkerFailPolicy.FAULT_TOLERANT
     ):
 
         config = config or default_config()
@@ -66,7 +69,7 @@ class FullRunService(ProductionFullRunService):
                          NoLogger(),
                          NoLogger(),
                          LocalRepository(config=config, file_system=system_file_system),
-                         OnlineImporter(file_system_factory=file_system_factory),
+                         OnlineImporter(file_system_factory=file_system_factory, start_on_db_processing=start_on_db_processing, fail_policy=fail_policy),
                          linux_updater,
                          RebootCalculator(file_system=system_file_system),
                          BasePathRelocator(),
@@ -98,7 +101,7 @@ class FullRunService(ProductionFullRunService):
 
         return FullRunService(
             config,
-            file_system_factory=file_system_factory
+            file_system_factory=file_system_factory,
         )
 
     @staticmethod
@@ -110,7 +113,7 @@ class FullRunService(ProductionFullRunService):
             linux_updater=linux_updater,
             os_utils=os_utils,
             certificates_fix=certificates_fix,
-            file_system_factory=file_system_factory
+            file_system_factory=file_system_factory,
         )
 
     @staticmethod
