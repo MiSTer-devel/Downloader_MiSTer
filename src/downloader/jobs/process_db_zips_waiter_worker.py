@@ -18,12 +18,12 @@
 
 from typing import Optional
 from downloader.job_system import Job, WorkerResult
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.index import Index
 from downloader.jobs.open_zip_index_job import OpenZipIndexJob
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.process_zip_job import ProcessZipJob
-from downloader.jobs.validate_file_job2 import ValidateFileJob2
+from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 

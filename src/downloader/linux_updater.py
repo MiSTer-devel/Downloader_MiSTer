@@ -26,7 +26,7 @@ from downloader.config import Config
 from downloader.constants import FILE_7z_util_uninstalled, FILE_7z_util_uninstalled_description, FILE_Linux_uninstalled, FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version, FILE_7z_util, FILE_Linux_user_files
 from downloader.db_entity import DbEntity
 from downloader.file_system import FileSystem
-from downloader.jobs.fetch_file_worker2 import SafeFileFetcher
+from downloader.jobs.fetch_file_worker import SafeFileFetcher
 from downloader.logger import Logger
 
 

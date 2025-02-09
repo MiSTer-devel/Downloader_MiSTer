@@ -28,11 +28,11 @@ from downloader.file_system import FsError, ReadOnlyFileSystem
 from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.errors import WrongDatabaseOptions
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.path_package import PathExists, PathPackage, PathType, RemovedCopy
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
-from downloader.jobs.validate_file_job2 import ValidateFileJob2
+from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext, DownloaderWorkerFailPolicy
 from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old, SUFFIX_file_in_progress
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter
@@ -304,13 +304,13 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             else:
                 backup_path = None
 
-            fetch_job = FetchFileJob2(
+            fetch_job = FetchFileJob(
                 source=_url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url),
                 info=pkg.rel_path,
                 temp_path=download_path,
                 silent=False
             )
-            fetch_job.after_job = ValidateFileJob2(
+            fetch_job.after_job = ValidateFileJob(
                 temp_path=download_path,
                 target_file_path=pkg.full_path,
                 description=pkg.description,
