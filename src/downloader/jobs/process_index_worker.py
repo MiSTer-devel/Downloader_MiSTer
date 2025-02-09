@@ -86,7 +86,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             job.removed_copies.extend(removed_folders)
 
             logger.debug(f"Process fetch packages and launch fetch jobs '{db.db_id}'...")
-            next_jobs = self._process_fetch_packages_and_launch_jobs(fetch_pkgs, db.base_files_url)
+            next_jobs = self._process_fetch_packages_and_launch_jobs(db.db_id, fetch_pkgs, db.base_files_url)
             return next_jobs, None
         except (BadFileFilterPartException, StoragePriorityError, FsError, OSError) as e:
             if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
@@ -288,7 +288,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         ])
 
     @staticmethod
-    def _process_fetch_packages_and_launch_jobs(fetch_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
+    def _process_fetch_packages_and_launch_jobs(db_id: str, fetch_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
         if len(fetch_pkgs) == 0:
             return []
 
@@ -318,6 +318,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
                 backup_path=backup_path,
                 get_file_job=fetch_job
             )
+            fetch_job.add_tag(db_id)
             jobs.append(fetch_job)
 
         return jobs

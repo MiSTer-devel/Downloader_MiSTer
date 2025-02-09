@@ -108,7 +108,7 @@ def make_open_zip_contents_job(job: ProcessZipJob, zip_index: Index, file_packs:
         filtered_data=filtered_data,
         make_process_index_backup=make_process_index_backup
     )
-    open_zip_contents_job.add_tag(make_zip_tag(job.db, job.zip_id))
+    open_zip_contents_job.add_tag(job.db.db_id)
     validate_job.after_job = open_zip_contents_job
     return get_file_job, info
 
@@ -133,4 +133,4 @@ def make_process_zip_job(zip_id: str, zip_description: Dict[str, Any], zip_index
     job.add_tag(make_zip_tag(db, zip_id))
     return job
 
-def make_zip_tag(db: DbEntity, zip_id: str) -> str:  return f'{db.db_id}:{zip_id}'
+def make_zip_tag(db: DbEntity, zip_id: str) -> str:  return f'{db.db_id}:zip:{zip_id}'

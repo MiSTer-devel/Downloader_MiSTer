@@ -78,6 +78,7 @@ class ProcessDbWorker(DownloaderWorkerBase):
                 store=job.store,
                 full_resync=job.full_resync,
             )
+            index_job.add_tag(f'db:{job.db.db_id}')
             return [index_job], None
 
 

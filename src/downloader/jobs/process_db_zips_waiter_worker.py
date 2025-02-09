@@ -44,8 +44,8 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
         index = Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url)
 
         store = job.store
-        for _tag, zip_jobs in self._ctx.installation_report.get_jobs_completed_by_tags(job.zip_job_tags):
-            for zip_job in zip_jobs:
+        for tag in job.zip_job_tags:
+            for zip_job in self._ctx.installation_report.get_jobs_completed_by_tag(tag):
                 if isinstance(zip_job, ProcessZipJob):
                     if zip_job.not_enough_space:
                         return [], None
@@ -60,4 +60,5 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
             store=store,
             full_resync=job.full_resync,
         )
+        resulting_job.add_tag(f'db:{job.db.db_id}')
         return [resulting_job], None
