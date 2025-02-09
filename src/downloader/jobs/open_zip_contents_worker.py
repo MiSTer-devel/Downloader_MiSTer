@@ -88,7 +88,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         if len(contained_files) > 0:
             self._ctx.installation_report.add_processed_files(contained_files, job.db.db_id)  # @TODO: this needs to be moved to process_zip_worker and as much as possible of the previous lines
-            self._logger.print(zip_description['description'])
+            self._ctx.logger.print(zip_description['description'])
             self._ctx.file_system.unzip_contents(download_path, target_folder_path, [pkg.full_path for pkg in contained_files])
 
         self._ctx.file_system.unlink(download_path)
