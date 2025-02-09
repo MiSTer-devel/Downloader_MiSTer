@@ -42,7 +42,7 @@ dot.edge('N', 'M', label=' retry', style='dashed', constraint='false')
 
 dot.edge('N', 'END', weight='20', constraint='true')
 
-dot.render('jobs_diagram_no_zip', format='png', cleanup=True)
+dot.render('jobs_diagram', format='png', cleanup=True)
 
 # ZIP NODES in a subgraph cluster
 with dot.subgraph(name='cluster_zip') as c:
@@ -96,4 +96,4 @@ dot.edge('J', 'E', label='b', style='dashed', constraint='false')
 #dot.edge('K', 'L', label='b', style='dashed', constraint='false', dir='none')
 #dot.edge('L', 'E', label='b', style='dashed', constraint='false')
 
-dot.render('jobs_diagram', format='png', cleanup=True)
+dot.render('jobs_diagram_with_zip_feature', format='png', cleanup=True)
