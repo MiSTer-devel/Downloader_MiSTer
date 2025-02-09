@@ -345,8 +345,8 @@ class OnlineImporter:
 
         self._needs_save = local_store.needs_save()
 
-        for db, store, _ in self.dbs:
-            self._clean_store(store)
+        for store in stores.values():
+            self._clean_store(store.unwrap_store())
 
         for e in box.wrong_db_options():
             raise e
