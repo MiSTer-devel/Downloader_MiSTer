@@ -48,6 +48,15 @@ class TargetPathsCalculator:
         self._priority_top_folders: Dict[str, StoragePriorityRegistryEntry] = dict()
 
     def deduce_target_path(self, path: str, description: Dict[str, Any], path_type: PathType) -> Tuple[PathPackage, Optional[StoragePriorityError]]:
+        if path[0] == '/':
+            return PathPackage(
+                full_path=path,
+                rel_path=path,
+                drive=None,
+                description=description,
+                ty=path_type,
+                kind=PathPackageKind.STANDARD
+            ), None
         is_system_file = 'path' in description and description['path'] == 'system'
         can_be_external = path[0] == '|'
         if can_be_external:
