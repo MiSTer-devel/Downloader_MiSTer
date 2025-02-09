@@ -22,6 +22,8 @@ from enum import auto, unique, Enum
 from typing import Dict, Any, Optional, Tuple
 import os
 
+from downloader.constants import SUFFIX_file_in_progress
+
 
 @unique
 class PathType(Enum):
@@ -105,6 +107,18 @@ class PathPackage:
     def pext_drive(self) -> Optional[str]:
         if self.kind == PathPackageKind.PEXT and self.pext_props is not None:
             return self.pext_props.drive
+        else:
+            return None
+
+    def temp_path(self) -> str:
+        if 'tmp' in self.description:
+            return os.path.join(self.drive, self.description['tmp']) if self.drive is not None else self.description['tmp']
+        else:
+            return self.full_path if self.exists == PathExists.DOES_NOT_EXIST else self.full_path + SUFFIX_file_in_progress
+
+    def backup_path(self) -> Optional[str]:
+        if 'backup' in self.description:
+            return os.path.join(self.drive, self.description['backup']) if self.drive is not None else self.description['backup']
         else:
             return None
 

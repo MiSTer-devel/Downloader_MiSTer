@@ -25,6 +25,7 @@ from typing import Optional
 
 from downloader.config import Environment
 from downloader.config_reader import ConfigReader
+from downloader.constants import KENV_LOGLEVEL
 from downloader.logger import FileLoggerDecorator, PrintLogger
 from downloader.full_run_service_factory import FullRunServiceFactory
 
@@ -61,6 +62,7 @@ def read_env(default_commit: Optional[str]) -> Environment:
         'DOWNLOADER_LAUNCHER_PATH': os.getenv(KENV_DOWNLOADER_LAUNCHER_PATH, None),
         'DOWNLOADER_INI_PATH': os.getenv(KENV_DOWNLOADER_INI_PATH, None),
         'LOGFILE': os.getenv(KENV_LOGFILE, None),
+        'LOGLEVEL': os.getenv(KENV_LOGLEVEL, '').lower(),  # info | debug, http
         'CURL_SSL': os.getenv(KENV_CURL_SSL, DEFAULT_CURL_SSL_OPTIONS),
         'COMMIT': os.getenv(KENV_COMMIT, default_commit or 'unknown'),
         'ALLOW_REBOOT': os.getenv(KENV_ALLOW_REBOOT, None),

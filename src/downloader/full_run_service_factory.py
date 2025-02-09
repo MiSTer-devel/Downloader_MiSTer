@@ -72,7 +72,7 @@ class FullRunServiceFactory:
         http_gateway = HttpGateway(
             ssl_ctx=context_from_curl_ssl(config['curl_ssl']),
             timeout=http_connection_timeout,
-#            logger=DebugOnlyLoggerDecorator(self._logger) if config['debug'] else None
+            logger=DebugOnlyLoggerDecorator(self._logger) if config['http_logging'] else None
         )
         atexit.register(http_gateway.cleanup)
         safe_file_fetcher = SafeFileFetcher(config, system_file_system, self._logger, http_gateway, waiter)
@@ -102,6 +102,7 @@ class FullRunServiceFactory:
             file_download_session_logger=file_download_reporter,
             free_space_reservation=free_space_reservation,
             external_drives_repository=external_drives_repository,
+            file_filter_factory=file_filter_factory,
             target_paths_calculator_factory=TargetPathsCalculatorFactory(system_file_system, external_drives_repository),
             config=config
         )

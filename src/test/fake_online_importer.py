@@ -21,6 +21,7 @@ from downloader.config import Config, ConfigDatabaseSection
 from downloader.constants import MEDIA_USB0
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
+from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import FreeSpaceReservation, UnlimitedFreeSpaceReservation
 from downloader.interruptions import Interruptions
 from downloader.job_system import Job, JobFailPolicy, JobSystem
@@ -52,6 +53,7 @@ class OnlineImporter(ProductionOnlineImporter):
         free_space_reservation: Optional[FreeSpaceReservation] = None,
         waiter: Optional[Waiter] = None,
         logger: Optional[Logger] = None,
+        file_filter_factory: Optional[FileFilterFactory] = None,
         path_dictionary: Optional[Dict[str, Any]] = None,
         network_state: Optional[NetworkState] = None,
         file_system_state: Optional[FileSystemState] = None,
@@ -86,6 +88,7 @@ class OnlineImporter(ProductionOnlineImporter):
             installation_report=installation_report,
             free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation(),
             external_drives_repository=ExternalDrivesRepository(file_system=self.file_system),
+            file_filter_factory=file_filter_factory or FileFilterFactory(NoLogger()),
             target_paths_calculator_factory=TargetPathsCalculatorFactory(self.file_system, external_drives_repository),
             config=self._config,
             fail_policy=fail_policy or DownloaderWorkerFailPolicy.FAIL_FAST

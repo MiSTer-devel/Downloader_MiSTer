@@ -213,7 +213,8 @@ class TestSandboxedInstall(SandboxTestBase):
         self.assertFalse(os.path.isfile(FILE_mister_downloader_needs_reboot))
 
     def test_print_drives(self):
-        exit_code = self.run_execute_full_run(self.sandbox_ini, ExternalDrivesRepositoryFactory(), PrintLogger(), ['', '--print-drives'])
+        logger =  PrintLogger()
+        exit_code = self.run_execute_full_run(self.sandbox_ini, ExternalDrivesRepositoryFactory(), logger, logger, ['', '--print-drives'])
         self.assertEqual(0, exit_code)
 
     def test_sandbox_db___installs_file_after_applying_expanded_filter(self):

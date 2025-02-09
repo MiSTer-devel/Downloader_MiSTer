@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Dict, Any, Final
 
 from downloader.config import default_config, Environment
-from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, FILE_MiSTer_new, K_BASE_PATH, \
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, KENV_LOGLEVEL, FILE_MiSTer_new, K_BASE_PATH, \
     K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, \
     K_DOWNLOADER_RETRIES, K_FILTER, K_DATABASES, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, \
     KENV_ALLOW_REBOOT, KENV_DEBUG, \
@@ -783,6 +783,7 @@ def default_env() -> Environment:
         KENV_FAIL_ON_FILE_ERROR: 'false',
         KENV_COMMIT: 'unknown',
         KENV_LOGFILE: None,
+        KENV_LOGLEVEL: '',
         KENV_PC_LAUNCHER: None,
     }
 

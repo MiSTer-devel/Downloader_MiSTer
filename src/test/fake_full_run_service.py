@@ -21,7 +21,7 @@ from pathlib import Path
 from downloader.config import default_config
 from downloader.full_run_service import FullRunService as ProductionFullRunService
 from downloader.interruptions import Interruptions
-from downloader.job_system import JobSystem
+from downloader.job_system import JobFailPolicy, JobSystem
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import DownloaderWorkerFailPolicy
 from test.fake_os_utils import SpyOsUtils
@@ -63,7 +63,9 @@ class FullRunService(ProductionFullRunService):
         file_download_reporter = file_download_reporter if file_download_reporter is not None else FileDownloadProgressReporter(
             NoLogger(), NoWaiter(), Interruptions(file_system_factory), installation_report
         )
-        job_system = job_system if job_system is not None else JobSystem(file_download_reporter, logger=NoLogger(), max_threads=1)
+        job_system = job_system if job_system is not None else JobSystem(
+            file_download_reporter, logger=NoLogger(), max_threads=1, fail_policy=JobFailPolicy.FAIL_FAST if fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST else JobFailPolicy.FAULT_TOLERANT
+        )
         super().__init__(config,
                          NoLogger(),
                          NoLogger(),

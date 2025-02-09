@@ -16,9 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
-from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import Partition
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_open_zip_contents_job
@@ -46,7 +45,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
             job.skip_unzip = True
             next_jobs: List[Job] = [_make_process_index_job(job)]
         else:
-            zip_index, filtered_zip_data = FileFilterFactory(self._ctx.logger).create(job.db, job.zip_index, job.config).select_filtered_files(job.zip_index)
+            zip_index, filtered_zip_data = self._ctx.file_filter_factory.create(job.db, job.zip_index, job.config).select_filtered_files(job.zip_index)
 
             file_packs: List[PathPackage] = []
             target_paths_calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(job.config)
@@ -65,8 +64,8 @@ class ProcessZipWorker(DownloaderWorkerBase):
             if len(job.full_partitions) > 0:
                 self._ctx.logger.debug(f"Not enough space '{job.db.db_id} zip:{job.zip_id}'!")
                 job.failed_files_no_space = file_packs
-                job.not_enough_space = True # @TODO return error instead to retry later?
-                next_jobs = []
+                job.not_enough_space = True
+                next_jobs = []  # @TODO return error instead to handle "zips_that_failed", and find other instances of zips failing
             else:
                 folder_packs: List[PathPackage] = []
                 for folder_path, folder_description in zip_index.folders.items():
@@ -87,7 +86,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
                     job=job,
                     zip_index=zip_index,
                     file_packs=file_packs,
-                    folder_packs=folder_packs,
+                    folder_packs=folder_packs,  # @TODO: Maybe process folders here instead, like we did in ProcessIndex?
                     filtered_data=filtered_zip_data[job.zip_id] if job.zip_id in filtered_zip_data else {'files': {}, 'folders': {}},
                     make_process_index_backup=lambda: _make_process_index_job(job)
                 )

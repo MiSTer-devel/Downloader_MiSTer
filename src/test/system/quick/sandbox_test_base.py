@@ -45,8 +45,9 @@ class SandboxTestBase(unittest.TestCase):
     def assertExecutesCorrectly(self, ini_path, expected=None, external_drives_repository_factory=None):
         external_drives_repository_factory = external_drives_repository_factory or ExternalDrivesRepositoryFactory()
         self.maxDiff = None
-        logger_spy = SpyLoggerDecorator(PrintLogger())
-        exit_code = self.run_execute_full_run(ini_path, external_drives_repository_factory, logger_spy)
+        logger_print = PrintLogger()
+        logger_spy = SpyLoggerDecorator(logger_print)
+        exit_code = self.run_execute_full_run(ini_path, external_drives_repository_factory, logger_spy, logger_print)
         self.assertEqual(exit_code, 0)
 
         if expected is None:
@@ -114,19 +115,20 @@ class SandboxTestBase(unittest.TestCase):
         #return contextlib.suppress()
         return self.subTest(message)
 
-    def run_execute_full_run(self, ini_path, external_drives_repository_factory, logger, argv=None):
+    def run_execute_full_run(self, ini_path, external_drives_repository_factory, logger, print_mgr, argv=None):
         env = default_env()
         env['DOWNLOADER_LAUNCHER_PATH'] = str(Path(ini_path).with_suffix('.sh'))
         env['UPDATE_LINUX'] = 'false'
         env['ALLOW_REBOOT'] = '0'
         env['COMMIT'] = 'quick system test'
         env['DEBUG'] = 'true'
+        env['LOGLEVEL'] = '' # info, http
         env['FAIL_ON_FILE_ERROR'] = 'true'
         env['CURL_SSL'] = ''
         env['DEFAULT_BASE_PATH'] = tmp_default_base_path
 
         config_reader = ConfigReader(logger, env)
-        factory = FullRunServiceFactory(logger, NoLogger(), NoLogger(), external_drives_repository_factory=external_drives_repository_factory)
+        factory = FullRunServiceFactory(logger, NoLogger(), print_mgr, external_drives_repository_factory=external_drives_repository_factory)
         return execute_full_run(factory, config_reader, argv or [])
 
     def find_all_files(self, directory):

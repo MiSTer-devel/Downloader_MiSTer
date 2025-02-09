@@ -422,10 +422,11 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
     def print_job_retried(self, job: Job, _retry_job: Job, exception: BaseException):
         self._print_job_error(job, exception)
 
-    def _print_job_error(self, _job: Job, exception: BaseException):
-        self._logger.debug(exception)
-        self._symbols.append('~')
-        self._print_symbols()
+    def _print_job_error(self, job: Job, exception: BaseException):
+        if (isinstance(job, GetFileJob) and not job.silent) or isinstance(job, ValidateFileJob):
+            self._logger.debug(exception)
+            self._symbols.append('~')
+            self._print_symbols()
 
 
 class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):

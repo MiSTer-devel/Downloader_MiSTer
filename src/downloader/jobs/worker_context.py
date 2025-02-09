@@ -22,6 +22,7 @@ from enum import Enum, auto
 
 from downloader.config import Config
 from downloader.external_drives_repository import ExternalDrivesRepository
+from downloader.file_filter import FileFilterFactory
 from downloader.file_system import FileSystem
 from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
@@ -49,6 +50,7 @@ class DownloaderWorkerContext:
     installation_report: InstallationReportImpl
     free_space_reservation: FreeSpaceReservation
     external_drives_repository: ExternalDrivesRepository
+    file_filter_factory: FileFilterFactory
     target_paths_calculator_factory: TargetPathsCalculatorFactory
     config: Config
     fail_policy: DownloaderWorkerFailPolicy
@@ -65,6 +67,7 @@ def make_downloader_worker_context(
         installation_report: InstallationReportImpl,
         free_space_reservation: FreeSpaceReservation,
         external_drives_repository: ExternalDrivesRepository,
+        file_filter_factory: FileFilterFactory,
         target_paths_calculator_factory: TargetPathsCalculatorFactory,
         config: Config,
         fail_policy: DownloaderWorkerFailPolicy = DownloaderWorkerFailPolicy.FAULT_TOLERANT
@@ -80,6 +83,7 @@ def make_downloader_worker_context(
         installation_report=installation_report,
         free_space_reservation=free_space_reservation,
         external_drives_repository=external_drives_repository,
+        file_filter_factory=file_filter_factory,
         target_paths_calculator_factory=target_paths_calculator_factory,
         config=config,
         fail_policy=fail_policy
