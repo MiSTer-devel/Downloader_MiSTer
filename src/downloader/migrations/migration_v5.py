@@ -15,42 +15,25 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import DISTRIBUTION_MISTER_DB_ID, K_DATABASES, K_OPTIONS
+
+import os
+from downloader.constants import MEDIA_FAT
 from downloader.store_migrator import MigrationBase
 
 
 class MigrationV5(MigrationBase):
-    def __init__(self, file_system_factory, path_resolver_factory, config):
-        self._file_system_factory = file_system_factory
-        self._path_resolver_factory = path_resolver_factory
+    def __init__(self, config, file_system_factory):
         self._config = config
+        self._file_system_factory = file_system_factory
 
     version = 5
 
     def migrate(self, local_store):
         """remove old mister from old location in case it exists"""
-
-        config = self._config.copy()
         try:
-            ini_description = self._config[K_DATABASES][DISTRIBUTION_MISTER_DB_ID]
-        except KeyError as _:
-            return
-
-        if K_OPTIONS in ini_description:
-            ini_description[K_OPTIONS].apply_to_config(config)
-
-        file_system = self._file_system_factory.create_for_config(config)
-
-        storage_priority_top_folders = {}
-
-        migrate_file_mister_old(file_system, self._path_resolver_factory.create(config, storage_priority_top_folders))
-
-
-def migrate_file_mister_old(file_system, path_resolver):
-    file_MiSTer_old = 'Scripts/.config/downloader/MiSTer.old'
-
-    path_resolver.add_system_path(file_MiSTer_old)
-    path_resolver.resolve_file_path(file_MiSTer_old)
-
-    if file_system.is_file(file_MiSTer_old):
-        file_system.unlink(file_MiSTer_old)
+            mister_old = os.path.join(self._config.get('base_system_path', MEDIA_FAT), 'Scripts/.config/downloader/MiSTer.old')
+            fs = self._file_system_factory.create_for_system_scope()
+            if fs.is_file(mister_old):
+                fs.unlink(mister_old)
+        except Exception as e:
+            print(e)

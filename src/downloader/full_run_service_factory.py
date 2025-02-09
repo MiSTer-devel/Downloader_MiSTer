@@ -35,12 +35,10 @@ from downloader.jobs.worker_context import make_downloader_worker_context
 from downloader.logger import DebugOnlyLoggerDecorator, Logger, FilelogManager, PrintLogManager, FileLoggerDecorator, \
     PrintLogger
 from downloader.os_utils import LinuxOsUtils
-from downloader.storage_priority_resolver import StoragePriorityResolver
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository
 from downloader.migrations import migrations
 from downloader.online_importer import OnlineImporter
-from downloader.path_resolver import PathResolverFactory
 from downloader.reboot_calculator import RebootCalculator
 from downloader.store_migrator import StoreMigrator
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
@@ -66,9 +64,7 @@ class FullRunServiceFactory:
         file_system_factory = FileSystemFactory(config, path_dictionary, self._logger)
         system_file_system = file_system_factory.create_for_system_scope()
         external_drives_repository = self._external_drives_repository_factory.create(system_file_system, self._logger)
-        storage_priority_resolver_factory = StoragePriorityResolver(file_system_factory, external_drives_repository)
-        path_resolver_factory = PathResolverFactory(storage_priority_resolver_factory, path_dictionary)
-        store_migrator = StoreMigrator(migrations(config, file_system_factory, path_resolver_factory), self._logger)
+        store_migrator = StoreMigrator(migrations(config, file_system_factory), self._logger)
         local_repository = LocalRepository(config, self._logger, system_file_system, store_migrator, external_drives_repository)
 
         http_connection_timeout = config['downloader_timeout'] / 4 if config['downloader_timeout'] > 60 else 15

@@ -21,7 +21,6 @@ import json
 
 from downloader.constants import K_BASE_PATH, DISTRIBUTION_MISTER_DB_ID
 from test.fake_importer_implicit_inputs import FileSystemState
-from test.fake_path_resolver import PathResolverFactory
 from test.fake_file_system_factory import fs_data, FileSystemFactory
 from test.objects import file_descr
 from test.fake_store_migrator import StoreMigrator
@@ -72,10 +71,7 @@ class TestRealisticMigrations(unittest.TestCase):
     def test_migrate___on_empty_store_with_file_mister_old___file_mister_old_gets_removed(self):
         file = 'Scripts/.config/downloader/MiSTer.old'
         file_system_state = FileSystemState(files={file: file_descr()})
-        sut = StoreMigrator(
-            file_system_factory=FileSystemFactory(file_system_state),
-            path_resolver_factory=PathResolverFactory.from_file_system_state(file_system_state)
-        )
+        sut = StoreMigrator(file_system_factory=FileSystemFactory(file_system_state))
         sut.migrate({})
         self.assertEqual(fs_data(), sut.system_file_system.data)
 
