@@ -62,17 +62,17 @@ class FileFetcher:
                 self._file_system.write_incoming_stream(in_stream, download_path, timeout=self._timeout)
 
         except socket.gaierror as e:
-            return FileDownloadError(f'Socket Address Error! {url}: {str(e)}')
+            return FileDownloadError(f'Socket Address Error! {url}: {str(e)}', e)
         except URLError as e:
-            return FileDownloadError(f'URL Error! {url}: {e.reason}')
+            return FileDownloadError(f'URL Error! {url}: {e.reason}', e)
         except HTTPException as e:
-            return FileDownloadError(f'HTTP Error {type(e).__name__}! {url}: {str(e)}')
+            return FileDownloadError(f'HTTP Error! {url}: {str(e)}', e)
         except ConnectionResetError as e:
-            return FileDownloadError(f'Connection reset error! {url}: {str(e)}')
+            return FileDownloadError(f'Connection reset error! {url}: {str(e)}', e)
         except OSError as e:
-            return FileDownloadError(f'OS Error! {url}: {e.errno} {str(e)}')
+            return FileDownloadError(f'OS Error! {url}: {e.errno} {str(e)}', e)
         except BaseException as e:
-            return FileDownloadError(f'Exception during download! {url}: {str(e)}')
+            return FileDownloadError(f'Exception during download! {url}: {str(e)}', e)
 
         if not self._file_system.is_file(download_path, use_cache=False):
             return FileDownloadError(f'File from {url} could not be stored.')

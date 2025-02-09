@@ -95,6 +95,8 @@ class FullRunService:
         self._logger.print()
         self._logger.debug('Linux Version: %s' % self._linux_updater.get_current_linux_version())
 
+        self._local_repository.ensure_base_paths()
+
         if not self._check_certificates():
             self._logger.print("ERROR: Couldn't load certificates.")
             self._logger.print()
@@ -163,7 +165,7 @@ class FullRunService:
 
         self._logger.print()
         self._logger.print('===========================')
-        self._logger.print(f'Downloader 1.8 ({self._config['commit'][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        self._logger.print(f'Downloader 2.0 ({self._config['commit'][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
         self._logger.debug(f'Commit: {self._config['commit']}')
         self._logger.print(f'Log: {self._local_repository.logfile_path}')
         if len(unused_filter_tags) > 0:

@@ -109,7 +109,7 @@ class OnlineImporter:
             if failures > 0:
                 box.add_failed_db(pkg.db_id)
 
-        if no_changes_msg != '': self._logger.print('\n' + no_changes_msg + '\n')
+        if no_changes_msg != '': self._logger.print('\n' + no_changes_msg)
 
         for job in report.get_completed_jobs(ProcessDbJob):
             box.add_installed_db(job.db)

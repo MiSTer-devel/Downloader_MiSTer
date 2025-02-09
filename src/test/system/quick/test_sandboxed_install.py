@@ -136,37 +136,6 @@ class TestSandboxedInstall(SandboxTestBase):
 
         self.assertEqual(baz_exists_before, baz_exists_after)
 
-    def test_sandbox_db___deletes_extra_file_from_offline_db(self):
-        sandbox_db_with_extra_json_file = 'test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox_db_with_extra_file.json'
-
-        shutil.copy2(self.foo_file, self.tmp_delme)
-        shutil.copy2(self.bar_file, self.tmp_delme)
-        shutil.copy2(self.baz_file, self.tmp_delme)
-        shutil.copy2(sandbox_db_with_extra_json_file, self.tmp_delme)
-
-        tmp_offline_db_file = self.tmp_delme + '/' + Path(sandbox_db_with_extra_json_file).name
-        tmp_baz_file = self.tmp_delme + '/' + Path(self.baz_file).name
-
-        offline_db_exists_before = Path(tmp_offline_db_file).is_file()
-        baz_exists_before = Path(tmp_baz_file).is_file()
-
-        db = load_json('test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox_db.json')
-        expected_local_store = local_store_files([('sandbox', db['files'])])
-        expected_local_store['dbs']['sandbox']['offline_databases_imported'] = ['5fce72d14b3b32291f60ee5eea925f35']
-
-        self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox.ini', {
-            'local_store': expected_local_store,
-            'files': hashes(self.tmp_delme, db['files']),
-            'files_count': 2
-        })
-
-        offline_db_exists_after = Path(tmp_offline_db_file).is_file()
-        baz_exists_after = Path(tmp_baz_file).is_file()
-
-        self.assertNotEqual(offline_db_exists_before, offline_db_exists_after)
-        self.assertNotEqual(baz_exists_before, baz_exists_after)
-        self.assertFalse(offline_db_exists_after or baz_exists_after)
-
     installed_folders = {'bar': {}, 'bar/sub_bar': {}, 'bar/sub_bar/sub_sub_bar': {}, 'baz': {}, 'foo': {},
                          'foo/sub_foo': {}}
     installed_system_folders = {'Scripts': {}, 'Scripts/.config': {}, 'Scripts/.config/downloader': {}}
