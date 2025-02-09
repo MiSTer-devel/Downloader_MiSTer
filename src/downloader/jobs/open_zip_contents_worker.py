@@ -16,12 +16,11 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from configparser import Error
-from typing import Dict, Any, List, Optional, Set
+from typing import List, Set
 from pathlib import Path
 
 from downloader.db_entity import DbEntity
-from downloader.file_filter import FileFilterFactory, BadFileFilterPartException
+from downloader.file_filter import BadFileFilterPartException
 from downloader.job_system import WorkerResult
 from downloader.jobs.index import Index
 from downloader.jobs.process_index_job import ProcessIndexJob
@@ -29,8 +28,7 @@ from downloader.path_package import PathPackage, PathType
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext, DownloaderWorkerFailPolicy
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.file_system import FileCopyError
-from downloader.storage_priority_resolver import StoragePriorityError
-from downloader.target_path_calculator import TargetPathsCalculator
+from downloader.target_path_calculator import StoragePriorityError
 
 
 class OpenZipContentsWorker(DownloaderWorkerBase):

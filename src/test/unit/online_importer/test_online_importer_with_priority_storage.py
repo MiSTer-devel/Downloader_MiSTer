@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.jobs.worker_context import DownloaderWorkerFailPolicy
-from downloader.storage_priority_resolver import StoragePriorityError
+from downloader.target_path_calculator import StoragePriorityError
 from test.fake_file_system_factory import fs_data
 from test.fake_online_importer import OnlineImporter
 from test.objects import empty_test_store, file_nes_palette_a, file_nes_smb1, db_test, db_entity, file_nes_smb1_descr, files_smb1, folder_games, folder_games_nes, folder_games_nes_palettes\
