@@ -25,7 +25,6 @@ from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
 from downloader.constants import K_STORAGE_PRIORITY, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL
 from downloader.path_package import PathPackageKind, PextPathProps, PathPackage, PextKind, PathType
-from downloader.storage_priority_resolver import StoragePriorityRegistryEntry, StoragePriorityError
 
 
 class TargetPathsCalculatorFactory:
@@ -47,7 +46,7 @@ class TargetPathsCalculator:
         self._lock = lock
         self._priority_top_folders: Dict[str, StoragePriorityRegistryEntry] = dict()
 
-    def deduce_target_path(self, path: str, description: Dict[str, Any], path_type: PathType) -> Tuple[PathPackage, Optional[StoragePriorityError]]:
+    def deduce_target_path(self, path: str, description: Dict[str, Any], path_type: PathType) -> Tuple[PathPackage, Optional['StoragePriorityError']]:
         if path[0] == '/':
             return PathPackage(
                 full_path=path,
@@ -61,7 +60,11 @@ class TargetPathsCalculator:
         can_be_external = path[0] == '|'
         if can_be_external:
             rel_path = path[1:]
-            drive, extra = self._deduce_possible_external_target_path(path=rel_path, path_type=path_type)
+            external, error = self._deduce_possible_external_target_path(path=rel_path, path_type=path_type)
+            if error is not None:
+                return self.deduce_target_path(path=rel_path, description=description, path_type=path_type)[0], error
+
+            drive, extra = external
             pkg = PathPackage(
                 full_path=os.path.join(drive, rel_path),
                 rel_path=rel_path,
@@ -94,15 +97,15 @@ class TargetPathsCalculator:
                 kind=PathPackageKind.STANDARD,
             ), None
 
-    def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> Tuple[str, PextPathProps]:
+    def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> Tuple[Optional[Tuple[str, PextPathProps]], Optional['StoragePriorityError']]:
         path_obj = Path(path)
         parts_len = len(path_obj.parts)
         if path_type == PathType.FOLDER and parts_len <= 1:
-            return self._config['base_path'], PextPathProps(kind=PextKind.PEXT_PARENT, parent=path, drive=self._config['base_path'], other_drives=())
+            return (self._config['base_path'], PextPathProps(kind=PextKind.PEXT_PARENT, parent=path, drive=self._config['base_path'], other_drives=())), None
         elif path_type == PathType.FILE and parts_len <= 2:
-            raise StoragePriorityError(f"File Path '|{path}' is incorrect, please contact the database maintainer.")
+            return None, StoragePriorityError(f"File Path '|{path}' is incorrect, please contact the database maintainer.")
         else:
-            return self._deduce_external_target_path_from_priority(source_path=path, path_obj=path_obj)
+            return self._deduce_external_target_path_from_priority(source_path=path, path_obj=path_obj), None
 
     def _deduce_external_target_path_from_priority(self, source_path: str, path_obj: Path) -> Tuple[str, PextPathProps]:
         first_folder, second_folder, *_ = path_obj.parts
@@ -184,3 +187,11 @@ class TargetPathsCalculator:
                 others = self._drives[1:]
 
         return result, tuple(others) if others is not None else ()
+
+
+class StoragePriorityError(Exception): pass
+
+class StoragePriorityRegistryEntry:
+    def __init__(self):
+        self.drives = set()
+        self.folders = dict()

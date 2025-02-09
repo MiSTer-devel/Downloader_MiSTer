@@ -37,8 +37,7 @@ from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorke
 from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old, SUFFIX_file_in_progress
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 from downloader.other import calculate_url
-from downloader.storage_priority_resolver import StoragePriorityError
-from downloader.target_path_calculator import TargetPathsCalculator
+from downloader.target_path_calculator import TargetPathsCalculator, StoragePriorityError
 
 _CheckFilePackage = PathPackage
 _FetchFilePackage = PathPackage
