@@ -37,11 +37,11 @@ from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
 from downloader.free_space_reservation import FreeSpaceReservation, Partition
 from downloader.job_system import JobSystem
 from downloader.jobs.copy_file_job import CopyFileJob
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.process_zip_job import ProcessZipJob
-from downloader.jobs.validate_file_job2 import ValidateFileJob2
+from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.local_store_wrapper import LocalStoreWrapper, StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType, RemovedCopy
 
@@ -92,7 +92,7 @@ class OnlineImporter:
 
         box = self._box
         report = self._worker_ctx.file_download_session_logger.report()
-        for job, e in report.get_failed_jobs(ValidateFileJob2):
+        for job, e in report.get_failed_jobs(ValidateFileJob):
             if job.info != FILE_MiSTer:
                 continue
 
@@ -119,7 +119,7 @@ class OnlineImporter:
         for job in report.get_completed_jobs(ProcessDbJob):
             box.add_installed_db(job.db)
 
-        for job in report.get_started_jobs(FetchFileJob2):
+        for job in report.get_started_jobs(FetchFileJob):
             box.add_file_fetch_started(job.info)
 
         for job in report.get_completed_jobs(ProcessIndexJob):
@@ -133,11 +133,11 @@ class OnlineImporter:
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
 
-        for job in report.get_completed_jobs(FetchFileJob2) + report.get_completed_jobs(CopyFileJob):
+        for job in report.get_completed_jobs(FetchFileJob) + report.get_completed_jobs(CopyFileJob):
             if job.silent: continue
             box.add_downloaded_file(job.info)
 
-        for job in report.get_completed_jobs(ValidateFileJob2):
+        for job in report.get_completed_jobs(ValidateFileJob):
             if job.after_job is not None: continue
             box.add_validated_file(job.info)
 
@@ -159,10 +159,10 @@ class OnlineImporter:
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
 
-        for job, _e in report.get_failed_jobs(ValidateFileJob2):
+        for job, _e in report.get_failed_jobs(ValidateFileJob):
             box.add_failed_file(job.get_file_job.info)
 
-        for job, _e in report.get_failed_jobs(FetchFileJob2) + report.get_failed_jobs(CopyFileJob):
+        for job, _e in report.get_failed_jobs(FetchFileJob) + report.get_failed_jobs(CopyFileJob):
             box.add_failed_file(job.info)
 
         for job, e in report.get_failed_jobs(ProcessIndexJob):

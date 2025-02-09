@@ -28,8 +28,8 @@ from typing import List, Tuple
 from downloader.config import default_config
 from downloader.file_system import FileSystemFactory
 from downloader.job_system import JobSystem, ProgressReporter, Job
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
-from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
+from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.fetch_file_worker import FetchFileWorker
 from downloader.logger import PrintLogger, DescribeNowDecorator, Logger
 from downloader.http_gateway import HttpGateway
 from test.exploratory.http_gateway_connections.explore_http_gateway_with_real_urls import urls
@@ -44,7 +44,7 @@ def main() -> None:
         job_system = JobSystem(reporter=reporter, logger=logger, max_threads=20)
         job_system.set_interfering_signals([signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT])
 
-        job_system.register_worker(FetchFileJob2.type_id, FetchFileWorker2(
+        job_system.register_worker(FetchFileJob.type_id, FetchFileWorker(
             progress_reporter=reporter, file_system=fs.create_for_system_scope(), http_gateway=gw, timeout=600
         ))
 
@@ -53,7 +53,7 @@ def main() -> None:
 
         for i in range(20):
             for u in urls:
-                fetch = FetchFileJob2(
+                fetch = FetchFileJob(
                     temp_path=f'{dir_path}/{i}_{Path(u).name[-30:]}_{len(u)}',
                     info=f'{i}_{Path(u).name}_{len(u)}',
                     source=u,
@@ -95,19 +95,19 @@ class Reporter(ProgressReporter):
     def notify_job_retried(self, job: Job, retry_job: Job, exception: Exception) -> None: pass
     def notify_job_started(self, job: Job) -> None: pass
 
-    completed: List[FetchFileJob2] = []
-    failed: List[Tuple[FetchFileJob2, Exception]] = []
-    cancelled: List[FetchFileJob2] = []
+    completed: List[FetchFileJob] = []
+    failed: List[Tuple[FetchFileJob, Exception]] = []
+    cancelled: List[FetchFileJob] = []
 
-    def notify_job_completed(self, job: FetchFileJob2, next_jobs: List[Job]) -> None:  # type: ignore[override]
+    def notify_job_completed(self, job: FetchFileJob, next_jobs: List[Job]) -> None:  # type: ignore[override]
         self._logger.print(f'>>>>>> COMPLETED! {job.info}')
         self.completed.append(job)
 
-    def notify_job_failed(self, job: FetchFileJob2, exception: Exception) -> None:  # type: ignore[override]
+    def notify_job_failed(self, job: FetchFileJob, exception: Exception) -> None:  # type: ignore[override]
         self._logger.print(f'>>>>>> FAILED! {job.info}', exception)
         self.failed.append((job, exception))
 
-    def notify_jobs_cancelled(self, jobs: List[FetchFileJob2]) -> None:  # type: ignore[override]
+    def notify_jobs_cancelled(self, jobs: List[FetchFileJob]) -> None:  # type: ignore[override]
         self.cancelled.extend(jobs)
 
         if self._cancelled: return

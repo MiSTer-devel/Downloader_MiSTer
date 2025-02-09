@@ -19,7 +19,7 @@
 from typing import List
 
 from downloader.jobs.copy_file_worker import CopyFileWorker
-from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
+from downloader.jobs.fetch_file_worker import FetchFileWorker
 from downloader.jobs.open_db_worker import OpenDbWorker
 from downloader.jobs.open_zip_contents_worker import OpenZipContentsWorker
 from downloader.jobs.open_zip_index_worker import OpenZipIndexWorker
@@ -27,15 +27,15 @@ from downloader.jobs.process_db_worker import ProcessDbWorker
 from downloader.jobs.process_db_zips_waiter_worker import ProcessDbZipsWaiterWorker
 from downloader.jobs.process_index_worker import ProcessIndexWorker
 from downloader.jobs.process_zip_worker import ProcessZipWorker
-from downloader.jobs.validate_file_worker2 import ValidateFileWorker2
+from downloader.jobs.validate_file_worker import ValidateFileWorker
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 
 
 def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
     return [
         CopyFileWorker(ctx),
-        FetchFileWorker2(progress_reporter=ctx.progress_reporter, http_gateway=ctx.http_gateway, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout']),
-        ValidateFileWorker2(progress_reporter=ctx.progress_reporter, file_system=ctx.file_system),
+        FetchFileWorker(progress_reporter=ctx.progress_reporter, http_gateway=ctx.http_gateway, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout']),
+        ValidateFileWorker(progress_reporter=ctx.progress_reporter, file_system=ctx.file_system),
         OpenDbWorker(ctx),
         ProcessIndexWorker(ctx),
         ProcessDbZipsWaiterWorker(ctx),

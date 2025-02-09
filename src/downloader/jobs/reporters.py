@@ -26,7 +26,7 @@ from downloader.db_entity import DbEntity
 from downloader.interruptions import Interruptions
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.path_package import PathPackage
-from downloader.jobs.validate_file_job2 import ValidateFileJob2
+from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.waiter import Waiter
 from downloader.job_system import ProgressReporter, Job
 from downloader.logger import Logger
@@ -344,7 +344,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
-        elif isinstance(job, ValidateFileJob2) and job.after_job is None:
+        elif isinstance(job, ValidateFileJob) and job.after_job is None:
             self._symbols.append('+')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()

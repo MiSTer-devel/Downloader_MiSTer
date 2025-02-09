@@ -21,20 +21,20 @@ from pathlib import Path
 
 from downloader.file_system import FileSystem
 from downloader.job_system import WorkerResult, ProgressReporter
-from downloader.jobs.validate_file_job2 import ValidateFileJob2
+from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorker
 from downloader.jobs.errors import FileDownloadError
 
 
-class ValidateFileWorker2(DownloaderWorker):
+class ValidateFileWorker(DownloaderWorker):
     def __init__(self, progress_reporter: ProgressReporter, file_system: FileSystem):
         self._progress_reporter = progress_reporter
         self._file_system = file_system
 
-    def job_type_id(self) -> int: return ValidateFileJob2.type_id
+    def job_type_id(self) -> int: return ValidateFileJob.type_id
     def reporter(self): return self._progress_reporter
 
-    def operate_on(self, job: ValidateFileJob2) -> WorkerResult:  # type: ignore[override]
+    def operate_on(self, job: ValidateFileJob) -> WorkerResult:  # type: ignore[override]
         error = self._validate_file(
             temp_path=job.temp_path,
             target_file_path=job.target_file_path,

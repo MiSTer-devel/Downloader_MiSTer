@@ -17,23 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.get_file_job import GetFileJob
 
-
 @dataclass(eq=False, order=False)
-class ValidateFileJob2(Job):
+class FetchFileJob(Job, GetFileJob):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
-    target_file_path: str
-    description: Dict[str, Any]
-    info: str
-    temp_path: str
-    get_file_job: GetFileJob
-    backup_path: Optional[str] = None
-    after_job: Optional[Job] = None
-    priority: bool = True
-
-    def retry_job(self) -> Optional[Job]: return self.get_file_job
     def backup_job(self) -> Optional[Job]: return None if self.after_job is None else self.after_job.backup_job()

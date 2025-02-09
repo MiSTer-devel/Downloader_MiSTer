@@ -26,7 +26,7 @@ from pathlib import Path
 
 from downloader.file_filter import FileFoldersHolder
 from downloader.jobs.copy_file_job import CopyFileJob
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.index import Index
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
@@ -35,7 +35,7 @@ from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.path_package import PathPackage
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.process_zip_job import ProcessZipJob
-from downloader.jobs.validate_file_job2 import ValidateFileJob2
+from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.local_store_wrapper import StoreWrapper, new_store_fragment_drive_paths
 from downloader.logger import Logger
 
@@ -54,16 +54,16 @@ def make_get_file_job(source: str, target: str, info: str, silent: bool, logger:
         return CopyFileJob(source=source, temp_path=target, info=info, silent=silent)
     else:
         if logger: logger.debug(f'Loading db from url: {source}')
-        return FetchFileJob2(source=source, temp_path=target, info=info, silent=silent)
+        return FetchFileJob(source=source, temp_path=target, info=info, silent=silent)
 
 
-def make_get_zip_file_jobs(db: DbEntity, zip_id: str, description: Dict[str, Any]) -> Tuple[GetFileJob, ValidateFileJob2, str]:
+def make_get_zip_file_jobs(db: DbEntity, zip_id: str, description: Dict[str, Any]) -> Tuple[GetFileJob, ValidateFileJob, str]:
     url = description['url']
     download_path = '/tmp/' + db.db_id + '_._' + zip_id + '_._' + Path(url).name
     info = f'temp zip file {db.db_id}:{zip_id}:{Path(url).name}'
     get_file_job = make_get_file_job(source=url, info=info, target=download_path, silent=False)
     get_file_job.add_tag(make_zip_tag(db, zip_id))
-    validate_job = ValidateFileJob2(temp_path=download_path, target_file_path=download_path, description=description, info=info, get_file_job=get_file_job)
+    validate_job = ValidateFileJob(temp_path=download_path, target_file_path=download_path, description=description, info=info, get_file_job=get_file_job)
     validate_job.add_tag(make_zip_tag(db, zip_id))
     get_file_job.after_job = validate_job
     return get_file_job, validate_job, info

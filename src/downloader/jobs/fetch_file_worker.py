@@ -19,7 +19,7 @@
 from downloader.file_system import FileSystem
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import WorkerResult, ProgressReporter
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.worker_context import DownloaderWorker
 from downloader.jobs.errors import FileDownloadError
 import socket
@@ -31,15 +31,15 @@ from downloader.logger import Logger
 from downloader.waiter import Waiter
 
 
-class FetchFileWorker2(DownloaderWorker):
+class FetchFileWorker(DownloaderWorker):
     def __init__(self, progress_reporter: ProgressReporter, http_gateway: HttpGateway, file_system: FileSystem, timeout: int):
         self._progress_reporter = progress_reporter
         self._fetcher = FileFetcher(http_gateway=http_gateway, file_system=file_system, timeout=timeout)
 
-    def job_type_id(self) -> int: return FetchFileJob2.type_id
+    def job_type_id(self) -> int: return FetchFileJob.type_id
     def reporter(self): return self._progress_reporter
 
-    def operate_on(self, job: FetchFileJob2) -> WorkerResult:  # type: ignore[override]
+    def operate_on(self, job: FetchFileJob) -> WorkerResult:  # type: ignore[override]
         error = self._fetcher.fetch_file(url=job.source, download_path=job.temp_path)
         if error is not None:
             return [], error

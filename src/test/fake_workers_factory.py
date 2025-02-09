@@ -19,11 +19,11 @@
 from typing import List
 
 from downloader.job_system import WorkerResult, Job
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
-from downloader.jobs.validate_file_job2 import ValidateFileJob2
+from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorkerContext, DownloaderWorker
 from downloader.jobs.workers_factory import make_workers as production_make_workers
-from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
+from downloader.jobs.fetch_file_worker import FetchFileWorker
 from test.fake_http_gateway import FakeHttpGateway
 
 
@@ -32,7 +32,7 @@ def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
     if isinstance(ctx.http_gateway, FakeHttpGateway):
         fake_http: FakeHttpGateway = ctx.http_gateway
         replacement_workers.extend([
-            FakeWorkerDecorator(FetchFileWorker2(
+            FakeWorkerDecorator(FetchFileWorker(
                 progress_reporter=ctx.progress_reporter, http_gateway=fake_http, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout'],
             ), fake_http),
         ])
@@ -49,8 +49,8 @@ class FakeWorkerDecorator(DownloaderWorker):
 
     def job_type_id(self) -> int: return self._worker.job_type_id()
     def operate_on(self, job: Job) -> WorkerResult:
-        if isinstance(job, FetchFileJob2):
-            if isinstance(job.after_job, ValidateFileJob2):
+        if isinstance(job, FetchFileJob):
+            if isinstance(job.after_job, ValidateFileJob):
                 description = {**job.after_job.description}
             else:
                 description = None
