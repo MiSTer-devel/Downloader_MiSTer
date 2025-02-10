@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, NotRequired, Tuple, Generator, Optional, TypedDict
+from typing import Dict, Any, Tuple, Generator, Optional, TypedDict
 from contextlib import contextmanager
 import ssl
 
@@ -24,10 +24,12 @@ from downloader.http_gateway import HttpGateway
 from test.objects import binary_content
 
 
-class FileContext(TypedDict):
+class FileContextRequired(TypedDict):
     description: Dict[str, Any]
     path: str
-    info: NotRequired[str]
+
+class FileContext(FileContextRequired, total=False):
+    info: str
 
 class FakeHttpGateway(HttpGateway):
     def __init__(self, config, network_state):
