@@ -170,7 +170,8 @@ class DescribeNowDecorator(Logger):
         header = describe_time(time.time())
         for i in range(len(args)):
             if isinstance(args[i], str) and not self._re.fullmatch(args[i]):
-                args[i] = f"{header}| {args[i].replace('\n', f'\n{header}| ')}"
+                replacement = f"\n{header}| "
+                args[i] = f"{header}| {args[i].replace('\n', replacement)}"
 
         return args
 
