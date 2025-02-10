@@ -366,7 +366,8 @@ class JobSystem(JobContext):
             msg += f' trying to spawn "{sub_job[0]}" job [{sub_job[1].type_id}|{type(sub_job[1]).__name__}{f": {info}" if info else ""}]'
 
         self._logger.print(msg)
-        self._logger.debug(f'{msg}:\n{''.join(traceback.TracebackException.from_exception(e).format())}\n')
+        e_text = ''.join(traceback.TracebackException.from_exception(e).format())
+        self._logger.debug(f'{msg}:\n{e_text}\n')
 
         self._unhandled_errors.append(e)
 
@@ -375,7 +376,8 @@ class JobSystem(JobContext):
 
         msg = f'Unhandled exceptions: {len(errors)}\n'
         for i, e in enumerate(errors[:0:-1]):
-            msg += f'  ({len(errors) - i}) {type(e).__name__}: {''.join(traceback.TracebackException.from_exception(e).format())}\n'
+            e_text = ''.join(traceback.TracebackException.from_exception(e).format())
+            msg += f'  ({len(errors) - i}) {type(e).__name__}: {e_text}\n'
 
         self._logger.debug(msg)
         raise errors[0]

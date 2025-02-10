@@ -104,17 +104,17 @@ class SafeFileFetcher:
             if error is None:
                 calculated_hash = self._file_system.hash(path)
                 if calculated_hash != description['hash']:
-                    error = FileDownloadError(f'Hash mismatch! {description['url']}: calculated hash {calculated_hash} != {description['hash']}')
+                    error = FileDownloadError(f'Hash mismatch! {description["url"]}: calculated hash {calculated_hash} != {description["hash"]}')
 
             if error is None:
                 calculated_size = self._file_system.size(path)
                 if calculated_size != description['size']:
-                    error = FileDownloadError(f'Size mismatch! {description['url']}: calculated size {calculated_size} != {description['size']}')
+                    error = FileDownloadError(f'Size mismatch! {description["url"]}: calculated size {calculated_size} != {description["size"]}')
 
             i -= 1
             if error is None or i <= 0:
                 break
-            self._logger.print(f'Retrying {description['url']}...')
+            self._logger.print(f'Retrying {description["url"]}...')
             self._waiter.sleep(10)
 
         return error

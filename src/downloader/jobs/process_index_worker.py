@@ -138,7 +138,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         for collection, col_ctx in ((index.files, 'file'), (index.folders, 'folder')):
             for path in collection:
                 path_obj = Path(path)
-                for parent_obj in path_obj.parents[:-1]:
+                for parent_obj in list(path_obj.parents)[:-1]:  # @TODO: Optimize .parents iteration
                     parent_str = str(parent_obj)
                     if parent_str in index.folders or parent_str in result_folders: continue
 
