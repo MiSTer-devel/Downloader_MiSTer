@@ -346,7 +346,7 @@ class JobSystem(JobContext):
     def _add_unhandled_exception(self, e: BaseException, package: Optional['_JobPackage'] = None, sub_job: Optional[Tuple[str, 'Job']] = None, ctx: Optional[str] = None, method: Optional[Callable] = None) -> None:
         if self._fail_policy == JobFailPolicy.FAIL_FAST: raise e
 
-        msg = f'WARNING! {ctx or 'unknown'}: '
+        msg = f'WARNING! {ctx or _unknown}: '
         if isinstance(e, JobSystemAbortException):
             msg += f'Unexpected system abort '
         else:
@@ -583,6 +583,8 @@ class _JobState(Enum):
     JOB_STARTED = auto()
     JOB_COMPLETED = auto()
     JOB_CANCELLED = auto()
+
+_unknown = 'unknown'
 
 def stacks_from_all_threads() -> dict:
     try:
