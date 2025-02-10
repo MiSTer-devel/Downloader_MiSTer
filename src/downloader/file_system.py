@@ -20,6 +20,7 @@ import os
 import hashlib
 import shutil
 import json
+import sys
 import tempfile
 import time
 from abc import ABC, abstractmethod
@@ -167,7 +168,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def unzip_contents(self, file: str, path: str, contained_files: Any) -> None:
+    def unzip_contents(self, file: str, path: str, files_to_unzip: Optional[Dict[str, str]], test_info: Any) -> None:
         """interface"""
 
     @abstractmethod
@@ -222,6 +223,7 @@ class FsError(Exception): pass
 class FsOperationsError(FsError): pass
 class FolderCreationError(FsError): pass
 class FileCopyError(FsError): pass
+class UnzipError(FsError): pass
 class FileReadError(FsError): pass
 class FileWriteError(FsError): pass
 class FsTimeoutError(FsError): pass
@@ -309,7 +311,7 @@ class _FileSystem(FileSystem):
         self._debug_log('Copying', (source, full_source), (target, full_target))
         try:
             shutil.copyfile(full_source, full_target, follow_symlinks=True)
-        except OSError as e:
+        except Exception as e:
             self._logger.debug(e)
             raise FileCopyError(f"Cannot copy '{source}' to '{target}'") from e
         self._shared_state.add_file(full_target)
@@ -326,14 +328,15 @@ class _FileSystem(FileSystem):
     def hash(self, path: str) -> str:
         try:
             return hash_file(self._path(path))
-        except FileNotFoundError as e:
+        except Exception as e:
             self._logger.debug(e)
+            sys.exit(1)
             return HASH_file_does_not_exist
 
     def size(self, path: str) -> int:
         try:
             return os.path.getsize(self._path(path))
-        except FileNotFoundError as e:
+        except Exception as e:
             self._logger.debug(e)
             return -1
 
@@ -356,7 +359,7 @@ class _FileSystem(FileSystem):
             if e.errno == 17:
                 return
             raise e
-        except FileNotFoundError as e:
+        except Exception as e:
             self._logger.debug(e)
             raise FolderCreationError(target) from e
 
@@ -367,9 +370,7 @@ class _FileSystem(FileSystem):
                 iterator.close()
                 return True
 
-        except FileNotFoundError as e:
-            self._ignore_error(e)
-        except NotADirectoryError as e:
+        except OSError as e:
             self._ignore_error(e)
 
         return False
@@ -385,9 +386,7 @@ class _FileSystem(FileSystem):
         self._debug_log('Deleting empty folder', (path, full_path))
         try:
             os.rmdir(full_path)
-        except FileNotFoundError as e:
-            self._ignore_error(e)
-        except NotADirectoryError as e:
+        except OSError as e:
             self._ignore_error(e)
 
     def _ignore_error(self, e: Exception) -> None:
@@ -403,8 +402,7 @@ class _FileSystem(FileSystem):
         try:
             shutil.rmtree(full_path)
         except Exception as e:
-            self._logger.debug(e)
-            self._logger.debug('Ignoring error.')
+            self._ignore_error(e)
 
     def download_target_path(self, path: str) -> str:
         return self._path(path)
@@ -464,14 +462,20 @@ class _FileSystem(FileSystem):
         with open(full_path, 'w') as f:
             json.dump(db, f)
 
-    def unzip_contents(self, file: str, path: str, contained_files: Any) -> None:
-        full_path = self._path(path)
-        full_file = self._path(file)
-        self._debug_log('Unzipping contents', (file, full_file), (path, full_path))
-        with zipfile.ZipFile(full_file, 'r') as zipf:
-            zipf.extractall(full_path)
-
-        self._unlink(file, False)
+    def unzip_contents(self, full_file: str, full_path: str, files_to_unzip: Optional[Dict[str, str]], test_info: Any) -> None:
+        self._debug_log('Unzipping contents', full_file, full_path)
+        try:
+            with zipfile.ZipFile(full_file, 'r') as zipf:
+                if files_to_unzip is None:
+                    zipf.extractall(full_path)
+                else:
+                    for member in zipf.infolist():
+                        if member.filename in files_to_unzip:
+                            zipf.extract(member, full_path)
+        except Exception as e:
+            self._logger.debug(e)
+            sys.exit(1)
+            raise UnzipError(f"Cannot unzip '{full_file}' to '{full_path}'") from e
 
     def _debug_log(self, message: str, path: Tuple[str, str], target: Optional[Tuple[str, str]] = None) -> None:
         if path[0][0] == '/':

@@ -410,7 +410,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
                 first_line +
                 '\n' +
                 '################################################################################\n' +
-                f'SECTION: {db.db_id}'
+                f'SECTION: {db.db_id}\n'
             )
 
         self._need_clear_header = True

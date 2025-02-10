@@ -16,8 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+import os
 from typing import List, Set
-from pathlib import Path
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import BadFileFilterPartException
@@ -27,7 +27,7 @@ from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext, DownloaderWorkerFailPolicy
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
-from downloader.file_system import FileCopyError
+from downloader.file_system import UnzipError
 from downloader.target_path_calculator import StoragePriorityError
 
 
@@ -60,8 +60,6 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         download_path = job.download_path
         store = job.store.read_only()
 
-        self._ctx.logger.print(zip_description['description'])
-
         target_pkg, target_error = self._ctx.target_paths_calculator_factory\
             .target_paths_calculator(config)\
             .deduce_target_path(zip_description['target_folder_path'], {}, PathType.FOLDER)
@@ -86,10 +84,20 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
             if file_hash != pkg_hash or not is_file_present:
                 contained_files.append(pkg)
 
-        if len(contained_files) > 0:
-            self._ctx.installation_report.add_processed_files(contained_files, job.db.db_id)  # @TODO: this needs to be moved to process_zip_worker and as much as possible of the previous lines
+        files_to_unzip, _ = self._ctx.installation_report.add_processed_files(contained_files, job.db.db_id)  # @TODO: this needs to be moved to process_zip_worker and as much as possible of the previous lines
+        if len(files_to_unzip) > 0:
+            should_extract_all = len(files_to_unzip) > (0.7 * len(job.files))
+            if should_extract_all:
+                zip_paths = None
+            else:
+                root_zip_path = os.path.join(target_pkg.rel_path, '')
+                zip_paths = {pkg.description.get('zip_path', None) or pkg.rel_path.removeprefix(root_zip_path): pkg.full_path for pkg in files_to_unzip}
             self._ctx.logger.print(zip_description['description'])
-            self._ctx.file_system.unzip_contents(download_path, target_folder_path, [pkg.full_path for pkg in contained_files])
+            try:
+                self._ctx.file_system.unzip_contents(download_path, target_folder_path, zip_paths, (target_pkg, job.index.files, job.filtered_data['files']))
+            except UnzipError as e:
+                job.failed_files.extend(contained_files)
+                return [], e
 
         self._ctx.file_system.unlink(download_path)
 
@@ -101,25 +109,33 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         invalid_files: List[PathPackage] = []
         validated_files: List[PathPackage] = []
-        for file_pkg in contained_files:
-            if self._ctx.file_system.hash(file_pkg.full_path) == file_pkg.description['hash']:
+        for file_pkg in files_to_unzip:
+            if self._ctx.file_system.is_file(file_pkg.full_path, use_cache=False) and self._ctx.file_system.hash(file_pkg.full_path) == file_pkg.description['hash']:
                 validated_files.append(file_pkg)
             else:
+                print(f"INVALID FILE: {file_pkg.full_path}", self._ctx.file_system.is_file(file_pkg.full_path, use_cache=False), file_pkg.description['hash'])
                 invalid_files.append(file_pkg)
 
         job.downloaded_files.extend(validated_files)
-        if len(invalid_files) > 0:
-            self._ctx.installation_report.unmark_processed_files(invalid_files, job.db.db_id)
-            return [ProcessIndexJob(
-                db=job.db,
-                ini_description=job.ini_description,
-                config=job.config,
-                index=Index(files={file.rel_path: file.description for file in invalid_files}, folders={}),
-                store=job.store.select(files=invalid_files),  # @TODO: This store needs to be a fragment only for the invalid files...
-                full_resync=job.full_resync
-            )], None
-        else:
+        if len(invalid_files) == 0:
             return [], None
+
+        self._ctx.installation_report.unmark_processed_files(invalid_files, job.db.db_id)
+        job.failed_files.extend(inv_file for inv_file in invalid_files if 'url' not in inv_file.description)
+
+        if len(job.failed_files) > 0:
+            error_msg = f"Files from '{zip_description['description']}' could not be unzipped correctly"
+            self._ctx.logger.print(f"ERROR: {error_msg}.")
+            return [], UnzipError(error_msg)
+
+        return [ProcessIndexJob(
+            db=job.db,
+            ini_description=job.ini_description,
+            config=job.config,
+            index=Index(files={file.rel_path: file.description for file in invalid_files}, folders={}),
+            store=job.store.select(files=[pkg.rel_path for pkg in invalid_files]),  # @TODO: This store needs to be a fragment only for the invalid files...
+            full_resync=job.full_resync
+        )], None
 
     def _process_create_folders_packages(self, db: DbEntity, create_folder_pkgs: List[PathPackage]) -> List[PathPackage]:
         # @TODO inspired in ProcessIndexWorker._process_create_folders_packages
@@ -147,32 +163,46 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         store = job.store.read_only()
         files = job.files
 
-        self._ctx.logger.print(zip_description['description'])
-
-        temp_filename = self._ctx.file_system.unique_temp_filename()
-        tmp_path = f'{temp_filename.value}_{zip_id}'
-
         # @TODO: self._ctx.file_system.precache_is_file_with_folders() THIS IS MISSING FOR PROPER PERFORMANCE!
 
         contained_files = [pkg for pkg in files if store.hash_file(pkg.rel_path) != pkg.description.get('hash', None) or self._ctx.file_system.is_file(pkg.full_path) is False]
 
-        if len(contained_files) > 0:
-            self._ctx.file_system.unzip_contents(download_path, tmp_path, [pkg.rel_path for pkg in contained_files])
-            self._ctx.installation_report.add_processed_files(contained_files, job.db.db_id)
-
-            for pkg in contained_files:
-                file_path = pkg.rel_path
-                file_description = pkg.description
-                try:
-                    self._ctx.file_system.copy(str(Path(tmp_path) / Path(file_description['zip_path'])), file_path)
-                except FileCopyError as _e:
-                    job.failed_files.append(pkg)
-                    self._ctx.logger.print('ERROR: File "%s" could not be copied, skipping.' % file_path)
-                    continue
-
-                job.downloaded_files.append(pkg)
+        files_to_unzip, _ = self._ctx.installation_report.add_processed_files(contained_files, job.db.db_id)  # @TODO: this needs to be moved to process_zip_worker and as much as possible of the previous lines
+        if len(files_to_unzip) > 0:
+            self._ctx.logger.print(zip_description['description'])
+            try:
+                self._ctx.file_system.unzip_contents(download_path, '[:single files:]', {pkg.description['zip_path']: pkg.full_path for pkg in files_to_unzip}, (None, job.index.files, job.filtered_data['files']))
+            except UnzipError as e:
+                job.failed_files.extend(contained_files)
+                return [], e
 
         self._ctx.file_system.unlink(download_path)
-        self._ctx.file_system.remove_non_empty_folder(tmp_path)
-        temp_filename.close()
-        return [], None
+
+        invalid_files: List[PathPackage] = []
+        validated_files: List[PathPackage] = []
+        for file_pkg in files_to_unzip:
+            if self._ctx.file_system.is_file(file_pkg.full_path, use_cache=False) and self._ctx.file_system.hash(file_pkg.full_path) == file_pkg.description['hash']:
+                validated_files.append(file_pkg)
+            else:
+                invalid_files.append(file_pkg)
+
+        job.downloaded_files.extend(validated_files)
+        if len(invalid_files) == 0:
+            return [], None
+
+        self._ctx.installation_report.unmark_processed_files(invalid_files, job.db.db_id)
+        job.failed_files.extend(inv_file for inv_file in invalid_files if 'url' not in inv_file.description)
+
+        if len(job.failed_files) > 0:
+            error_msg = f"Files from '{zip_description['description']}' could not be unzipped correctly"
+            self._ctx.logger.print(f"ERROR: {error_msg}.")
+            return [], UnzipError(error_msg)
+
+        return [ProcessIndexJob(
+            db=job.db,
+            ini_description=job.ini_description,
+            config=job.config,
+            index=Index(files={file.rel_path: file.description for file in invalid_files}, folders={}),
+            store=job.store.select(files=[pkg.rel_path for pkg in invalid_files]),  # @TODO: This store needs to be a fragment only for the invalid files...
+            full_resync=job.full_resync
+        )], None

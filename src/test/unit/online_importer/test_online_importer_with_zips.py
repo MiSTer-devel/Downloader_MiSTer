@@ -202,9 +202,9 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
 
         self.assertEverythingIsClean(sut, store, save=True)
 
-    def test_download_unibios_from_official_url___on_empty_store_and_failing_copy___installs_only_the_file_not_in_zip(self):
+    def test_download_unibios_from_official_url___on_empty_store_and_failing_unzip___installs_only_the_file_not_in_zip(self):
         sut = OnlineImporter()
-        sut.fs_factory.set_copy_will_error()
+        sut.fs_factory.set_unzip_will_error()
         store = empty_test_store()
 
         sut.add_db(db_with_unibios_from_official_url(), store).download(False)
@@ -223,9 +223,9 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         self.assertEqual(fs_data(files=fs_files_neogeo_bios(), folders=fs_folders_neogeo_bios()), sut.fs_data)
         self.assertReports(sut, [file_neogeo_unibios], save=False)
 
-    def test_download_unibios_from_official_url___on_second_run_after_failing_with_failing_copies___still_fails_on_unibios(self):
+    def test_download_unibios_from_official_url___on_second_run_after_failing_with_failing_unzips___still_fails_on_unibios(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_neogeo_000lo: file_neogeo_000lo_descr()}, folders=fs_folders_neogeo_bios()))
-        sut.fs_factory.set_copy_will_error()
+        sut.fs_factory.set_unzip_will_error()
         store = store_with_unibios_from_zip()
 
         sut.add_db(db_with_unibios_from_official_url(), store).download(False)
@@ -304,8 +304,7 @@ def db_with_unibios_from_official_url():
                     "url": "http://unibios.free.fr/download/uni-bios-40.zip",
                     "zipped_files": {
                         "files": {
-                            "/tmp/unique_temp_filename_0_neogeo_unibios/uni-bios.rom": {
-                                "hash": "4f0aeda8d2d145f596826b62d563c4ef", "size": 131072}
+                            "uni-bios.rom": {"hash": "4f0aeda8d2d145f596826b62d563c4ef", "size": 131072}
                         },
                         "folders": {}
                     }

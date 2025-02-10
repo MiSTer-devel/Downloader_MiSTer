@@ -235,7 +235,7 @@ def zip_desc(description, target_folder_path, zipped_files=None, summary=None, s
                 file_path: {
                     **file_description,
                     'zip_id': summary_internal_zip_id,
-                    'zip_path': file_description.get('zip_path', file_path)
+                    **({} if 'zip_path' not in file_description else {'zip_path': file_description['zip_path']})
                 } for file_path, file_description in summary['files'].items()
             },
             'folders': {

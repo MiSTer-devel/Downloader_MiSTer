@@ -141,7 +141,7 @@ def _validate_zip_description(zip_id, zip_desc):
         raise _AmbiguousSummaryException()
 
     if 'internal_summary' in zip_desc:
-        _validate_zip_internal_summary(zip_id, zip_desc['internal_summary'])
+        _validate_zip_internal_summary(zip_id, zip_desc)
     elif 'summary_file' in zip_desc:
         _validate_zip_summary_file(zip_desc['summary_file'])
 
@@ -155,9 +155,9 @@ def _validate_zip_description(zip_id, zip_desc):
         _validate_zip_kind_extract_single_files(zip_desc)
 
 
-def _validate_zip_internal_summary(zip_id, summary):
-    _mandatory(summary, 'files', _guard(_make_files_validator(None, zip_id, mandatory_zip_path=True)))
-    _mandatory(summary, 'folders', _guard(_make_folders_validator(None, zip_id)))
+def _validate_zip_internal_summary(zip_id, zip_desc):
+    _mandatory(zip_desc['internal_summary'], 'files', _guard(_make_files_validator(None, zip_id, mandatory_zip_path=zip_desc['kind'] == 'extract_single_files')))
+    _mandatory(zip_desc['internal_summary'], 'folders', _guard(_make_folders_validator(None, zip_id)))
 
 
 def _validate_zip_contents_file(description):

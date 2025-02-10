@@ -260,7 +260,7 @@ class OnlineImporter:
                 other_file = os.path.join(other_drive, file.pkg.rel_path)
                 if not self._worker_ctx.file_system.is_file(other_file):
                     if is_external:
-                        stores[file.db_id].write_only().remove_external_file(file.pkg.rel_path)
+                        stores[file.db_id].write_only().remove_external_file(other_drive, file.pkg.rel_path)
                     else:
                         stores[file.db_id].write_only().remove_local_file(file.pkg.rel_path)
                         
@@ -298,7 +298,7 @@ class OnlineImporter:
             if ty == PathType.FILE:
                 file = report.processed_file(el_path)
                 if is_external:
-                    stores[file.db_id].write_only().remove_external_file(el_path)
+                    stores[file.db_id].write_only().remove_external_file(drive, el_path)
                 else:
                     stores[file.db_id].write_only().remove_local_file(el_path)
 

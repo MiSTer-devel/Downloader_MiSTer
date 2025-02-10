@@ -22,7 +22,7 @@ import os
 import os.path
 from pathlib import Path
 from downloader.config_reader import ConfigReader
-from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_CURL_SSL, KENV_DEBUG
+from downloader.constants import KENV_CURL_SSL, KENV_DEBUG, KENV_LOGLEVEL
 from test.objects import debug_env
 from downloader.logger import NoLogger
 from downloader.file_system import hash_file
@@ -70,9 +70,9 @@ class TestFullInstall(unittest.TestCase):
 
     def assertRunOk(self, ini_path):
         config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
-        shutil.rmtree(config[K_BASE_PATH], ignore_errors=True)
-        shutil.rmtree(config[K_BASE_SYSTEM_PATH], ignore_errors=True)
-        mister_path = Path('%s/MiSTer' % config[K_BASE_SYSTEM_PATH])
+        shutil.rmtree(config['base_path'], ignore_errors=True)
+        shutil.rmtree(config['base_system_path'], ignore_errors=True)
+        mister_path = Path('%s/MiSTer' % config['base_system_path'])
         os.makedirs(str(mister_path.parent), exist_ok=True)
         mister_path.touch()
         tool = str(Path(ini_path).with_suffix('.sh'))
@@ -81,7 +81,8 @@ class TestFullInstall(unittest.TestCase):
         test_env = os.environ.copy()
         test_env[KENV_CURL_SSL] = ''
         test_env[KENV_DEBUG] = 'true'
+        test_env[KENV_LOGLEVEL] = 'info'
         result = subprocess.run([tool], stderr=subprocess.STDOUT, env=test_env)
         self.assertEqual(result.returncode, 0)
-        self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json" % config[K_BASE_SYSTEM_PATH]))
+        self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json" % config['base_system_path']))
         os.unlink(tool)

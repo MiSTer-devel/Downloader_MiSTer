@@ -42,7 +42,7 @@ def zipped_nes_palettes_desc(summary_internal_zip_id=None):
             }
         },
         zipped_files={
-            "files": {file_nes_palette_a[1:]: file_nes_palette_a_descr()},
+            "files": {file_nes_palette_a[1 + len(folder_games_nes):]: file_nes_palette_a_descr()},
             "folders": {}
         },
         summary_internal_zip_id=summary_internal_zip_id
@@ -54,7 +54,8 @@ def cheats_folder_tags():
 
 
 cheats_folder_nes_folder_name = 'Cheats/NES'
-cheats_folder_nes_file_path = cheats_folder_nes_folder_name + '/10-Yard Fight (USA, Europe) [3D564757].zip'
+cheats_folder_nes_file_zip_path = 'NES/10-Yard Fight (USA, Europe) [3D564757].zip'
+cheats_folder_nes_file_path = 'Cheats/' + cheats_folder_nes_file_zip_path
 cheats_folder_nes_file_url = f'https://{cheats_folder_nes_folder_name}/10-Yard%20Fight%20%28USA%2C%20Europe%29%20%5B3D564757%5D.zip'
 cheats_folder_nes_file_hash = "8c02595fef1096a9dd160e59067f4f4"
 cheats_folder_nes_file_size = 1020
@@ -69,7 +70,8 @@ def cheats_folder_nes_tags():
 
 
 cheats_folder_sms_folder_name = 'Cheats/SMS'
-cheats_folder_sms_file_path = cheats_folder_sms_folder_name + '/Sonic The Hedgehog (World).zip'
+cheats_folder_sms_file_zip_path = 'SMS/Sonic The Hedgehog (World).zip'
+cheats_folder_sms_file_path = 'Cheats/' + cheats_folder_sms_file_zip_path
 cheats_folder_sms_file_url = f'https://{cheats_folder_sms_folder_name}/Sonic%20The%20Hedgehog%20%28World%29.zip'
 cheats_folder_sms_file_hash = "1c111111111096a9dd160e59067f4f4"
 cheats_folder_sms_file_size = 2048
@@ -98,10 +100,10 @@ def cheats_folder_only_nes_folders(zip_id=True, tags=True):
     }
 
 
-def cheats_folder_files(zip_id=True, tags=True, url=True, is_internal_summary=False):
+def cheats_folder_files(zip_id=True, tags=True, url=True, is_internal_summary=False, zip_path=False):
     return {
-        cheats_folder_nes_file_path: cheats_folder_nes_file_descr(zip_id=zip_id, tags=tags, url=url, zip_path=is_internal_summary),
-        cheats_folder_sms_file_path: cheats_folder_sms_file_descr(zip_id=zip_id, tags=tags, url=url, zip_path=is_internal_summary),
+        cheats_folder_nes_file_zip_path if zip_path else cheats_folder_nes_file_path: cheats_folder_nes_file_descr(zip_id=zip_id, tags=tags, url=url, zip_path=is_internal_summary),
+        cheats_folder_sms_file_zip_path if zip_path else cheats_folder_sms_file_path: cheats_folder_sms_file_descr(zip_id=zip_id, tags=tags, url=url, zip_path=is_internal_summary),
     }
 
 
@@ -111,7 +113,6 @@ def cheats_folder_nes_file_descr(zip_id=True, tags=True, url=True, zip_path=Fals
         'size': cheats_folder_nes_file_size,
         'url': cheats_folder_nes_file_url,
         'zip_id': cheats_folder_id,
-        'zip_path': cheats_folder_nes_file_path,
         'tags': cheats_folder_nes_tags()
     }, zip_id=zip_id, tags=tags, url=url, zip_path=zip_path)
 
@@ -122,7 +123,7 @@ def cheats_folder_sms_file_descr(zip_id=True, tags=True, url=True, zip_path=Fals
         'size': cheats_folder_sms_file_size,
         'url': cheats_folder_sms_file_url,
         'zip_id': cheats_folder_id,
-        'zip_path': cheats_folder_sms_file_path,
+        'zip_path': cheats_folder_sms_file_zip_path,
         'tags': cheats_folder_sms_tags()
     }, zip_id=zip_id, tags=tags, url=url, zip_path=zip_path is not None)
 
@@ -185,7 +186,7 @@ def summary_json_from_cheats_folder():
 
 def zipped_files_from_cheats_folder():
     return {
-        'files': cheats_folder_files(url=False, zip_id=False, tags=False),
+        'files': cheats_folder_files(url=False, zip_id=False, tags=False, zip_path=True),
         'folders': cheats_folder_folders(),
     }
 

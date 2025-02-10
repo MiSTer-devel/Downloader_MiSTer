@@ -18,12 +18,13 @@
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from downloader.constants import K_BASE_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE
-from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, FsError, \
+from downloader.constants import K_BASE_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE, HASH_file_does_not_exist
+from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, FsError, UnzipError, \
     absolute_parent_folder, is_windows, FolderCreationError, FsSharedState, FileCopyError
 from downloader.other import ClosableValue
+from downloader.path_package import PathPackage
 from test.fake_importer_implicit_inputs import FileSystemState
 from downloader.logger import NoLogger
 
@@ -54,6 +55,9 @@ class FileSystemFactory:
 
     def set_copy_will_error(self):
         self._fake_failures['copy_error'] = True
+
+    def set_unzip_will_error(self):
+        self._fake_failures['unzip_error'] = True
 
     def create_for_config(self, config):
         return FakeFileSystem(self._state, config, self._fake_failures, self._write_records, self._fs_cache)
@@ -120,7 +124,10 @@ class FakeFileSystem(ProductionFileSystem):
         return '/tmp'
 
     def hash(self, path):
-        return self.state.files[self._path(path)]['hash']
+        file_path = self._path(path)
+        if file_path not in self.state.files:
+            return HASH_file_does_not_exist
+        return self.state.files[file_path]['hash']
 
     def size(self, path):
         return self.state.files[self._path(path)]['size']
@@ -299,19 +306,37 @@ class FakeFileSystem(ProductionFileSystem):
         self.state.files[file]['json'] = db
         self._write_records.append(_Record('save_json', file))
 
-    def unzip_contents(self, file_path, zip_target_path, contained_files):
+    def unzip_contents(self, file_path, zip_target_path, files_to_unzip: Optional[Dict[str, str]], test_info: Tuple[Optional[PathPackage], Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]):
+        if 'unzip_error' in self._fake_failures:
+            raise UnzipError(file_path)
+
+        extracting = {}
+        target_pkg, files, filtered_files = test_info
+        if files_to_unzip is not None:
+            extracting.update(files_to_unzip)
+            if target_pkg is None:
+                zip_path, full_path = next(iter(files_to_unzip.items()))
+                abs_zip_root_path = full_path.removesuffix(zip_path)
+                for f_desc in filtered_files.values():
+                    f = f_desc['zip_path']
+                    extracting[f] = os.path.join(abs_zip_root_path, f)
+
+        if target_pkg is not None:
+            zip_root_path = os.path.join(target_pkg.rel_path, '')
+            abs_zip_root_path = target_pkg.full_path
+            for f_path in list(filtered_files) + (list(files) if files_to_unzip is None else []):
+                f = f_path.lstrip('|').removeprefix(zip_root_path)
+                extracting[f] = os.path.join(abs_zip_root_path, f)
+
         contents = self.state.files[self._path(file_path)]['zipped_files']
         for file, description in contents['files'].items():
-            full_path = None
-            for contained_file in contained_files:  # @TODO Maybe contained files should not be a list but a dict, but since is only used in tests...
-                if contained_file.endswith(file):
-                    full_path = contained_file.lower()
-                    break
+            full_path = extracting.get(file, None)
             if full_path is None:
                 full_path = self._path(file)
-            self.state.files[full_path] = {'hash': description['hash'], 'size': description['size']}
+            self.state.files[full_path.lower()] = {'hash': description['hash'], 'size': description['size']}
+
         for folder in contents['folders']:
-            if not self._is_folder_unziped(contained_files, folder):
+            if not self._is_folder_unziped(extracting, folder):
                 continue
 
             self.state.folders[self._path(folder)] = {}
@@ -319,9 +344,9 @@ class FakeFileSystem(ProductionFileSystem):
     def turn_off_logs(self) -> None:
         pass
 
-    def _is_folder_unziped(self, contained_files, folder):
-        for file in contained_files:
-            if folder in file:
+    def _is_folder_unziped(self, extracting: Dict[str, str], folder: str):
+        for file in extracting:
+            if file.lower().startswith(folder):
                 return True
 
         return False
