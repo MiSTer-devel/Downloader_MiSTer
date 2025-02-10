@@ -20,11 +20,10 @@ from typing import Any, Dict, List, Tuple
 from downloader.config import Config, config_with_base_path
 from downloader.constants import K_BASE_PATH
 from downloader.db_utils import DbSectionPackage
-from downloader.file_system import FileSystem
+from downloader.file_system import FileSystem, FileSystemFactory
 from downloader.local_store_wrapper import StoreWrapper
 from downloader.logger import Logger
 from downloader.waiter import Waiter
-from test.fake_file_system_factory import FileSystemFactory
 
 
 class BasePathRelocator:
