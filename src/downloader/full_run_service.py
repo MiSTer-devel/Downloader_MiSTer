@@ -165,8 +165,8 @@ class FullRunService:
 
         self._logger.print()
         self._logger.print('===========================')
-        self._logger.print(f'Downloader 2.0 ({self._config['commit'][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
-        self._logger.debug(f'Commit: {self._config['commit']}')
+        self._logger.print(f'Downloader 2.0 ({self._config["commit"][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        self._logger.debug(f'Commit: {self._config["commit"]}')
         self._logger.print(f'Log: {self._local_repository.logfile_path}')
         if len(unused_filter_tags) > 0:
             self._logger.print()
@@ -204,8 +204,8 @@ class FullRunService:
             self._logger.print("You DON'T have enough free space to run Downloader!")
             for partition in full_partitions: self._logger.print(f' - {partition} is FULL')
             self._logger.print()
-            if has_system: self._logger.print(f'Minimum required space for {self._config['base_system_path']} is {self._config['minimum_system_free_space_mb']}MB.')
-            if has_external: self._logger.print(f'Minimum required space for external storage is {self._config['minimum_external_free_space_mb']}MB.')
+            if has_system: self._logger.print(f"Minimum required space for {self._config['base_system_path']} is {self._config['minimum_system_free_space_mb']}MB.")
+            if has_external: self._logger.print(f"Minimum required space for external storage is {self._config['minimum_external_free_space_mb']}MB.")
             self._logger.print('Free some space and try again. [Waiting 10 seconds...]')
             self._waiter.sleep(10)
 
