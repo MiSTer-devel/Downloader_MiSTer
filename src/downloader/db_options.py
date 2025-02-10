@@ -16,16 +16,16 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Set, TypedDict, NotRequired, Dict, Any
+from typing import Set, TypedDict, Dict, Any
 
 from downloader.other import test_only
 
 
-class DbOptionsProps(TypedDict):
-    downloader_threads_limit: NotRequired[int]
-    downloader_timeout: NotRequired[int]
-    downloader_retries: NotRequired[int]
-    filter: NotRequired[str]
+class DbOptionsProps(TypedDict, total=False):
+    downloader_threads_limit: int
+    downloader_timeout: int
+    downloader_retries: int
+    filter: str
 
 
 class DbOptions:

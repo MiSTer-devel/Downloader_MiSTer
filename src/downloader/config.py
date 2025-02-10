@@ -18,7 +18,7 @@
 
 from enum import IntEnum, unique
 from pathlib import Path
-from typing import TypedDict, Optional, List, Dict, NotRequired
+from typing import TypedDict, Optional, List, Dict
 
 from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, \
     MEDIA_FAT, DISTRIBUTION_MISTER_DB_ID, K_DOWNLOADER_THREADS_LIMIT, STORAGE_PRIORITY_PREFER_SD, \
@@ -58,10 +58,13 @@ class AllowReboot(IntEnum):
     ONLY_AFTER_LINUX_UPDATE = 2
 
 
-class ConfigDatabaseSection(TypedDict):
+class ConfigDatabaseSectionRequired(TypedDict):
     section: str
     db_url: str
-    options: NotRequired[DbOptions]
+
+
+class ConfigDatabaseSection(ConfigDatabaseSectionRequired, total=False):
+    options: DbOptions
 
 
 class ConfigMisterSection(TypedDict):
@@ -81,7 +84,7 @@ class ConfigMisterSection(TypedDict):
     user_defined_options: List[str]
 
 
-class Config(ConfigMisterSection):
+class ConfigRequired(ConfigMisterSection):
     zip_file_count_threshold: int
     zip_accumulated_mb_threshold: int
     debug: bool
@@ -95,7 +98,9 @@ class Config(ConfigMisterSection):
     fail_on_file_error: bool
     curl_ssl: str
     http_logging: bool
-    environment: NotRequired[Environment]  # This should never be used. It's there just to be debug-logged.
+
+class Config(ConfigRequired, total=False):
+    environment: Environment  # This should never be used. It's there just to be debug-logged.
 
 
 def config_with_base_path(config: Config, base_path: str) -> Config:
