@@ -38,20 +38,19 @@ class ProcessDbWorker(DownloaderWorkerBase):
         logger.bench('ProcessDbWorker start.')
     
         read_only_store = job.store.read_only()
-        write_only_store = job.store.write_only()
 
         self._ctx.file_download_session_logger.print_header(job.db)
         logger.debug(f"Building db config '{job.db.db_id}'...")
         config = build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
 
         if not read_only_store.has_base_path():  # @TODO should remove this from here at some point.
-            write_only_store.set_base_path(config['base_path'])
+            job.store.write_only().set_base_path(config['base_path'])  # After that, all worker stores will be read-only.
 
         for zip_id in list(read_only_store.zips):
             if zip_id in job.db.zips:
                 continue
 
-            write_only_store.remove_zip_id(zip_id)
+            job.removed_zips.append(zip_id)
 
         if len(job.db.zips) > 0:
             zip_jobs = []
