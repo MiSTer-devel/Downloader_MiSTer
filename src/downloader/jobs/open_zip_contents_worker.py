@@ -73,7 +73,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         job.downloaded_files.extend(job.files_to_unzip)
 
         logger.bench('Precaching is_file...')
-        self._ctx.file_system.precache_is_file_with_folders(job.recipient_folders)
+        self._ctx.file_system.precache_is_file_with_folders(job.recipient_folders, recheck=True)
 
         logger.bench('OpenZipContentsWorker validating...')
 
