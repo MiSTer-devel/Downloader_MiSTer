@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from downloader.config import Config
 from downloader.db_entity import DbEntity
+from downloader.file_filter import FileFoldersHolder
 from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.index import Index
@@ -48,6 +49,8 @@ class ProcessZipJob(Job):
     result_zip_index: StoreFragmentDrivePaths
     skip_unzip: bool = field(default=False)
     summary_download_failed: Optional[str] = field(default=None)
+    installed_folders: List[PathPackage] = field(default_factory=list)
+    filtered_data: Optional[FileFoldersHolder] = field(default=None)
 
     # Failure results
     not_enough_space: bool = field(default=False)

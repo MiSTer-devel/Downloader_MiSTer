@@ -36,7 +36,7 @@ class HttpLogger(Protocol):
 
 
 class HttpGateway:
-    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: int, logger: Optional[HttpLogger] = None):
+    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: float, logger: Optional[HttpLogger] = None):
         now = time.monotonic()
         self._ssl_ctx = ssl_ctx
         self._timeout = timeout
@@ -166,7 +166,7 @@ class HttpGateway:
     def _take_connection(self, queue_id: '_QueueId') -> '_Connection':
         with self._connections_lock:
             if queue_id not in self._connections:
-                self._connections[queue_id] = _ConnectionQueue(queue_id,self._timeout, self._ssl_ctx, self._logger)
+                self._connections[queue_id] = _ConnectionQueue(queue_id, self._timeout, self._ssl_ctx, self._logger)
             return self._connections[queue_id].pull()
 
     def _clean_timeout_connections(self, now: float) -> None:
@@ -271,7 +271,7 @@ class _Connection:
         self._http = http
         self._connection_queue = connection_queue
         self._logger = logger
-        self._timeout = http.timeout if http.timeout is not None else 120.0
+        self._timeout: float = http.timeout if http.timeout is not None else 120.0
         self._last_use_time: float = 0.0
         self._uses: int = 0
         self._max_uses: int = sys.maxsize
@@ -340,7 +340,7 @@ class _FinishedResponse: pass
 
 
 class _ConnectionQueue:
-    def __init__(self, queue_id: _QueueId, timeout: int, ctx: ssl.SSLContext, logger: Optional[HttpLogger]):
+    def __init__(self, queue_id: _QueueId, timeout: float, ctx: ssl.SSLContext, logger: Optional[HttpLogger]):
         self.id = queue_id
         self._timeout = timeout
         self._ctx = ctx
@@ -388,7 +388,7 @@ class _ConnectionQueue:
             return expired_count
 
 
-def create_http_connection(scheme: str, netloc: str, timeout: int, ctx: ssl.SSLContext) -> HTTPConnection:
+def create_http_connection(scheme: str, netloc: str, timeout: float, ctx: ssl.SSLContext) -> HTTPConnection:
     if scheme == 'http': return HTTPConnection(netloc, timeout=timeout)
     elif scheme == 'https': return HTTPSConnection(netloc, timeout=timeout, context=ctx)
     else: raise HttpGatewayException(f"Scheme {scheme} not supported")

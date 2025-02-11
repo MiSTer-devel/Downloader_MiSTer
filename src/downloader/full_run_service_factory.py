@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import ssl
+from typing import Dict
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config
@@ -59,7 +60,7 @@ class FullRunServiceFactory:
         return FullRunServiceFactory(file_logger, file_logger, print_logger)
 
     def create(self, config: Config):
-        path_dictionary = dict()
+        path_dictionary: Dict[str, str] = dict()
         waiter = Waiter()
         file_system_factory = FileSystemFactory(config, path_dictionary, self._logger)
         system_file_system = file_system_factory.create_for_system_scope()
