@@ -143,6 +143,8 @@ class OnlineImporter:
             if job.summary_download_failed is not None:
                 box.add_failed_file(job.summary_download_failed)
             box.add_installed_folders(job.installed_folders)
+            box.add_removed_copies(job.removed_folders)
+            box.add_failed_folders(job.failed_folders)
             if job.filtered_data:
                 box.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_data)
             if job.has_new_zip_index:

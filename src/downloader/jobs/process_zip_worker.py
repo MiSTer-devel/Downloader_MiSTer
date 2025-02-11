@@ -94,6 +94,9 @@ class ProcessZipWorker(DownloaderWorkerBase):
 
             folder_packs.append(folder_pkg)
 
+        logger.bench('Precaching is_file...')
+        self._ctx.file_system.precache_is_file_with_folders(folder_packs)
+
         store = job.store.read_only()
 
         zip_kind, kind_err = make_zip_kind(job.zip_description.get('kind', None), (job.zip_id, job.db.db_id))
@@ -116,8 +119,10 @@ class ProcessZipWorker(DownloaderWorkerBase):
         if job.full_resync:
             contained_files = file_packs
         else:
-            # @TODO: self._ctx.file_system.precache_is_file_with_folders() THIS IS MISSING FOR PROPER PERFORMANCE!
-            contained_files = [pkg for pkg in file_packs if not self._ctx.file_system.is_file(pkg.full_path) or store.hash_file(pkg.rel_path) != pkg.description.get('hash', None)]
+            existing_files, missing_files = self._ctx.file_system.are_files(file_packs)
+
+            contained_files = [pkg for pkg in existing_files if store.hash_file(pkg.rel_path) != pkg.description.get('hash', None)]
+            contained_files.extend(missing_files)
 
         files_to_unzip, already_processed_files = self._ctx.installation_report.add_processed_files(contained_files, job.db.db_id)
         if len(already_processed_files) > 0:
@@ -146,6 +151,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
             target_folder=target_pkg,
             total_amount_of_files_in_zip=total_amount_of_files_in_zip,
             files_to_unzip=files_to_unzip,
+            recipient_folders=job.installed_folders,
             contents_zip_temp_path=validate_job.target_file_path,
             action_text=job.zip_description['description'],
             zip_base_files_url=job.zip_description.get('base_files_url', '').strip(),
@@ -221,7 +227,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
                 fragment['base_paths']['folders'][folder_path] = folder_description
 
     def _process_create_folders_packages(self, db: DbEntity, create_folder_pkgs: List[PathPackage]) -> List[PathPackage]:
-        # @TODO inspired in ProcessIndexWorker._process_create_folders_packages
+        # @TODO: inspired in ProcessIndexWorker._process_create_folders_packages
         folders_to_create: Set[str] = set()
         for pkg in create_folder_pkgs:
             if pkg.is_pext_parent:

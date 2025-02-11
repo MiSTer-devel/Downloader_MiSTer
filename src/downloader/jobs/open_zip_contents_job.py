@@ -50,6 +50,7 @@ class OpenZipContentsJob(Job):
     target_folder: Optional[PathPackage]
     total_amount_of_files_in_zip: int
     files_to_unzip: List[PathPackage]
+    recipient_folders: List[PathPackage]
     contents_zip_temp_path: str
     action_text: str
     zip_base_files_url: str

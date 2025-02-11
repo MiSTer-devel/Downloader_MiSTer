@@ -43,7 +43,7 @@ class ProcessDbWorker(DownloaderWorkerBase):
         logger.debug(f"Building db config '{job.db.db_id}'...")
         config = build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
 
-        if not read_only_store.has_base_path():  # @TODO should remove this from here at some point.
+        if not read_only_store.has_base_path():  # @TODO: should remove this from here at some point.
             job.store.write_only().set_base_path(config['base_path'])  # After that, all worker stores will be read-only.
 
         for zip_id in list(read_only_store.zips):
@@ -94,7 +94,7 @@ def _make_zip_job(z: ZipJobContext) -> Tuple[Job, Optional[Exception]]:
         index = z.job.store.read_only().zip_index(z.zip_id)
 
 
-        #@TODO ZIP_INDEX method does not pull data from filtered_zip_data so and that makes the current test to not pass
+        #@TODO: ZIP_INDEX method does not pull data from filtered_zip_data so and that makes the current test to not pass
 
         process_zip_job = None if index is None else _make_process_zip_job_from_ctx(z, zip_index=index, has_new_zip_index=False)
 

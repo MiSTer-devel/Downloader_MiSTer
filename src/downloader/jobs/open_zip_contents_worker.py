@@ -73,11 +73,14 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         job.downloaded_files.extend(job.files_to_unzip)
 
+        logger.bench('Precaching is_file...')
+        self._ctx.file_system.precache_is_file_with_folders(job.recipient_folders)
+
         logger.bench('OpenZipContentsWorker validating...')
 
-        invalid_files: List[PathPackage] = []
-        for file_pkg in job.files_to_unzip:
-            if self._ctx.file_system.is_file(file_pkg.full_path, use_cache=False) and self._ctx.file_system.hash(file_pkg.full_path) == file_pkg.description['hash']:
+        existing_files, invalid_files = self._ctx.file_system.are_files(job.files_to_unzip)
+        for file_pkg in existing_files:
+            if self._ctx.file_system.hash(file_pkg.full_path) == file_pkg.description['hash']:
                 job.validated_files.append(file_pkg)
             else:
                 invalid_files.append(file_pkg)

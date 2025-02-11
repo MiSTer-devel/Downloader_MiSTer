@@ -67,6 +67,9 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             logger.bench('Creating index packages...')
             check_file_pkgs, job.files_to_remove, create_folder_pkgs, job.directories_to_remove = self._create_packages_from_index(config, summary, db, store)
 
+            logger.bench('Precaching is_file...')
+            self._ctx.file_system.precache_is_file_with_folders(create_folder_pkgs)
+
             logger.debug(f"Processing check file packages '{db.db_id}'...")
             logger.bench('Testing index packages presence in FS...')
             fetch_pkgs, validate_pkgs, job.present_not_validated_files = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
@@ -168,8 +171,14 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         fetch_pkgs: List[_FetchFilePackage] = []
         validate_pkgs: List[_ValidateFilePackage] = []
         already_installed_pkgs: List[_ValidateFilePackage] = []
+
+        exists, dont = file_system.are_files(check_file_pkgs)
+        for pkg in exists:
+            pkg.exists = PathExists.EXISTS
+        for pkg in dont:
+            pkg.exists = PathExists.DOES_NOT_EXIST
+
         for pkg in non_duplicated_pkgs:
-            pkg.exists = PathExists.EXISTS if file_system.is_file(pkg.full_path) else PathExists.DOES_NOT_EXIST
             if pkg.exists == PathExists.DOES_NOT_EXIST:
                 fetch_pkgs.append(pkg)
                 continue
