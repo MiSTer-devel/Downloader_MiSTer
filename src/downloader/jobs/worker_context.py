@@ -53,7 +53,7 @@ class DownloaderWorkerContext:
     file_filter_factory: FileFilterFactory
     target_paths_calculator_factory: TargetPathsCalculatorFactory
     config: Config
-    fail_policy: DownloaderWorkerFailPolicy
+    fail_policy: DownloaderWorkerFailPolicy = DownloaderWorkerFailPolicy.FAULT_TOLERANT
 
     def swallow_error(self, e: Exception, print: bool = True):
         if self.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
@@ -61,38 +61,6 @@ class DownloaderWorkerContext:
         self.logger.debug(e)
         if print: self.logger.print(f"ERROR: {e}")
 
-def make_downloader_worker_context(
-        job_ctx: JobContext,
-        http_gateway: HttpGateway,
-        logger: Logger,
-        file_system: FileSystem,
-        waiter: Waiter,
-        progress_reporter: ProgressReporter,
-        file_download_session_logger: FileDownloadSessionLogger,
-        installation_report: InstallationReportImpl,
-        free_space_reservation: FreeSpaceReservation,
-        external_drives_repository: ExternalDrivesRepository,
-        file_filter_factory: FileFilterFactory,
-        target_paths_calculator_factory: TargetPathsCalculatorFactory,
-        config: Config,
-        fail_policy: DownloaderWorkerFailPolicy = DownloaderWorkerFailPolicy.FAULT_TOLERANT
-    ) -> DownloaderWorkerContext:
-    return DownloaderWorkerContext(
-        job_ctx=job_ctx,
-        http_gateway=http_gateway,
-        logger=logger,
-        file_system=file_system,
-        waiter=waiter,
-        progress_reporter=progress_reporter,
-        file_download_session_logger=file_download_session_logger,
-        installation_report=installation_report,
-        free_space_reservation=free_space_reservation,
-        external_drives_repository=external_drives_repository,
-        file_filter_factory=file_filter_factory,
-        target_paths_calculator_factory=target_paths_calculator_factory,
-        config=config,
-        fail_policy=fail_policy
-    )
 
 class DownloaderWorker(Worker):
     @abstractmethod

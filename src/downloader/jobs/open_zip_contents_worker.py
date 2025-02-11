@@ -17,7 +17,6 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import os
-from typing import List
 
 from downloader.job_system import WorkerResult
 from downloader.jobs.index import Index

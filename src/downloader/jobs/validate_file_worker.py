@@ -17,7 +17,6 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from typing import Optional
-from pathlib import Path
 
 from downloader.file_system import FileSystem
 from downloader.job_system import WorkerResult, ProgressReporter

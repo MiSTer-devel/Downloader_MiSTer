@@ -27,7 +27,7 @@ from downloader.interruptions import Interruptions
 from downloader.job_system import Job, JobFailPolicy, JobSystem
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerFailPolicy, make_downloader_worker_context
+from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerFailPolicy, DownloaderWorkerContext
 from downloader.local_store_wrapper import StoreWrapper
 from downloader.online_importer import InstallationBox, OnlineImporter as ProductionOnlineImporter
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
@@ -78,7 +78,7 @@ class OnlineImporter(ProductionOnlineImporter):
         self._report_tracker = ProgressReporterTracker(self._file_download_reporter)
         self._job_system = JobSystem(self._report_tracker, logger=logger, max_threads=1, fail_policy=JobFailPolicy.FAIL_FAST, max_timeout=1)
         external_drives_repository = ExternalDrivesRepository(file_system=self.file_system)
-        self._worker_ctx = make_downloader_worker_context(
+        self._worker_ctx = DownloaderWorkerContext(
             job_ctx=self._job_system,
             waiter=waiter,
             logger=logger,
