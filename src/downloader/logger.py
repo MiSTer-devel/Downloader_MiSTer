@@ -16,12 +16,11 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import datetime
-import re
 import tempfile
 import sys
 import time
 import traceback
-from typing import List, Any, Optional, Protocol
+from typing import Optional, Protocol
 
 from downloader.config import Config
 
@@ -140,41 +139,3 @@ class DebugOnlyLoggerDecorator(Logger):
 
     def bench(self, label: str):
         self._decorated_logger.bench(label)
-
-
-# @TODO: Consider moving this one to test code
-class NoLogger(Logger, FilelogManager, PrintLogManager):
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
-    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
-    def bench(self, label: str): pass
-    def finalize(self) -> None: pass
-    def set_local_repository(self, local_repository: FilelogSaver) -> None: pass
-    def configure(self, config: Config) -> None: pass
-
-
-# @TODO: Consider moving this one to test code
-class DescribeNowDecorator(Logger):
-    def __init__(self, decorated_logger: Logger):
-        self._re = re.compile(r'^ */[^:]+:\d+.*$')  # Matches paths such as /asd/bef/df:34
-        self._decorated_logger = decorated_logger
-
-    def bench(self, label: str): self._decorated_logger.bench(label)
-
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
-        self._decorated_logger.print(*self._handle_args([*args]), sep=sep, end=end, flush=True)
-
-    def debug(self, *args, sep='', end='\n', flush=True):
-        self._decorated_logger.debug(*self._handle_args([*args]), sep=sep, end=end, flush=True)
-
-    def _handle_args(self, args: List[Any]) -> List[Any]:
-        header = describe_time(time.time())
-        for i in range(len(args)):
-            if isinstance(args[i], str) and not self._re.fullmatch(args[i]):
-                endln, replacement = '\n', f"\n{header}| "
-                args[i] = f"{header}| {args[i].replace(endln, replacement)}"
-
-        return args
-
-
-
-def describe_time(t: float) -> str: return time.strftime(f'%Y-%m-%d %H:%M:%S.{t % 1 * 1000:03.0f}', time.localtime(t))

@@ -117,10 +117,6 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         create_folder_pkgs, folders_set = self._translate_items(calculator, summary_folders, PathType.FOLDER, set())
         delete_folder_pkgs, _ = self._translate_items(calculator, store.folders, PathType.FOLDER, folders_set)
 
-        # @TODO Why did I let this here? It breaks 2 tests.
-        # remove_files_pkgs = [pkg for pkg in remove_files_pkgs if 'zip_id' not in pkg.description]
-        # delete_folder_pkgs = [pkg for pkg in delete_folder_pkgs if 'zip_id' not in pkg.description]
-
         return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs
 
     def _folders_with_missing_parents(self, index: Index, store: ReadOnlyStoreAdapter, db: DbEntity) -> Dict[str, Any]:
