@@ -37,3 +37,4 @@ class ProcessDbJob(Job):
 
     # Results
     ignored_zips: List[str] = field(default_factory=list)
+    removed_zips: List[str] = field(default_factory=list)

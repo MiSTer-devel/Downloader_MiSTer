@@ -120,6 +120,8 @@ class OnlineImporter:
             box.add_installed_db(job.db)
             for zip_id in job.ignored_zips:
                 box.add_failed_zip(job.db.db_id, zip_id)
+            for zip_id in job.removed_zips:
+                box.add_removed_zip(job.db.db_id, zip_id)
 
         for job in report.get_completed_jobs(ProcessIndexJob):
             box.add_present_not_validated_files(job.present_not_validated_files)
@@ -200,6 +202,9 @@ class OnlineImporter:
         stores = {}
         for db in db_pkgs:
             stores[db.db_id] = local_store.store_by_id(db.db_id)
+
+        for db_id, zip_id in box.removed_zips():
+            stores[db_id].write_only().remove_zip_id(zip_id)
 
         removed_files = []
         processed_files = defaultdict(list)
@@ -447,6 +452,7 @@ class InstallationBox:
         self._failed_db_options: List[WrongDatabaseOptions] = []
         self._removed_files: List[str] = []
         self._removed_copies: List[RemovedCopy] = []
+        self._removed_zips: List[Tuple[str, str]] = []
         self._skipped_updated_files: List[str] = []
         self._filtered_zip_data: List[Tuple[str, str, Dict[str, Any], Dict[str, Any]]] = []
         self._installed_zip_indexes: List[Tuple[str, str, StoreFragmentDrivePaths, Dict[str, Any]]] = []
@@ -491,6 +497,8 @@ class InstallationBox:
             self._failed_files.append(pkg.rel_path)
     def add_failed_zip(self, db_id: str, zip_id: str):
         self._failed_zips.append((db_id, zip_id))
+    def add_removed_zip(self, db_id: str, zip_id: str):
+        self._removed_zips.append((db_id, zip_id))
     def add_failed_folders(self, folders: List[str]):
         self._failed_folders.extend(folders)
     def add_full_partitions(self, full_partitions: List[Tuple[Partition, int]]):
@@ -533,6 +541,7 @@ class InstallationBox:
     def failed_zips(self): return self._failed_zips
     def removed_files(self): return self._removed_files
     def removed_copies(self): return self._removed_copies
+    def removed_zips(self): return self._removed_zips
     def installed_files(self): return list(set(self._present_validated_files) | set(self._validated_files))
     def installed_folders(self): return list(self._installed_folders)
     def uninstalled_files(self): return self._removed_files + self._failed_files
