@@ -16,8 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.db_entity import DbEntity, DbEntityValidationException, make_db_tag
-from downloader.file_system import FsError
+from downloader.db_entity import DbEntity, make_db_tag
 from downloader.job_system import WorkerResult
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_job import ProcessDbJob

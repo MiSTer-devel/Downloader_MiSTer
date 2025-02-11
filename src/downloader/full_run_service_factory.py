@@ -32,7 +32,7 @@ from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem
 from downloader.jobs.fetch_file_worker import SafeFileFetcher
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
-from downloader.jobs.worker_context import make_downloader_worker_context
+from downloader.jobs.worker_context import DownloaderWorkerContext
 from downloader.logger import DebugOnlyLoggerDecorator, Logger, FilelogManager, PrintLogManager, FileLoggerDecorator, \
     PrintLogger
 from downloader.os_utils import LinuxOsUtils
@@ -92,7 +92,7 @@ class FullRunServiceFactory:
         free_space_reservation = LinuxFreeSpaceReservation(logger=self._logger, config=config) if system_file_system.is_file(FILE_MiSTer_version) else UnlimitedFreeSpaceReservation()
         linux_updater = LinuxUpdater(self._logger, config, system_file_system, safe_file_fetcher)
 
-        workers_ctx = make_downloader_worker_context(
+        workers_ctx = DownloaderWorkerContext(
             job_ctx=job_system,
             waiter=waiter,
             logger=self._logger,
