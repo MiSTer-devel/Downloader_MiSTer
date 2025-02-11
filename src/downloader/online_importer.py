@@ -23,7 +23,7 @@ from collections import defaultdict
 import os
 
 from downloader.constants import FILE_MiSTer
-from downloader.db_entity import DbEntity
+from downloader.db_entity import DbEntity, make_db_tag
 from downloader.db_utils import DbSectionPackage
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.errors import WrongDatabaseOptions
@@ -74,7 +74,7 @@ class OnlineImporter:
                 store=local_store.store_by_id(pkg.db_id),
                 full_resync=full_resync,
             )
-            db_tag = f'db:{pkg.db_id}'
+            db_tag = make_db_tag(pkg.db_id)
             get_db_job.add_tag(db_tag)
             get_db_job.after_job.add_tag(db_tag)
             jobs.append(get_db_job)
@@ -107,7 +107,7 @@ class OnlineImporter:
             if changes == 0:
                 no_changes_msg += f"Nothing new to download from {db.db_id}.\n"
 
-            failures = len(report.get_jobs_failed_by_tag(f'db:{db.db_id}'))
+            failures = len(report.get_jobs_failed_by_tag(make_db_tag(db.db_id)))
             if failures > 0:
                 box.add_failed_db(db.db_id)
 

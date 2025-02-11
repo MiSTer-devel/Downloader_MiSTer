@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from typing import Optional
+from downloader.db_entity import make_db_tag
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.index import Index
@@ -64,6 +65,6 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
             store=store,
             full_resync=job.full_resync,
         )
-        resulting_job.add_tag(f'db:{job.db.db_id}')
+        resulting_job.add_tag(make_db_tag(job.db.db_id))
         logger.bench('ProcessDbWorker done.')
         return [resulting_job], None

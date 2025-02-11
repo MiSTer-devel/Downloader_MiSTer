@@ -169,8 +169,6 @@ class _WithLock(Generic[T]):
         self.lock.release()
 
 
-# @TODO: Want to remove almost all locks in the report altogether, workers should add intermediate results to the jobs
-#  instead, only exception is tags as workers want to query that in runtime in some scenarios.
 class InstallationReportImpl(InstallationReport):
     def __init__(self):
         # These are only accessed in the main thread

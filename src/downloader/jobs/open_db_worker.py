@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.db_entity import DbEntity, DbEntityValidationException
+from downloader.db_entity import DbEntity, DbEntityValidationException, make_db_tag
 from downloader.file_system import FsError
 from downloader.job_system import WorkerResult
 from downloader.jobs.open_db_job import OpenDbJob
@@ -36,7 +36,7 @@ class OpenDbWorker(DownloaderWorkerBase):
             return [], e
 
         ini_description, store, full_resync = job.ini_description, job.store, job.full_resync
-        return [ProcessDbJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync).add_tag(f'db:{job.section}')], None
+        return [ProcessDbJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync).add_tag(make_db_tag(job.section))], None
 
     def _open_db(self, section: str, temp_path: str) -> DbEntity:
         db_raw = self._ctx.file_system.load_dict_from_file(temp_path)

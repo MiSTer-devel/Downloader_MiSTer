@@ -172,10 +172,10 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         validate_pkgs: List[_ValidateFilePackage] = []
         already_installed_pkgs: List[_ValidateFilePackage] = []
 
-        exists, dont = file_system.are_files(check_file_pkgs)
-        for pkg in exists:
+        existing, missing = file_system.are_files(check_file_pkgs)
+        for pkg in existing:
             pkg.exists = PathExists.EXISTS
-        for pkg in dont:
+        for pkg in missing:
             pkg.exists = PathExists.DOES_NOT_EXIST
 
         for pkg in non_duplicated_pkgs:
@@ -259,6 +259,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
                 get_file_job=fetch_job
             )
             fetch_job.add_tag(db_id)
+            fetch_job.after_job.add_tag(db_id)
             jobs.append(fetch_job)
 
         return jobs
