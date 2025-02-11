@@ -101,9 +101,6 @@ class OnlineImporter:
         box = self._box
         report = self._worker_ctx.file_download_session_logger.report()
 
-        for job in report.get_started_jobs(FetchFileJob):
-            box.add_file_fetch_started(job.info)
-
         no_changes_msg = ''
         for db in db_pkgs:
             changes = len(report.get_jobs_completed_by_tag(db.db_id))
@@ -123,6 +120,9 @@ class OnlineImporter:
             for zip_id in job.removed_zips:
                 box.add_removed_zip(job.db.db_id, zip_id)
 
+        for job, _e in report.get_failed_jobs(ProcessDbJob):
+            box.add_failed_db(job.db.db_id)
+
         for job in report.get_completed_jobs(ProcessIndexJob):
             box.add_present_not_validated_files(job.present_not_validated_files)
             box.add_present_validated_files(job.present_validated_files)
@@ -132,24 +132,27 @@ class OnlineImporter:
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
 
-        for job in report.get_completed_jobs(FetchFileJob) + report.get_completed_jobs(CopyFileJob):
-            if job.silent: continue
-            box.add_downloaded_file(job.info)
-
-        for job in report.get_completed_jobs(ValidateFileJob):
-            if job.after_job is not None: continue
-            box.add_validated_file(job.info)
+        for job, e in report.get_failed_jobs(ProcessIndexJob):
+            box.add_full_partitions(job.full_partitions)
+            box.add_failed_files(job.failed_files_no_space)
+            box.add_failed_folders(job.failed_folders)
+            if not isinstance(e, BadFileFilterPartException): continue
+            box.add_failed_db_options(WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(e)}' is invalid."))
 
         for job in report.get_completed_jobs(ProcessZipJob):
             if job.summary_download_failed is not None:
                 box.add_failed_file(job.summary_download_failed)
-            box.add_full_partitions(job.full_partitions)
-            box.add_failed_files(job.failed_files_no_space)
             box.add_installed_folders(job.installed_folders)
             if job.filtered_data:
                 box.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_data)
             if job.has_new_zip_index:
                 box.add_installed_zip_index(job.db.db_id, job.zip_id, job.result_zip_index, job.zip_description)
+
+        for job, _e in report.get_failed_jobs(ProcessZipJob):
+            if job.summary_download_failed is not None:
+                box.add_failed_file(job.summary_download_failed)
+            box.add_failed_files(job.failed_files_no_space)
+            box.add_full_partitions(job.full_partitions)
 
         for job in report.get_completed_jobs(OpenZipContentsJob):
             box.add_downloaded_files(job.downloaded_files)
@@ -159,35 +162,39 @@ class OnlineImporter:
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
 
-        for job, e in report.get_failed_jobs(OpenZipContentsJob):
+        for job, _e in report.get_failed_jobs(OpenZipContentsJob):
             box.add_failed_files(job.files_to_unzip)
 
-        for job, e in report.get_failed_jobs(ProcessIndexJob):
-            box.add_full_partitions(job.full_partitions)
-            box.add_failed_files(job.failed_files_no_space)
-            box.add_failed_folders(job.failed_folders)
-            if not isinstance(e, BadFileFilterPartException): continue
-            box.add_failed_db_options(WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(e)}' is invalid."))
+        for job in report.get_started_jobs(FetchFileJob):
+            box.add_file_fetch_started(job.info)
+
+        for job in report.get_completed_jobs(FetchFileJob) + report.get_completed_jobs(CopyFileJob):
+            if job.silent: continue
+            box.add_downloaded_file(job.info)
 
         for job, _e in report.get_failed_jobs(FetchFileJob) + report.get_failed_jobs(CopyFileJob):
             box.add_failed_file(job.info)
 
-        for job, _e in report.get_failed_jobs(ValidateFileJob):
+        for job in report.get_completed_jobs(ValidateFileJob):
+            if job.after_job is not None: continue
+            box.add_validated_file(job.info)
+
+        for job, e in report.get_failed_jobs(ValidateFileJob):
             box.add_failed_file(job.get_file_job.info)
             if job.info != FILE_MiSTer:
                 continue
 
             self._logger.debug(e)
             fs = self._worker_ctx.file_system
-            if fs.is_file(job.target_file_path):
+            if fs.is_file(job.target_file_path, use_cache=False):
                 continue
 
-            if fs.is_file(job.backup_job):
-                fs.move(job.backup_job, job.target_file_path)
-            elif fs.is_file(job.temp_path) and fs.hash(job.temp_path) == job.description['hash']:
+            if fs.is_file(job.backup_path, use_cache=False):
+                fs.move(job.backup_path, job.target_file_path)
+            elif fs.is_file(job.temp_path, use_cache=False) and fs.hash(job.temp_path) == job.description['hash']:
                 fs.move(job.temp_path, job.target_file_path)
 
-            if fs.is_file(job.target_file_path):
+            if fs.is_file(job.target_file_path, use_cache=False):
                 continue
 
             # This error message should never happen.

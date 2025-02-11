@@ -264,14 +264,21 @@ class InstallationReportImpl(InstallationReport):
                     return processed_files[pkg.rel_path]
         return None
 
-    def add_processed_folders(self, folders: List[PathPackage], db_id: str):
-        if len(folders) == 0: return
+    def add_processed_folders(self, folders: List[PathPackage], db_id: str) -> List[PathPackage]:
+        if len(folders) == 0: return []
+        non_already_present = []
         with self._processed_folders as processed_folders:
             for pkg in folders:
-                if pkg.rel_path in processed_folders and db_id in processed_folders[pkg.rel_path]:
-                    processed_folders[pkg.rel_path][db_id].description.update(pkg.description)
+                if pkg.rel_path in processed_folders:
+                    if db_id in processed_folders[pkg.rel_path]:
+                        processed_folders[pkg.rel_path][db_id].description.update(pkg.description)
+                    else:
+                        processed_folders[pkg.rel_path][db_id] = pkg
                 else:
-                    processed_folders.setdefault(pkg.rel_path, dict())[db_id] = pkg
+                    non_already_present.append(pkg)
+                    processed_folders[pkg.rel_path] = {db_id: pkg}
+
+        return non_already_present
 
     def get_started_jobs    (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_started   [job_class.type_id]
     def get_completed_jobs  (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_completed [job_class.type_id]

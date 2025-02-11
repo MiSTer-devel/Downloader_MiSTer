@@ -86,7 +86,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
             logger.debug(f"Processing create folder packages '{db.db_id}'...")
             logger.bench('Creating folders...')
-            removed_folders, job.installed_folders, job.failed_folders = self._process_create_folder_packages(create_folder_pkgs, db, store)
+            removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(self._ctx, create_folder_pkgs, db, store)
             if len(job.failed_folders) > 0:
                 return [], FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
 
@@ -227,56 +227,6 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
             return full_partitions
 
-    def _process_create_folder_packages(self, create_folder_pkgs: List[_CreateFolderPackage], db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[List[RemovedCopy], List[PathPackage], List[str]]:
-        if len(create_folder_pkgs) == 0:
-            return [], [], []
-
-        folders_to_create: Set[str] = set()
-        folder_copies_to_be_removed: List[Tuple[bool, str, str, PathType]] = []
-        parents: Dict[str, Set[str]] = defaultdict(set)
-
-        for pkg in create_folder_pkgs:
-            if pkg.is_pext_parent:
-                continue
-
-            if pkg.pext_props is not None:
-                parents[pkg.pext_props.parent].add(pkg.pext_props.drive)
-                folders_to_create.add(pkg.pext_props.parent_full_path())
-
-            folders_to_create.add(pkg.full_path)
-            self._maybe_add_copies_to_remove(folder_copies_to_be_removed, store, pkg.rel_path, pkg.pext_drive())
-
-        for parent_path, drives in parents.items():
-            for d in drives:
-                self._maybe_add_copies_to_remove(folder_copies_to_be_removed, store, parent_path, d)
-
-        with self._lock:
-            folders_to_create = folders_to_create - self._folders_created
-            if len(folders_to_create) > 0:
-                self._folders_created.update(folders_to_create)
-
-        errors = []
-        for full_folder_path in sorted(folders_to_create, key=lambda x: len(x), reverse=True):
-            try:
-                self._ctx.file_system.make_dirs(full_folder_path)
-            except FolderCreationError as e:
-                self._ctx.logger.print(f'ERROR: Folder "{full_folder_path}" could not be created.')
-                errors.append(full_folder_path)
-
-        # @TODO Why two adds?
-        folders = [f for f in create_folder_pkgs if f.db_path() in db.folders]
-        self._ctx.installation_report.add_processed_folders(folders, db.db_id)
-
-        return folder_copies_to_be_removed, folders, errors
-
-    def _maybe_add_copies_to_remove(self, copies: List[Tuple[bool, str, str, PathType]], store: ReadOnlyStoreAdapter, folder_path: str, drive: Optional[str]):
-        if store.folder_drive(folder_path) == drive: return
-        copies.extend([
-            (is_external, folder_path, other_drive, PathType.FOLDER)
-            for is_external, other_drive in store.list_other_drives_for_folder(folder_path, drive)
-            if not self._ctx.file_system.is_folder(os.path.join(other_drive, folder_path))
-        ])
-
     @staticmethod
     def _process_fetch_packages_and_launch_jobs(db_id: str, fetch_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
         if len(fetch_pkgs) == 0:
@@ -307,3 +257,55 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
 def _url(file_path: str, file_description: Dict[str, Any], base_files_url: str):
     return file_description['url'] if 'url' in file_description else calculate_url(base_files_url, file_path if file_path[0] != '|' else file_path[1:])
+
+
+def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[List[RemovedCopy], List[PathPackage], List[str]]:
+    if len(create_folder_pkgs) == 0:
+        return [], [], []
+
+    folders_to_create: Set[str] = set()
+    folder_copies_to_be_removed: List[Tuple[bool, str, str, PathType]] = []
+    parents: Dict[str, Set[str]] = defaultdict(set)
+    processing_folders: List[PathPackage] = []
+
+    for pkg in create_folder_pkgs:
+        if pkg.is_pext_parent:
+            continue
+
+        if pkg.pext_props is not None:
+            parents[pkg.pext_props.parent].add(pkg.pext_props.drive)
+            # @TODO: Check why is these 4 following lines required:
+            parent_full_path = pkg.pext_props.parent_full_path()
+            if parent_full_path not in folders_to_create:
+                folders_to_create.add(parent_full_path)
+                processing_folders.append(pkg.pext_props.parent_pkg())
+
+        if pkg.full_path not in folders_to_create:
+            folders_to_create.add(pkg.full_path)
+            processing_folders.append(pkg)
+        _maybe_add_copies_to_remove(ctx, folder_copies_to_be_removed, store, pkg.rel_path, pkg.pext_drive())
+
+    for parent_path, drives in parents.items():
+        for d in drives:
+            _maybe_add_copies_to_remove(ctx, folder_copies_to_be_removed, store, parent_path, d)
+
+    non_existing_folders = ctx.installation_report.add_processed_folders(processing_folders, db.db_id)
+
+    errors = []
+    for create_folder in sorted(non_existing_folders, key=lambda x: len(x.full_path), reverse=True):
+        try:
+            ctx.file_system.make_dirs(create_folder.full_path)
+        except FolderCreationError as e:
+            ctx.swallow_error(e)
+            errors.append(create_folder.full_path)
+
+    installed_folders = [f for f in processing_folders if f.db_path() in db.folders]
+    return folder_copies_to_be_removed, installed_folders, errors
+
+def _maybe_add_copies_to_remove(ctx: DownloaderWorkerContext, copies: List[Tuple[bool, str, str, PathType]], store: ReadOnlyStoreAdapter, folder_path: str, drive: Optional[str]):
+    if store.folder_drive(folder_path) == drive: return
+    copies.extend([
+        (is_external, folder_path, other_drive, PathType.FOLDER)
+        for is_external, other_drive in store.list_other_drives_for_folder(folder_path, drive)
+        if not ctx.file_system.is_folder(os.path.join(other_drive, folder_path))
+    ])

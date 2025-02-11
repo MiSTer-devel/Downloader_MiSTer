@@ -48,11 +48,14 @@ class ProcessZipJob(Job):
     # Results
     result_zip_index: StoreFragmentDrivePaths
     skip_unzip: bool = field(default=False)
-    summary_download_failed: Optional[str] = field(default=None)
     installed_folders: List[PathPackage] = field(default_factory=list)
+    failed_folders: List[str] = field(default_factory=list)
+    removed_folders: List[str] = field(default_factory=list)
     filtered_data: Optional[FileFoldersHolder] = field(default=None)
 
     # Failure results
-    not_enough_space: bool = field(default=False)
     full_partitions: List[Tuple[Partition, int]] = field(default_factory=list)
     failed_files_no_space: List[PathPackage] = field(default_factory=list)
+
+    # Success & Failure results
+    summary_download_failed: Optional[str] = field(default=None)
