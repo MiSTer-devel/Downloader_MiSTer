@@ -34,7 +34,6 @@ from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
-from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 from downloader.other import calculate_url
 from downloader.target_path_calculator import TargetPathsCalculator, StoragePriorityError
@@ -121,12 +120,6 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         # @TODO Why did I let this here? It breaks 2 tests.
         # remove_files_pkgs = [pkg for pkg in remove_files_pkgs if 'zip_id' not in pkg.description]
         # delete_folder_pkgs = [pkg for pkg in delete_folder_pkgs if 'zip_id' not in pkg.description]
-
-        # @TODO remove these 4 lines after distribution mister is updated
-        for pkg in check_file_pkgs:
-            if pkg.rel_path is FILE_MiSTer:
-                pkg.description['backup'] = FILE_MiSTer_old
-                pkg.description['tmp'] = FILE_MiSTer_new
 
         return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs
 
