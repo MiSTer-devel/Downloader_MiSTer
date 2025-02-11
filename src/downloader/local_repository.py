@@ -22,7 +22,7 @@ from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_lo
 from downloader.file_system import FileSystem
 from downloader.local_store_wrapper import LocalStoreWrapper
 from downloader.logger import FilelogSaver, Logger
-from downloader.other import UnreachableException, empty_store_without_base_path
+from downloader.other import empty_store_without_base_path
 from downloader.store_migrator import make_new_local_store, StoreMigrator
 from downloader.config import Config
 
@@ -113,8 +113,6 @@ class LocalRepository(FilelogSaver):
             try:
                 external_store = self._file_system.load_dict_from_file(external_store_file)
                 self._store_migrator.migrate(external_store)  # not very strict with exceptions, because this file is easier to tweak
-            except UnreachableException as e:
-                raise e
             except Exception as e:
                 self._logger.debug(e)
                 self._logger.print('Could not load external store for drive "%s"' % drive)

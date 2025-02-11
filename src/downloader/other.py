@@ -20,7 +20,6 @@
 import sys
 import urllib
 from typing import Optional
-from urllib.parse import urlparse
 
 if 'unittest' in sys.modules.keys():
     import inspect
@@ -38,22 +37,11 @@ def empty_store_without_base_path():
 
 
 def calculate_url(base_files_url, path) -> Optional[str]:
-    if base_files_url is None:
-        raise NoArgumentsToComputeUrlError('Could not calculate URL for "%s" because "base_files_url" is not defined.' % path)
-
-    if base_files_url == '':
+    if base_files_url is None or base_files_url.strip() == '':
         return None
 
     url = base_files_url + urllib.parse.quote(path)
     return url
-
-
-class NoArgumentsToComputeUrlError(Exception):
-    pass
-
-
-class UnreachableException(Exception):
-    pass
 
 
 def format_files_message(file_list):
