@@ -169,7 +169,7 @@ class FakeFileSystem(ProductionFileSystem):
     def read_file_contents(self, path):
         return self.state.files[self._path(path)]['content']
 
-    def precache_is_file_with_folders(self, _folders: list[str], _recheck: bool = False):
+    def precache_is_file_with_folders(self, _folders: list[str], recheck: bool = False):
         pass
 
     def write_file_contents(self, path, content):
