@@ -33,7 +33,7 @@ from downloader.path_package import PathExists, PathPackage, PathType, RemovedCo
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job import ValidateFileJob
-from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext, DownloaderWorkerFailPolicy
+from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
 from downloader.constants import FILE_MiSTer, FILE_MiSTer_new, FILE_MiSTer_old
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 from downloader.other import calculate_url
@@ -99,10 +99,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             logger.bench('Done process index...')
             return next_jobs, None
         except (BadFileFilterPartException, StoragePriorityError, FsError, OSError) as e:
-            if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
-                if isinstance(e, BadFileFilterPartException):
-                    raise WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e)))
-                raise e
+            self._ctx.swallow_error(WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e))) if isinstance(e, BadFileFilterPartException) else e)
             return [], e
 
     def _create_packages_from_index(self, config: Config, summary: Index, db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[
@@ -160,10 +157,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         for path, description in items.items():
             pkg, error = calculator.deduce_target_path(path, description, path_type)
             if error is not None:
-                if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
-                    raise error
-
-                self._ctx.logger.print(f"ERROR: {error}")
+                self._ctx.swallow_error(error)
 
             if pkg.rel_path in exclude: continue
 

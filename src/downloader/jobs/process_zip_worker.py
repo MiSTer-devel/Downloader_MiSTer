@@ -27,7 +27,7 @@ from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.local_store_wrapper import StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_zip_job import ProcessZipJob
-from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerFailPolicy
+from downloader.jobs.worker_context import DownloaderWorkerBase
 
 
 class ProcessZipWorker(DownloaderWorkerBase):
@@ -70,11 +70,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
         for file_path, file_description in zip_index.files.items():
             file_pkg, file_error = target_paths_calculator.deduce_target_path(file_path, file_description, PathType.FILE)
             if file_error is not None:
-                    if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
-                        raise file_error
-
-                    self._ctx.logger.debug(file_error)
-                    self._ctx.logger.print(f'Error: {file_error}')
+                self._ctx.swallow_error(file_error)
 
             file_packs.append(file_pkg)
 
@@ -90,21 +86,15 @@ class ProcessZipWorker(DownloaderWorkerBase):
         for folder_path, folder_description in zip_index.folders.items():
             folder_pkg, folder_error = target_paths_calculator.deduce_target_path(folder_path, folder_description, PathType.FOLDER)
             if folder_error is not None:
-                if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
-                    raise folder_error
+                self._ctx.swallow_error(folder_error)
 
-                self._ctx.logger.print(f'Error: {folder_error}')
             folder_packs.append(folder_pkg)
 
         store = job.store.read_only()
 
         zip_kind, kind_err = make_zip_kind(job.zip_description.get('kind', None), (job.zip_id, job.db.db_id))
         if kind_err is not None:
-            if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
-                raise kind_err
-
-            self._ctx.logger.debug(kind_err)
-            self._ctx.logger.print(f"ERROR: {kind_err}")
+            self._ctx.swallow_error(kind_err)
             return [], None
 
         if zip_kind == ZipKind.EXTRACT_ALL_CONTENTS:
@@ -113,11 +103,8 @@ class ProcessZipWorker(DownloaderWorkerBase):
                 .deduce_target_path(job.zip_description['target_folder_path'], {}, PathType.FOLDER)
 
             if target_error is not None:
-                if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
-                    raise target_error
+                self._ctx.swallow_error(target_error)
 
-                self._ctx.logger.debug(target_error)
-                self._ctx.logger.print(f"ERROR: {target_error}")
         elif zip_kind == ZipKind.EXTRACT_SINGLE_FILES:
             target_pkg = None
         else: raise ValueError(f"Impossible kind '{zip_kind}' for zip '{job.zip_id}' in db '{job.db.db_id}'")
@@ -203,11 +190,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
             .deduce_target_path(path, {}, PathType.FOLDER)
 
         if path_error is not None:
-            if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
-                raise path_error
-
-            self._ctx.logger.debug(path_error)
-            self._ctx.logger.print(f"ERROR: {path_error}")
+            self._ctx.swallow_error(path_error)
 
         if path_pkg.pext_props and path_pkg.is_pext_external:
             drive = path_pkg.pext_props.drive

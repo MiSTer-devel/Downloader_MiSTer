@@ -24,7 +24,7 @@ from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_ind
 from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
-from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerFailPolicy
+from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE
 
@@ -60,9 +60,7 @@ class ProcessDbWorker(DownloaderWorkerBase):
             for zip_id, zip_description in job.db.zips.items():
                 zip_job, err = _make_zip_job(ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
                 if err is not None:
-                    if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST: raise err
-                    logger.print(f'ERROR: Wrong zip {zip_id} format in database "{job.db.db_id}".')
-                    logger.debug(err)
+                    self._ctx.swallow_error(err)
                     job.ignored_zips.append(zip_id)
                     continue
 

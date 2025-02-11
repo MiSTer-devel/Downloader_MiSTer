@@ -30,7 +30,7 @@ from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.jobs_factory import make_get_file_job
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_job import ProcessDbJob
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext, DownloaderWorkerFailPolicy
+from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 from downloader.jobs.workers_factory import make_workers
 from downloader.logger import Logger
 from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
@@ -118,6 +118,8 @@ class OnlineImporter:
 
         for job in report.get_completed_jobs(ProcessDbJob):
             box.add_installed_db(job.db)
+            for zip_id in job.ignored_zips:
+                box.add_failed_zip(job.db.db_id, zip_id)
 
         for job in report.get_completed_jobs(ProcessIndexJob):
             box.add_present_not_validated_files(job.present_not_validated_files)
@@ -361,10 +363,7 @@ class OnlineImporter:
             self._clean_store(store.unwrap_store())
 
         for e in box.wrong_db_options():
-            if self._worker_ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
-                raise e
-            logger.debug(e)
-            logger.print(f'ERROR: {e}')
+            self._worker_ctx.swallow_error(e)
 
         logger.bench('OnlineImporter done.')
         return self
