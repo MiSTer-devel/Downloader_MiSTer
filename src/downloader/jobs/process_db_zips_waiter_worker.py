@@ -16,15 +16,11 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Optional
 from downloader.db_entity import make_db_tag
-from downloader.job_system import Job, WorkerResult
-from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.job_system import WorkerResult
 from downloader.jobs.index import Index
-from downloader.jobs.open_zip_index_job import OpenZipIndexJob
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.process_zip_job import ProcessZipJob
-from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 
