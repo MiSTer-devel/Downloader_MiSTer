@@ -21,7 +21,7 @@ from downloader.migrations import migrations
 from downloader.store_migrator import StoreMigrator as ProductionStoreMigrator
 from test.objects import db_options
 from test.fake_file_system_factory import FileSystemFactory
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 
 
 def default_config_with_distribution_mister():

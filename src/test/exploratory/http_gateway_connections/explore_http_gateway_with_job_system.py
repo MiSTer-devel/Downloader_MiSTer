@@ -30,9 +30,10 @@ from downloader.file_system import FileSystemFactory
 from downloader.job_system import JobSystem, ProgressReporter, Job
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.fetch_file_worker import FetchFileWorker
-from downloader.logger import PrintLogger, DescribeNowDecorator, Logger
+from downloader.logger import PrintLogger, Logger
 from downloader.http_gateway import HttpGateway
 from test.exploratory.http_gateway_connections.explore_http_gateway_with_real_urls import urls
+from test.fake_logger import DescribeNowDecorator
 
 
 def main() -> None:

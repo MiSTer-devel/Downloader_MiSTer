@@ -19,7 +19,7 @@
 from downloader.constants import FILE_PDFViewer, FOLDER_linux, \
     DISTRIBUTION_MISTER_DB_ID
 from downloader.file_system import FileSystemFactory
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 from test.fake_logger import SpyLoggerDecorator
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_waiter import NoWaiter

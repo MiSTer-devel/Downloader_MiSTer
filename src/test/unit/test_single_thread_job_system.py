@@ -26,7 +26,7 @@ from downloader.job_system import CantSetSignalsException, Job, JobFailPolicy, J
 from typing import Dict, Optional, List
 
 from downloader.jobs.reporters import JobTagTracking
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 
 
 class TestSingleThreadJobSystem(unittest.TestCase):

@@ -20,7 +20,7 @@ from typing import Optional
 from downloader.config import Config
 from downloader.file_system import FileSystem
 from downloader.jobs.fetch_file_worker import SafeFileFetcher as ProductionSafeFileFetcher
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_importer_implicit_inputs import NetworkState
 from test.fake_waiter import NoWaiter

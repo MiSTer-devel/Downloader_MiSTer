@@ -20,7 +20,7 @@ from downloader.config import default_config
 from downloader.constants import DEFAULT_CURL_SSL_OPTIONS
 from test.fake_waiter import NoWaiter
 from test.fake_file_system_factory import FileSystemFactory
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 
 
 class CertificatesFix(ProductionCertificatesFix):

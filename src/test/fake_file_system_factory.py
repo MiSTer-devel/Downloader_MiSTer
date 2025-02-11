@@ -26,7 +26,7 @@ from downloader.file_system import FileSystemFactory as ProductionFileSystemFact
 from downloader.other import ClosableValue
 from downloader.path_package import PathPackage
 from test.fake_importer_implicit_inputs import FileSystemState
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 
 first_fake_temp_file = '/tmp/unique_temp_filename_0'
 

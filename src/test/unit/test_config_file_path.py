@@ -19,7 +19,7 @@
 import unittest
 from downloader.config_reader import ConfigReader
 from downloader.constants import KENV_DOWNLOADER_LAUNCHER_PATH, KENV_DOWNLOADER_INI_PATH, KENV_PC_LAUNCHER
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 
 
 def calculate_config_path(env_vars, working_dir):

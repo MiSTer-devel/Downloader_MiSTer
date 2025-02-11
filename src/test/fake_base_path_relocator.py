@@ -18,7 +18,7 @@
 from downloader.base_path_relocator import BasePathRelocator as ProductionBasePathRelocator
 from downloader.config import default_config
 from test.fake_file_system_factory import FileSystemFactory
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 from test.fake_waiter import NoWaiter
 
 

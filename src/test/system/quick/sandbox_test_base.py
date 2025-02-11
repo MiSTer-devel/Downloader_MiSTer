@@ -30,7 +30,7 @@ from downloader.other import UnreachableException
 from test.fake_file_system_factory import make_production_filesystem_factory
 from test.fake_logger import SpyLoggerDecorator
 from test.objects import debug_env, default_env
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 from test.fake_store_migrator import StoreMigrator
 from downloader.file_system import hash_file, is_windows
 from downloader.main import execute_full_run

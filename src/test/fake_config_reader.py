@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config_reader import ConfigReader as ProductionConfigReader
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 from test.objects import default_env
 
 

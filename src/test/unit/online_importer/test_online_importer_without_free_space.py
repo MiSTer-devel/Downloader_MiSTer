@@ -21,7 +21,7 @@ from typing import Dict, Any
 from downloader.config import default_config
 from downloader.constants import MEDIA_FAT, STORAGE_PRIORITY_PREFER_EXTERNAL, MEDIA_USB1, DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB, DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB, STORAGE_PRIORITY_PREFER_SD
 from downloader.free_space_reservation import LinuxFreeSpaceReservation, Partition, file_size_on_disk, partition_min_space
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 from test.fake_file_system_factory import fs_data
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.objects import file_a, folder_a, db_test_with_file_a, empty_test_store, store_with_folders, store_test_with_file_a_descr, file_a_descr, config_with, file_size_a, \

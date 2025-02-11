@@ -32,7 +32,7 @@ from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_linux_updater import LinuxUpdater
 from test.fake_local_repository import LocalRepository
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 from test.fake_online_importer import OnlineImporter
 from test.fake_reboot_calculator import RebootCalculator
 from test.objects import db_empty

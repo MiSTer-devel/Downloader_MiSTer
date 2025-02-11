@@ -19,7 +19,7 @@
 import time
 import unittest
 from downloader.job_system import CantWaitWhenTimedOut, JobFailPolicy, JobSystem, JobSystemAbortException, Worker, Job
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 from test.unit.test_single_thread_job_system import TestSingleThreadJobSystem
 
 

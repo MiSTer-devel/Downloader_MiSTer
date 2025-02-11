@@ -31,13 +31,14 @@ from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerFai
 from downloader.local_store_wrapper import StoreWrapper
 from downloader.online_importer import InstallationBox, OnlineImporter as ProductionOnlineImporter
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
-from downloader.logger import Logger, NoLogger
+from downloader.logger import Logger
 
 from downloader.waiter import Waiter
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_job_system import ProgressReporterTracker
 from test.fake_local_store_wrapper import LocalStoreWrapper
 from test.fake_external_drives_repository import ExternalDrivesRepository
+from test.fake_logger import NoLogger
 from test.fake_workers_factory import make_workers
 from test.objects import config_with
 from test.fake_waiter import NoWaiter

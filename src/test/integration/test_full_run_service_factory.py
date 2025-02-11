@@ -21,7 +21,7 @@ import unittest
 from downloader.config import default_config, AllowReboot
 from downloader.constants import K_ALLOW_REBOOT, K_CURL_SSL, K_DEBUG
 from downloader.full_run_service_factory import FullRunServiceFactory
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 
 
 class TestFullRunServiceFactory(unittest.TestCase):
