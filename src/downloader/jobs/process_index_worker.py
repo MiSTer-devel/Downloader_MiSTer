@@ -65,16 +65,20 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
         try:
             logger.debug(f"Processing db '{db.db_id}'...")
+            logger.bench('Creating index packages...')
             check_file_pkgs, job.files_to_remove, create_folder_pkgs, job.directories_to_remove = self._create_packages_from_index(config, summary, db, store)
 
             logger.debug(f"Processing check file packages '{db.db_id}'...")
+            logger.bench('Testing index packages presence in FS...')
             fetch_pkgs, validate_pkgs, job.present_not_validated_files = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
 
             logger.debug(f"Processing validate file packages '{db.db_id}'...")
+            logger.bench('Testing index packages hashes in FS...')
             job.present_validated_files, job.skipped_updated_files, more_fetch_pkgs = self._process_validate_packages(validate_pkgs)
             fetch_pkgs.extend(more_fetch_pkgs)
 
             logger.debug(f"Reserving space '{db.db_id}'...")
+            logger.bench('Reserving space...')
             job.full_partitions = self._try_reserve_space(fetch_pkgs)
             if len(job.full_partitions) > 0:
                 job.failed_files_no_space = fetch_pkgs
@@ -82,6 +86,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
                 return [], FileWriteError(f"Could not allocate space for {len(fetch_pkgs)} files.")
 
             logger.debug(f"Processing create folder packages '{db.db_id}'...")
+            logger.bench('Creating folders...')
             removed_folders, job.installed_folders, job.failed_folders = self._process_create_folder_packages(create_folder_pkgs, db, store)
             if len(job.failed_folders) > 0:
                 return [], FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
@@ -89,7 +94,9 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             job.removed_copies.extend(removed_folders)
 
             logger.debug(f"Process fetch packages and launch fetch jobs '{db.db_id}'...")
+            logger.bench('Creating fetch packages...')
             next_jobs = self._process_fetch_packages_and_launch_jobs(db.db_id, fetch_pkgs, db.base_files_url)
+            logger.bench('Done process index...')
             return next_jobs, None
         except (BadFileFilterPartException, StoragePriorityError, FsError, OSError) as e:
             if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
@@ -104,12 +111,8 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         List[_CreateFolderPackage],
         List[_DeleteFolderPackage]
     ]:
-        logger = self._ctx.logger
-
-        logger.bench('Filtering Database...')
         filtered_summary, _ = self._ctx.file_filter_factory.create(db, summary, config).select_filtered_files(summary)
 
-        logger.bench('Translating paths...')
         summary_folders = self._folders_with_missing_parents(filtered_summary, store, db)
         calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(config)
 

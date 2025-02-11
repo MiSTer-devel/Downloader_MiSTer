@@ -35,6 +35,8 @@ class ProcessZipWorker(DownloaderWorkerBase):
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: ProcessZipJob) -> WorkerResult:  # type: ignore[override]
+        logger = self._ctx.logger
+        logger.bench('ProcessZipWorker start.')
         total_files_size = 0
         for file_description in job.zip_index.files.values():
             total_files_size += file_description['size']
@@ -56,6 +58,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
             next_jobs = [process_index_job]
 
         self._fill_fragment_with_zip_index(job.result_zip_index, job)
+        logger.bench('ProcessZipWorker done.')
         return next_jobs, None
 
     def _make_open_zip_contents_job(self, job: ProcessZipJob) -> Tuple[Job, Optional[Exception]]:

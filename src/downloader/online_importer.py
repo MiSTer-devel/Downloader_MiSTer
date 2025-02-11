@@ -30,7 +30,7 @@ from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.jobs_factory import make_get_file_job
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_job import ProcessDbJob
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext, DownloaderWorkerFailPolicy
 from downloader.jobs.workers_factory import make_workers
 from downloader.logger import Logger
 from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
@@ -85,13 +85,18 @@ class OnlineImporter:
 
     def download_dbs_contents(self, db_pkgs: List[DbSectionPackage], full_resync: bool):
         if self._local_store is None: raise Exception("Local store is not set")
+
+        logger = self._logger
+        logger.bench('OnlineImporter start.')
         
         local_store: LocalStoreWrapper = self._local_store
 
         self._job_system.register_workers(self._make_workers())
         self._job_system.push_jobs(self._make_jobs(db_pkgs, local_store, full_resync))
 
+        logger.bench('OnlineImporter execute jobs start.')
         self._job_system.execute_jobs()
+        logger.bench('OnlineImporter execute jobs done.')
 
         box = self._box
         report = self._worker_ctx.file_download_session_logger.report()
@@ -187,6 +192,8 @@ class OnlineImporter:
             self._logger.print('Please manually rename the file MiSTer.new as MiSTer')
             self._logger.print('Your system won\'nt be able to boot until you do so!')
             sys.exit(1)
+
+        logger.bench('OnlineImporter applying changes on stores...')
 
         stores = {}
         for db in db_pkgs:
@@ -354,8 +361,12 @@ class OnlineImporter:
             self._clean_store(store.unwrap_store())
 
         for e in box.wrong_db_options():
-            raise e
-    
+            if self._worker_ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
+                raise e
+            logger.debug(e)
+            logger.print(f'ERROR: {e}')
+
+        logger.bench('OnlineImporter done.')
         return self
  
     @staticmethod

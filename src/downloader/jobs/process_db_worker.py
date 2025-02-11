@@ -34,11 +34,14 @@ class ProcessDbWorker(DownloaderWorkerBase):
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: ProcessDbJob) -> WorkerResult:  # type: ignore[override]
+        logger = self._ctx.logger
+        logger.bench('ProcessDbWorker start.')
+    
         read_only_store = job.store.read_only()
         write_only_store = job.store.write_only()
 
         self._ctx.file_download_session_logger.print_header(job.db)
-        self._ctx.logger.debug(f"Building db config '{job.db.db_id}'...")
+        logger.debug(f"Building db config '{job.db.db_id}'...")
         config = build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
 
         if not read_only_store.has_base_path():  # @TODO should remove this from here at some point.
@@ -58,8 +61,8 @@ class ProcessDbWorker(DownloaderWorkerBase):
                 zip_job, err = _make_zip_job(ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
                 if err is not None:
                     if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST: raise err
-                    self._ctx.logger.print(f'ERROR: Wrong zip {zip_id} format in database "{job.db.db_id}".')
-                    self._ctx.logger.debug(err)
+                    logger.print(f'ERROR: Wrong zip {zip_id} format in database "{job.db.db_id}".')
+                    logger.debug(err)
                     job.ignored_zips.append(zip_id)
                     continue
 
