@@ -293,11 +293,17 @@ class _FileSystem(FileSystem):
 
     def precache_is_file_with_folders(self, folders: List[PathPackage], recheck: bool = False) -> None:
         not_checked_folders = folders if recheck else self._shared_state.consult_not_checked_folders(folders)
-        for folder_pkg in not_checked_folders:
-            try:
-                self._shared_state.add_many_files([f.path for f in os.scandir(folder_pkg.full_path) if f.is_file()])
-            except FileNotFoundError:
-                continue
+        try:
+            self._shared_state.add_many_files([f.path for folder_pkg in not_checked_folders for f in os.scandir(folder_pkg.full_path) if f.is_file()])
+        except Exception as e:
+            self._logger.debug(e)
+            for folder_pkg in not_checked_folders:
+                try:
+                    self._shared_state.add_many_files([f.path for f in os.scandir(folder_pkg.full_path) if f.is_file()])
+                except OSError:
+                    continue
+                except Exception as e:
+                    return
 
     def read_file_contents(self, path: str) -> str:
         full_path = self._path(path)
