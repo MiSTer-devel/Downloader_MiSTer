@@ -90,7 +90,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def precache_is_file_with_folders(self, folders: List[PathPackage]) -> None:
+    def precache_is_file_with_folders(self, folders: List[PathPackage], recheck: bool = False) -> None:
         """interface"""
 
     @abstractmethod
@@ -195,8 +195,8 @@ class ReadOnlyFileSystem:
     def is_folder(self, path):
         return self._fs.is_folder(path)
 
-    def precache_is_file_with_folders(self, folders: List[PathPackage]):
-        return self._fs.precache_is_file_with_folders(folders)
+    def precache_is_file_with_folders(self, folders: List[PathPackage], recheck: bool = False):
+        return self._fs.precache_is_file_with_folders(folders, recheck)
 
     def download_target_path(self, path):
         return self._fs.download_target_path(path)
@@ -291,8 +291,9 @@ class _FileSystem(FileSystem):
     def is_folder(self, path: str) -> bool:
         return os.path.isdir(self._path(path))
 
-    def precache_is_file_with_folders(self, folders: List[PathPackage]) -> None:
-        for folder_pkg in folders:
+    def precache_is_file_with_folders(self, folders: List[PathPackage], recheck: bool = False) -> None:
+        not_checked_folders = folders if recheck else self._shared_state.consult_not_checked_folders(folders)
+        for folder_pkg in not_checked_folders:
             try:
                 self._shared_state.add_many_files([f.path for f in os.scandir(folder_pkg.full_path) if f.is_file()])
             except FileNotFoundError:
@@ -580,17 +581,29 @@ class FsSharedState:
     def __init__(self) -> None:
         self.interrupting_operations = False
         self._files: Set[str] = set()
-        self._lock = threading.Lock()
+        self._files_lock = threading.Lock()
+        self._cached_folders = set()
+        self._cached_folders_lock = threading.Lock()
+
+    def consult_not_checked_folders(self, folders: List[PathPackage]) -> List[PathPackage]:
+        precaching_folders = []
+        with self._cached_folders_lock:
+            for folder_pkg in folders:
+                if folder_pkg.full_path not in self._cached_folders:
+                    self._cached_folders.add(folder_pkg.full_path)
+                    precaching_folders.append(folder_pkg)
+
+        return precaching_folders
 
     def contains_file(self, path: str) -> bool:
-        with self._lock:
+        with self._files_lock:
             return path in self._files
 
     def contained_file_pkgs(self, pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
         if len(pkgs) == 0: return [], []
         contained = []
         foreigns = []
-        with self._lock:
+        with self._files_lock:
             for p in pkgs:
                 if p.full_path in self._files:
                     contained.append(p)
@@ -600,13 +613,13 @@ class FsSharedState:
 
     def add_many_files(self, paths: List[str]) -> None:
         if len(paths) == 0: return
-        with self._lock:
+        with self._files_lock:
             self._files.update(paths)
 
     def add_file(self, path: str) -> None:
-        with self._lock:
+        with self._files_lock:
             self._files.add(path)
 
     def remove_file(self, path: str) -> None:
-        with self._lock:
+        with self._files_lock:
             if path in self._files: self._files.remove(path)
