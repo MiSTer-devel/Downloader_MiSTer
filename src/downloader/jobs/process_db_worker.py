@@ -18,6 +18,7 @@
 
 from typing import Dict, Any, Optional, Tuple
 
+from downloader.db_entity import make_db_tag
 from downloader.db_utils import build_db_config
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_index_job, make_zip_tag, ZipJobContext
@@ -85,7 +86,7 @@ class ProcessDbWorker(DownloaderWorkerBase):
                 store=job.store,
                 full_resync=job.full_resync,
             )
-            index_job.add_tag(f'db:{job.db.db_id}')
+            index_job.add_tag(make_db_tag(job.db.db_id))
             return [index_job], None
 
 

@@ -435,3 +435,7 @@ def file_folder_reason_from_exception(e: _InternalDbValidationException) -> str:
         return f'with an illegal path'
     else:
         return ''
+
+
+def make_db_tag(db_id: str) -> str:
+    return f'db:{db_id}'
