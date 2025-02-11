@@ -26,7 +26,6 @@ from downloader.constants import FILE_downloader_storage_json
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from downloader.full_run_service_factory import FullRunServiceFactory
 from downloader.logger import PrintLogger
-from downloader.other import UnreachableException
 from test.fake_file_system_factory import make_production_filesystem_factory
 from test.fake_logger import SpyLoggerDecorator
 from test.objects import debug_env, default_env
@@ -155,11 +154,11 @@ class SandboxTestBase(unittest.TestCase):
 
 def local_store_files(tuples):
     if not len(tuples):
-        raise UnreachableException("Forgot adding some tuples!")
+        raise Exception("Forgot adding some tuples!")
     if len(tuples[0]) == 2:
         tuples = [tuple([store_id, files, {}]) for store_id, files in tuples]
     if len(tuples[0]) != 3:
-        raise UnreachableException("This is not meant to be used like this!")
+        raise Exception("This is not meant to be used like this!")
 
     store = make_new_local_store(StoreMigrator())
     for store_id, files, folders in tuples:

@@ -236,16 +236,20 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
             return full_partitions
 
-    @staticmethod
-    def _process_fetch_packages_and_launch_jobs(db_id: str, fetch_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
+    def _process_fetch_packages_and_launch_jobs(self, db_id: str, fetch_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
         if len(fetch_pkgs) == 0:
             return []
 
         jobs: List[Job] = []
         for pkg in fetch_pkgs:
+            source = _url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url)
+            if not isinstance(source, str):
+                self._ctx.swallow_error(Exception(f"Invalid 'url' for file '{pkg.rel_path}' at database '{db_id}'."))
+                continue
+
             temp_path = pkg.temp_path()
             fetch_job = FetchFileJob(
-                source=_url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url),
+                source=source,
                 info=pkg.rel_path,
                 temp_path=temp_path,
                 silent=False
@@ -265,7 +269,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         return jobs
 
 
-def _url(file_path: str, file_description: Dict[str, Any], base_files_url: str):
+def _url(file_path: str, file_description: Dict[str, Any], base_files_url: str) -> Any:
     return file_description['url'] if 'url' in file_description else calculate_url(base_files_url, file_path if file_path[0] != '|' else file_path[1:])
 
 

@@ -18,7 +18,7 @@
 
 import unittest
 
-from downloader.other import calculate_url, NoArgumentsToComputeUrlError
+from downloader.other import calculate_url
 
 
 class TestUrls(unittest.TestCase):
@@ -31,9 +31,8 @@ class TestUrls(unittest.TestCase):
              'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/Cheats/NES/Lipstick%20%231%20-%20Lolita%20Hen%20%28Japan%29%20%28Unl%29%20%5B30D9946C%5D.zip'],
             ['https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/', 'Cheats/SNES/Maerchen Adventure Cotton 100% (Japan) [5FB7A31D].zip',
              'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/Cheats/SNES/Maerchen%20Adventure%20Cotton%20100%25%20%28Japan%29%20%5B5FB7A31D%5D.zip'],
+            ['   ', 'Cheats/SNES/Maerchen Adventure Cotton 100% (Japan) [5FB7A31D].zip', None],
+            [None, 'Cheats/SNES/Maerchen Adventure Cotton 100% (Japan) [5FB7A31D].zip', None],
         ]:
             with self.subTest(input_url) as _:
                 self.assertEqual(expected, calculate_url(input_url, input_file_ctx))
-
-    def test_calculate_url___without_base_files_url___raises_no_arguments_to_compute_url_error(self):
-        self.assertRaises(NoArgumentsToComputeUrlError, lambda: calculate_url(None, 'Cheats/SNES/Maerchen Adventure Cotton 100% (Japan) [5FB7A31D].zip'))
