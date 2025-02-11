@@ -588,16 +588,14 @@ class FsSharedState:
 
     def contained_file_pkgs(self, pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
         if len(pkgs) == 0: return [], []
-        with self._lock:
-            files = frozenset(self._files)
-
         contained = []
         foreigns = []
-        for p in pkgs:
-            if p.full_path in files:
-                contained.append(p)
-            else:
-                foreigns.append(p)
+        with self._lock:
+            for p in pkgs:
+                if p.full_path in self._files:
+                    contained.append(p)
+                else:
+                    foreigns.append(p)
         return contained, foreigns
 
     def add_many_files(self, paths: List[str]) -> None:
