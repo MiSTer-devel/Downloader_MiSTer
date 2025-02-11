@@ -22,6 +22,7 @@ import shutil
 import json
 import sys
 import tempfile
+import threading
 import time
 import zipfile
 from abc import ABC, abstractmethod
@@ -32,6 +33,7 @@ from downloader.config import AllowDelete, Config
 from downloader.constants import HASH_file_does_not_exist
 from downloader.logger import Logger, PrintLogger
 from downloader.other import ClosableValue
+from downloader.path_package import PathPackage
 
 
 is_windows = os.name == 'nt'
@@ -76,6 +78,10 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
+    def are_files(self, file_pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
+        """interface"""
+
+    @abstractmethod
     def print_debug(self) -> None:
         """interface"""
 
@@ -84,7 +90,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def precache_is_file_with_folders(self, folders: List[str]) -> None:
+    def precache_is_file_with_folders(self, folders: List[PathPackage]) -> None:
         """interface"""
 
     @abstractmethod
@@ -183,10 +189,13 @@ class ReadOnlyFileSystem:
     def is_file(self, path):
         return self._fs.is_file(path)
 
+    def are_files(self, file_pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
+        return self._fs.are_files(file_pkgs)
+
     def is_folder(self, path):
         return self._fs.is_folder(path)
 
-    def precache_is_file_with_folders(self, folders):
+    def precache_is_file_with_folders(self, folders: List[PathPackage]):
         return self._fs.precache_is_file_with_folders(folders)
 
     def download_target_path(self, path):
@@ -263,21 +272,31 @@ class _FileSystem(FileSystem):
 
         return False
 
+    def are_files(self, file_pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
+        are, not_sure = self._shared_state.contained_file_pkgs(file_pkgs)
+        bulk_add = []
+        nope = []
+        for f in not_sure:
+            if os.path.isfile(f.full_path):
+                bulk_add.append(f.full_path)
+                are.append(f)
+            else:
+                nope.append(f)
+        self._shared_state.add_many_files(bulk_add)
+        return are, nope
+
     def print_debug(self) -> None:
         self._logger.debug(f'IS_FILE quick hits: {self._quick_hit} slow hits: {self._slow_hit}')
 
     def is_folder(self, path: str) -> bool:
         return os.path.isdir(self._path(path))
 
-    def precache_is_file_with_folders(self, folders: List[str]) -> None:
-        for folder_path in folders:
-            base_path = self._base_path(folder_path)
-            full_folder_path = folder_path if base_path is None else os.path.join(base_path, folder_path)
-            if not os.path.isdir(full_folder_path):
+    def precache_is_file_with_folders(self, folders: List[PathPackage]) -> None:
+        for folder_pkg in folders:
+            try:
+                self._shared_state.add_many_files([f.path for f in os.scandir(folder_pkg.full_path) if f.is_file()])
+            except FileNotFoundError:
                 continue
-
-            files = [f.path for f in os.scandir(full_folder_path) if f.is_file()]
-            self._shared_state.add_many_files(files)
 
     def read_file_contents(self, path: str) -> str:
         full_path = self._path(path)
@@ -561,14 +580,35 @@ class FsSharedState:
     def __init__(self) -> None:
         self.interrupting_operations = False
         self._files: Set[str] = set()
+        self._lock = threading.Lock()
 
-    def contains_file(self, path: str) -> bool: return path in self._files
+    def contains_file(self, path: str) -> bool:
+        with self._lock:
+            return path in self._files
+
+    def contained_file_pkgs(self, pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
+        if len(pkgs) == 0: return [], []
+        with self._lock:
+            files = frozenset(self._files)
+
+        contained = []
+        foreigns = []
+        for p in pkgs:
+            if p.full_path in files:
+                contained.append(p)
+            else:
+                foreigns.append(p)
+        return contained, foreigns
 
     def add_many_files(self, paths: List[str]) -> None:
-        self._files.update(paths)
+        if len(paths) == 0: return
+        with self._lock:
+            self._files.update(paths)
 
     def add_file(self, path: str) -> None:
-        self._files.add(path)
+        with self._lock:
+            self._files.add(path)
 
     def remove_file(self, path: str) -> None:
-        if path in self._files: self._files.remove(path)
+        with self._lock:
+            if path in self._files: self._files.remove(path)

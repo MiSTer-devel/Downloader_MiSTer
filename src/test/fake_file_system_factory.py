@@ -146,6 +146,14 @@ class FakeFileSystem(ProductionFileSystem):
 
         return False
 
+    def are_files(self, file_pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
+        are = []
+        nope = []
+        for p in file_pkgs:
+            if self.is_file(p.full_path): are.append(p)
+            else: nope.append(p)
+        return are, nope
+
     def print_debug(self):
         pass
 
