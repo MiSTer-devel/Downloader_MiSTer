@@ -23,7 +23,7 @@ from downloader.job_system import WorkerResult
 from downloader.jobs.index import Index
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.path_package import PathPackage
-from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext, DownloaderWorkerFailPolicy
+from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
 from downloader.file_system import UnzipError
 
@@ -57,8 +57,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         try:
             self._ctx.file_system.unzip_contents(job.contents_zip_temp_path, target_path, (job.target_folder, job.files_to_unzip, job.filtered_data['files']))
         except UnzipError as e:
-            if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
-                raise e
+            self._ctx.swallow_error(e)
             return [], e
         finally:
             self._ctx.file_system.unlink(job.contents_zip_temp_path)

@@ -55,6 +55,11 @@ class DownloaderWorkerContext:
     config: Config
     fail_policy: DownloaderWorkerFailPolicy
 
+    def swallow_error(self, e: Exception, print: bool = True):
+        if self.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
+            raise e
+        self.logger.debug(e)
+        if print: self.logger.print(f"ERROR: {e}")
 
 def make_downloader_worker_context(
         job_ctx: JobContext,

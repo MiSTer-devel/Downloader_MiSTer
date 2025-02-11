@@ -60,6 +60,6 @@ class ValidateFileWorker(DownloaderWorker):
                     self._file_system.move(target_file_path, backup_path)
                 self._file_system.move(temp_path, target_file_path)
 
-        except BaseException as e:
+        except Exception as e:
             return FileDownloadError(f'Exception during validation! {info}: {str(e)}')
         else: return None
