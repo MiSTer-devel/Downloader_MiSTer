@@ -117,4 +117,4 @@ def make_zip_kind(kind: Optional[str], ctx: Any = None) -> Tuple[ZipKind, Option
     elif kind == 'extract_single_files':
         return ZipKind.EXTRACT_SINGLE_FILES, None
     else:
-        return Exception(f"Unknown kind '{kind}' for zip. '{ctx}'")
+        return ZipKind.EXTRACT_SINGLE_FILES, Exception(f"Unknown kind '{kind}' for zip. '{ctx}'")
