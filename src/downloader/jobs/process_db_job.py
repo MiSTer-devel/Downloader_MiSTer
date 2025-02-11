@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
@@ -34,3 +34,6 @@ class ProcessDbJob(Job):
     full_resync: bool
 
     def retry_job(self): return None
+
+    # Results
+    ignored_zips: List[str] = field(default_factory=list)

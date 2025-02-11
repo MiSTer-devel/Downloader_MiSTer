@@ -18,7 +18,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from downloader.constants import K_BASE_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE, HASH_file_does_not_exist
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, FsError, UnzipError, \
@@ -306,25 +306,28 @@ class FakeFileSystem(ProductionFileSystem):
         self.state.files[file]['json'] = db
         self._write_records.append(_Record('save_json', file))
 
-    def unzip_contents(self, file_path, zip_target_path, files_to_unzip: Optional[Dict[str, str]], test_info: Tuple[Optional[PathPackage], Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]):
+    def unzip_contents(self, file_path, target_path: Union[str, Dict[str, str]], test_info: Tuple[Optional[PathPackage], List[PathPackage], Dict[str, Dict[str, Any]]]):
         if 'unzip_error' in self._fake_failures:
             raise UnzipError(file_path)
 
+        target_path_by_relpath = None if isinstance(target_path, str) else target_path
+
         extracting = {}
-        target_pkg, files, filtered_files = test_info
-        if files_to_unzip is not None:
-            extracting.update(files_to_unzip)
+        target_pkg, files_to_unzip, filtered_files = test_info
+        if target_path_by_relpath is not None:
+            # Should NOT extract all case
+            extracting.update(target_path_by_relpath)
             if target_pkg is None:
-                zip_path, full_path = next(iter(files_to_unzip.items()))
+                zip_path, full_path = next(iter(target_path_by_relpath.items()))
                 abs_zip_root_path = full_path.removesuffix(zip_path)
                 for f_desc in filtered_files.values():
                     f = f_desc['zip_path']
                     extracting[f] = os.path.join(abs_zip_root_path, f)
-
-        if target_pkg is not None:
+        else:
+            # Should extract all case
             zip_root_path = os.path.join(target_pkg.rel_path, '')
             abs_zip_root_path = target_pkg.full_path
-            for f_path in list(filtered_files) + (list(files) if files_to_unzip is None else []):
+            for f_path in list(filtered_files) + ([pkg.rel_path for pkg in files_to_unzip] if target_path_by_relpath is None else []):
                 f = f_path.lstrip('|').removeprefix(zip_root_path)
                 extracting[f] = os.path.join(abs_zip_root_path, f)
 
@@ -332,7 +335,7 @@ class FakeFileSystem(ProductionFileSystem):
         for file, description in contents['files'].items():
             full_path = extracting.get(file, None)
             if full_path is None:
-                full_path = self._path(file)
+                continue
             self.state.files[full_path.lower()] = {'hash': description['hash'], 'size': description['size']}
 
         for folder in contents['folders']:

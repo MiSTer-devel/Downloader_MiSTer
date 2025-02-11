@@ -33,10 +33,7 @@ class OpenDbWorker(DownloaderWorkerBase):
             db = self._open_db(section=job.section, temp_path=job.temp_path)
         except Exception as e:
             self._ctx.logger.debug(e)
-            if isinstance(e, DbEntityValidationException) or isinstance(e, FsError) or isinstance(e, OSError):
-                return [], e
-            else:
-                raise e
+            return [], e
 
         ini_description, store, full_resync = job.ini_description, job.store, job.full_resync
         return [ProcessDbJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync).add_tag(f'db:{job.section}')], None
@@ -46,4 +43,3 @@ class OpenDbWorker(DownloaderWorkerBase):
         self._ctx.file_system.unlink(temp_path)
         self._ctx.logger.bench(f'Validating database {section}...')
         return DbEntity(db_raw, section)
-

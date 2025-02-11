@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Tuple
 
 from downloader.db_utils import build_db_config
 from downloader.job_system import WorkerResult, Job
@@ -24,7 +24,7 @@ from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_ind
 from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
 from downloader.jobs.process_index_job import ProcessIndexJob
 from downloader.jobs.index import Index
-from downloader.jobs.worker_context import DownloaderWorkerBase
+from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerFailPolicy
 from downloader.jobs.process_db_job import ProcessDbJob
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE
 
@@ -55,7 +55,14 @@ class ProcessDbWorker(DownloaderWorkerBase):
             zip_job_tags = []
 
             for zip_id, zip_description in job.db.zips.items():
-                zip_job = _make_zip_job(ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
+                zip_job, err = _make_zip_job(ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
+                if err is not None:
+                    if self._ctx.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST: raise err
+                    self._ctx.logger.print(f'ERROR: Wrong zip {zip_id} format in database "{job.db.db_id}".')
+                    self._ctx.logger.debug(err)
+                    job.ignored_zips.append(zip_id)
+                    continue
+
                 zip_job_tags.append(make_zip_tag(job.db, zip_id))
                 zip_jobs.append(zip_job)
 
@@ -82,7 +89,7 @@ class ProcessDbWorker(DownloaderWorkerBase):
             return [index_job], None
 
 
-def _make_zip_job(z: ZipJobContext) -> Job:
+def _make_zip_job(z: ZipJobContext) -> Tuple[Job, Optional[Exception]]:
     if 'summary_file' in z.zip_description:
         index = z.job.store.read_only().zip_index(z.zip_id)
 
@@ -95,15 +102,15 @@ def _make_zip_job(z: ZipJobContext) -> Job:
         if process_zip_job is not None and index['hash'] == z.zip_description['summary_file']['hash'] and index['hash'] != NO_HASH_IN_STORE_CODE:
             job = process_zip_job
         else:
-            job, summary_info =  make_open_zip_index_job(z, z.zip_description['summary_file'], process_zip_job)
+            job = make_open_zip_index_job(z, z.zip_description['summary_file'], process_zip_job)
 
     elif 'internal_summary' in z.zip_description:
         job = _make_process_zip_job_from_ctx(z, zip_index=z.zip_description['internal_summary'], has_new_zip_index=True)
     else:
-        raise Exception(f"Unknown zip description for zip '{z.zip_id}' in db '{z.job.db.db_id}'")
-        # @TODO: Handle this case, it should never raise in any case
+        return z.job, Exception(f"Unknown zip description for zip '{z.zip_id}' in db '{z.job.db.db_id}'")
+        # @TODO: Set a more descriptive exception type here, is a exception validation error
 
-    return job
+    return job, None
 
 
 def _make_process_zip_job_from_ctx(z: ZipJobContext, zip_index: Dict[str, Any], has_new_zip_index: bool):

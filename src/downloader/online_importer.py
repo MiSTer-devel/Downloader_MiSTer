@@ -100,14 +100,14 @@ class OnlineImporter:
             box.add_file_fetch_started(job.info)
 
         no_changes_msg = ''
-        for pkg in db_pkgs:
-            changes = len(report.get_jobs_completed_by_tag(pkg.db_id))
+        for db in db_pkgs:
+            changes = len(report.get_jobs_completed_by_tag(db.db_id))
             if changes == 0:
-                no_changes_msg += f"Nothing new to download from {pkg.db_id}.\n"
+                no_changes_msg += f"Nothing new to download from {db.db_id}.\n"
 
-            failures = len(report.get_jobs_failed_by_tag(f'db:{pkg.db_id}'))
+            failures = len(report.get_jobs_failed_by_tag(f'db:{db.db_id}'))
             if failures > 0:
-                box.add_failed_db(pkg.db_id)
+                box.add_failed_db(db.db_id)
 
         if no_changes_msg != '': self._logger.print('\n' + no_changes_msg)
 
@@ -136,18 +136,22 @@ class OnlineImporter:
                 box.add_failed_file(job.summary_download_failed)
             box.add_full_partitions(job.full_partitions)
             box.add_failed_files(job.failed_files_no_space)
+            box.add_installed_folders(job.installed_folders)
+            if job.filtered_data:
+                box.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_data)
             if job.has_new_zip_index:
                 box.add_installed_zip_index(job.db.db_id, job.zip_id, job.result_zip_index, job.zip_description)
 
         for job in report.get_completed_jobs(OpenZipContentsJob):
             box.add_downloaded_files(job.downloaded_files)
-            box.add_validated_files(job.downloaded_files)  # @TODO: Check the old implementation, didn't we check the hashes after unzipping?
-            # We shoould be able to comment previous line and the test still pass
+            box.add_validated_files(job.validated_files)
+            # We should be able to comment previous line and the test still pass
             box.add_failed_files(job.failed_files)
-            box.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_data)
-            box.add_installed_folders(job.installed_folders)
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
+
+        for job, e in report.get_failed_jobs(OpenZipContentsJob):
+            box.add_failed_files(job.files_to_unzip)
 
         for job, e in report.get_failed_jobs(ProcessIndexJob):
             box.add_full_partitions(job.full_partitions)
@@ -185,8 +189,8 @@ class OnlineImporter:
             sys.exit(1)
 
         stores = {}
-        for pkg in db_pkgs:
-            stores[pkg.db_id] = local_store.store_by_id(pkg.db_id)
+        for db in db_pkgs:
+            stores[db.db_id] = local_store.store_by_id(db.db_id)
 
         removed_files = []
         processed_files = defaultdict(list)
@@ -372,7 +376,13 @@ class OnlineImporter:
         return self._box.failed_folders()
 
     def zips_that_failed(self) -> List[str]:
-        return []
+        return [f'{db_id}:{zip_id}' for db_id, zip_id in self._box.failed_zips()]
+
+    def files_that_failed(self):
+        return self._box.failed_files()
+
+    def dbs_that_failed(self):
+        return self._box.failed_dbs()
 
     def unused_filter_tags(self) -> List[str]:
         return self._worker_ctx.file_filter_factory.unused_filter_parts()
@@ -394,22 +404,16 @@ class OnlineImporter:
         for p, reservation in self._box.full_partitions_iter():
             actual_remaining_space[p] -= reservation
         return actual_remaining_space
-    
+
     def correctly_downloaded_dbs(self) -> List[DbEntity]:
         return self._box.installed_dbs()
 
     def correctly_installed_files(self):
         return self._box.installed_files()
 
-    def files_that_failed(self):
-        return self._box.failed_files()
-    
     def run_files(self):
         return self._box.fetch_started_files()
-    
-    def dbs_that_failed(self):
-        return self._box.failed_dbs()
-    
+
     @property
     def needs_save(self) -> bool:
         return self._needs_save
@@ -428,6 +432,7 @@ class InstallationBox:
         self._fetch_started_files: List[str] = []
         self._failed_files: List[str] = []
         self._failed_folders: List[str] = []
+        self._failed_zips: List[Tuple[str, str]] = []
         self._full_partitions: Dict[str, int] = dict()
         self._failed_db_options: List[WrongDatabaseOptions] = []
         self._removed_files: List[str] = []
@@ -474,6 +479,8 @@ class InstallationBox:
         if len(file_pkgs) == 0: return
         for pkg in file_pkgs:
             self._failed_files.append(pkg.rel_path)
+    def add_failed_zip(self, db_id: str, zip_id: str):
+        self._failed_zips.append((db_id, zip_id))
     def add_failed_folders(self, folders: List[str]):
         self._failed_folders.extend(folders)
     def add_full_partitions(self, full_partitions: List[Tuple[Partition, int]]):
@@ -513,6 +520,7 @@ class InstallationBox:
     def fetch_started_files(self): return self._fetch_started_files
     def failed_files(self): return self._failed_files
     def failed_folders(self): return self._failed_folders
+    def failed_zips(self): return self._failed_zips
     def removed_files(self): return self._removed_files
     def removed_copies(self): return self._removed_copies
     def installed_files(self): return list(set(self._present_validated_files) | set(self._validated_files))

@@ -118,7 +118,7 @@ class OnlineImporter(ProductionOnlineImporter):
         return jobs
 
     @staticmethod
-    def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs, free_space_reservation=None):
+    def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs, free_space_reservation=None, fail_policy=DownloaderWorkerFailPolicy.FAIL_FAST):
         config = implicit_inputs.config
         file_system_factory = FileSystemFactory(state=implicit_inputs.file_system_state, config=config)
         return OnlineImporter(
@@ -126,7 +126,8 @@ class OnlineImporter(ProductionOnlineImporter):
             file_system_factory=file_system_factory,
             free_space_reservation=free_space_reservation,
             network_state=implicit_inputs.network_state,
-            file_system_state=implicit_inputs.file_system_state
+            file_system_state=implicit_inputs.file_system_state,
+            fail_policy=fail_policy
         )
 
     @property

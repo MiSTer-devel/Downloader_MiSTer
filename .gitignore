@@ -1,6 +1,6 @@
 .vscode
 .idea
-venv
+.coverage
 __pycache__
 .DS_Store
 

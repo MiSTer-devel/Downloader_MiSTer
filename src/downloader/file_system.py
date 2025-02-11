@@ -23,15 +23,15 @@ import json
 import sys
 import tempfile
 import time
+import zipfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Set, Dict, Any, Tuple
+from typing import List, Optional, Set, Dict, Any, Tuple, Union
 
 from downloader.config import AllowDelete, Config
 from downloader.constants import HASH_file_does_not_exist
 from downloader.logger import Logger, NoLogger
 from downloader.other import ClosableValue
-import zipfile
 
 
 is_windows = os.name == 'nt'
@@ -168,7 +168,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def unzip_contents(self, file: str, path: str, files_to_unzip: Optional[Dict[str, str]], test_info: Any) -> None:
+    def unzip_contents(self, file: str, target_path: Union[str, Dict[str, str]], test_info: Any) -> None:
         """interface"""
 
     @abstractmethod
@@ -462,20 +462,33 @@ class _FileSystem(FileSystem):
         with open(full_path, 'w') as f:
             json.dump(db, f)
 
-    def unzip_contents(self, full_file: str, full_path: str, files_to_unzip: Optional[Dict[str, str]], test_info: Any) -> None:
-        self._debug_log('Unzipping contents', full_file, full_path)
+    def unzip_contents(self, zip_file: str, target_path: Union[str, Dict[str, str]], test_info: Any) -> None:
+        self._debug_log('Unzipping contents', (zip_file))
+        files_to_unzip = None if isinstance(target_path, str) else target_path
         try:
-            with zipfile.ZipFile(full_file, 'r') as zipf:
+            with zipfile.ZipFile(zip_file, 'r') as zipf:
                 if files_to_unzip is None:
-                    zipf.extractall(full_path)
-                else:
-                    for member in zipf.infolist():
-                        if member.filename in files_to_unzip:
-                            zipf.extract(member, full_path)
+                    zipf.extractall(target_path)
+                    return
+
+                for member in zipf.infolist():
+                    if member.filename not in files_to_unzip:
+                        continue
+
+                    if self._shared_state.interrupting_operations:
+                        raise FsOperationsError("File system operations have been disabled.")
+
+                    file_path = files_to_unzip[member.filename]
+                    with zipf.open(member) as source, open(file_path, 'wb') as target:
+                        while True:
+                            buf = source.read(COPY_BUFSIZE)
+                            if not buf:
+                                break
+                            target.write(buf)
+
         except Exception as e:
             self._logger.debug(e)
-            sys.exit(1)
-            raise UnzipError(f"Cannot unzip '{full_file}' to '{full_path}'") from e
+            raise UnzipError(f"Cannot unzip '{zip_file}' ['{target_path if isinstance(target_path, str) else len(target_path)}']") from e
 
     def _debug_log(self, message: str, path: Tuple[str, str], target: Optional[Tuple[str, str]] = None) -> None:
         if path[0][0] == '/':
