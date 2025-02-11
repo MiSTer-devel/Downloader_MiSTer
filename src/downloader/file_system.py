@@ -296,7 +296,7 @@ class _FileSystem(FileSystem):
         try:
             self._shared_state.add_many_files([f.path for folder_pkg in not_checked_folders for f in os.scandir(folder_pkg.full_path) if f.is_file()])
         except Exception as e:
-            self._logger.debug(e)
+            self._logger.debug('precache_is_file_with_folders error:', e)
             for folder_pkg in not_checked_folders:
                 try:
                     self._shared_state.add_many_files([f.path for f in os.scandir(folder_pkg.full_path) if f.is_file()])
