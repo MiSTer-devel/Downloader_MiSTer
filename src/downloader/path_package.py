@@ -19,6 +19,7 @@
 
 from dataclasses import dataclass
 from enum import auto, unique, Enum
+from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 import os
 
@@ -130,8 +131,13 @@ class PextPathProps:
     other_drives: Tuple[str, ...]
     is_subfolder: bool = False
 
-    def parent_full_path(self):
+    def parent_full_path(self) -> str:
         return os.path.join(self.drive, self.parent)
+
+    def parent_pkg(self) -> PathPackage:
+        return PathPackage(full_path=self.parent_full_path(), rel_path=self.parent, drive=self.drive, description={}, pext_props=PextPathProps(
+            kind=self.kind, parent=Path(self.parent).parent, drive=self.drive, other_drives=self.other_drives, is_subfolder=True
+        ), ty=PathType.FOLDER, kind=PathPackageKind.PEXT)
 
 
 RemovedCopy = Tuple[bool, str, str, PathType]

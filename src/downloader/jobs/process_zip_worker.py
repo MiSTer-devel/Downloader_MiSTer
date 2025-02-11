@@ -19,11 +19,13 @@
 from typing import List, Optional, Set, Tuple
 
 from downloader.db_entity import DbEntity
+from downloader.file_system import FileWriteError
 from downloader.free_space_reservation import Partition
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_zip_kind
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
 from downloader.jobs.process_index_job import ProcessIndexJob
+from downloader.jobs.process_index_worker import process_create_folder_packages
 from downloader.local_store_wrapper import StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_zip_job import ProcessZipJob
@@ -62,6 +64,8 @@ class ProcessZipWorker(DownloaderWorkerBase):
         return next_jobs, None
 
     def _make_open_zip_contents_job(self, job: ProcessZipJob) -> Tuple[Job, Optional[Exception]]:
+        logger = self._ctx.logger
+
         total_amount_of_files_in_zip = len(job.zip_index.files)
         zip_index, filtered_zip_data = self._ctx.file_filter_factory.create(job.db, job.zip_index, job.config).select_filtered_files(job.zip_index)
 
@@ -74,13 +78,13 @@ class ProcessZipWorker(DownloaderWorkerBase):
 
             file_packs.append(file_pkg)
 
-        self._ctx.logger.debug(f"Reserving space '{job.db.db_id}'...")
+        logger.debug(f"Reserving space '{job.db.db_id} zip:{job.zip_id}...")
+        logger.bench('Reserving space...')
         job.full_partitions = self._try_reserve_space(file_packs)
         if len(job.full_partitions) > 0:
-            self._ctx.logger.debug(f"Not enough space '{job.db.db_id} zip:{job.zip_id}'!")
             job.failed_files_no_space = file_packs
-            job.not_enough_space = True
-            return [], None  # @TODO return error instead to handle "zips_that_failed", and find other instances of zips failing
+            logger.debug(f"Not enough space '{job.db.db_id} zip:{job.zip_id}'!")
+            return [], FileWriteError(f"Could not allocate space for decompressing {len(file_packs)} files.")
 
         folder_packs: List[PathPackage] = []
         for folder_path, folder_description in zip_index.folders.items():
@@ -118,10 +122,12 @@ class ProcessZipWorker(DownloaderWorkerBase):
         files_to_unzip, already_processed_files = self._ctx.installation_report.add_processed_files(contained_files, job.db.db_id)
         if len(already_processed_files) > 0:
             already_processed = already_processed_files[0]
-            self._ctx.logger.print(f'Skipping zip "{job.zip_id}" because file "{already_processed.pkg.rel_path}" was already processed by db "{already_processed.db_id}"')
+            logger.print(f'Skipping zip "{job.zip_id}" because file "{already_processed.pkg.rel_path}" was already processed by db "{already_processed.db_id}"')
             return [], None
 
-        job.installed_folders = self._process_create_folders_packages(job.db, folder_packs)
+        logger.bench('Creating folders...')
+        job.installed_folders = self._process_create_folders_packages(job.db, folder_packs)  # @TODO: Transition to below line
+        #job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(self._ctx, folder_packs, job.db, store)
         job.filtered_data = filtered_zip_data[job.zip_id] if job.zip_id in filtered_zip_data else {'files': {}, 'folders': {}}
 
         if len(files_to_unzip) == 0:

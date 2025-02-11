@@ -50,10 +50,11 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
         for tag in job.zip_job_tags:
             for zip_job in self._ctx.installation_report.get_jobs_completed_by_tag(tag):
                 if isinstance(zip_job, ProcessZipJob):
-                    if zip_job.not_enough_space:
-                        return [], None
-
                     store = job.store.deselect(zip_job.zip_index)
+            for zip_job in self._ctx.installation_report.get_jobs_failed_by_tag(tag):
+                if isinstance(zip_job, ProcessZipJob):
+                    if len(zip_job.full_partitions) > 0:
+                        return [], None
 
         resulting_job = ProcessIndexJob(
             db=job.db,
