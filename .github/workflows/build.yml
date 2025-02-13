@@ -11,8 +11,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Install sharutils
-      run: sudo apt-get install sharutils
 
     - uses: actions/setup-python@v2
       with:
