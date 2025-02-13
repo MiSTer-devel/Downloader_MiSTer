@@ -155,8 +155,8 @@ class ProcessZipWorker(DownloaderWorkerBase):
 
     def _create_target_package(self, calculator: TargetPathsCalculator, kind: ZipKind, description: Dict[str, Any]) -> Tuple[Optional[str], Optional[Exception]]:
         if kind == ZipKind.EXTRACT_ALL_CONTENTS:
-            if 'target_folder_path' not in description:
-                return None, Exception('extract_all_contents zip requires "target_folder_path" but found none.')
+            if 'target_folder_path' not in description or not isinstance(description['target_folder_path']):
+                return None, Exception('extract_all_contents zip requires string "target_folder_path".')
             else:
                 return calculator.deduce_target_path(description['target_folder_path'], {}, PathType.FOLDER)
         elif kind == ZipKind.EXTRACT_SINGLE_FILES:
