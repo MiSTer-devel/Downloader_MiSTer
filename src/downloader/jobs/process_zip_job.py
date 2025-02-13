@@ -47,7 +47,6 @@ class ProcessZipJob(Job):
 
     # Results
     result_zip_index: StoreFragmentDrivePaths
-    skip_unzip: bool = field(default=False)
     installed_folders: List[PathPackage] = field(default_factory=list)
     failed_folders: List[str] = field(default_factory=list)
     removed_folders: List[RemovedCopy] = field(default_factory=list)
