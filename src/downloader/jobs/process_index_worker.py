@@ -172,16 +172,13 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         validate_pkgs: List[_ValidateFilePackage] = []
         already_installed_pkgs: List[_ValidateFilePackage] = []
 
-        existing, missing = file_system.are_files(check_file_pkgs)
+        existing, missing = file_system.are_files(non_duplicated_pkgs)
+
+        for pkg in missing: pkg.exists = PathExists.DOES_NOT_EXIST
+        fetch_pkgs.extend(missing)
+
         for pkg in existing:
             pkg.exists = PathExists.EXISTS
-        for pkg in missing:
-            pkg.exists = PathExists.DOES_NOT_EXIST
-
-        for pkg in non_duplicated_pkgs:
-            if pkg.exists == PathExists.DOES_NOT_EXIST:
-                fetch_pkgs.append(pkg)
-                continue
 
             if full_resync or (store.hash_file(pkg.rel_path) != pkg.description['hash']):
                 validate_pkgs.append(pkg)
