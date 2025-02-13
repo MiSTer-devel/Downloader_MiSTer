@@ -6,7 +6,6 @@ set -euo pipefail
 DOWNLOADER_ZIP="downloader.zip"
 TEMP_ZIP2="${ZIP_FILE:-$(mktemp -u).zip}"
 BIN="/tmp/dont_download.zip"
-UUDECODE_CMD=$({ [[ "${MISTER:-false}" == "false" ]] && [[ "$(uname -s)" == "Darwin" ]] ; } && echo "uudecode -p" || echo "uudecode -o -")
 TEMPDIR="$(mktemp -d)"
 
 pin_metadata() {
@@ -34,12 +33,12 @@ cat <<-EOF
 #!/usr/bin/env bash
 set -euo pipefail
 export DOWNLOADER_LAUNCHER_PATH="\${DOWNLOADER_LAUNCHER_PATH:-\${0}}"
-${UUDECODE_CMD} "\${0}" | xzcat -d -c > "${BIN}"
+tail -n +8 "\${0}" | xzcat -d -c > "${BIN}"
 chmod a+x "${BIN}"
 "${BIN}" "\${1:-}"
 exit 0
 EOF
 
-uuencode - < <(xzcat -z < "${TEMP_ZIP2}")
+xzcat -z < "${TEMP_ZIP2}"
 
 rm -rf "${TEMPDIR}" >/dev/null 2>&1
