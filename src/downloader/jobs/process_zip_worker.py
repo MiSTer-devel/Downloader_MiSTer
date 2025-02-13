@@ -16,10 +16,9 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Tuple
 
-from downloader.db_entity import DbEntity
-from downloader.file_system import FileWriteError, FolderCreationError
+from downloader.file_system import FileWriteError
 from downloader.free_space_reservation import Partition
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_zip_kind
@@ -131,8 +130,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
             return [], None
 
         logger.bench('Creating folders...')
-        job.installed_folders, job.failed_folders = self._process_create_folders_packages(job.db, folder_packs)  # @TODO: Transition to below line
-        #job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(self._ctx, folder_packs, job.db, store)
+        job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(self._ctx, folder_packs, job.db.db_id, zip_index.folders, store)
         job.filtered_data = filtered_zip_data[job.zip_id] if job.zip_id in filtered_zip_data else {'files': {}, 'folders': {}}
 
         if len(files_to_unzip) == 0:
@@ -225,30 +223,6 @@ class ProcessZipWorker(DownloaderWorkerBase):
 
             for folder_path, folder_description in job.zip_index.folders.items():
                 fragment['base_paths']['folders'][folder_path] = folder_description
-
-    def _process_create_folders_packages(self, db: DbEntity, create_folder_pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[str]]:
-        # @TODO: inspired in ProcessIndexWorker._process_create_folders_packages
-        folders_to_create: Set[str] = set()
-        for pkg in create_folder_pkgs:
-            if pkg.is_pext_parent:
-                continue
-
-            if self._ctx.file_system.is_folder(pkg.full_path):
-                continue
-
-            if pkg.pext_props:
-                folders_to_create.add(pkg.pext_props.parent_full_path())
-
-            folders_to_create.add(pkg.full_path)
-        errors = []
-        for full_folder_path in sorted(folders_to_create, key=lambda x: len(x), reverse=True):
-            try:
-                self._ctx.file_system.make_dirs(full_folder_path)
-            except FolderCreationError as e:
-                self._ctx.swallow_error(e)
-                errors.append(full_folder_path)
-        self._ctx.installation_report.add_processed_folders(create_folder_pkgs, db.db_id)
-        return create_folder_pkgs, errors
 
 def _make_process_index_job(job: ProcessZipJob) -> Optional[ProcessIndexJob]:
     if 'base_files_url' not in job.zip_description:

@@ -193,7 +193,7 @@ def db_external_drives_2(): return db_entity(db_id=db_id_external_drives_2, file
 
 
 def db_with_zipped_nes_palettes(): return db_entity(
-    folders=_store_folders_nes(),
+    folders={**_store_folders_nes(), folder_games_nes_palettes: {}},
     zips={zipped_nes_palettes_id: zipped_nes_palettes_desc()}
 )
 

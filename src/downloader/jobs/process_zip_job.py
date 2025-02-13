@@ -26,7 +26,7 @@ from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.index import Index
 from downloader.local_store_wrapper import StoreWrapper, StoreFragmentDrivePaths
-from downloader.path_package import PathPackage
+from downloader.path_package import PathPackage, RemovedCopy
 
 
 @dataclass(eq=False, order=False)
@@ -50,7 +50,7 @@ class ProcessZipJob(Job):
     skip_unzip: bool = field(default=False)
     installed_folders: List[PathPackage] = field(default_factory=list)
     failed_folders: List[str] = field(default_factory=list)
-    removed_folders: List[str] = field(default_factory=list)
+    removed_folders: List[RemovedCopy] = field(default_factory=list)
     filtered_data: Optional[FileFoldersHolder] = field(default=None)
 
     # Failure results

@@ -136,7 +136,7 @@ class PextPathProps:
 
     def parent_pkg(self) -> PathPackage:
         return PathPackage(full_path=self.parent_full_path(), rel_path=self.parent, drive=self.drive, description={}, pext_props=PextPathProps(
-            kind=self.kind, parent=Path(self.parent).parent, drive=self.drive, other_drives=self.other_drives, is_subfolder=True
+            kind=PextKind.PEXT_PARENT, parent=self.parent, drive=self.drive, other_drives=self.other_drives, is_subfolder=False
         ), ty=PathType.FOLDER, kind=PathPackageKind.PEXT)
 
 
