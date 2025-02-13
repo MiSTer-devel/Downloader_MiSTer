@@ -81,7 +81,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
             logger.debug(f"Reserving space '{db.db_id}'...")
             logger.bench('Reserving space...')
-            job.full_partitions = self._try_reserve_space(fetch_pkgs)
+            job.full_partitions = try_reserve_space(self._ctx, fetch_pkgs)
             if len(job.full_partitions) > 0:
                 job.failed_files_no_space = fetch_pkgs
                 logger.debug(f"Not enough space '{db.db_id}'!")
@@ -223,19 +223,6 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
         return present_validated_files, skipped_updated_files, more_fetch_pkgs
 
-    def _try_reserve_space(self, fetch_pkgs: List[_FetchFilePackage]) -> List[Tuple[Partition, int]]:
-        if len(fetch_pkgs) == 0:
-            return []
-
-        fits_well, full_partitions = self._ctx.free_space_reservation.reserve_space_for_file_pkgs(fetch_pkgs)
-        if fits_well:
-            return []
-        else:
-            for partition, _ in full_partitions:
-                self._ctx.file_download_session_logger.print_progress_line(f"Partition {partition.path} would get full!")
-
-            return full_partitions
-
     def _process_fetch_packages_and_launch_jobs(self, db_id: str, fetch_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
         if len(fetch_pkgs) == 0:
             return []
@@ -271,6 +258,20 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
 def _url(file_path: str, file_description: Dict[str, Any], base_files_url: str) -> Any:
     return file_description['url'] if 'url' in file_description else calculate_url(base_files_url, file_path if file_path[0] != '|' else file_path[1:])
+
+
+def try_reserve_space(ctx: DownloaderWorkerContext, file_pkgs: List[PathPackage]) -> List[Tuple[Partition, int]]:
+    if len(file_pkgs) == 0:
+        return []
+
+    fits_well, full_partitions = ctx.free_space_reservation.reserve_space_for_file_pkgs(file_pkgs)
+    if fits_well:
+        return []
+    else:
+        for partition, _ in full_partitions:
+            ctx.file_download_session_logger.print_progress_line(f"Partition {partition.path} would get full!")
+
+        return full_partitions
 
 
 def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter) -> Tuple[List[RemovedCopy], List[PathPackage], List[str]]:
