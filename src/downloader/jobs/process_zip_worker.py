@@ -18,7 +18,7 @@
 
 from typing import List, Optional, Tuple
 
-from downloader.file_system import FileWriteError
+from downloader.file_system import FileWriteError, FolderCreationError
 from downloader.free_space_reservation import Partition
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_zip_kind
@@ -131,6 +131,9 @@ class ProcessZipWorker(DownloaderWorkerBase):
 
         logger.bench('Creating folders...')
         job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(self._ctx, folder_packs, job.db.db_id, zip_index.folders, store)
+        if len(job.failed_folders) > 0:
+            return [], FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
+
         job.filtered_data = filtered_zip_data[job.zip_id] if job.zip_id in filtered_zip_data else {'files': {}, 'folders': {}}
 
         if len(files_to_unzip) == 0:
