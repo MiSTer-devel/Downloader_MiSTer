@@ -25,7 +25,7 @@ from downloader.jobs.index import Index
 from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_zip_kind
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
 from downloader.jobs.process_index_job import ProcessIndexJob
-from downloader.jobs.process_index_worker import process_create_folder_packages
+from downloader.jobs.process_index_worker import process_create_folder_packages, try_reserve_space
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter, StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_zip_job import ProcessZipJob
@@ -84,7 +84,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
 
         logger.debug(f"Reserving space '{job.db.db_id} zip:{job.zip_id}...")
         logger.bench('Reserving space...')
-        job.full_partitions = self._try_reserve_space(file_packs)
+        job.full_partitions = try_reserve_space(self._ctx, file_packs)
         if len(job.full_partitions) > 0:
             job.failed_files_no_space = file_packs
             logger.debug(f"Not enough space '{job.db.db_id} zip:{job.zip_id}'!")
@@ -162,16 +162,6 @@ class ProcessZipWorker(DownloaderWorkerBase):
         elif kind == ZipKind.EXTRACT_SINGLE_FILES:
             return None, None
         else: raise ValueError(f"Impossible kind '{kind}'")
-
-    def _try_reserve_space(self, file_packs: List[PathPackage]) -> List[Tuple[Partition, int]]:
-        fits_well, full_partitions = self._ctx.free_space_reservation.reserve_space_for_file_pkgs(file_packs)
-        if fits_well:
-            return []
-        else:
-            for partition, _ in full_partitions:
-                self._ctx.file_download_session_logger.print_progress_line(f"Partition {partition.path} would get full!")
-
-            return full_partitions
 
     def _process_compressed_file_packages(self, file_packs: List[PathPackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool) -> Tuple[List[PathPackage], List[PathPackage]]:
         if full_resync:
