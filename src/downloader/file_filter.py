@@ -137,10 +137,10 @@ class FileFilterFactory:
 
     def _create_filter_calculator(self, db: DbEntity, index: Index, config: Config) -> Optional[FilterCalculator]:
         if config['filter'] is None or config['filter'] == '':
-            self._logger.debug(f'No filter for db {db.db_id}.')
+            self._logger.debug('No filter for db %s.', db.db_id)
             return None
         this_filter = config['filter'].strip().lower()  # @TODO: Remove strip after field is validated in other place
-        self._logger.debug(f'Filter for db {db.db_id}: {this_filter}')
+        self._logger.debug('Filter for db %s: %s', db.db_id, this_filter)
         if this_filter == '':
             raise BadFileFilterPartException(this_filter)
         if this_filter == 'all':

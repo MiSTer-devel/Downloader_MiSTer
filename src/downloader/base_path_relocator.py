@@ -43,7 +43,7 @@ class BasePathRelocator:
             to_base_path = self._config[K_BASE_PATH]
 
             if to_base_path == from_base_path:
-                self._logger.debug('%s still uses base_path: %s' % (pkg.db_id, self._config[K_BASE_PATH]))
+                self._logger.debug('%s still uses base_path: %s', pkg.db_id, self._config[K_BASE_PATH])
                 continue
 
             from_file_system = self._file_system_factory.create_for_config(config_with_base_path(self._config, from_base_path))

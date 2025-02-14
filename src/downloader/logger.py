@@ -20,7 +20,7 @@ import tempfile
 import sys
 import time
 import traceback
-from typing import Optional, Protocol
+from typing import Any, List, Optional, Protocol
 
 from downloader.config import Config
 
@@ -29,7 +29,6 @@ class Logger(Protocol):
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True) -> None: """print always"""
     def debug(self, *args, sep='', end='\n', flush=True) -> None: """print only to debug target"""
     def bench(self, label: str) -> None: """print only to debug target"""
-
 
 class PrintLogManager(Protocol):
     def configure(self, config: Config) -> None: pass
@@ -49,26 +48,52 @@ class PrintLogger(Logger, PrintLogManager):
         _do_print(*args, sep=sep, end=end, file=file, flush=flush)
 
     def debug(self, *args, sep='', end='\n', flush=True):
-        if self._verbose_mode:
-            exceptions = []
-            for a in args:
-                if isinstance(a, Exception):
-                    exceptions.append(a)
-            if len(exceptions) > 0:
-                args = list(set(args) - set(exceptions))
-                for e in exceptions:
-                    _do_print(''.join(traceback.TracebackException.from_exception(e).format()), sep=sep, end=end, file=sys.stdout, flush=flush)
-                    padding = ' ' * 4
-                    while e.__cause__ is not None:
-                        e = e.__cause__
-                        _do_print(padding.join(traceback.TracebackException.from_exception(e).format()), sep=sep, end=end, file=sys.stdout, flush=flush)
-                        padding += ' ' * 4
+        if not self._verbose_mode:
+            return
 
-            _do_print(*args, sep=sep, end=end, file=sys.stdout, flush=flush)
+        _do_print("DEBUG| ", *_transform_debug_args(args), sep=sep, end=end, file=sys.stdout, flush=flush)
 
     def bench(self, label: str):
         if self._start_time is not None:
-            _do_print('%s| %s' % (str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-4], label), sep='', end='\n', file=sys.stdout, flush=True)
+            _do_print('BENCH %s| %s' % (str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-4], label), sep='', end='\n', file=sys.stdout, flush=True)
+
+def _transform_debug_args(args: List[Any]) -> List[str]:
+    exception_msgs = []
+    rest_args = []
+    interp_count = 0
+    interp_main = ''
+    interp_subs = []
+    for a in args:
+        if isinstance(a, Exception):
+            exception_msgs.append(_format_ex(a))
+            continue
+
+        if interp_count > 1:
+            interp_subs.append(str(a))
+            interp_count =- 1
+        elif interp_count == 1:
+            try:
+                rest_args.append(interp_main % (*interp_subs, str(a)))
+            except Exception as e:
+                exception_msgs.append(_format_ex(e))
+                rest_args.extend([interp_main, *interp_subs, str(a)])
+            interp_subs = []
+            interp_count = 0
+            interp_main = ''
+        elif isinstance(a, str) and (interp_count := a.count('%s')) > 0:
+            interp_main = a
+        else:
+            rest_args.append(str(a))
+    return [*rest_args, *exception_msgs]
+
+def _format_ex(e: Exception) -> str:
+    exception_msg = ''.join(traceback.TracebackException.from_exception(e).format())
+    padding = ' ' * 4
+    while e.__cause__ is not None:
+        e = e.__cause__
+        exception_msg += padding + 'CAUSE: ' + padding.join(traceback.TracebackException.from_exception(e).format())
+        padding += ' ' * 4
+    return exception_msg
 
 def _do_print(*args, sep, end, file, flush):
     try:
@@ -116,14 +141,15 @@ class FileLoggerDecorator(Logger, FilelogManager):
 
     def debug(self, *args, sep='', end='\n', flush=True):
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
-        self._do_print_in_file(*args, sep=sep, end=end, flush=flush)
+        self._do_print_in_file("DEBUG| ", *_transform_debug_args(args), sep=sep, end=end, flush=flush)
 
     def bench(self, label: str):
         self._decorated_logger.bench(label)
+        self._do_print_in_file("BENCH| ", label, sep='', end='\n', flush=False)
 
     def _do_print_in_file(self, *args, sep, end, flush):
         if self._logfile is not None:
-            print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
+            self._decorated_logger.print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
 
 
 class DebugOnlyLoggerDecorator(Logger):

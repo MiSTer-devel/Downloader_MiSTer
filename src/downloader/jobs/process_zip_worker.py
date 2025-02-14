@@ -82,12 +82,12 @@ class ProcessZipWorker(DownloaderWorkerBase):
             self._ctx.swallow_error(target_error)
             return [], target_error
 
-        logger.debug(f"Reserving space '{job.db.db_id} zip:{job.zip_id}...")
+        logger.debug("Reserving space '%s zip:%s'...", job.db.db_id, job.zip_id)
         logger.bench('Reserving space...')
         job.full_partitions = try_reserve_space(self._ctx, file_packs)
         if len(job.full_partitions) > 0:
             job.failed_files_no_space = file_packs
-            logger.debug(f"Not enough space '{job.db.db_id} zip:{job.zip_id}'!")
+            logger.debug("Not enough space '%s zip:%s'!", job.db.db_id, job.zip_id)
             return [], FileWriteError(f"Could not allocate space for decompressing {len(file_packs)} files.")
 
         logger.bench('Precaching is_file...')

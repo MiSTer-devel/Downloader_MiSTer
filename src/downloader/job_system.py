@@ -367,7 +367,7 @@ class JobSystem(JobContext):
 
         self._logger.print(msg)
         e_text = ''.join(traceback.TracebackException.from_exception(e).format())
-        self._logger.debug(f'{msg}:\n{e_text}\n')
+        self._logger.debug('%s:\n%s\n', msg, e_text)
 
         self._unhandled_errors.append(e)
 
