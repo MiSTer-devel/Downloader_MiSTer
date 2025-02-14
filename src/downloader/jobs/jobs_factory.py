@@ -48,10 +48,10 @@ class ZipJobContext:
 
 def make_get_file_job(source: str, target: str, info: str, silent: bool, logger: Optional[Logger] = None) -> GetFileJob:
     if not source.startswith("http"):
-        if logger: logger.debug(f'Loading db from fs: {source}')
+        if logger: logger.debug('Loading db from fs: %s', source)
         return CopyFileJob(source=source, temp_path=target, info=info, silent=silent)
     else:
-        if logger: logger.debug(f'Loading db from url: {source}')
+        if logger: logger.debug('Loading db from url: %s', source)
         return FetchFileJob(source=source, temp_path=target, info=info, silent=silent)
 
 

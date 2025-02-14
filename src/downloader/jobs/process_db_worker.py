@@ -41,7 +41,7 @@ class ProcessDbWorker(DownloaderWorkerBase):
         read_only_store = job.store.read_only()
 
         self._ctx.file_download_session_logger.print_header(job.db)
-        logger.debug(f"Building db config '{job.db.db_id}'...")
+        logger.debug("Building db config '%s'...", job.db.db_id)
         config = build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
 
         if not read_only_store.has_base_path():  # @TODO: should remove this from here at some point.

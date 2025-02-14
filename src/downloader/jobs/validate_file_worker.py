@@ -51,7 +51,7 @@ class ValidateFileWorker(DownloaderWorker):
         try:
             fs_hash = self._file_system.hash(temp_path)
             if fs_hash != file_hash:
-                self._file_system.unlink(temp_path)
+                self._file_system.unlink(temp_path, verbose=False)
                 return FileDownloadError(f'Bad hash on {info} ({file_hash} != {fs_hash})')
 
             if temp_path != target_file_path:

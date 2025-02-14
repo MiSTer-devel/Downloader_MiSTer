@@ -286,7 +286,7 @@ class _FileSystem(FileSystem):
         return are, nope
 
     def print_debug(self) -> None:
-        self._logger.debug(f'IS_FILE quick hits: {self._quick_hit} slow hits: {self._slow_hit}')
+        self._logger.debug('IS_FILE quick hits: %s slow hits: %s', self._quick_hit, self._slow_hit)
 
     def is_folder(self, path: str) -> bool:
         return os.path.isdir(self._path(path))
@@ -517,14 +517,14 @@ class _FileSystem(FileSystem):
     def _debug_log(self, message: str, path: Tuple[str, str], target: Optional[Tuple[str, str]] = None) -> None:
         if path[0][0] == '/':
             if target is None:
-                self._logger.debug(f'{message} "{path[0]}"')
+                self._logger.debug('%s "%s"', message, path[0])
             else:
-                self._logger.debug(f'{message} "{path[0]}" to "{target[0]}"')
+                self._logger.debug('%s "%s" to "%s"', message, path[0], target[0])
         else:
             if target is None:
-                self._logger.debug(f'{message} "{path[0]}". {path[1]}')
+                self._logger.debug('%s "%s". %s', message, path[0], path[1])
             else:
-                self._logger.debug(f'{message} "{path[0]}" to "{target[0]}". {path[1]} -> {target[1]}')
+                self._logger.debug('%s "%s" to "%s". %s -> %s', message, path[0], target[0], path[1], target[1])
 
     def turn_off_logs(self) -> None:
         self._logger = PrintLogger(self._config['start_time'])

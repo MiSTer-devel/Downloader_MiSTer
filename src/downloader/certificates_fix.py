@@ -57,7 +57,7 @@ class CertificatesFix:
     def _check_cacert(self, cacert_path):
         result = self._test_query(cacert_path)
         if result.returncode == 0:
-            self._logger.debug('cacert file at "%s" seems to be fine.' % cacert_path)
+            self._logger.debug('cacert file at "%s" seems to be fine.', cacert_path)
             return True
 
         self._logger.print('WARNING: cacert file at "%s" seems to be wrong!' % cacert_path)
