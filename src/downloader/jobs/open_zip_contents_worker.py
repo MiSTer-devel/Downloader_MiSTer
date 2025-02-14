@@ -109,5 +109,6 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
             config=job.config,
             index=Index(files=files_to_recover, folders={}),
             store=job.store.select(files=[pkg.rel_path for pkg in invalid_files]),  # @TODO: This store needs to be a fragment only for the invalid files...
-            full_resync=job.full_resync
+            full_resync=job.full_resync,
+            from_zip=True
         )], None

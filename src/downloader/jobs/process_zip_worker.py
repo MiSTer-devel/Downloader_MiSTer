@@ -18,6 +18,7 @@
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from downloader.db_entity import fix_folders
 from downloader.file_system import FileWriteError, FolderCreationError
 from downloader.free_space_reservation import Partition
 from downloader.job_system import WorkerResult, Job
@@ -40,6 +41,9 @@ class ProcessZipWorker(DownloaderWorkerBase):
     def operate_on(self, job: ProcessZipJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
         logger.bench('ProcessZipWorker start.')
+
+        fix_folders(job.zip_index.folders)  # @TODO: Try to look for a better place to put this, while validating zip_index entity for example which we don't do yet.
+
         total_files_size = 0
         for file_description in job.zip_index.files.values():
             total_files_size += file_description['size']
@@ -240,4 +244,5 @@ def _make_process_index_job(job: ProcessZipJob) -> Optional[ProcessIndexJob]:
         index=job.zip_index,
         store=job.store.select(files=list(job.zip_index.files), folders=list(job.zip_index.folders)),
         full_resync=job.full_resync,
+        from_zip=True
     )

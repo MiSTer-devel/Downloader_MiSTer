@@ -31,7 +31,7 @@ from typing import List, Optional, Set, Dict, Any, Tuple, Union
 
 from downloader.config import AllowDelete, Config
 from downloader.constants import HASH_file_does_not_exist
-from downloader.logger import Logger, PrintLogger
+from downloader.logger import Logger, OffLogger, PrintLogger
 from downloader.other import ClosableValue
 from downloader.path_package import PathPackage
 
@@ -527,7 +527,7 @@ class _FileSystem(FileSystem):
                 self._logger.debug('%s "%s" to "%s". %s -> %s', message, path[0], target[0], path[1], target[1])
 
     def turn_off_logs(self) -> None:
-        self._logger = PrintLogger(self._config['start_time'])
+        self._logger = OffLogger()
 
     def _unlink(self, path: str, verbose: bool) -> bool:
         full_path = self._path(path)

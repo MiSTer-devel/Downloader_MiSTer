@@ -65,7 +65,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         try:
             logger.debug("Processing db '%s'...", db.db_id)
             logger.bench('Creating index packages...')
-            check_file_pkgs, job.files_to_remove, create_folder_pkgs, job.directories_to_remove = self._create_packages_from_index(config, summary, db, store)
+            check_file_pkgs, job.files_to_remove, create_folder_pkgs, job.directories_to_remove = self._create_packages_from_index(config, summary, db, store, job.from_zip)
 
             logger.bench('Precaching is_file...')
             self._ctx.file_system.precache_is_file_with_folders(create_folder_pkgs)
@@ -104,7 +104,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
             self._ctx.swallow_error(WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e))) if isinstance(e, BadFileFilterPartException) else e)
             return [], e
 
-    def _create_packages_from_index(self, config: Config, summary: Index, db: DbEntity, store: ReadOnlyStoreAdapter) -> Tuple[
+    def _create_packages_from_index(self, config: Config, summary: Index, db: DbEntity, store: ReadOnlyStoreAdapter, from_zip: bool) -> Tuple[
         List[_CheckFilePackage],
         List[_RemoveFilePackage],
         List[_CreateFolderPackage],
@@ -112,7 +112,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
     ]:
         filtered_summary, _ = self._ctx.file_filter_factory.create(db, summary, config).select_filtered_files(summary)
 
-        summary_folders = self._folders_with_missing_parents(filtered_summary, store, db)
+        summary_folders = self._folders_with_missing_parents(filtered_summary, store, db, from_zip)
         calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(config)
 
         check_file_pkgs, files_set = self._translate_items(calculator, filtered_summary.files, PathType.FILE, set())
@@ -122,7 +122,7 @@ class ProcessIndexWorker(DownloaderWorkerBase):
 
         return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs
 
-    def _folders_with_missing_parents(self, index: Index, store: ReadOnlyStoreAdapter, db: DbEntity) -> Dict[str, Any]:
+    def _folders_with_missing_parents(self, index: Index, store: ReadOnlyStoreAdapter, db: DbEntity, from_zip: bool) -> Dict[str, Any]:
         if len(index.files) == 0 and len(index.folders) == 0:
             return index.folders
 
@@ -135,7 +135,10 @@ class ProcessIndexWorker(DownloaderWorkerBase):
                     if parent_str in index.folders or parent_str in result_folders: continue
 
                     result_folders[parent_str] = store.folders.get(parent_str, {})
-                    self._ctx.logger.print(f"Warning: Database [{db.db_id}] should contain {col_ctx} '{parent_str}' because of {col_ctx} '{path}'. The database maintainer should fix this.")
+                    if from_zip:
+                        pass  # @TODO: This whole from_zip should not be needed. But we need to avoid a warning because it always fails now. This is happening because pext_parent folder loses the zip_id in the store.
+                    else:
+                        self._ctx.logger.print(f"Warning: Database [{db.db_id}] should contain {col_ctx} '{parent_str}' because of {col_ctx} '{path}'. The database maintainer should fix this.")
 
         if len(result_folders) > 0:
             result_folders.update(index.folders)
