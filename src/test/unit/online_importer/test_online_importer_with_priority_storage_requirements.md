@@ -26,7 +26,7 @@ The combination is called "pext base" and it has a fixed drive assigned to it. T
 ### Prefer External
 
 - When there is no external drives, the pext base will be created in the base_path drive (usually the SD).
-- When there is one external drives, the pext base will be created in an external drive following the priority drive order (defined in constants.py).
+- When there is external drives, the pext base will be created in an external drive following the priority drive order (defined in constants.py). First, a "pext base" in the external drives will be searched following that priority drive order. If not found, it will be picking the first existing external drive of the mentioned priority order.
 
 ### Off
 
