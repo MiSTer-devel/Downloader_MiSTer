@@ -149,7 +149,7 @@ class FileLoggerDecorator(Logger, FilelogManager):
 
     def _do_print_in_file(self, *args, sep, end, flush):
         if self._logfile is not None:
-            self._decorated_logger.print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
+            _do_print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
 
 
 class DebugOnlyLoggerDecorator(Logger):
