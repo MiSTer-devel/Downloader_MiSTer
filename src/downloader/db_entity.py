@@ -245,6 +245,8 @@ def _make_folders_validator(db_id, zip_id=None):
         if not isinstance(folders, dict):
             return False
 
+        fix_folders(folders)
+
         for folder_path, folder_description in folders.items():
             try:
                 _validate_single_folder(db_id, folder_path, folder_description, zip_id)
@@ -254,6 +256,19 @@ def _make_folders_validator(db_id, zip_id=None):
         return True
 
     return validator
+
+
+def fix_folders(folders):
+    if len(folders) == 0: return
+
+    rename_folders = []
+    for folder_path, folder_description in folders.items():
+        if folder_path.endswith('/'):
+            rename_folders.append((folder_path, folder_description))
+
+    for folder_path, folder_description in rename_folders:
+        folders[folder_path[:-1]] = folder_description
+        folders.pop(folder_path)
 
 
 def _validate_single_folder(db_id, folder_path, folder_description, zip_id=None):

@@ -30,6 +30,13 @@ class Logger(Protocol):
     def debug(self, *args, sep='', end='\n', flush=True) -> None: """print only to debug target"""
     def bench(self, label: str) -> None: """print only to debug target"""
 
+
+class OffLogger(Logger):
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
+    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
+    def bench(self, label: str): pass
+
+
 class PrintLogManager(Protocol):
     def configure(self, config: Config) -> None: pass
 

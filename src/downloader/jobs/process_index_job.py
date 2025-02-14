@@ -38,6 +38,7 @@ class ProcessIndexJob(Job):
     index: Index
     full_resync: bool
     config: Config
+    from_zip: bool = False
 
     def retry_job(self): return None
 
