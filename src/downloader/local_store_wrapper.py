@@ -420,8 +420,6 @@ class WriteOnlyStoreAdapter:
             if not are_zip_descriptions_equal(self._store['zips'][zip_id], description):
                 self._store['zips'][zip_id] = description
                 self._top_wrapper.mark_force_save()
-        else:
-            self._store['zips'] = {}
 
         self._store['zips'][zip_id] = description
 

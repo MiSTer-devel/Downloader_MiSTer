@@ -15,8 +15,9 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+
 from downloader.constants import K_BASE_PATH
-from test.objects import zip_desc, file_nes_palette_a, tweak_descr, folder_games_nes, folder_games, \
+from test.objects import db_entity, store_descr, zip_desc, file_nes_palette_a, tweak_descr, folder_games_nes, folder_games, \
     folder_games_nes_palettes, file_nes_palette_a_descr
 
 
@@ -29,12 +30,12 @@ zipped_nes_palettes_id = 'zipped_nes_palettes_id'
 cheats_folder_name = 'Cheats'
 
 
-def zipped_nes_palettes_desc(summary_internal_zip_id=None):
+def zipped_nes_palettes_desc(summary_internal_zip_id=None, url: bool = True):
     return zip_desc(
         "Extracting Palettes",
         folder_games_nes,
         summary={
-            "files": {file_nes_palette_a: file_nes_palette_a_descr_zipped()},
+            "files": {file_nes_palette_a: file_nes_palette_a_descr_zipped(url=url)},
             "folders": {
                 folder_games: {"zip_id": zipped_nes_palettes_id},
                 folder_games_nes: {"zip_id": zipped_nes_palettes_id},
@@ -148,6 +149,13 @@ def cheats_folder_descr(zip_id=True, tags=True):
         'tags': cheats_folder_tags()
     }, zip_id=zip_id, tags=tags)
 
+def folders_games_nes_palettes(zip_id=True):
+    return {
+        folder_games: tweak_descr({'zip_id': zipped_nes_palettes_id}, zip_id=zip_id),
+        folder_games_nes: tweak_descr({'zip_id': zipped_nes_palettes_id}, zip_id=zip_id),
+        folder_games_nes_palettes: tweak_descr({'zip_id': zipped_nes_palettes_id}, zip_id=zip_id),
+    }
+
 
 def store_with_unzipped_cheats(url=False, folders=True, files=True, zip_id=True, zips=True, tags=True, online_database_imported=None, summary_hash=None, is_internal_summary=False):
     summary_internal_zip_id = cheats_folder_id if is_internal_summary else None
@@ -191,13 +199,18 @@ def zipped_files_from_cheats_folder():
     }
 
 
-
-def file_nes_palette_a_descr_zipped():
-    return {
+def file_nes_palette_a_descr_zipped(zip_id=True, url=True):
+    return tweak_descr({
         "hash": file_nes_palette_a[1:],
         "size": 2905020,
         "url": "https://a.pal",
         "zip_id": zipped_nes_palettes_id
+    }, zip_id=zip_id, url=url)
+
+
+def files_nes_palettes(zip_id=True, url=True):
+    return {
+        file_nes_palette_a: file_nes_palette_a_descr_zipped(zip_id=zip_id, url=url)
     }
 
 
@@ -208,4 +221,3 @@ def with_installed_cheats_folder_on_fs(file_system_state):
                    description={"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size}) \
         .add_file(base_path=None, file=cheats_folder_sms_file_path,
                    description={"hash": cheats_folder_sms_file_hash, "size": cheats_folder_sms_file_size})
-

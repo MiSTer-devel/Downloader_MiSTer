@@ -21,14 +21,12 @@ from downloader.constants import K_BASE_PATH
 from downloader.jobs.worker_context import DownloaderWorkerFailPolicy
 from test.fake_file_system_factory import fs_data
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
-from test.objects import db_test_descr, empty_zip_summary, store_descr, empty_test_store, media_fat, db_entity
+from test.objects import db_test_descr, empty_zip_summary, folder_games_nes, store_descr, empty_test_store, media_fat, db_entity
 from test.objects import file_a, zipped_file_a_descr, zip_desc
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
-from test.zip_objects import store_with_unzipped_cheats, cheats_folder_zip_desc, \
-    cheats_folder_nes_file_path, \
-    summary_json_from_cheats_folder, \
-    zipped_files_from_cheats_folder, cheats_folder_id, cheats_folder_sms_file_path, cheats_folder_folders, \
+from test.zip_objects import files_nes_palettes, folders_games_nes_palettes, zipped_nes_palettes_id, zipped_nes_palettes_desc, store_with_unzipped_cheats, cheats_folder_zip_desc, \
+    cheats_folder_nes_file_path, summary_json_from_cheats_folder, zipped_files_from_cheats_folder, cheats_folder_id, cheats_folder_sms_file_path, cheats_folder_folders, \
     cheats_folder_files, with_installed_cheats_folder_on_fs
 
 
@@ -48,37 +46,53 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
         store = self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=True)
         self.assertEqual(store_with_unzipped_cheats(url=False), store)
+        self.assertSutReports(list(cheats_folder_files()))
+
+    def test_download_zipped_cheats_folder___with_installed_store_and_fs___changes_nothing(self):
+        with_installed_cheats_folder_on_fs(self.implicit_inputs.file_system_state)
+        self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
+        store = self.download_zipped_cheats_folder(store_with_unzipped_cheats(url=False), from_zip_content=True)
+        self.assertEqual(store_with_unzipped_cheats(url=False), store)
+        self.assertSutReports([], save=False)
 
     def test_download_zipped_cheats_folder___on_empty_store_from_internal_summary_and_contents_file_when_file_count_threshold_is_surpassed___installs_from_zip_content(self):
         self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
         store = self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=True, is_internal_summary=True)
         self.assertEqual(store_with_unzipped_cheats(url=False, is_internal_summary=True), store)
+        self.assertSutReports(list(cheats_folder_files()))
 
     def test_download_zipped_cheats_folder___on_empty_store_from_summary_and_contents_files_when_accumulated_mb_threshold_is_surpassed___installs_from_zip_content(self):
         self.config['zip_accumulated_mb_threshold'] = 0  # This will cause to unzip the contents
         store = self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=True)
         self.assertEqual(store_with_unzipped_cheats(url=False), store)
+        self.assertSutReports(list(cheats_folder_files()))
 
     def test_download_zipped_cheats_folder___on_empty_store_from_summary_file_but_no_contents_because_thresholds_are_not_surpassed___installs_from_url(self):
         self.assertEqual(store_with_unzipped_cheats(), self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=False))
+        self.assertSutReports(list(cheats_folder_files()))
 
     def test_download_zipped_cheats_folder___on_empty_store_from_internal_summary_but_no_contents_because_thresholds_are_not_surpassed___installs_from_zip_content(self):
         expected_store = store_with_unzipped_cheats(is_internal_summary=True)
         self.assertEqual(expected_store, self.download_zipped_cheats_folder(empty_test_store(), from_zip_content=False, is_internal_summary=True))
+        self.assertSutReports(list(cheats_folder_files()))
 
     def test_download_zipped_cheats_folder___with_already_downloaded_summary_file___restores_file_contained_in_summary(self):
         self.assertEqual(store_with_unzipped_cheats(), self.download_zipped_cheats_folder(store_with_unzipped_cheats(), from_zip_content=False, save=False))
+        self.assertSutReports(list(cheats_folder_files()), save=False)
 
     def test_download_zipped_cheats_folder___with_already_stored_internal_summary___restores_file_contained_in_summary(self):
         expected_store = store_with_unzipped_cheats(is_internal_summary=True)
         self.assertEqual(expected_store, self.download_zipped_cheats_folder(store_with_unzipped_cheats(), from_zip_content=False, is_internal_summary=True))
+        self.assertSutReports(list(cheats_folder_files()))
 
     def test_download_zipped_cheats_folder___with_summary_file_containing_already_existing_files___updates_files_in_the_store_now_pointing_to_summary(self):
         self.assertEqual(store_with_unzipped_cheats(), self.download_zipped_cheats_folder(store_with_unzipped_cheats(zip_id=False, zips=False), from_zip_content=False))
+        self.assertSutReports(list(cheats_folder_files()))
 
     def test_download_zipped_cheats_folder___with_internal_summary_containing_already_existing_files___updates_files_in_the_store_now_pointing_to_summary(self):
         expected_store = store_with_unzipped_cheats(is_internal_summary=True)
         self.assertEqual(expected_store, self.download_zipped_cheats_folder(store_with_unzipped_cheats(zip_id=False, zips=False), from_zip_content=False, is_internal_summary=True))
+        self.assertSutReports(list(cheats_folder_files()))
 
     def test_download_empty_test_db___on_existing_store_with_zips___removes_old_zips_and_saves_the_store(self):
         with_installed_cheats_folder_on_fs(self.implicit_inputs.file_system_state)
@@ -90,7 +104,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         self.assertFalse(self.sut.file_system.is_file(cheats_folder_nes_file_path))
         self.assertFalse(self.sut.file_system.is_file(cheats_folder_sms_file_path))
 
-    def test_download_zipped_contents___on_existing_store_with_zips___removes_old_zip_id_and_inserts_new_one2(self):
+    def test_download_zipped_contents___on_existing_store_with_zips___removes_old_zip_id_and_inserts_new_one(self):
         with_installed_cheats_folder_on_fs(self.implicit_inputs.file_system_state)
 
         different_zip_id = 'a_different_id'
@@ -141,6 +155,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         expected_store = store_descr(zips=zip_descriptions)
         actual_store = self.download(db_test_descr(zips=zip_descriptions), empty_test_store())
         self.assertEqual(expected_store, actual_store)
+        self.assertSutReports([])
 
     def test_download_zipped_cheats_folder___with_summary_file_containing_already_existing_files_but_old_hash___when_file_count_threshold_is_surpassed_but_network_fails____reports_error_and_installs_from_zip_content_using_store_information(self):
         self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
@@ -245,6 +260,51 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         sut.add_db(db_entity(), store).download(False)
 
         self.assertEverythingIsClean(sut, store, save=True)
+
+    def test_download_two_zips_in_one_db___on_empty_store__installs_both_zips_in_the_store_and_reports_them(self):
+        self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
+
+        store = self.download(db_test_descr(zips={
+            zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False),
+            cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files_from_cheats_folder(), summary=summary_json_from_cheats_folder()),
+        }), empty_test_store())
+
+        self.assertEqual(store_descr(
+            zips={
+                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes),
+                cheats_folder_id: cheats_folder_zip_desc()
+            },
+            files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},
+            folders={**cheats_folder_folders(), **folders_games_nes_palettes()}
+        ), store)
+        self.assertSutReports([*cheats_folder_files(), *files_nes_palettes()])
+
+    def test_download_two_zips_in_one_db___on_a_store_with_the_same_db_previously_installed__changes_nothing(self):
+        self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
+
+        store = self.download(db_test_descr(zips={
+            zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False),
+            cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files_from_cheats_folder(), summary=summary_json_from_cheats_folder()),
+        }), store_descr(
+            zips={
+                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes),
+                cheats_folder_id: cheats_folder_zip_desc()
+            },
+            files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},
+            folders={**cheats_folder_folders(), **folders_games_nes_palettes()}
+        ))
+
+        self.assertEqual(store_descr(
+            zips={
+                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes),
+                cheats_folder_id: cheats_folder_zip_desc()
+            },
+            files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},
+            folders={**cheats_folder_folders(), **folders_games_nes_palettes()}
+        ), store)
+
+        self.assertSutReports([], save=False)
+
 
     def download_zipped_cheats_folder(self, input_store, from_zip_content, is_internal_summary=False, save=True):
         summary_internal_zip_id = cheats_folder_id if is_internal_summary else None
