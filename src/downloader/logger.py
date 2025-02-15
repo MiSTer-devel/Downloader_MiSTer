@@ -116,7 +116,7 @@ class TopLogger(Logger, ConfigLogManager):
     @staticmethod
     def for_main():
         return TopLogger(PrintLogger(), FileLogger())
-    
+
     def configure(self, config: Config):
         if config['verbose']:
             self._start_time = config['start_time']
