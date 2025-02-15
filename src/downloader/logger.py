@@ -100,10 +100,8 @@ class FileLogger(Logger, FilelogManager):
             _do_print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
 
 
-
 class ConfigLogManager(Protocol):
     def configure(self, config: Config) -> None: pass
-
 
 class TopLogger(Logger, ConfigLogManager):
     def __init__(self, print_logger: PrintLogger, file_logger: FileLogger):
@@ -142,7 +140,6 @@ class TopLogger(Logger, ConfigLogManager):
         bench_header = f'BENCH {time_str}| '
         self.print_logger.bench(bench_header, *args)
         self.file_logger.bench(bench_header, *args)
-
 
 def _transform_debug_args(args: List[Any]) -> List[str]:
     exception_msgs = []
