@@ -20,7 +20,8 @@ import os
 
 from downloader.job_system import WorkerResult
 from downloader.jobs.index import Index
-from downloader.jobs.process_index_job import ProcessIndexJob
+from downloader.jobs.process_db_index_job import ProcessDbIndexJob
+from downloader.jobs.process_db_index_worker import create_fetch_jobs
 from downloader.path_package import PathPackage
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
@@ -99,11 +100,12 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         else:
             files_to_recover = {file.rel_path: file.description for file in invalid_files}
 
-        self._ctx.installation_report.unmark_processed_files(job.failed_files, job.db.db_id)
+        #self._ctx.installation_report.unmark_processed_files(job.failed_files, job.db.db_id)
 
         logger.bench('OpenZipContentsWorker launching recovery process index...', job.db.db_id, job.zip_id)
 
-        return [ProcessIndexJob(
+        return create_fetch_jobs(self._ctx, job.db.db_id, invalid_files, job.zip_description.get('base_files_url', job.db.base_files_url))
+        return [ProcessDbIndexJob(
             db=job.db,
             ini_description=job.ini_description,
             config=job.config,

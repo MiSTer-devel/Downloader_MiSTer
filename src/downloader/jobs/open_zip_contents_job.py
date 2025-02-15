@@ -24,7 +24,7 @@ from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFoldersHolder, Config
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.get_file_job import GetFileJob
-from downloader.jobs.process_index_job import ProcessIndexJob
+from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.path_package import PathPackage
 from downloader.local_store_wrapper import StoreWrapper
 
@@ -47,6 +47,7 @@ class OpenZipContentsJob(Job):
 
     zip_id: str
     zip_kind: ZipKind
+    zip_description: Dict[str, Any]
     target_folder: Optional[PathPackage]
     total_amount_of_files_in_zip: int
     files_to_unzip: List[PathPackage]
@@ -56,10 +57,8 @@ class OpenZipContentsJob(Job):
     zip_base_files_url: str
     filtered_data: FileFoldersHolder
     get_file_job: GetFileJob
-    make_process_index_backup: Callable[[], Optional[ProcessIndexJob]]
 
     def retry_job(self): return self.get_file_job
-    def backup_job(self): return self.make_process_index_backup()
 
     # Results
     downloaded_files: List[PathPackage] = field(default_factory=list)

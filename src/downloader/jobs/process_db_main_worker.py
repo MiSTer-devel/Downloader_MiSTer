@@ -21,22 +21,22 @@ from typing import Dict, Any, Optional, Tuple
 from downloader.db_entity import make_db_tag
 from downloader.db_utils import build_db_config
 from downloader.job_system import WorkerResult, Job
-from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_index_job, make_zip_tag, ZipJobContext
-from downloader.jobs.process_db_zips_waiter_job import ProcessDbZipsWaiterJob
-from downloader.jobs.process_index_job import ProcessIndexJob
+from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_summary_job, make_zip_tag, ZipJobContext
+from downloader.jobs.wait_db_zips_job import WaitDbZipsJob
+from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.worker_context import DownloaderWorkerBase
-from downloader.jobs.process_db_job import ProcessDbJob
+from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE
 
 
-class ProcessDbWorker(DownloaderWorkerBase):
-    def job_type_id(self) -> int: return ProcessDbJob.type_id
+class ProcessDbMainWorker(DownloaderWorkerBase):
+    def job_type_id(self) -> int: return ProcessDbMainJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ProcessDbJob) -> WorkerResult:  # type: ignore[override]
+    def operate_on(self, job: ProcessDbMainJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
-        logger.bench('ProcessDbWorker start: ', job.db.db_id)
+        logger.bench('ProcessDbMainWorker start: ', job.db.db_id)
     
         read_only_store = job.store.read_only()
 
@@ -67,7 +67,7 @@ class ProcessDbWorker(DownloaderWorkerBase):
                 zip_job_tags.append(make_zip_tag(job.db, zip_id))
                 zip_jobs.append(zip_job)
 
-            waiter_job = ProcessDbZipsWaiterJob(
+            waiter_job = WaitDbZipsJob(
                 db=job.db,
                 config=config,
                 store=job.store,
@@ -78,7 +78,7 @@ class ProcessDbWorker(DownloaderWorkerBase):
 
             next_jobs = [*zip_jobs, waiter_job]
         else:
-            index_job = ProcessIndexJob(
+            index_job = ProcessDbIndexJob(
                 db=job.db,
                 ini_description=job.ini_description,
                 config=config,
@@ -89,28 +89,25 @@ class ProcessDbWorker(DownloaderWorkerBase):
             index_job.add_tag(make_db_tag(job.db.db_id))
             next_jobs = [index_job]
 
-        logger.bench('ProcessDbWorker end: ', job.db.db_id)
+        logger.bench('ProcessDbMainWorker end: ', job.db.db_id)
 
         return next_jobs, None
 
 
 def _make_zip_job(z: ZipJobContext) -> Tuple[Job, Optional[Exception]]:
     if 'summary_file' in z.zip_description:
-        index = z.job.store.read_only().zip_index(z.zip_id)
+        index = z.job.store.read_only().zip_summary(z.zip_id)
 
-
-        #@TODO: ZIP_INDEX method does not pull data from filtered_zip_data so and that makes the current test to not pass
-
-        process_zip_job = None if index is None else _make_process_zip_job_from_ctx(z, zip_index=index, has_new_zip_index=False)
+        process_zip_job = None if index is None else _make_process_zip_job_from_ctx(z, zip_summary=index, has_new_zip_summary=False)
 
         # if there is a recent enough index in the store, use it
         if process_zip_job is not None and index['hash'] == z.zip_description['summary_file']['hash'] and index['hash'] != NO_HASH_IN_STORE_CODE:
             job = process_zip_job
         else:
-            job = make_open_zip_index_job(z, z.zip_description['summary_file'], process_zip_job)
+            job = make_open_zip_summary_job(z, z.zip_description['summary_file'], process_zip_job)
 
     elif 'internal_summary' in z.zip_description:
-        job = _make_process_zip_job_from_ctx(z, zip_index=z.zip_description['internal_summary'], has_new_zip_index=True)
+        job = _make_process_zip_job_from_ctx(z, zip_summary=z.zip_description['internal_summary'], has_new_zip_summary=True)
     else:
         return z.job, Exception(f"Unknown zip description for zip '{z.zip_id}' in db '{z.job.db.db_id}'")
         # @TODO: Set a more descriptive exception type here, is a exception validation error
@@ -118,15 +115,15 @@ def _make_zip_job(z: ZipJobContext) -> Tuple[Job, Optional[Exception]]:
     return job, None
 
 
-def _make_process_zip_job_from_ctx(z: ZipJobContext, zip_index: Dict[str, Any], has_new_zip_index: bool):
+def _make_process_zip_job_from_ctx(z: ZipJobContext, zip_summary: Dict[str, Any], has_new_zip_summary: bool):
     return make_process_zip_job(
         zip_id=z.zip_id,
         zip_description=z.zip_description,
-        zip_index=zip_index,
+        zip_summary=zip_summary,
         config=z.config,
         db=z.job.db,
         ini_description=z.job.ini_description,
         store=z.job.store,
         full_resync=z.job.full_resync,
-        has_new_zip_index=has_new_zip_index
+        has_new_zip_summary=has_new_zip_summary
     )

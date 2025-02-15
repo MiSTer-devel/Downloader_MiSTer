@@ -17,30 +17,30 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.jobs.worker_context import DownloaderWorkerBase
-from downloader.jobs.open_zip_index_job import OpenZipIndexJob
+from downloader.jobs.open_zip_summary_job import OpenZipSummaryJob
 from downloader.jobs.jobs_factory import make_process_zip_job
 from downloader.job_system import WorkerResult
 from downloader.file_system import FsError
 
-class OpenZipIndexWorker(DownloaderWorkerBase):
-    def job_type_id(self) -> int: return OpenZipIndexJob.type_id
+class OpenZipSummaryWorker(DownloaderWorkerBase):
+    def job_type_id(self) -> int: return OpenZipSummaryJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: OpenZipIndexJob) -> WorkerResult:  # type: ignore[override]
+    def operate_on(self, job: OpenZipSummaryJob) -> WorkerResult:  # type: ignore[override]
         try:
-            index = self._ctx.file_system.load_dict_from_file(job.download_path)
+            summary = self._ctx.file_system.load_dict_from_file(job.download_path)
             self._ctx.file_system.unlink(job.download_path)
 
             return [make_process_zip_job(
                 zip_id=job.zip_id,
                 zip_description=job.zip_description,
-                zip_index=index,
+                zip_summary=summary,
                 config=job.config,
                 db=job.db,
                 ini_description=job.ini_description,
                 store=job.store,
                 full_resync=job.full_resync,
-                has_new_zip_index=True
+                has_new_zip_summary=True
             )], None
         except (FsError, OSError) as e:
             return [], e

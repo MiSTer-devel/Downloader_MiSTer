@@ -16,24 +16,42 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import field, dataclass
-from typing import Any, Dict, List
+from dataclasses import dataclass, field
+from typing import Dict, Any, List, Optional, Tuple
 
 from downloader.config import Config
 from downloader.db_entity import DbEntity
+from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, JobSystem
+from downloader.jobs.index import Index
 from downloader.local_store_wrapper import StoreWrapper
+from downloader.path_package import PathPackage, RemovedCopy
 
 
 @dataclass(eq=False, order=False)
-class ProcessDbZipsWaiterJob(Job):
+class ProcessDbIndexJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
     db: DbEntity
     store: StoreWrapper
     ini_description: Dict[str, Any]
+    index: Index
     full_resync: bool
     config: Config
-    zip_job_tags: List[str]
+    zip_id: Optional[str] = None
 
     def retry_job(self): return None
+
+    # Results
+    present_not_validated_files: List[PathPackage] = field(default_factory=list)
+    present_validated_files: List[PathPackage] = field(default_factory=list)
+    skipped_updated_files: List[PathPackage] = field(default_factory=list)
+    removed_folders: List[RemovedCopy] = field(default_factory=list)
+    installed_folders: List[PathPackage] = field(default_factory=list)
+    directories_to_remove: List[PathPackage] = field(default_factory=list)
+    files_to_remove: List[PathPackage] = field(default_factory=list)
+
+    # Failure results
+    full_partitions: List[Tuple[Partition, int]] = field(default_factory=list)
+    failed_files_no_space: List[PathPackage] = field(default_factory=list)
+    failed_folders: List[str] = field(default_factory=list)

@@ -17,30 +17,23 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import Dict, Any, Optional
+from typing import Any, Dict, List
 
 from downloader.config import Config
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.get_file_job import GetFileJob
-from downloader.jobs.process_zip_job import ProcessZipJob
 from downloader.local_store_wrapper import StoreWrapper
 
 
 @dataclass(eq=False, order=False)
-class OpenZipIndexJob(Job):
+class WaitDbZipsJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
     db: DbEntity
     store: StoreWrapper
-    zip_id: str
     ini_description: Dict[str, Any]
-    zip_description: Dict[str, Any]
     full_resync: bool
-    download_path: str
     config: Config
-    get_file_job: GetFileJob
-    process_zip_backup: ProcessZipJob
+    zip_job_tags: List[str]
 
-    def retry_job(self) -> Optional[Job]: return self.get_file_job
-    def backup_job(self) -> Optional[Job]: return self.process_zip_backup
+    def retry_job(self): return None

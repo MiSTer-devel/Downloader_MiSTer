@@ -18,8 +18,8 @@ dot.node('START', 'START', shape='ellipse', fillcolor='black', fontcolor='white'
 dot.node('END', 'END', shape='ellipse', fillcolor='#77DD77')
 dot.node('A', 'FetchFileJob [db]')
 dot.node('C', 'OpenDbJob', fillcolor='#ffefd5')
-dot.node('D', 'ProcessDbJob', fillcolor='#B0E0E6')
-dot.node('E', 'ProcessIndexJob', fillcolor='#B0E0E6')
+dot.node('D', 'ProcessDbMainJob', fillcolor='#B0E0E6')
+dot.node('E', 'ProcessDbIndexJob', fillcolor='#B0E0E6')
 dot.node('M', 'FetchFileJob [file]')
 dot.node('N', 'ValidateFileJob [file]', fillcolor='#ffefd5')
 
@@ -49,15 +49,15 @@ with dot.subgraph(name='cluster_zip') as c:
     c.attr(style='filled', color='#f5f5ff', penwidth='1.0')
     c.node('3', 'Zip Feature', style='filled', fillcolor='#8f8fff', fontcolor='white', penwidth='0')
 
-    c.node('O', 'ProcessDbZipsWaiterJob', fillcolor='#B0E0E6')
-    c.node('F', 'ProcessZipJob', fillcolor='#B0E0E6')
-    c.node('G', 'FetchFileJob [zip index]')
-    c.node('H', 'ValidateFileJob [zip index]', fillcolor='#ffefd5')
-    c.node('I', 'OpenZipIndexJob', fillcolor='#ffefd5')
+    c.node('O', 'WaitDbZipsJob', fillcolor='#B0E0E6')
+    c.node('F', 'ProcessZipIndexJob', fillcolor='#B0E0E6')
+    c.node('G', 'FetchFileJob [zip summary]')
+    c.node('H', 'ValidateFileJob [zip summary]', fillcolor='#ffefd5')
+    c.node('I', 'OpenZipSummaryJob', fillcolor='#ffefd5')
     c.node('J', 'FetchFileJob [zip contents]')
     c.node('K', 'ValidateFileJob [zip contents]', fillcolor='#ffefd5')
     c.node('L', 'OpenZipContentsJob', fillcolor='#ffefd5')
-
+    c.node('Q', '', shape='circle', fixedsize='true', width='0.01', fillcolor='#ff8f8f')
 #
 # EDGES
 #
@@ -71,7 +71,10 @@ dot.edge('G', 'H')
 dot.edge('H', 'I')
 dot.edge('J', 'K')
 dot.edge('K', 'L')
-dot.edge('L', 'E', label='inv[]', minlen='4', weight='2')
+dot.edge('L', 'M', label='1:N')
+dot.edge('F', 'Q', label='1:N', dir='none')
+dot.edge('Q', 'M')
+#dot.edge('L', 'M', label='1:N')
 
 # “Wait” edges
 dot.edge('F', 'O', style='dotted', constraint='true', label='wait')
@@ -92,7 +95,7 @@ dot.edge('L', 'J', label=' r', style='dashed', constraint='false')
 dot.edge('G', 'F', label='backup if stored', style='dashed', constraint='false')
 #dot.edge('H', 'I', label='b', style='dashed', constraint='false', dir='none')
 #dot.edge('I', 'F', label='b', style='dashed', constraint='false')
-dot.edge('J', 'E', label='b', style='dashed', constraint='false')
+#dot.edge('J', 'E', label='b', style='dashed', constraint='false')
 #dot.edge('K', 'L', label='b', style='dashed', constraint='false', dir='none')
 #dot.edge('L', 'E', label='b', style='dashed', constraint='false')
 

@@ -19,7 +19,7 @@
 from downloader.db_entity import DbEntity, make_db_tag
 from downloader.job_system import WorkerResult
 from downloader.jobs.open_db_job import OpenDbJob
-from downloader.jobs.process_db_job import ProcessDbJob
+from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.worker_context import DownloaderWorkerBase
 
 
@@ -35,7 +35,7 @@ class OpenDbWorker(DownloaderWorkerBase):
             return [], e
 
         ini_description, store, full_resync = job.ini_description, job.store, job.full_resync
-        return [ProcessDbJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync).add_tag(make_db_tag(job.section))], None
+        return [ProcessDbMainJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync).add_tag(make_db_tag(job.section))], None
 
     def _open_db(self, section: str, temp_path: str) -> DbEntity:
         self._ctx.logger.bench('Loading database start: ', section)

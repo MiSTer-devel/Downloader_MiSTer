@@ -30,7 +30,7 @@ from downloader.path_package import PathPackage, RemovedCopy
 
 
 @dataclass(eq=False, order=False)
-class ProcessZipJob(Job):
+class ProcessZipIndexJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
     db: DbEntity
@@ -40,7 +40,7 @@ class ProcessZipJob(Job):
     ini_description: Dict[str, Any]
     zip_description: Dict[str, Any]
     zip_index: Index
-    has_new_zip_index: bool
+    has_new_zip_summary: bool
     full_resync: bool
 
     def retry_job(self): return None
@@ -48,13 +48,18 @@ class ProcessZipJob(Job):
     # Results
     result_zip_index: StoreFragmentDrivePaths
     installed_folders: List[PathPackage] = field(default_factory=list)
-    failed_folders: List[str] = field(default_factory=list)
-    removed_folders: List[RemovedCopy] = field(default_factory=list)
     filtered_data: Optional[FileFoldersHolder] = field(default=None)
+    directories_to_remove: List[PathPackage] = field(default_factory=list)
+    files_to_remove: List[PathPackage] = field(default_factory=list)
+    removed_folders: List[RemovedCopy] = field(default_factory=list)
+    skipped_updated_files: List[PathPackage] = field(default_factory=list)
+    present_not_validated_files: List[PathPackage] = field(default_factory=list)
+    present_validated_files: List[PathPackage] = field(default_factory=list)
 
     # Failure results
     full_partitions: List[Tuple[Partition, int]] = field(default_factory=list)
     failed_files_no_space: List[PathPackage] = field(default_factory=list)
+    failed_folders: List[str] = field(default_factory=list)
 
     # Success & Failure results
     summary_download_failed: Optional[str] = field(default=None)
