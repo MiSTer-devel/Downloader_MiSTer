@@ -296,7 +296,7 @@ class FileDownloadSessionLogger(Protocol):
     def start_session(self):
         '''Starts a new session.'''
 
-    def print_progress_line(self, line):
+    def print_progress_line(self, line: str):
         '''Prints a progress line.'''
 
     def print_pending(self):
@@ -475,6 +475,6 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
             self._logger.debug(e)
 
     def start_session(self): self._session_logger.start_session()
-    def print_progress_line(self, line): self._session_logger.print_progress_line(line)
+    def print_progress_line(self, line: str): self._session_logger.print_progress_line(line)
     def print_pending(self): self._session_logger.print_pending()
     def print_header(self, db: DbEntity):  self._session_logger.print_header(db)
