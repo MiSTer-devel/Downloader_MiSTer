@@ -39,7 +39,7 @@ class PrintLogger(Logger):
         _do_print("DEBUG| ", *args, sep=sep, end=end, file=sys.stdout, flush=flush)
 
     def bench(self, *args):
-        _do_print(f'BENCH {args[0]}| ', *args[1:], sep='', end='\n', file=sys.stdout, flush=True)
+        _do_print(*args, sep='', end='\n', file=sys.stdout, flush=True)
 
 
 class OffLogger(Logger):
@@ -93,7 +93,7 @@ class FileLogger(Logger, FilelogManager):
         self._do_print_in_file("DEBUG| ", *_transform_debug_args(args), sep=sep, end=end, flush=flush)
 
     def bench(self, *args):
-        self._do_print_in_file(f"BENCH {args[0]}| ", *args[1:], sep='', end='\n', flush=False)
+        self._do_print_in_file(*args, sep='', end='\n', flush=False)
 
     def _do_print_in_file(self, *args, sep, end, flush):
         if self._logfile is not None:
@@ -138,9 +138,10 @@ class TopLogger(Logger, ConfigLogManager):
         if self._start_time is None:
             return
 
-        time_msg = str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-4]
-        self.print_logger.bench(time_msg, *args)
-        self.file_logger.bench(time_msg, *args)
+        time_str = str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-4]
+        bench_header = f'BENCH {time_str}| '
+        self.print_logger.bench(bench_header, *args)
+        self.file_logger.bench(bench_header, *args)
 
 
 def _transform_debug_args(args: List[Any]) -> List[str]:
