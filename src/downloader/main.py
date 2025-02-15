@@ -26,7 +26,7 @@ from typing import Optional
 from downloader.config import Environment
 from downloader.config_reader import ConfigReader
 from downloader.constants import KENV_LOGLEVEL
-from downloader.logger import FileLoggerDecorator, PrintLogger
+from downloader.logger import FileLogger, PrintLogger, TopLogger
 from downloader.full_run_service_factory import FullRunServiceFactory
 
 
@@ -34,12 +34,11 @@ def main(env: Environment) -> int:
     # This function should be called in __main__.py which just bootstraps the application.
     # It should receive an 'env' dictionary produced by calling the "read_env" function below.
 
-    printer = PrintLogger()
-    logger = FileLoggerDecorator(printer)
+    logger = TopLogger.for_main()
     # noinspection PyBroadException
     try:
         exit_code = execute_full_run(
-            FullRunServiceFactory.for_main(logger, printer),
+            FullRunServiceFactory.for_main(logger),
             ConfigReader(logger, env),
             sys.argv
         )
@@ -47,7 +46,7 @@ def main(env: Environment) -> int:
         logger.print(traceback.format_exc())
         exit_code = 1
 
-    logger.finalize()
+    logger.file_logger.finalize()
     return exit_code
 
 

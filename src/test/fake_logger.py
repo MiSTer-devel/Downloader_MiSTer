@@ -19,7 +19,7 @@
 import sys
 from typing import Any, List
 from downloader.config import Config
-from downloader.logger import FilelogManager, FilelogSaver, Logger, PrintLogManager
+from downloader.logger import FilelogManager, FilelogSaver, Logger, ConfigLogManager
 
 
 class SpyLoggerDecorator(Logger):
@@ -40,7 +40,7 @@ class SpyLoggerDecorator(Logger):
         self._decorated_logger.bench(*args)
 
 
-class NoLogger(Logger, FilelogManager, PrintLogManager):
+class NoLogger(Logger, FilelogManager, ConfigLogManager):
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
     def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
     def bench(self, *args): pass

@@ -25,7 +25,7 @@ from downloader.config_reader import ConfigReader
 from downloader.constants import FILE_downloader_storage_json
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from downloader.full_run_service_factory import FullRunServiceFactory
-from downloader.logger import PrintLogger
+from downloader.logger import PrintLogger, TopLogger
 from test.fake_file_system_factory import make_production_filesystem_factory
 from test.fake_logger import SpyLoggerDecorator
 from test.objects import debug_env, default_env
@@ -44,9 +44,9 @@ class SandboxTestBase(unittest.TestCase):
     def assertExecutesCorrectly(self, ini_path, expected=None, external_drives_repository_factory=None):
         external_drives_repository_factory = external_drives_repository_factory or ExternalDrivesRepositoryFactory()
         self.maxDiff = None
-        logger_print = PrintLogger()
-        logger_spy = SpyLoggerDecorator(logger_print)
-        exit_code = self.run_execute_full_run(ini_path, external_drives_repository_factory, logger_spy, logger_print)
+        logger = TopLogger(PrintLogger(), NoLogger())
+        logger_spy = SpyLoggerDecorator(logger)
+        exit_code = self.run_execute_full_run(ini_path, external_drives_repository_factory, logger_spy, logger)
         self.assertEqual(exit_code, 0)
 
         if expected is None:
@@ -114,7 +114,7 @@ class SandboxTestBase(unittest.TestCase):
         #return contextlib.suppress()
         return self.subTest(message)
 
-    def run_execute_full_run(self, ini_path, external_drives_repository_factory, logger, print_mgr, argv=None):
+    def run_execute_full_run(self, ini_path, external_drives_repository_factory, logger, log_mgr, argv=None):
         env = default_env()
         env['DOWNLOADER_LAUNCHER_PATH'] = str(Path(ini_path).with_suffix('.sh'))
         env['UPDATE_LINUX'] = 'false'
@@ -127,7 +127,7 @@ class SandboxTestBase(unittest.TestCase):
         env['DEFAULT_BASE_PATH'] = tmp_default_base_path
 
         config_reader = ConfigReader(logger, env)
-        factory = FullRunServiceFactory(logger, NoLogger(), print_mgr, external_drives_repository_factory=external_drives_repository_factory)
+        factory = FullRunServiceFactory(logger, NoLogger(), log_mgr, external_drives_repository_factory=external_drives_repository_factory)
         return execute_full_run(factory, config_reader, argv or [])
 
     def find_all_files(self, directory):

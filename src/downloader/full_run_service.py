@@ -29,7 +29,7 @@ from downloader.db_utils import DbSectionPackage, sorted_db_sections
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository
-from downloader.logger import FilelogManager, Logger, PrintLogManager
+from downloader.logger import FilelogManager, Logger, ConfigLogManager
 from downloader.online_importer import OnlineImporter
 from downloader.os_utils import OsUtils
 from downloader.other import format_files_message, format_folders_message, format_zips_message
@@ -38,7 +38,7 @@ from downloader.waiter import Waiter
 
 
 class FullRunService:
-    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: PrintLogManager, local_repository: LocalRepository, online_importer: OnlineImporter, linux_updater: LinuxUpdater, reboot_calculator: RebootCalculator, base_path_relocator: BasePathRelocator, certificates_fix: CertificatesFix, external_drives_repository: ExternalDrivesRepository, os_utils: OsUtils, waiter: Waiter):
+    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, local_repository: LocalRepository, online_importer: OnlineImporter, linux_updater: LinuxUpdater, reboot_calculator: RebootCalculator, base_path_relocator: BasePathRelocator, certificates_fix: CertificatesFix, external_drives_repository: ExternalDrivesRepository, os_utils: OsUtils, waiter: Waiter):
         self._waiter = waiter
         self._os_utils = os_utils
         self._external_drives_repository = external_drives_repository

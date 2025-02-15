@@ -20,7 +20,8 @@ import shutil
 from pathlib import Path
 from downloader.constants import K_BASE_PATH, FILE_mister_downloader_needs_reboot
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
-from downloader.logger import PrintLogger
+from downloader.logger import PrintLogger, TopLogger
+from test.fake_logger import NoLogger
 from test.system.quick.sandbox_test_base import SandboxTestBase, tmp_delme_sandbox, local_store_files, load_json, hashes, cleanup
 from test.fake_store_migrator import StoreMigrator
 from downloader.file_system import hash_file
@@ -213,7 +214,7 @@ class TestSandboxedInstall(SandboxTestBase):
         self.assertFalse(os.path.isfile(FILE_mister_downloader_needs_reboot))
 
     def test_print_drives(self):
-        logger =  PrintLogger()
+        logger = TopLogger(PrintLogger(), NoLogger())
         exit_code = self.run_execute_full_run(self.sandbox_ini, ExternalDrivesRepositoryFactory(), logger, logger, ['', '--print-drives'])
         self.assertEqual(0, exit_code)
 

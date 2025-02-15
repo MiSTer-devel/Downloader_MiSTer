@@ -33,8 +33,8 @@ from downloader.job_system import JobSystem
 from downloader.jobs.fetch_file_worker import SafeFileFetcher
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import DownloaderWorkerContext
-from downloader.logger import DebugOnlyLoggerDecorator, Logger, FilelogManager, PrintLogManager, FileLoggerDecorator, \
-    PrintLogger
+from downloader.logger import DebugOnlyLoggerDecorator, Logger, FilelogManager, ConfigLogManager, FileLogger, \
+    PrintLogger, TopLogger
 from downloader.os_utils import LinuxOsUtils
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository
@@ -48,7 +48,7 @@ import atexit
 
 
 class FullRunServiceFactory:
-    def __init__(self, logger: Logger, filelog_manager: FilelogManager, printlog_manager: PrintLogManager, external_drives_repository_factory=None):
+    def __init__(self, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, external_drives_repository_factory=None):
         self._logger = logger
         self._filelog_manager = filelog_manager
         self._printlog_manager = printlog_manager
@@ -56,8 +56,8 @@ class FullRunServiceFactory:
 
 
     @staticmethod
-    def for_main(file_logger: FileLoggerDecorator, print_logger: PrintLogger):
-        return FullRunServiceFactory(file_logger, file_logger, print_logger)
+    def for_main(top_logger: TopLogger):
+        return FullRunServiceFactory(top_logger, top_logger.file_logger, top_logger)
 
     def create(self, config: Config):
         path_dictionary: Dict[str, str] = dict()
