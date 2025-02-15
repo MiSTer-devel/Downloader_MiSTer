@@ -63,42 +63,36 @@ class ProcessIndexWorker(DownloaderWorkerBase):
         store = job.store.read_only()
 
         try:
-            logger.debug("Processing db '%s'...", db.db_id)
-            logger.bench('Creating index packages...')
-            check_file_pkgs, job.files_to_remove, create_folder_pkgs, job.directories_to_remove = self._create_packages_from_index(config, summary, db, store, job.from_zip)
+            logger.bench('ProcessIndexWorker create pkgs: ', job.db.db_id, job.zip_id)
+            check_file_pkgs, job.files_to_remove, create_folder_pkgs, job.directories_to_remove = self._create_packages_from_index(config, summary, db, store, job.zip_id is not None)
 
-            logger.bench('Precaching is_file...')
+            logger.bench('ProcessIndexWorker Precaching is_file: ', job.db.db_id, job.zip_id)
             self._ctx.file_system.precache_is_file_with_folders(create_folder_pkgs)
 
-            logger.debug("Processing check file packages '%s'...", db.db_id)
-            logger.bench('Testing index packages presence in FS...')
+            logger.bench('ProcessIndexWorker check pkgs: ', job.db.db_id, job.zip_id)
             fetch_pkgs, validate_pkgs, job.present_not_validated_files = self._process_check_file_packages(check_file_pkgs, db.db_id, store, full_resync)
 
-            logger.debug("Processing validate file packages '%s'...", db.db_id)
-            logger.bench('Testing index packages hashes in FS...')
+            logger.bench('ProcessIndexWorker validate pkgs: ', job.db.db_id, job.zip_id)
             job.present_validated_files, job.skipped_updated_files, more_fetch_pkgs = self._process_validate_packages(validate_pkgs)
             fetch_pkgs.extend(more_fetch_pkgs)
 
-            logger.debug("Reserving space '%s'...", db.db_id)
-            logger.bench('Reserving space...')
+            logger.bench('ProcessIndexWorker Reserve space: ', job.db.db_id, job.zip_id)
             job.full_partitions = try_reserve_space(self._ctx, fetch_pkgs)
             if len(job.full_partitions) > 0:
                 job.failed_files_no_space = fetch_pkgs
                 logger.debug("Not enough space '%s'!", db.db_id)
                 return [], FileWriteError(f"Could not allocate space for {len(fetch_pkgs)} files.")
 
-            logger.debug("Processing create folder packages '%s'...", db.db_id)
-            logger.bench('Creating folders...')
+            logger.bench('ProcessIndexWorker Create folders: ', job.db.db_id, job.zip_id)
             removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(self._ctx, create_folder_pkgs, db.db_id, db.folders, store)
             if len(job.failed_folders) > 0:
                 return [], FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
 
             job.removed_copies.extend(removed_folders)
 
-            logger.debug("Process fetch packages and launch fetch jobs '%s'...", db.db_id)
-            logger.bench('Creating fetch packages...')
+            logger.bench('ProcessIndexWorker fetch jobs: ', job.db.db_id, job.zip_id)
             next_jobs = self._process_fetch_packages_and_launch_jobs(db.db_id, fetch_pkgs, db.base_files_url)
-            logger.bench('Done process index...')
+            logger.bench('ProcessIndexWorker done: ', job.db.db_id, job.zip_id)
             return next_jobs, None
         except (BadFileFilterPartException, StoragePriorityError, FsError, OSError) as e:
             self._ctx.swallow_error(WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e))) if isinstance(e, BadFileFilterPartException) else e)

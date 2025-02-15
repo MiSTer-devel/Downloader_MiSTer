@@ -36,14 +36,14 @@ class SpyLoggerDecorator(Logger):
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
         self.debugCalls.append(args)
 
-    def bench(self, label):
-        self._decorated_logger.bench(label)
+    def bench(self, *args):
+        self._decorated_logger.bench(*args)
 
 
 class NoLogger(Logger, FilelogManager, PrintLogManager):
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
     def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
-    def bench(self, label: str): pass
+    def bench(self, *args): pass
     def finalize(self) -> None: pass
     def set_local_repository(self, local_repository: FilelogSaver) -> None: pass
     def configure(self, config: Config) -> None: pass

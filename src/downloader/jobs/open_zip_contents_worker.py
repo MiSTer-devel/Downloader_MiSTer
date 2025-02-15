@@ -36,7 +36,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: OpenZipContentsJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
-        logger.bench('OpenZipContentsWorker start.')
+        logger.bench('OpenZipContentsWorker start: ', job.db.db_id, job.zip_id)
 
         if job.zip_kind == ZipKind.EXTRACT_ALL_CONTENTS:
             should_extract_all = len(job.files_to_unzip) > (0.7 * job.total_amount_of_files_in_zip)
@@ -52,7 +52,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         target_path = job.target_folder.full_path if should_extract_all else zip_paths
         logger.print(job.action_text)
-        logger.bench('OpenZipContentsWorker unzipping...')
+        logger.bench('OpenZipContentsWorker unzipping...', job.db.db_id, job.zip_id)
         try:
             self._ctx.file_system.unzip_contents(job.contents_zip_temp_path, target_path, (job.target_folder, job.files_to_unzip, job.filtered_data['files']))
         except UnzipError as e:
@@ -61,7 +61,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         finally:
             self._ctx.file_system.unlink(job.contents_zip_temp_path)
 
-        logger.bench('OpenZipContentsWorker unzip done...')
+        logger.bench('OpenZipContentsWorker unzip done...', job.db.db_id, job.zip_id)
 
         if should_extract_all:
             if len(job.filtered_data['files']) > 0:
@@ -72,10 +72,10 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         job.downloaded_files.extend(job.files_to_unzip)
 
-        logger.bench('Precaching is_file...')
+        logger.bench('OpenZipContentsWorker precaching is_file...', job.db.db_id, job.zip_id)
         self._ctx.file_system.precache_is_file_with_folders(job.recipient_folders, recheck=True)
 
-        logger.bench('OpenZipContentsWorker validating...')
+        logger.bench('OpenZipContentsWorker validating...', job.db.db_id, job.zip_id)
 
         existing_files, invalid_files = self._ctx.file_system.are_files(job.files_to_unzip)
         for file_pkg in existing_files:
@@ -84,7 +84,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
             else:
                 invalid_files.append(file_pkg)
 
-        logger.bench('OpenZipContentsWorker validation done...')
+        logger.bench('OpenZipContentsWorker validation done...', job.db.db_id, job.zip_id)
 
         if len(invalid_files) == 0:
             return [], None
@@ -101,7 +101,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         self._ctx.installation_report.unmark_processed_files(job.failed_files, job.db.db_id)
 
-        logger.bench('OpenZipContentsWorker launching recovery process index...')
+        logger.bench('OpenZipContentsWorker launching recovery process index...', job.db.db_id, job.zip_id)
 
         return [ProcessIndexJob(
             db=job.db,
@@ -110,5 +110,5 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
             index=Index(files=files_to_recover, folders={}),
             store=job.store.select(files=[pkg.rel_path for pkg in invalid_files]),  # @TODO: This store needs to be a fragment only for the invalid files...
             full_resync=job.full_resync,
-            from_zip=True
+            zip_id=job.zip_id
         )], None
