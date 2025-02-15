@@ -51,7 +51,7 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         else: raise ValueError(f"Impossible kind '{job.zip_kind}' for zip '{job.zip_id}' in db '{job.db.db_id}'")
 
         target_path = job.target_folder.full_path if should_extract_all else zip_paths
-        logger.print(job.action_text)
+        self._ctx.file_download_session_logger.print_progress_line(job.action_text)
         logger.bench('OpenZipContentsWorker unzipping...', job.db.db_id, job.zip_id)
         try:
             self._ctx.file_system.unzip_contents(job.contents_zip_temp_path, target_path, (job.target_folder, job.files_to_unzip, job.filtered_data['files']))

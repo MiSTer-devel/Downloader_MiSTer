@@ -152,7 +152,7 @@ class FileLoggerDecorator(Logger, FilelogManager):
 
     def bench(self, *args):
         self._decorated_logger.bench(*args)
-        self._do_print_in_file("BENCH| ", *args, sep='', end='\n', flush=False)
+        #self._do_print_in_file("BENCH| ", *args, sep='', end='\n', flush=False)
 
     def _do_print_in_file(self, *args, sep, end, flush):
         if self._logfile is not None:
