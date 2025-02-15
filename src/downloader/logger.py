@@ -31,38 +31,117 @@ class Logger(Protocol):
     def bench(self, *args) -> None: """print only to debug target"""
 
 
+class PrintLogger(Logger):
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
+        _do_print(*args, sep=sep, end=end, file=file, flush=flush)
+
+    def debug(self, *args, sep='', end='\n', flush=True):
+        _do_print("DEBUG| ", *args, sep=sep, end=end, file=sys.stdout, flush=flush)
+
+    def bench(self, *args):
+        _do_print(f'BENCH {args[0]}| ', *args[1:], sep='', end='\n', file=sys.stdout, flush=True)
+
+
 class OffLogger(Logger):
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
     def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
     def bench(self, *args): pass
 
+def _do_print(*args, sep, end, file, flush):
+    try:
+        print(*args, sep=sep, end=end, file=file, flush=flush)
+    except UnicodeEncodeError:
+        pack = []
+        for a in args:
+            pack.append(a.encode('utf8', 'surrogateescape'))
+        print(*pack, sep=sep, end=end, file=file, flush=flush)
+    except BaseException as error:
+        print('An unknown exception occurred during logging: %s' % str(error))
 
-class PrintLogManager(Protocol):
+
+class FilelogSaver(Protocol):
+    def save_log_from_tmp(self, tmp_logfile: str) -> None: pass
+
+class FilelogManager(Protocol):
+    def finalize(self) -> None: pass
+    def set_local_repository(self, local_repository: FilelogSaver) -> None: pass
+
+class FileLogger(Logger, FilelogManager):
+    def __init__(self):
+        self._logfile = tempfile.NamedTemporaryFile('w', delete=False)
+        self._local_repository: Optional[FilelogSaver] = None
+
+    def finalize(self):
+        if self._logfile is None:
+            return
+
+        if self._local_repository is None:
+            self.print('Log saved in temp file: ' + self._logfile.name)
+
+        self._logfile.close()
+        if self._local_repository is not None:
+            self._local_repository.save_log_from_tmp(self._logfile.name)
+        self._logfile = None
+
+    def set_local_repository(self, local_repository: FilelogSaver):
+        self._local_repository = local_repository
+
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
+        self._do_print_in_file(*args, sep=sep, end=end, flush=flush)
+
+    def debug(self, *args, sep='', end='\n', flush=True):
+        self._do_print_in_file("DEBUG| ", *_transform_debug_args(args), sep=sep, end=end, flush=flush)
+
+    def bench(self, *args):
+        self._do_print_in_file(f"BENCH {args[0]}| ", *args[1:], sep='', end='\n', flush=False)
+
+    def _do_print_in_file(self, *args, sep, end, flush):
+        if self._logfile is not None:
+            _do_print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
+
+
+
+class ConfigLogManager(Protocol):
     def configure(self, config: Config) -> None: pass
 
-class PrintLogger(Logger, PrintLogManager):
-    def __init__(self, start_time: Optional[float] = None):
-        self._verbose_mode = True
-        self._start_time = start_time
 
+class TopLogger(Logger, ConfigLogManager):
+    def __init__(self, print_logger: PrintLogger, file_logger: FileLogger):
+        self.print_logger = print_logger
+        self.file_logger = file_logger
+        self._verbose_mode = True
+        self._debug = True
+        self._start_time = None
+
+    @staticmethod
+    def for_main():
+        return TopLogger(PrintLogger(), FileLogger())
+    
     def configure(self, config: Config):
         if config['verbose']:
             self._start_time = config['start_time']
         else:
             self._verbose_mode = False
 
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
-        _do_print(*args, sep=sep, end=end, file=file, flush=flush)
-
-    def debug(self, *args, sep='', end='\n', flush=True):
-        if not self._verbose_mode:
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
+        self.print_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
+        self.file_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
+    def debug(self, *args, sep='', end='\n', flush=False):
+        if self._debug is False:
             return
 
-        _do_print("DEBUG| ", *_transform_debug_args(args), sep=sep, end=end, file=sys.stdout, flush=flush)
-
+        args = _transform_debug_args(args)
+        if self._verbose_mode:
+            self.print_logger.debug(*args, sep=sep, end=end, flush=flush)
+        self.file_logger.debug(*args, sep=sep, end=end, flush=flush)
     def bench(self, *args):
-        if self._start_time is not None:
-            _do_print('BENCH %s| %s' % (str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-4], label), sep='', end='\n', file=sys.stdout, flush=True)
+        if self._start_time is None:
+            return
+
+        time_msg = str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-4]
+        self.print_logger.bench(time_msg, *args)
+        self.file_logger.bench(time_msg, *args)
+
 
 def _transform_debug_args(args: List[Any]) -> List[str]:
     exception_msgs = []
@@ -101,62 +180,6 @@ def _format_ex(e: Exception) -> str:
         exception_msg += padding + 'CAUSE: ' + padding.join(traceback.TracebackException.from_exception(e).format())
         padding += ' ' * 4
     return exception_msg
-
-def _do_print(*args, sep, end, file, flush):
-    try:
-        print(*args, sep=sep, end=end, file=file, flush=flush)
-    except UnicodeEncodeError:
-        pack = []
-        for a in args:
-            pack.append(a.encode('utf8', 'surrogateescape'))
-        print(*pack, sep=sep, end=end, file=file, flush=flush)
-    except BaseException as error:
-        print('An unknown exception occurred during logging: %s' % str(error))
-
-
-class FilelogSaver(Protocol):
-    def save_log_from_tmp(self, tmp_logfile: str) -> None: pass
-
-class FilelogManager(Protocol):
-    def finalize(self) -> None: pass
-    def set_local_repository(self, local_repository: FilelogSaver) -> None: pass
-
-class FileLoggerDecorator(Logger, FilelogManager):
-    def __init__(self, decorated_logger: Logger):
-        self._decorated_logger = decorated_logger
-        self._logfile = tempfile.NamedTemporaryFile('w', delete=False)
-        self._local_repository: Optional[FilelogSaver] = None
-
-    def finalize(self):
-        if self._logfile is None:
-            return
-
-        if self._local_repository is None:
-            self.print('Log saved in temp file: ' + self._logfile.name)
-
-        self._logfile.close()
-        if self._local_repository is not None:
-            self._local_repository.save_log_from_tmp(self._logfile.name)
-        self._logfile = None
-
-    def set_local_repository(self, local_repository: FilelogSaver):
-        self._local_repository = local_repository
-
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
-        self._decorated_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
-        self._do_print_in_file(*args, sep=sep, end=end, flush=flush)
-
-    def debug(self, *args, sep='', end='\n', flush=True):
-        self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
-        self._do_print_in_file("DEBUG| ", *_transform_debug_args(args), sep=sep, end=end, flush=flush)
-
-    def bench(self, *args):
-        self._decorated_logger.bench(*args)
-        #self._do_print_in_file("BENCH| ", *args, sep='', end='\n', flush=False)
-
-    def _do_print_in_file(self, *args, sep, end, flush):
-        if self._logfile is not None:
-            _do_print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
 
 
 class DebugOnlyLoggerDecorator(Logger):
