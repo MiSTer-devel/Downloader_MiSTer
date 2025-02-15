@@ -62,12 +62,12 @@ class BasePathRelocator:
         return result
 
     def relocate_non_system_files(self, package: 'BasePathRelocatorPackage') -> None:
-        self._logger.bench('Base Path Relocator start.')
+        self._logger.bench('Base Path Relocator start: ', package.db_id)
 
         package.relocate_non_system_files()
         package.update_store()
 
-        self._logger.bench('Base Path Relocator done.')
+        self._logger.bench('Base Path Relocator done: ', package.db_id)
 
 
 class BasePathRelocatorPackage:
@@ -79,6 +79,9 @@ class BasePathRelocatorPackage:
         self._logger = logger
         self._waiter = waiter
         self._db_id = db_id
+
+    @property
+    def db_id(self): return self._db_id
 
     def relocate_non_system_files(self) -> None:
         files_to_relocate: Tuple[str, Dict[str, Any]] = []

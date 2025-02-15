@@ -28,13 +28,13 @@ from downloader.config import Config
 class Logger(Protocol):
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True) -> None: """print always"""
     def debug(self, *args, sep='', end='\n', flush=True) -> None: """print only to debug target"""
-    def bench(self, label: str) -> None: """print only to debug target"""
+    def bench(self, *args) -> None: """print only to debug target"""
 
 
 class OffLogger(Logger):
     def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
     def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
-    def bench(self, label: str): pass
+    def bench(self, *args): pass
 
 
 class PrintLogManager(Protocol):
@@ -60,7 +60,7 @@ class PrintLogger(Logger, PrintLogManager):
 
         _do_print("DEBUG| ", *_transform_debug_args(args), sep=sep, end=end, file=sys.stdout, flush=flush)
 
-    def bench(self, label: str):
+    def bench(self, *args):
         if self._start_time is not None:
             _do_print('BENCH %s| %s' % (str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-4], label), sep='', end='\n', file=sys.stdout, flush=True)
 
@@ -150,9 +150,9 @@ class FileLoggerDecorator(Logger, FilelogManager):
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
         self._do_print_in_file("DEBUG| ", *_transform_debug_args(args), sep=sep, end=end, flush=flush)
 
-    def bench(self, label: str):
-        self._decorated_logger.bench(label)
-        self._do_print_in_file("BENCH| ", label, sep='', end='\n', flush=False)
+    def bench(self, *args):
+        self._decorated_logger.bench(*args)
+        self._do_print_in_file("BENCH| ", *args, sep='', end='\n', flush=False)
 
     def _do_print_in_file(self, *args, sep, end, flush):
         if self._logfile is not None:
@@ -170,5 +170,5 @@ class DebugOnlyLoggerDecorator(Logger):
     def debug(self, *args, sep='', end='\n', flush=True):
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
 
-    def bench(self, label: str):
-        self._decorated_logger.bench(label)
+    def bench(self, *args):
+        self._decorated_logger.bench(*args)

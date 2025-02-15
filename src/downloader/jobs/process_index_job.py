@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Optional, Tuple
 
 from downloader.config import Config
 from downloader.db_entity import DbEntity
@@ -38,7 +38,7 @@ class ProcessIndexJob(Job):
     index: Index
     full_resync: bool
     config: Config
-    from_zip: bool = False
+    zip_id: Optional[str] = None
 
     def retry_job(self): return None
 

@@ -35,12 +35,12 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: ProcessDbZipsWaiterJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
-        logger.bench('ProcessDbWorker wait start.')
+        logger.bench('ProcessDbZipsWaiterWorker wait start: ', job.db.db_id)
 
         while self._ctx.installation_report.any_in_progress_job_with_tags(job.zip_job_tags):
             self._ctx.job_ctx.wait_for_other_jobs()
 
-        logger.bench('ProcessDbWorker wait done.')
+        logger.bench('ProcessDbZipsWaiterWorker wait done: ', job.db.db_id)
         index = Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url)
 
         store = job.store
@@ -62,5 +62,5 @@ class ProcessDbZipsWaiterWorker(DownloaderWorkerBase):
             full_resync=job.full_resync,
         )
         resulting_job.add_tag(make_db_tag(job.db.db_id))
-        logger.bench('ProcessDbWorker done.')
+        logger.bench('ProcessDbZipsWaiterWorker done: ', job.db.db_id)
         return [resulting_job], None

@@ -36,7 +36,7 @@ class ProcessDbWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: ProcessDbJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
-        logger.bench('ProcessDbWorker start.')
+        logger.bench('ProcessDbWorker start: ', job.db.db_id)
     
         read_only_store = job.store.read_only()
 
@@ -76,7 +76,7 @@ class ProcessDbWorker(DownloaderWorkerBase):
                 zip_job_tags=zip_job_tags
             )
 
-            return [*zip_jobs, waiter_job], None
+            next_jobs = [*zip_jobs, waiter_job]
         else:
             index_job = ProcessIndexJob(
                 db=job.db,
@@ -87,7 +87,11 @@ class ProcessDbWorker(DownloaderWorkerBase):
                 full_resync=job.full_resync,
             )
             index_job.add_tag(make_db_tag(job.db.db_id))
-            return [index_job], None
+            next_jobs = [index_job]
+
+        logger.bench('ProcessDbWorker end: ', job.db.db_id)
+
+        return next_jobs, None
 
 
 def _make_zip_job(z: ZipJobContext) -> Tuple[Job, Optional[Exception]]:

@@ -40,7 +40,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: ProcessZipJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
-        logger.bench('ProcessZipWorker start.')
+        logger.bench('ProcessZipWorker start: ', job.db.db_id, job.zip_id)
 
         fix_folders(job.zip_index.folders)  # @TODO: Try to look for a better place to put this, while validating zip_index entity for example which we don't do yet.
 
@@ -64,7 +64,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
             next_jobs = [process_index_job]
 
         self._fill_fragment_with_zip_index(job.result_zip_index, job)
-        logger.bench('ProcessZipWorker done.')
+        logger.bench('ProcessZipWorker done: ', job.db.db_id, job.zip_id)
         return next_jobs, None
 
     def _make_open_zip_contents_job(self, job: ProcessZipJob) -> Tuple[Job, Optional[Exception]]:
@@ -86,15 +86,14 @@ class ProcessZipWorker(DownloaderWorkerBase):
             self._ctx.swallow_error(target_error)
             return [], target_error
 
-        logger.debug("Reserving space '%s zip:%s'...", job.db.db_id, job.zip_id)
-        logger.bench('Reserving space...')
+        logger.bench('ProcessZipWorker Reserving space: ', job.db.db_id, job.zip_id)
         job.full_partitions = try_reserve_space(self._ctx, file_packs)
         if len(job.full_partitions) > 0:
             job.failed_files_no_space = file_packs
             logger.debug("Not enough space '%s zip:%s'!", job.db.db_id, job.zip_id)
             return [], FileWriteError(f"Could not allocate space for decompressing {len(file_packs)} files.")
 
-        logger.bench('Precaching is_file...')
+        logger.bench('ProcessZipWorker Precaching is_file: ', job.db.db_id, job.zip_id)
         self._ctx.file_system.precache_is_file_with_folders(folder_packs)
 
         files_to_unzip, already_processed_files = self._process_compressed_file_packages(file_packs, job.db.db_id, store, job.full_resync)
@@ -103,7 +102,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
             logger.print(f'Skipping zip "{job.zip_id}" because file "{already_processed.pkg.rel_path}" was already processed by db "{already_processed.db_id}"')
             return [], None
 
-        logger.bench('Creating folders...')
+        logger.bench('ProcessZipWorker Creating folders: ', job.db.db_id, job.zip_id)
         job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(self._ctx, folder_packs, job.db.db_id, zip_index.folders, store)
         if len(job.failed_folders) > 0:
             return [], FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
@@ -244,5 +243,5 @@ def _make_process_index_job(job: ProcessZipJob) -> Optional[ProcessIndexJob]:
         index=job.zip_index,
         store=job.store.select(files=list(job.zip_index.files), folders=list(job.zip_index.folders)),
         full_resync=job.full_resync,
-        from_zip=True
+        zip_id=job.zip_id
     )
