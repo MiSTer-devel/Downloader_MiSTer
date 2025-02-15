@@ -41,12 +41,6 @@ class PrintLogger(Logger):
     def bench(self, *args):
         _do_print(*args, sep='', end='\n', file=sys.stdout, flush=True)
 
-
-class OffLogger(Logger):
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
-    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
-    def bench(self, *args): pass
-
 def _do_print(*args, sep, end, file, flush):
     try:
         print(*args, sep=sep, end=end, file=file, flush=flush)
@@ -57,6 +51,12 @@ def _do_print(*args, sep, end, file, flush):
         print(*pack, sep=sep, end=end, file=file, flush=flush)
     except BaseException as error:
         print('An unknown exception occurred during logging: %s' % str(error))
+
+
+class OffLogger(Logger):
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
+    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
+    def bench(self, *args): pass
 
 
 class FilelogSaver(Protocol):
