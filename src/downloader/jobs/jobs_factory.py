@@ -30,9 +30,9 @@ from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.index import Index
 from downloader.jobs.open_zip_contents_job import ZipKind
-from downloader.jobs.open_zip_index_job import OpenZipIndexJob
-from downloader.jobs.process_db_job import ProcessDbJob
-from downloader.jobs.process_zip_job import ProcessZipJob
+from downloader.jobs.open_zip_summary_job import OpenZipSummaryJob
+from downloader.jobs.process_db_main_job import ProcessDbMainJob
+from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.local_store_wrapper import StoreWrapper, new_store_fragment_drive_paths
 from downloader.logger import Logger
@@ -43,7 +43,7 @@ class ZipJobContext:
     zip_id: str
     zip_description: Dict[str, Any]
     config: Config
-    job: ProcessDbJob
+    job: ProcessDbMainJob
 
 
 def make_get_file_job(source: str, target: str, info: str, silent: bool, logger: Optional[Logger] = None) -> GetFileJob:
@@ -68,9 +68,9 @@ def make_get_zip_file_jobs(db: DbEntity, zip_id: str, description: Dict[str, Any
     return get_file_job, validate_job
 
 
-def make_open_zip_index_job(z: ZipJobContext, file_description: Dict[str, Any], process_zip_backup: Optional[ProcessZipJob]) -> Job:
+def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any], process_zip_backup: Optional[ProcessZipIndexJob]) -> Job:
     get_file_job, validate_job = make_get_zip_file_jobs(db=z.job.db, zip_id=z.zip_id, description=file_description, tag=make_zip_tag(z.job.db, z.zip_id))
-    open_zip_index_job = OpenZipIndexJob(
+    open_zip_summary_job = OpenZipSummaryJob(
         zip_id=z.zip_id,
         zip_description=z.zip_description,
         db=z.job.db,
@@ -82,28 +82,28 @@ def make_open_zip_index_job(z: ZipJobContext, file_description: Dict[str, Any], 
         get_file_job=get_file_job,
         process_zip_backup=process_zip_backup
     )
-    open_zip_index_job.add_tag(make_zip_tag(z.job.db, z.zip_id))
-    validate_job.after_job = open_zip_index_job
+    open_zip_summary_job.add_tag(make_zip_tag(z.job.db, z.zip_id))
+    validate_job.after_job = open_zip_summary_job
     if process_zip_backup is not None:
         process_zip_backup.summary_download_failed = validate_job.info
     return get_file_job
 
 
-def make_process_zip_job(zip_id: str, zip_description: Dict[str, Any], zip_index: Dict[str, Any], config: Config, db: DbEntity, ini_description: Dict[str, Any], store: StoreWrapper, full_resync: bool, has_new_zip_index: bool) -> ProcessZipJob:
+def make_process_zip_job(zip_id: str, zip_description: Dict[str, Any], zip_summary: Dict[str, Any], config: Config, db: DbEntity, ini_description: Dict[str, Any], store: StoreWrapper, full_resync: bool, has_new_zip_summary: bool) -> ProcessZipIndexJob:
     base_files_url = db.base_files_url
     if 'base_files_url' in zip_description:
         base_files_url = zip_description['base_files_url']
 
-    job = ProcessZipJob(
+    job = ProcessZipIndexJob(
         zip_id=zip_id,
         zip_description=zip_description,
-        zip_index=Index(files=zip_index['files'], folders=zip_index['folders'], base_files_url=base_files_url),
+        zip_index=Index(files=zip_summary['files'], folders=zip_summary['folders'], base_files_url=base_files_url),
         config=config,
         db=db,
         ini_description=ini_description,
         store=store,
         full_resync=full_resync,
-        has_new_zip_index=has_new_zip_index,
+        has_new_zip_summary=has_new_zip_summary,
         result_zip_index = new_store_fragment_drive_paths()
     )
     job.add_tag(make_zip_tag(db, zip_id))

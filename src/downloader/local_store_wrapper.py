@@ -118,17 +118,29 @@ class StoreWrapper:
         new_store = {
             'files': {},
             'folders': {},
-            'base_path': self._store['base_path']
+            'base_path': self._store['base_path'],
+            'external': defaultdict(lambda: {'files': {}, 'folders': {}})
         }
 
         for file_path in files:
-            if file_path not in self._store['files']:
-                continue
-            new_store['files'][file_path] = self._store['files'][file_path]
+            if file_path[0] == '|':
+                file_path = file_path[1:]
+            if file_path in self._store['files']:
+                new_store['files'][file_path] = self._store['files'][file_path]
+            if 'external' not in self._store: continue
+            for drive, index in self._store['external'].items():
+                if file_path in index['files']:
+                    new_store['external'][drive]['files'][file_path] = index['files'][file_path]
+
         for folder_path in folders:
-            if folder_path not in self._store['folders']:
-                continue
-            new_store['folders'][folder_path] = self._store['folders'][folder_path]
+            if folder_path[0] == '|':
+                folder_path = folder_path[1:]
+            if folder_path in self._store['folders']:
+                new_store['folders'][folder_path] = self._store['folders'][folder_path]
+            if 'external' not in self._store: continue
+            for drive, index in self._store['external'].items():
+                if folder_path in index['folders']:
+                    new_store['external'][drive]['folders'][folder_path] = index['folders'][folder_path]
 
         return StoreWrapper(new_store, self._local_store_wrapper, readonly=True)
 
@@ -136,16 +148,34 @@ class StoreWrapper:
         new_store = {
             'files': {},
             'folders': {},
-            'base_path': self._store['base_path']
+            'base_path': self._store['base_path'],
+            'external': defaultdict(lambda: {'files': {}, 'folders': {}})
         }
 
+        # @TODO: Remove this after we change the pext store structure
+        normalized_files = {file if (file[0] != '|' or len(file) == 0) else file[1:] for file in index.files}
+
         for file_path in self._store['files']:
-            if file_path not in index.files:
+            if file_path not in normalized_files:
                 new_store['files'][file_path] = self._store['files'][file_path]
 
+        # @TODO: Remove this after we change the pext store structure
+        normalized_folders = {folder if (folder[0] != '|' or len(folder) == 0) else folder[1:] for folder in index.folders}
+
         for folder_path in self._store['folders']:
-            if folder_path not in index.folders:
+            if folder_path not in normalized_folders:
                 new_store['folders'][folder_path] = self._store['folders'][folder_path]
+
+        if 'external' in self._store:
+            for drive, summary in self._store['external'].items():
+
+                for file_path in summary['files']:
+                    if file_path not in normalized_files:
+                        new_store['external'][drive]['files'][file_path] = summary['files'][file_path]
+
+                for folder_path in summary['folders']:
+                    if folder_path not in normalized_folders:
+                        new_store['external'][drive]['folders'][folder_path] = summary['folders'][folder_path]
 
         return StoreWrapper(new_store, self._local_store_wrapper, readonly=True)
 
@@ -404,6 +434,13 @@ class WriteOnlyStoreAdapter:
         self.remove_zip_ids(removed_zip_ids)
 
     def save_filtered_zip_data(self, filtered_zip_data):
+        for drive in list(filtered_zip_data):
+            data = filtered_zip_data[drive]
+            empty_files = 'files' not in data or len(data['files']) == 0
+            empty_folders = 'folders' not in data or len(data['folders']) == 0
+            if empty_files and empty_folders:
+                filtered_zip_data.pop(drive)
+
         if len(filtered_zip_data):
             if 'filtered_zip_data' in self._store and equal_dicts(self._store['filtered_zip_data'], filtered_zip_data):
                 return
@@ -415,13 +452,14 @@ class WriteOnlyStoreAdapter:
 
             self._top_wrapper.mark_force_save()
 
-    def add_zip_index(self, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]):
+    def add_zip_summary(self, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]):
         if zip_id in self._store['zips']:
             if not are_zip_descriptions_equal(self._store['zips'][zip_id], description):
                 self._store['zips'][zip_id] = description
                 self._top_wrapper.mark_force_save()
-
-        self._store['zips'][zip_id] = description
+        else:
+            self._store['zips'][zip_id] = description
+            self._top_wrapper.mark_force_save()
 
         for file_path, file_description in fragment['base_paths']['files'].items():
             self.add_file(file_path, file_description)
@@ -497,7 +535,7 @@ class ReadOnlyStoreAdapter:
                     files.update(external['files'])
         return {f: d for f, d in files.items() if f not in db_files}
 
-    def zip_index(self, zip_id) -> Optional[Dict[str, Any]]:
+    def zip_summary(self, zip_id) -> Optional[Dict[str, Any]]:
         files = {}
         folders = {}
         for file_path, file_description in self._aggregated_summary['files'].items():

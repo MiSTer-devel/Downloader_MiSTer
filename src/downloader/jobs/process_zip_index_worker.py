@@ -19,57 +19,82 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from downloader.db_entity import fix_folders
+from downloader.file_filter import ZipData
 from downloader.file_system import FileWriteError, FolderCreationError
-from downloader.free_space_reservation import Partition
 from downloader.job_system import WorkerResult, Job
-from downloader.jobs.index import Index
 from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_zip_kind
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
-from downloader.jobs.process_index_job import ProcessIndexJob
-from downloader.jobs.process_index_worker import process_create_folder_packages, try_reserve_space
+from downloader.jobs.process_db_index_job import ProcessDbIndexJob
+from downloader.jobs.process_db_index_worker import create_fetch_jobs, create_packages_from_index, process_check_file_packages, process_create_folder_packages, process_validate_packages, try_reserve_space
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter, StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
-from downloader.jobs.process_zip_job import ProcessZipJob
+from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.target_path_calculator import TargetPathsCalculator
 
 
-class ProcessZipWorker(DownloaderWorkerBase):
-    def job_type_id(self) -> int: return ProcessZipJob.type_id
+class ProcessZipIndexWorker(DownloaderWorkerBase):
+    def job_type_id(self) -> int: return ProcessZipIndexJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
-    def operate_on(self, job: ProcessZipJob) -> WorkerResult:  # type: ignore[override]
+    def operate_on(self, job: ProcessZipIndexJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
-        logger.bench('ProcessZipWorker start: ', job.db.db_id, job.zip_id)
+        zip_id, zip_description, db, config, summary, full_resync = job.zip_id, job.zip_description, job.db, job.config, job.zip_index, job.full_resync
 
-        fix_folders(job.zip_index.folders)  # @TODO: Try to look for a better place to put this, while validating zip_index entity for example which we don't do yet.
+        logger.bench('ProcessZipIndexWorker start: ', db.db_id, zip_id)
+        store = job.store.select(files=list(job.zip_index.files), folders=list(job.zip_index.folders)).read_only()
+        fix_folders(summary.folders)  # @TODO: Try to look for a better place to put this, while validating zip_index entity for example which we don't do yet.
+
+        logger.bench('ProcessZipIndexWorker create pkgs: ', db.db_id, zip_id)
+        check_file_pkgs, job.files_to_remove, create_folder_pkgs, job.directories_to_remove, zip_data = create_packages_from_index(self._ctx, config, summary, db, store, zip_id is not None)
+
+        logger.bench('ProcessZipIndexWorker Precaching is_file: ', db.db_id, zip_id)
+        self._ctx.file_system.precache_is_file_with_folders(create_folder_pkgs)
+
+        logger.bench('ProcessZipIndexWorker check pkgs: ', db.db_id, zip_id)
+        unzip_file_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(self._ctx, check_file_pkgs, db.db_id, store, full_resync)
+
+        logger.bench('ProcessZipIndexWorker validate pkgs: ', db.db_id, zip_id)
+        job.present_validated_files, job.skipped_updated_files, more_unzip_file_pkgs = process_validate_packages(self._ctx, validate_pkgs)
+        unzip_file_pkgs.extend(more_unzip_file_pkgs)
+
+        logger.bench('ProcessZipIndexWorker Reserve space: ', db.db_id, zip_id)
+        job.full_partitions = try_reserve_space(self._ctx, unzip_file_pkgs)
+        if len(job.full_partitions) > 0:
+            job.failed_files_no_space = unzip_file_pkgs
+            logger.debug("Not enough space '%s'!", db.db_id)
+            return [], FileWriteError(f"Could not allocate space for {len(unzip_file_pkgs)} files.")
+
+        logger.bench('ProcessZipIndexWorker Create folders: ', db.db_id, zip_id)
+        job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(self._ctx, create_folder_pkgs, db.db_id, summary.folders, store)
+        if len(job.failed_folders) > 0:
+            return [], FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
+
+        job.filtered_data = zip_data[job.zip_id] if job.zip_id in zip_data else {'files': {}, 'folders': {}}
 
         total_files_size = 0
-        for file_description in job.zip_index.files.values():
-            total_files_size += file_description['size']
+        for file_pkg in unzip_file_pkgs:
+            total_files_size += file_pkg.description['size']
 
-        needs_extracting_single_files = 'kind' in job.zip_description and job.zip_description['kind'] == 'extract_single_files'
-        less_file_count = len(job.zip_index.files) < job.config['zip_file_count_threshold']
-        less_accumulated_mbs = total_files_size < (1000 * 1000 * job.config['zip_accumulated_mb_threshold'])
+        needs_extracting_single_files = 'kind' in zip_description and zip_description['kind'] == 'extract_single_files'
+        less_file_count = len(summary.files) < config['zip_file_count_threshold']
+        less_accumulated_mbs = total_files_size < (1000 * 1000 * config['zip_accumulated_mb_threshold'])
 
-        process_index_job = None
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
-            process_index_job = _make_process_index_job(job)
+            next_jobs = create_fetch_jobs(self._ctx, db.db_id, unzip_file_pkgs, zip_description.get('base_files_url', db.base_files_url))
 
-        if process_index_job is None:
-            next_jobs, error = self._make_open_zip_contents_job(job)
+        else:
+            next_jobs, error = self._make_open_zip_contents_job(job, unzip_file_pkgs, store)
             if error is not None:
                 return [], error
-        else:
-            next_jobs = [process_index_job]
 
         self._fill_fragment_with_zip_index(job.result_zip_index, job)
-        logger.bench('ProcessZipWorker done: ', job.db.db_id, job.zip_id)
+        logger.bench('ProcessZipWorker done: ', db.db_id, zip_id)
         return next_jobs, None
 
-    def _make_open_zip_contents_job(self, job: ProcessZipJob) -> Tuple[Job, Optional[Exception]]:
-        logger = self._ctx.logger
-        store = job.store.read_only()
+    def _make_open_zip_contents_job(self, job: ProcessZipIndexJob, unzip_file_pkgs: List[PathPackage], store: ReadOnlyStoreAdapter) -> Tuple[List[Job], Optional[Exception]]:
+        if len(unzip_file_pkgs) == 0:
+            return [], None
 
         zip_kind, kind_err = make_zip_kind(job.zip_description.get('kind', None), (job.zip_id, job.db.db_id))
         if kind_err is not None:
@@ -77,54 +102,28 @@ class ProcessZipWorker(DownloaderWorkerBase):
             return [], None
 
         total_amount_of_files_in_zip = len(job.zip_index.files)
-        zip_index, filtered_zip_data = self._ctx.file_filter_factory.create(job.db, job.zip_index, job.config).select_filtered_files(job.zip_index)
 
         calculator = self._ctx.target_paths_calculator_factory.target_paths_calculator(job.config)
-        file_packs, folder_packs = self._create_packages_from_index(calculator, zip_index)
+
         target_pkg, target_error = self._create_target_package(calculator, zip_kind, job.zip_description)
         if target_error is not None:
             self._ctx.swallow_error(target_error)
             return [], target_error
 
-        logger.bench('ProcessZipWorker Reserving space: ', job.db.db_id, job.zip_id)
-        job.full_partitions = try_reserve_space(self._ctx, file_packs)
-        if len(job.full_partitions) > 0:
-            job.failed_files_no_space = file_packs
-            logger.debug("Not enough space '%s zip:%s'!", job.db.db_id, job.zip_id)
-            return [], FileWriteError(f"Could not allocate space for decompressing {len(file_packs)} files.")
-
-        logger.bench('ProcessZipWorker Precaching is_file: ', job.db.db_id, job.zip_id)
-        self._ctx.file_system.precache_is_file_with_folders(folder_packs)
-
-        files_to_unzip, already_processed_files = self._process_compressed_file_packages(file_packs, job.db.db_id, store, job.full_resync)
-        if len(already_processed_files) > 0:
-            already_processed = already_processed_files[0]
-            logger.print(f'Skipping zip "{job.zip_id}" because file "{already_processed.pkg.rel_path}" was already processed by db "{already_processed.db_id}"')
-            return [], None
-
-        logger.bench('ProcessZipWorker Creating folders: ', job.db.db_id, job.zip_id)
-        job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(self._ctx, folder_packs, job.db.db_id, zip_index.folders, store)
-        if len(job.failed_folders) > 0:
-            return [], FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
-
-        job.filtered_data = filtered_zip_data[job.zip_id] if job.zip_id in filtered_zip_data else {'files': {}, 'folders': {}}
-
-        if len(files_to_unzip) == 0:
-            return [], None
-
         get_file_job, validate_job = make_get_zip_file_jobs(db=job.db, zip_id=job.zip_id, description=job.zip_description['contents_file'], tag=None)
         open_zip_contents_job = OpenZipContentsJob(
             db=job.db,
-            store=job.store,
+            store=store,
             ini_description=job.ini_description,
             config=job.config,
             full_resync=job.full_resync,
 
             zip_id=job.zip_id,
             zip_kind=zip_kind,
+            zip_description=job.zip_description,
             target_folder=target_pkg,
             total_amount_of_files_in_zip=total_amount_of_files_in_zip,
-            files_to_unzip=files_to_unzip,
+            files_to_unzip=unzip_file_pkgs,
             recipient_folders=job.installed_folders,
             contents_zip_temp_path=validate_job.target_file_path,
             action_text=job.zip_description['description'],
@@ -132,29 +131,9 @@ class ProcessZipWorker(DownloaderWorkerBase):
             filtered_data=job.filtered_data,
 
             get_file_job=get_file_job,
-            make_process_index_backup=lambda: _make_process_index_job(job)
         )
         validate_job.after_job = open_zip_contents_job
         return [get_file_job], None
-
-    def _create_packages_from_index(self, calculator: TargetPathsCalculator, zip_index: Index) -> Tuple[List[PathPackage], List[PathPackage]]:
-        file_packs: List[PathPackage] = []
-        for file_path, file_description in zip_index.files.items():
-            file_pkg, file_error = calculator.deduce_target_path(file_path, file_description, PathType.FILE)
-            if file_error is not None:
-                self._ctx.swallow_error(file_error)
-
-            file_packs.append(file_pkg)
-
-        folder_packs: List[PathPackage] = []
-        for folder_path, folder_description in zip_index.folders.items():
-            folder_pkg, folder_error = calculator.deduce_target_path(folder_path, folder_description, PathType.FOLDER)
-            if folder_error is not None:
-                self._ctx.swallow_error(folder_error)
-
-            folder_packs.append(folder_pkg)
-
-        return file_packs, folder_packs
 
     def _create_target_package(self, calculator: TargetPathsCalculator, kind: ZipKind, description: Dict[str, Any]) -> Tuple[Optional[str], Optional[Exception]]:
         if kind == ZipKind.EXTRACT_ALL_CONTENTS:
@@ -166,18 +145,7 @@ class ProcessZipWorker(DownloaderWorkerBase):
             return None, None
         else: raise ValueError(f"Impossible kind '{kind}'")
 
-    def _process_compressed_file_packages(self, file_packs: List[PathPackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool) -> Tuple[List[PathPackage], List[PathPackage]]:
-        if full_resync:
-            contained_files = file_packs
-        else:
-            existing_files, missing_files = self._ctx.file_system.are_files(file_packs)
-
-            contained_files = [pkg for pkg in existing_files if store.hash_file(pkg.rel_path) != pkg.description.get('hash', None)]
-            contained_files.extend(missing_files)
-
-        return self._ctx.installation_report.add_processed_files(contained_files, db_id)
-
-    def _fill_fragment_with_zip_index(self, fragment: StoreFragmentDrivePaths, job: ProcessZipJob):
+    def _fill_fragment_with_zip_index(self, fragment: StoreFragmentDrivePaths, job: ProcessZipIndexJob):
         path = None
         if 'target_folder_path' in job.zip_description:
             path = job.zip_description['target_folder_path']
@@ -229,19 +197,3 @@ class ProcessZipWorker(DownloaderWorkerBase):
 
             for folder_path, folder_description in job.zip_index.folders.items():
                 fragment['base_paths']['folders'][folder_path] = folder_description
-
-def _make_process_index_job(job: ProcessZipJob) -> Optional[ProcessIndexJob]:
-    if 'base_files_url' not in job.zip_description:
-        for file_description in job.zip_index.files.values():
-            if 'url' not in file_description:
-                return None
-
-    return ProcessIndexJob(
-        db=job.db,
-        ini_description=job.ini_description,
-        config=job.config,
-        index=job.zip_index,
-        store=job.store.select(files=list(job.zip_index.files), folders=list(job.zip_index.folders)),
-        full_resync=job.full_resync,
-        zip_id=job.zip_id
-    )

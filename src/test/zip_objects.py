@@ -221,3 +221,10 @@ def with_installed_cheats_folder_on_fs(file_system_state):
                    description={"hash": cheats_folder_nes_file_hash, "size": cheats_folder_nes_file_size}) \
         .add_file(base_path=None, file=cheats_folder_sms_file_path,
                    description={"hash": cheats_folder_sms_file_hash, "size": cheats_folder_sms_file_size})
+
+
+def with_installed_nes_palettes_on_fs(file_system_state):
+    file_system_state \
+        .add_folders(folders_games_nes_palettes())\
+        .add_file(base_path=None, file=file_nes_palette_a[1:],
+                   description=file_nes_palette_a_descr(url=False))

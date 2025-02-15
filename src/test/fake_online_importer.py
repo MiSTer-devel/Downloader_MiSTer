@@ -25,7 +25,7 @@ from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import FreeSpaceReservation, UnlimitedFreeSpaceReservation
 from downloader.interruptions import Interruptions
 from downloader.job_system import Job, JobFailPolicy, JobSystem
-from downloader.jobs.process_db_job import ProcessDbJob
+from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerFailPolicy, DownloaderWorkerContext
 from downloader.local_store_wrapper import StoreWrapper
@@ -115,7 +115,7 @@ class OnlineImporter(ProductionOnlineImporter):
 
         jobs = []
         for db, _store, ini_description in self.dbs:
-            jobs.append(ProcessDbJob(db=db, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
+            jobs.append(ProcessDbMainJob(db=db, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
         return jobs
 
     @staticmethod

@@ -22,7 +22,7 @@ from downloader.config import default_config
 from downloader.constants import K_DOWNLOADER_RETRIES, K_OPTIONS, K_STORAGE_PRIORITY, STORAGE_PRIORITY_PREFER_EXTERNAL
 from downloader.db_options import DbOptions
 from downloader.db_utils import sorted_db_sections
-from downloader.jobs.process_db_worker import build_db_config
+from downloader.jobs.process_db_main_worker import build_db_config
 from test.objects import db_entity, config_with
 
 nil = {}

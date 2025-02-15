@@ -593,12 +593,12 @@ def file_nes_contra_descr():
     }
 
 
-def file_nes_palette_a_descr():
-    return {
+def file_nes_palette_a_descr(url: bool = True):
+    return tweak_descr({
         "hash": file_nes_palette_a[1:],
         "size": 2905020,
         "url": "https://a.pal"
-    }
+    }, url=url)
 
 
 def file_neogeo_md_descr():

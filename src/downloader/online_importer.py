@@ -29,7 +29,7 @@ from downloader.job_system import Job, JobSystem
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.jobs_factory import make_get_file_job
 from downloader.jobs.open_db_job import OpenDbJob
-from downloader.jobs.process_db_job import ProcessDbJob
+from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 from downloader.jobs.workers_factory import make_workers
 from downloader.logger import Logger
@@ -39,8 +39,8 @@ from downloader.job_system import JobSystem
 from downloader.jobs.copy_file_job import CopyFileJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
-from downloader.jobs.process_index_job import ProcessIndexJob
-from downloader.jobs.process_zip_job import ProcessZipJob
+from downloader.jobs.process_db_index_job import ProcessDbIndexJob
+from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.local_store_wrapper import LocalStoreWrapper, StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType, RemovedCopy
@@ -113,48 +113,53 @@ class OnlineImporter:
 
         if no_changes_msg != '': self._logger.print('\n' + no_changes_msg)
 
-        for job in report.get_completed_jobs(ProcessDbJob):
+        for job in report.get_completed_jobs(ProcessDbMainJob):
             box.add_installed_db(job.db)
             for zip_id in job.ignored_zips:
                 box.add_failed_zip(job.db.db_id, zip_id)
             for zip_id in job.removed_zips:
                 box.add_removed_zip(job.db.db_id, zip_id)
 
-        for job, _e in report.get_failed_jobs(ProcessDbJob):
+        for job, _e in report.get_failed_jobs(ProcessDbMainJob):
             box.add_failed_db(job.db.db_id)
 
-        for job in report.get_completed_jobs(ProcessIndexJob):
+        for job in report.get_completed_jobs(ProcessDbIndexJob):
             box.add_present_not_validated_files(job.present_not_validated_files)
             box.add_present_validated_files(job.present_validated_files)
             box.add_skipped_updated_files(job.skipped_updated_files)
-            box.add_removed_copies(job.removed_copies)
+            box.add_removed_copies(job.removed_folders)
             box.add_installed_folders(job.installed_folders)
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
 
-        for job, e in report.get_failed_jobs(ProcessIndexJob):
+        for job, e in report.get_failed_jobs(ProcessDbIndexJob):
             box.add_full_partitions(job.full_partitions)
             box.add_failed_files(job.failed_files_no_space)
             box.add_failed_folders(job.failed_folders)
             if not isinstance(e, BadFileFilterPartException): continue
             box.add_failed_db_options(WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(e)}' is invalid."))
 
-        for job in report.get_completed_jobs(ProcessZipJob):
+        for job in report.get_completed_jobs(ProcessZipIndexJob):
+            box.add_present_not_validated_files(job.present_not_validated_files)
+            box.add_present_validated_files(job.present_validated_files)
+            box.add_skipped_updated_files(job.skipped_updated_files)
+            box.add_removed_copies(job.removed_folders)
+            box.add_installed_folders(job.installed_folders)
+            box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
+            box.queue_file_removal(job.files_to_remove, job.db.db_id)
             if job.summary_download_failed is not None:
                 box.add_failed_file(job.summary_download_failed)
-            box.add_installed_folders(job.installed_folders)
-            box.add_removed_copies(job.removed_folders)
-            box.add_failed_folders(job.failed_folders)
             if job.filtered_data:
                 box.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_data)
-            if job.has_new_zip_index:
-                box.add_installed_zip_index(job.db.db_id, job.zip_id, job.result_zip_index, job.zip_description)
+            if job.has_new_zip_summary:
+                box.add_installed_zip_summary(job.db.db_id, job.zip_id, job.result_zip_index, job.zip_description)
 
-        for job, _e in report.get_failed_jobs(ProcessZipJob):
+        for job, _e in report.get_failed_jobs(ProcessZipIndexJob):
             if job.summary_download_failed is not None:
                 box.add_failed_file(job.summary_download_failed)
             box.add_failed_files(job.failed_files_no_space)
             box.add_full_partitions(job.full_partitions)
+            box.add_failed_folders(job.failed_folders)
 
         for job in report.get_completed_jobs(OpenZipContentsJob):
             box.add_downloaded_files(job.downloaded_files)
@@ -298,6 +303,12 @@ class OnlineImporter:
                     if self._worker_ctx.file_system.is_file(os.path.join(other, file.pkg.rel_path)):
                         stores[file.db_id].write_only().add_external_file(other, file.pkg.rel_path, file.pkg.description)
 
+        # for file_path in box.failed_files():
+        #     if not report.is_file_processed(file_path):
+        #         continue
+        #     file = report.processed_file(file_path)
+        #     stores[file.db_id].write_only().remove_file(file.pkg.rel_path)
+
         for folder_path in sorted(box.installed_folders(), key=lambda x: len(x), reverse=True):
             for db_id, folder_pkg in report.processed_folder(folder_path).items():
                 if folder_pkg.is_pext_parent:
@@ -336,28 +347,19 @@ class OnlineImporter:
                     else:
                         stores[db_id].write_only().remove_local_folder(el_path)
 
-        for file_path in box.failed_files():
-            if not report.is_file_processed(file_path):
-                continue
-            file = report.processed_file(file_path)
-            stores[file.db_id].write_only().remove_file(file.pkg.rel_path)
-
         for file_path in box.skipped_updated_files():
             file = report.processed_file(file_path)
             if file.db_id not in self._new_files_not_overwritten:
                 self._new_files_not_overwritten[file.db_id] = []
             self._new_files_not_overwritten[file.db_id].append(file.pkg.rel_path)
 
-        for db_id, zip_id, zip_index, zip_description in box.installed_zip_indexes():
-            stores[db_id].write_only().add_zip_index(zip_id, zip_index, zip_description)
+        for db_id, zip_id, zip_summary, zip_description in box.installed_zip_summary():
+            stores[db_id].write_only().add_zip_summary(zip_id, zip_summary, zip_description)
 
         filtered_zip_data = {}
         for db_id, zip_id, files, folders in box.filtered_zip_data():
             if db_id not in filtered_zip_data:
                 filtered_zip_data[db_id] = {}
-
-            if len(files) == 0 and len(folders) == 0:
-                continue
 
             if zip_id not in filtered_zip_data[db_id]:
                 filtered_zip_data[db_id][zip_id] = {'files': {}, 'folders': {}}
@@ -464,7 +466,7 @@ class InstallationBox:
         self._removed_zips: List[Tuple[str, str]] = []
         self._skipped_updated_files: List[str] = []
         self._filtered_zip_data: List[Tuple[str, str, Dict[str, Any], Dict[str, Any]]] = []
-        self._installed_zip_indexes: List[Tuple[str, str, StoreFragmentDrivePaths, Dict[str, Any]]] = []
+        self._installed_zip_summary: List[Tuple[str, str, StoreFragmentDrivePaths, Dict[str, Any]]] = []
         self._installed_folders: Set[str] = set()
         self._directories = dict()
         self._files = dict()
@@ -483,8 +485,8 @@ class InstallationBox:
         if len(files) == 0: return
         for pkg in files:
             self._validated_files.append(pkg.rel_path)
-    def add_installed_zip_index(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]):
-        self._installed_zip_indexes.append((db_id, zip_id, fragment, description))
+    def add_installed_zip_summary(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]):
+        self._installed_zip_summary.append((db_id, zip_id, fragment, description))
     def add_present_validated_files(self, paths: List[PathPackage]):
         if len(paths) == 0: return
         self._present_validated_files.extend([p.rel_path for p in paths])
@@ -528,6 +530,8 @@ class InstallationBox:
 
     def add_failed_db_options(self, exception: WrongDatabaseOptions):
         self._failed_db_options.append(exception)
+    def add_removed_file(self, file: str):
+        self._removed_files.append(file)
     def add_removed_files(self, files: List[PathPackage]):
         if len(files) == 0: return
         for pkg in files:
@@ -555,7 +559,7 @@ class InstallationBox:
     def installed_folders(self): return list(self._installed_folders)
     def uninstalled_files(self): return self._removed_files + self._failed_files
     def wrong_db_options(self): return self._failed_db_options
-    def installed_zip_indexes(self): return self._installed_zip_indexes
+    def installed_zip_summary(self): return self._installed_zip_summary
     def skipped_updated_files(self): return self._skipped_updated_files
     def filtered_zip_data(self): return self._filtered_zip_data
     def full_partitions_iter(self) -> Iterable[Tuple[str, int]]: return self._full_partitions.items()

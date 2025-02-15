@@ -25,7 +25,7 @@ from test.objects import db_test_descr, empty_zip_summary, folder_games_nes, sto
 from test.objects import file_a, zipped_file_a_descr, zip_desc
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
-from test.zip_objects import files_nes_palettes, folders_games_nes_palettes, zipped_nes_palettes_id, zipped_nes_palettes_desc, store_with_unzipped_cheats, cheats_folder_zip_desc, \
+from test.zip_objects import files_nes_palettes, folders_games_nes_palettes, with_installed_nes_palettes_on_fs, zipped_nes_palettes_id, zipped_nes_palettes_desc, store_with_unzipped_cheats, cheats_folder_zip_desc, \
     cheats_folder_nes_file_path, summary_json_from_cheats_folder, zipped_files_from_cheats_folder, cheats_folder_id, cheats_folder_sms_file_path, cheats_folder_folders, \
     cheats_folder_files, with_installed_cheats_folder_on_fs
 
@@ -251,7 +251,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
 
         self.assertEqual(store_with_unibios_from_zip(), store)
         self.assertEqual(fs_data(files={file_neogeo_000lo: file_neogeo_000lo_descr()}, folders=fs_folders_neogeo_bios()), sut.fs_data)
-        self.assertReports(sut, [], errors=[file_neogeo_unibios])
+        self.assertReports(sut, [], errors=[file_neogeo_unibios], save=False)
 
     def test_download_empty_db___after_installing_db_with_unibios_that_failed_copying___cleans_everything(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_neogeo_000lo: file_neogeo_000lo_descr()}, folders=fs_folders_neogeo_bios()))
@@ -280,6 +280,9 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         self.assertSutReports([*cheats_folder_files(), *files_nes_palettes()])
 
     def test_download_two_zips_in_one_db___on_a_store_with_the_same_db_previously_installed__changes_nothing(self):
+        with_installed_cheats_folder_on_fs(self.implicit_inputs.file_system_state)
+        with_installed_nes_palettes_on_fs(self.implicit_inputs.file_system_state)
+
         self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
 
         store = self.download(db_test_descr(zips={
@@ -310,13 +313,9 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         summary_internal_zip_id = cheats_folder_id if is_internal_summary else None
         zipped_files = zipped_files_from_cheats_folder() if from_zip_content else None
 
-        output_store = self.download(db_test_descr(zips={
+        return self.download(db_test_descr(zips={
             cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files, summary=summary_json_from_cheats_folder(), summary_internal_zip_id=summary_internal_zip_id)
         }), input_store)
-
-        self.assertSutReports(list(cheats_folder_files()), save=save)
-
-        return output_store
 
     def assertSutReports(self, installed, errors=None, needs_reboot=False, save=True):
         return self.assertReports(self.sut, installed, errors, needs_reboot, save)

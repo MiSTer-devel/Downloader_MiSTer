@@ -191,16 +191,16 @@ class TestOnlineImporter(OnlineImporterTestBase):
         ), sut.fs_data)
         self.assertReports(sut, [FILE_PDFViewer], needs_reboot=False)
 
-    def test_download_dbs_contents___with_stored_file_a_and_download_error___store_deletes_file_a_but_not_folder_a_and_fs_is_unchanged(self):
+    def test_download_dbs_contents___with_stored_file_a_and_download_error___reports_error_but_store_and_fs_is_unchanged(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, storing_problems={file_a: 99}))
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a(descr=file_a_updated_descr()), store)
         sut.download(False)
 
-        self.assertEqual(store_with_folders([folder_a]), store)
+        self.assertEqual(store_test_with_file_a_descr(), store)
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.file_system.data)
-        self.assertReports(sut, [], errors=[file_a])
+        self.assertReports(sut, [], errors=[file_a], save=False)
 
     def test_download_dbs_contents___with_duplicated_file___just_accounts_for_the_first_added(self):
         sut = OnlineImporter()
