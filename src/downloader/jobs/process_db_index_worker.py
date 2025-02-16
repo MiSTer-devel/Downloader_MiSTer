@@ -29,7 +29,7 @@ from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.path_package import PathExists, PathPackage, PathType, RemovedCopy
+from downloader.path_package import PATH_EXISTS_DOES_NOT_EXIST, PATH_EXISTS_EXISTS, PATH_PACKAGE_KIND_STANDARD, PathExists, PathPackage, PathPackageKind, PathType, RemovedCopy
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job import ValidateFileJob
@@ -104,15 +104,23 @@ def create_packages_from_index(ctx: DownloaderWorkerContext, config: Config, sum
     List[_DeleteFolderPackage],
     ZipData
 ]:
+    ctx.logger.bench('select_filtered_files start.')
     filtered_summary, zip_data = ctx.file_filter_factory.create(db, summary, config).select_filtered_files(summary)
+    ctx.logger.bench('select_filtered_files end.')
 
+    ctx.logger.bench('_folders_with_missing_parents start.')
     summary_folders = _folders_with_missing_parents(ctx, filtered_summary, store, db, from_zip)
+    #summary_folders = filtered_summary.folders
+    ctx.logger.bench('_folders_with_missing_parents end.')
+
     calculator = ctx.target_paths_calculator_factory.target_paths_calculator(config)
 
-    check_file_pkgs, files_set = _translate_items(ctx, calculator, filtered_summary.files, PathType.FILE, set())
-    remove_files_pkgs, _ = _translate_items(ctx, calculator, store.files, PathType.FILE, files_set)
-    create_folder_pkgs, folders_set = _translate_items(ctx, calculator, summary_folders, PathType.FOLDER, set())
-    delete_folder_pkgs, _ = _translate_items(ctx, calculator, store.folders, PathType.FOLDER, folders_set)
+    ctx.logger.bench('translate files start: ', len(filtered_summary.files), ' ', len(store.files))
+    check_file_pkgs, remove_files_pkgs = _translate_items(ctx, calculator, filtered_summary.files, PathType.FILE, store.files)
+    ctx.logger.bench('translate files end: ', len(check_file_pkgs), ' ', len(remove_files_pkgs))
+    ctx.logger.bench('translate folders start: ', len(summary_folders), ' ', len(store.folders))
+    create_folder_pkgs, delete_folder_pkgs = _translate_items(ctx, calculator, summary_folders, PathType.FOLDER, store.folders)
+    ctx.logger.bench('translate folders end: ', len(create_folder_pkgs), ' ', len(delete_folder_pkgs))
 
     return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs, zip_data
 
@@ -140,21 +148,15 @@ def _folders_with_missing_parents(ctx: DownloaderWorkerContext, index: Index, st
     else:
         return index.folders
 
-def _translate_items(ctx: DownloaderWorkerContext, calculator: TargetPathsCalculator, items: Dict[str, Dict[str, Any]], path_type: PathType, exclude: Set[str]) -> Tuple[List[PathPackage], Set[str]]:
-    translated = []
-    rel_set = set()
-    for path, description in items.items():
-        pkg, error = calculator.deduce_target_path(path, description, path_type)
-        if error is not None:
-           ctx.swallow_error(error)
-
-        if pkg.rel_path in exclude: continue
-
-        translated.append(pkg)
-        rel_set.add(pkg.rel_path)
-
-    return translated, rel_set
-
+def _translate_items(ctx: DownloaderWorkerContext, calculator: TargetPathsCalculator, items: Dict[str, Dict[str, Any]], path_type: PathType, stored: Dict[str, Dict[str, Any]]) -> Tuple[List[PathPackage], List[PathPackage]]:
+    # This list-comprehension implementation is an optimization, since python 3.9 works much faster this way than with a traditional loop and this is part is super hot for perf
+    present_results = [calculator.deduce_target_path(path, description, path_type) for path, description in items.items()]
+    present = [pkg for pkg, error in present_results if (error is None or ctx.swallow_error(error) is None)]
+    present_set = {pkg.rel_path for pkg in present}
+    #removed_results = [calculator.deduce_target_path(path, stored[path], path_type) for path in (stored.keys() - present_set)]  # @TODO: The one below passes but if I check the store, there are no paths with | so maybe the test is wrong
+    removed_results = [calculator.deduce_target_path(path, stored[path], path_type) for path in (stored.keys() - present_set) if (path[1:] if len(path) > 0 and path[0] == '|' else path) not in present_set]
+    removed = [pkg for pkg, error in removed_results if (error is None or ctx.swallow_error(error) is None)]
+    return present, removed
 
 def process_check_file_packages(ctx: DownloaderWorkerContext, check_file_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_MovedFilePackage], List[_AlreadyInstalledFilePackage]]:
     if len(check_file_pkgs) == 0:
@@ -162,30 +164,38 @@ def process_check_file_packages(ctx: DownloaderWorkerContext, check_file_pkgs: L
 
     file_system = ReadOnlyFileSystem(ctx.file_system)
 
+    ctx.logger.bench('add_processing start: ', db_id, len(check_file_pkgs))
     non_duplicated_pkgs, duplicated_files = ctx.installation_report.add_processed_files(check_file_pkgs, db_id)
+    ctx.logger.bench('add_processing done: ', db_id, len(check_file_pkgs))
     for dup in duplicated_files:
         ctx.file_download_session_logger.print_progress_line(f'DUPLICATED: {dup.pkg.rel_path} [using {dup.db_id} instead]')
 
-    fetch_pkgs: List[_FetchFilePackage] = []
-    validate_pkgs: List[_ValidateFilePackage] = []
-    already_installed_pkgs: List[_ValidateFilePackage] = []
+    ctx.logger.bench('are_files start: ', db_id, len(check_file_pkgs))
+    existing, fetch_pkgs = file_system.are_files(non_duplicated_pkgs)
+    ctx.logger.bench('are_files done: ', db_id, len(check_file_pkgs))
 
-    existing, missing = file_system.are_files(non_duplicated_pkgs)
+    ctx.logger.bench('write pkg.exists start: ', db_id, len(check_file_pkgs))
+    for pkg in fetch_pkgs: pkg.exists = PATH_EXISTS_DOES_NOT_EXIST
+    for pkg in existing: pkg.exists = PATH_EXISTS_EXISTS
+    ctx.logger.bench('write pkg.exists done: ', db_id, len(check_file_pkgs))
 
-    for pkg in missing: pkg.exists = PathExists.DOES_NOT_EXIST
-    fetch_pkgs.extend(missing)
-
-    for pkg in existing:
-        pkg.exists = PathExists.EXISTS
-
-        if full_resync or (store.hash_file(pkg.rel_path) != pkg.description['hash']):
-            validate_pkgs.append(pkg)
-            continue
-
-        if store.is_file_in_drive(pkg.rel_path, pkg.pext_drive()):
-            already_installed_pkgs.append(pkg)
+    ctx.logger.bench('existing loop start: ', db_id, len(check_file_pkgs))
+    already_installed_pkgs: List[_ValidateFilePackage]
+    validate_pkgs: List[_ValidateFilePackage]
+    if full_resync:
+        validate_pkgs = existing
+        already_installed_pkgs = []
+    else:
+        ctx.logger.bench('invalid hashes start: ', db_id, len(check_file_pkgs))
+        invalid_hashes = store.invalid_hashes(existing)
+        ctx.logger.bench('invalid hashes end: ', db_id, len(check_file_pkgs))
+        if any(invalid_hashes):
+            validate_pkgs = [pkg for pkg, inv in zip(existing, invalid_hashes) if inv]
+            already_installed_pkgs = [pkg for pkg, inv in zip(existing, invalid_hashes) if not inv]
         else:
-            validate_pkgs.append(pkg)
+            validate_pkgs = []
+            already_installed_pkgs = existing
+    ctx.logger.bench('existing loop done: ', db_id, len(check_file_pkgs))
 
     return fetch_pkgs, validate_pkgs, already_installed_pkgs
 
@@ -247,7 +257,7 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
     parent_pkgs: Dict[str, PathPackage] = dict()
 
     for pkg in sorted(create_folder_pkgs, key=lambda x: len(x.rel_path)):
-        if pkg.is_pext_parent:
+        if pkg.is_pext_parent():
             parent_pkgs[pkg.rel_path] = pkg
             continue
 

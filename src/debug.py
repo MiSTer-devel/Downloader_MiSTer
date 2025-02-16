@@ -2,6 +2,7 @@
 # Copyright (c) 2021-2023 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 import os
+import sys
 import tempfile
 import subprocess
 import time
@@ -45,7 +46,8 @@ def run_operation(op, env=None, retries=False):
         'store_pull': lambda: store_pull(retries=retries),
         'log_pull': lambda: log_pull(retries=retries),
         'run': lambda: run_build(env=env, retries=retries),
-        'launcher': lambda: run_launcher(env=env, retries=retries)
+        'launcher': lambda: run_launcher(env=env, retries=retries),
+        'copy': lambda: scp_file(sys.argv[2], f'/media/fat/{sys.argv[2]}'),
     }.get(op, lambda: [send_build(env=env, retries=retries), print('OK')])()
 
 
@@ -60,7 +62,7 @@ def _ssh_pass(cmd, args, out=None, retries=True):
 
 def _main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', choices=['store_push', 'store_pull', 'log_pull', 'run', 'launcher'], nargs='?', default=None)
+    parser.add_argument('command', choices=['store_push', 'store_pull', 'log_pull', 'run', 'launcher', 'copy'], nargs='?', default=None)
     parser.add_argument('parameter', nargs='?', default='')
     run_operation(parser.parse_args().command)
 

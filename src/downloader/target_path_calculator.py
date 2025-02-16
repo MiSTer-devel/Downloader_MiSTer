@@ -24,7 +24,7 @@ from downloader.config import Config
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
 from downloader.constants import K_STORAGE_PRIORITY, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL
-from downloader.path_package import PathPackageKind, PextPathProps, PathPackage, PextKind, PathType
+from downloader.path_package import PATH_PACKAGE_KIND_PEXT, PATH_PACKAGE_KIND_STANDARD, PATH_PACKAGE_KIND_SYSTEM, PATH_TYPE_FILE, PATH_TYPE_FOLDER, PEXT_KIND_EXTERNAL, PEXT_KIND_PARENT, PEXT_KIND_STANDARD, PextPathProps, PathPackage, PextKind, PathType
 
 
 class TargetPathsCalculatorFactory:
@@ -49,12 +49,12 @@ class TargetPathsCalculator:
     def deduce_target_path(self, path: str, description: Dict[str, Any], path_type: PathType) -> Tuple[PathPackage, Optional['StoragePriorityError']]:
         if path[0] == '/':
             return PathPackage(
-                full_path=path,
-                rel_path=path,
-                drive=None,
-                description=description,
-                ty=path_type,
-                kind=PathPackageKind.STANDARD
+                path,  # rel_path
+                None,  # drive
+                description,
+                path_type,
+                PATH_PACKAGE_KIND_STANDARD,
+                None  # extra
             ), None
         is_system_file = 'path' in description and description['path'] == 'system'
         can_be_external = path[0] == '|'
@@ -66,13 +66,12 @@ class TargetPathsCalculator:
 
             drive, extra = external
             pkg = PathPackage(
-                full_path=os.path.join(drive, rel_path),
-                rel_path=rel_path,
-                drive=drive,
-                description=description,
-                ty=path_type,
-                kind=PathPackageKind.PEXT,
-                pext_props=extra
+                rel_path,
+                drive,
+                description,
+                path_type,
+                PATH_PACKAGE_KIND_PEXT,
+                extra,
             )
             if is_system_file:
                 return pkg, StoragePriorityError(f"System Path '{path}' is incorrect because it starts with '|', please contact the database maintainer.")
@@ -80,29 +79,35 @@ class TargetPathsCalculator:
                 return pkg, None
         elif is_system_file:
             return PathPackage(
-                full_path=os.path.join(self._config['base_system_path'], path),
-                rel_path=path,
-                drive=self._config['base_system_path'],
-                description=description,
-                ty=path_type,
-                kind=PathPackageKind.SYSTEM,
+                path,  # rel_path
+                self._config['base_system_path'],
+                description,
+                path_type,
+                PATH_PACKAGE_KIND_SYSTEM,
+                None  # extra
             ), None
         else:
             return PathPackage(
-                full_path=os.path.join(self._config['base_path'], path),
-                rel_path=path,
-                drive=self._config['base_path'],
-                description=description,
-                ty=path_type,
-                kind=PathPackageKind.STANDARD,
+                path,  # rel_path
+                self._config['base_path'],
+                description,
+                path_type,
+                PATH_PACKAGE_KIND_STANDARD,
+                None  # extra
             ), None
 
     def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> Tuple[Optional[Tuple[str, PextPathProps]], Optional['StoragePriorityError']]:
         path_obj = Path(path)
         parts_len = len(path_obj.parts)
-        if path_type == PathType.FOLDER and parts_len <= 1:
-            return (self._config['base_path'], PextPathProps(kind=PextKind.PEXT_PARENT, parent=path, drive=self._config['base_path'], other_drives=())), None
-        elif path_type == PathType.FILE and parts_len <= 2:
+        if path_type == PATH_TYPE_FOLDER and parts_len <= 1:
+            return (self._config['base_path'], PextPathProps(
+                PEXT_KIND_PARENT,  # kind
+                path,  # parent
+                self._config['base_path'],  # drive
+                (),  # other_drives
+                False  # is_subfolder
+            )), None
+        elif path_type == PATH_TYPE_FILE and parts_len <= 2:
             return None, StoragePriorityError(f"File Path '|{path}' is incorrect, please contact the database maintainer.")
         else:
             return self._deduce_external_target_path_from_priority(source_path=path, path_obj=path_obj), None
@@ -123,19 +128,25 @@ class TargetPathsCalculator:
                 registry.drives.add(drive)
 
         drive, external, others = registry.folders[first_two_folders]
-        return drive, PextPathProps(kind=external, parent=first_folder, drive=drive, other_drives=others, is_subfolder=len(path_obj.parts) == 2)
+        return drive, PextPathProps(
+            external,  # kind
+            first_folder,  # parent
+            drive,  # drive
+            others,  # other_drives
+            len(path_obj.parts) == 2,  # is_subfolder
+        )
 
     def _search_drive_for_directory(self, first_folder: str, second_folder: str) -> Tuple[str, PextKind, Tuple[str, ...]]:
         base_path, priority = self._config['base_path'], self._config['storage_priority']
 
         if priority == STORAGE_PRIORITY_OFF:
-            return base_path, PextKind.PEXT_STANDARD, ()
+            return base_path, PEXT_KIND_STANDARD, ()
         elif priority == STORAGE_PRIORITY_PREFER_SD:
             result, others = self._first_drive_with_existing_directory_prefer_sd(os.path.join(first_folder, second_folder))
             if result is not None:
-                return result, PextKind.PEXT_EXTERNAL, others
+                return result, PEXT_KIND_EXTERNAL, others
 
-            return base_path, PextKind.PEXT_STANDARD, ()
+            return base_path, PEXT_KIND_STANDARD, ()
         elif priority == STORAGE_PRIORITY_PREFER_EXTERNAL:
             # Check better_test_download_external_drives_1_and_2___on_empty_stores_with_same_fs_as_system_tests___installs_at_expected_locations
             #   and better_test_download_external_drives_1_and_2___on_store_and_fs____installs_at_expected_locations
@@ -144,13 +155,13 @@ class TargetPathsCalculator:
             #
             result, others = self._first_drive_with_existing_directory_prefer_sd(os.path.join(first_folder, second_folder))
             if result is not None:
-               return result, PextKind.PEXT_EXTERNAL, others
+               return result, PEXT_KIND_EXTERNAL, others
 
             result, others = self._first_external_alternative()
             if result is not None:
-                return result, PextKind.PEXT_EXTERNAL, others
+                return result, PEXT_KIND_EXTERNAL, others
 
-            return base_path, PextKind.PEXT_STANDARD, ()
+            return base_path, PEXT_KIND_STANDARD, ()
         else:
             raise StoragePriorityError('%s "%s" not valid!' % (K_STORAGE_PRIORITY, priority))
 

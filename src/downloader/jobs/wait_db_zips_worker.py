@@ -43,15 +43,20 @@ class WaitDbZipsWorker(DownloaderWorkerBase):
         logger.bench('WaitDbZipsWorker wait done: ', job.db.db_id)
         index = Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url)
 
-        store = job.store
+        zip_indexes = []
         for tag in job.zip_job_tags:
             for zip_job in self._ctx.installation_report.get_jobs_completed_by_tag(tag):
                 if isinstance(zip_job, ProcessZipIndexJob):
-                    store = store.deselect(zip_job.zip_index)
+                    zip_indexes.append(zip_job.zip_index)
             for zip_job in self._ctx.installation_report.get_jobs_failed_by_tag(tag):
                 if isinstance(zip_job, ProcessZipIndexJob):
                     if len(zip_job.full_partitions) > 0:
                         return [], None
+
+        logger.bench('WaitDbZipsWorker deselect_all start: ', job.db.db_id)
+        store = job.store.deselect_all(zip_indexes)
+        logger.bench('WaitDbZipsWorker deselect_all done: ', job.db.db_id)
+        #exit(0)
 
         resulting_job = ProcessDbIndexJob(
             db=job.db,

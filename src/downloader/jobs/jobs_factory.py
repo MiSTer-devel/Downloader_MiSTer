@@ -57,7 +57,7 @@ def make_get_file_job(source: str, target: str, info: str, silent: bool, logger:
 
 def make_get_zip_file_jobs(db: DbEntity, zip_id: str, description: Dict[str, Any], tag: Optional[str]) -> Tuple[GetFileJob, ValidateFileJob]:
     url = description['url']
-    download_path = '/tmp/' + db.db_id + '_._' + zip_id + '_._' + Path(url).name
+    download_path = '/tmp/' + db.db_id.replace('/', '__') + '_._' + zip_id + '_._' + Path(url).name  # @TODO: Use proper tempfile.mkstemp instead
     info = f'temp zip file {db.db_id}:{zip_id}:{Path(url).name}'
     get_file_job = make_get_file_job(source=url, info=info, target=download_path, silent=True)
     validate_job = ValidateFileJob(temp_path=download_path, target_file_path=download_path, description=description, info=info, get_file_job=get_file_job)

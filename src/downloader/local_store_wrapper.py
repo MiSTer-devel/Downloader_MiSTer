@@ -114,68 +114,51 @@ class StoreWrapper:
     def read_only(self) -> 'ReadOnlyStoreAdapter':
         return self._read_only
     
-    def select(self, files: List[str] = [], folders: List[str] = []) -> 'StoreWrapper':
+    def select(self, index: Index) -> 'StoreWrapper':
+        # @TODO: Remove this | handling after we change the pext path format in the stores
+        norm_files = [fp[1:] if len(fp) > 0 and fp[0] == '|' else fp for fp in index.files]
+        norm_folders = [dp[1:] if len(dp) > 0 and dp[0] == '|' else dp for dp in index.folders]
+
         new_store = {
-            'files': {},
-            'folders': {},
-            'base_path': self._store['base_path'],
-            'external': defaultdict(lambda: {'files': {}, 'folders': {}})
+            'files': {fp: self._store['files'][fp] for fp in norm_files if fp in self._store['files']},
+            'folders': {fp: self._store['folders'][fp] for fp in norm_folders if fp in self._store['folders']},
         }
 
-        for file_path in files:
-            if file_path[0] == '|':
-                file_path = file_path[1:]
-            if file_path in self._store['files']:
-                new_store['files'][file_path] = self._store['files'][file_path]
-            if 'external' not in self._store: continue
-            for drive, index in self._store['external'].items():
-                if file_path in index['files']:
-                    new_store['external'][drive]['files'][file_path] = index['files'][file_path]
+        if 'base_path' in self._store:
+            new_store['base_path'] = self._store['base_path']
 
-        for folder_path in folders:
-            if folder_path[0] == '|':
-                folder_path = folder_path[1:]
-            if folder_path in self._store['folders']:
-                new_store['folders'][folder_path] = self._store['folders'][folder_path]
-            if 'external' not in self._store: continue
-            for drive, index in self._store['external'].items():
-                if folder_path in index['folders']:
-                    new_store['external'][drive]['folders'][folder_path] = index['folders'][folder_path]
+        if 'external' in self._store:
+            new_store['external'] = {
+                drive: {
+                    'files': {fp: summary['files'][fp] for fp in norm_files if fp in summary['files']},
+                    'folders': {dp: summary['folders'][dp] for dp in norm_folders if dp in summary['folders']}
+                }
+                for drive, summary in self._store['external'].items()
+            }
 
         return StoreWrapper(new_store, self._local_store_wrapper, readonly=True)
 
-    def deselect(self, index: Index) -> 'StoreWrapper':
+    def deselect_all(self, indexes: List[Index]) -> 'StoreWrapper':
+        # @TODO: Remove this | handling after we change the pext path format in the stores
+        norm_files = {fp if (fp[0] != '|' or len(fp) == 0) else fp[1:] for index in indexes for fp in index.files}
+        norm_folders = {dp if (dp[0] != '|' or len(dp) == 0) else dp[1:] for index in indexes for dp in index.folders}
+
         new_store = {
-            'files': {},
-            'folders': {},
-            'base_path': self._store['base_path'],
-            'external': defaultdict(lambda: {'files': {}, 'folders': {}})
+            'files': {fp: fd for fp, fd in self._store['files'].items() if fp not in norm_files},
+            'folders': {dp: dd for dp, dd in self._store['folders'].items() if dp not in norm_folders},
         }
 
-        # @TODO: Remove this after we change the pext store structure
-        normalized_files = {file if (file[0] != '|' or len(file) == 0) else file[1:] for file in index.files}
-
-        for file_path in self._store['files']:
-            if file_path not in normalized_files:
-                new_store['files'][file_path] = self._store['files'][file_path]
-
-        # @TODO: Remove this after we change the pext store structure
-        normalized_folders = {folder if (folder[0] != '|' or len(folder) == 0) else folder[1:] for folder in index.folders}
-
-        for folder_path in self._store['folders']:
-            if folder_path not in normalized_folders:
-                new_store['folders'][folder_path] = self._store['folders'][folder_path]
+        if 'base_path' in self._store:
+            new_store['base_path'] = self._store['base_path']
 
         if 'external' in self._store:
-            for drive, summary in self._store['external'].items():
-
-                for file_path in summary['files']:
-                    if file_path not in normalized_files:
-                        new_store['external'][drive]['files'][file_path] = summary['files'][file_path]
-
-                for folder_path in summary['folders']:
-                    if folder_path not in normalized_folders:
-                        new_store['external'][drive]['folders'][folder_path] = summary['folders'][folder_path]
+            new_store['external'] = {
+                drive: {
+                    'files': {fp: fd for fp, fd in summary['files'].items() if fp not in norm_files},
+                    'folders': {dp: dd for dp, dd in summary['folders'].items() if dp not in norm_folders}
+                }
+                for drive, summary in self._store['external'].items()
+            }
 
         return StoreWrapper(new_store, self._local_store_wrapper, readonly=True)
 
@@ -188,13 +171,13 @@ class WriteOnlyStoreAdapter:
         self._aggregated_summary = aggregated_summary
 
     def add_file_pkg(self, file_pkg: PathPackage):
-        if file_pkg.is_pext_external:
+        if file_pkg.is_pext_external():
             self.add_external_file(file_pkg.pext_props.drive, file_pkg.rel_path, file_pkg.description)
         else:
             self.add_file(file_pkg.rel_path, file_pkg.description)
 
     def add_folder_pkg(self, folder_pkg: PathPackage):
-        if folder_pkg.is_pext_external:
+        if folder_pkg.is_pext_external():
             self.add_external_folder(folder_pkg.pext_props.drive, folder_pkg.rel_path, folder_pkg.description)
         else:
             self.add_folder(folder_pkg.rel_path, folder_pkg.description)
@@ -207,6 +190,9 @@ class WriteOnlyStoreAdapter:
 
     def _add_entry(self, kind, path, description):
         self._clean_external_additions(kind, path)
+
+        if 'zip_id' not in description and 'tags' in description:
+            description.pop('tags')
 
         if path in self._store[kind] and equal_dicts(self._store[kind][path], description):
             return
@@ -222,6 +208,9 @@ class WriteOnlyStoreAdapter:
 
     def _add_external_entry(self, kind, drive, path, description):
         external = self._external_by_drive(drive)
+
+        if 'zip_id' not in description and 'tags' in description:
+            description.pop('tags')
 
         entries = external[kind]
         if path in entries and equal_dicts(entries[path], description):
@@ -492,11 +481,39 @@ class ReadOnlyStoreAdapter:
         self._store = store
         self._aggregated_summary = aggregated_summary
 
-    def hash_file(self, file):
-        if file not in self._aggregated_summary['files_no_pext']:
-            return NO_HASH_IN_STORE_CODE
+    def hash_file(self, file_pkg: PathPackage):
+        if file_pkg.is_pext_external():
+            if 'external' not in self._store:
+                return NO_HASH_IN_STORE_CODE
 
-        return self._aggregated_summary['files_no_pext'][file]['hash']
+            external = self._store['external']
+            drive = file_pkg.drive
+            if drive not in external:
+                return NO_HASH_IN_STORE_CODE
+
+            summary_files = external[drive]['files']
+            file = file_pkg.rel_path
+            if file not in summary_files:
+                return NO_HASH_IN_STORE_CODE
+
+            return summary_files[file]['hash']
+        else:
+            file = file_pkg.rel_path
+            file_desc = self._store_files_get(file, None)
+            return file_desc['hash'] if file_desc is not None else NO_HASH_IN_STORE_CODE
+
+    def invalid_hashes(self, file_pkgs: List[PathPackage]) -> List[bool]:
+        '''Returns a list of booleans indicating invalid hashes with the same order as the input.'''
+        store_files = self._store['files']
+        return [
+            (store_files[pkg.rel_path]['hash'] != pkg.description['hash'] if pkg.rel_path in store_files else True) 
+            if not pkg.is_pext_external() else
+            (True if 'external' not in self._store \
+                else True if pkg.drive not in self._store['external'] \
+                    else True if pkg.rel_path not in self._store['external'][pkg.drive]['files'] \
+                        else self._store['external'][pkg.drive]['files'][pkg.rel_path]['hash'] != pkg.description['hash'])
+            for pkg in file_pkgs
+        ]
 
     def file_drive(self, file: str):
         if file in self._store['files']:
@@ -508,12 +525,6 @@ class ReadOnlyStoreAdapter:
                         return drive
 
         return None
-
-    def is_file_in_drive(self, file: str, drive: Optional[str]) -> bool:
-        if drive is None or drive == self.base_path:
-            return file in self._store['files']
-        else:
-            return 'external' in self._store and drive in self._store['external'] and file in self._store['external'][drive]['files']
 
     def folder_drive(self, folder: str):
         if folder in self._store['folders']:

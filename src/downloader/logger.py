@@ -136,7 +136,7 @@ class TopLogger(Logger, ConfigLogManager):
         if self._start_time is None:
             return
 
-        time_str = str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-4]
+        time_str = str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-3]
         bench_header = f'BENCH {time_str}| '
         self.print_logger.bench(bench_header, *args)
         self.file_logger.bench(bench_header, *args)

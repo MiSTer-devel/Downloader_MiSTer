@@ -64,10 +64,11 @@ class DownloaderProgressReporter(ProgressReporter):
         pass
 
 
-@dataclasses.dataclass
 class ProcessedFile:
-    pkg: PathPackage
-    db_id: str
+    __slots__ = ('pkg', 'db_id')
+    def __init__(self, pkg: PathPackage, db_id: str,/):
+        self.pkg = pkg
+        self.db_id = db_id
 
 
 @dataclasses.dataclass
@@ -179,9 +180,10 @@ class InstallationReportImpl(InstallationReport):
         self._jobs_retried: Dict[int, List[Tuple[Job, BaseException]]] = defaultdict(list)
 
         # Following might be modified by multiple threads, but read only in the main thread
-        processed_lock = threading.Lock()
-        self._processed_files = _WithLock[Dict[str, ProcessedFile]]({}, processed_lock)
-        self._processed_folders = _WithLock[Dict[str, Dict[str, PathPackage]]]({}, processed_lock)
+        self._processed_files = _WithLock[Dict[str, ProcessedFile]]({})
+        self._processed_files_set = _WithLock[Set[str]](set())
+        self._processed_folders = _WithLock[Dict[str, Dict[str, PathPackage]]]({})
+        self._processed_folders_set = _WithLock[Set[str]](set())
         job_tag_lock = threading.Lock()
         self._jobs_tag_tracking = _WithLock[JobTagTracking](JobTagTracking(), job_tag_lock)
 
@@ -233,15 +235,28 @@ class InstallationReportImpl(InstallationReport):
 
     def add_processed_files(self, files: List[PathPackage], db_id: str) -> Tuple[List[PathPackage], List[ProcessedFile]]:
         if len(files) == 0: return [], []
-        non_duplicates = []
-        duplicates = []
-        with self._processed_files as processed_files:
-            for pkg in files:
-                if pkg.rel_path in processed_files:
-                    duplicates.append(processed_files[pkg.rel_path])
-                else:
-                    processed_files[pkg.rel_path] = ProcessedFile(pkg, db_id)
-                    non_duplicates.append(pkg)
+
+        files_set = {pkg.rel_path for pkg in files}
+        with self._processed_files_set as processed_files_set:
+            duplicates_set = files_set.intersection(processed_files_set)
+            processed_files_set.update(files_set)
+
+        non_duplicates_set = files_set - duplicates_set
+        non_duplicates = [pkg for pkg in files if pkg.rel_path in non_duplicates_set]
+        # @TODO: Most of the time is spent creating ProcessedFile class, we need that data later for online_importer, let's see if we can provide this data in another way.
+        #        There should be a better way for linking file_paths to db_id and file_paths to pkgs.
+        to_add = {pkg.rel_path: ProcessedFile(pkg, db_id) for pkg in non_duplicates}
+
+        if len(duplicates_set):
+            with self._processed_files as processed_files:
+                duplicates = [processed_files[d] for d in duplicates_set]
+        else:
+            duplicates = []
+
+        if len(to_add):
+            with self._processed_files as processed_files:
+                processed_files.update(to_add)
+
         return non_duplicates, duplicates
     
     def unmark_processed_files(self, files: List[PathPackage], db_id: str) -> None:

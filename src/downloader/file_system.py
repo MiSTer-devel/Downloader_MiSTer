@@ -27,17 +27,17 @@ import time
 import zipfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Set, Dict, Any, Tuple, Union
+from typing import Final, List, Optional, Set, Dict, Any, Tuple, Union
 
 from downloader.config import AllowDelete, Config
 from downloader.constants import HASH_file_does_not_exist
-from downloader.logger import Logger, OffLogger, PrintLogger
+from downloader.logger import Logger, OffLogger
 from downloader.other import ClosableValue
 from downloader.path_package import PathPackage
 
 
-is_windows = os.name == 'nt'
-COPY_BUFSIZE = 1024 * 1024 if is_windows else 64 * 1024
+is_windows: Final = os.name == 'nt'
+COPY_BUFSIZE: Final = 1024 * 1024 if is_windows else 64 * 1024
 
 
 class FileSystemFactory:
