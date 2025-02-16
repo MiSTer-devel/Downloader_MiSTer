@@ -42,7 +42,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         zip_id, zip_description, db, config, summary, full_resync = job.zip_id, job.zip_description, job.db, job.config, job.zip_index, job.full_resync
 
         logger.bench('ProcessZipIndexWorker start: ', db.db_id, zip_id)
-        store = job.store.select(files=list(job.zip_index.files), folders=list(job.zip_index.folders)).read_only()
+        store = job.store.select(job.zip_index).read_only()
         fix_folders(summary.folders)  # @TODO: Try to look for a better place to put this, while validating zip_index entity for example which we don't do yet.
 
         logger.bench('ProcessZipIndexWorker create pkgs: ', db.db_id, zip_id)
@@ -51,7 +51,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         logger.bench('ProcessZipIndexWorker Precaching is_file: ', db.db_id, zip_id)
         self._ctx.file_system.precache_is_file_with_folders(create_folder_pkgs)
 
-        logger.bench('ProcessZipIndexWorker check pkgs: ', db.db_id, zip_id)
+        logger.bench('ProcessZipIndexWorker check pkgs: ', db.db_id, zip_id, len(check_file_pkgs))
         unzip_file_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(self._ctx, check_file_pkgs, db.db_id, store, full_resync)
 
         logger.bench('ProcessZipIndexWorker validate pkgs: ', db.db_id, zip_id)
@@ -89,7 +89,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
                 return [], error
 
         self._fill_fragment_with_zip_index(job.result_zip_index, job)
-        logger.bench('ProcessZipWorker done: ', db.db_id, zip_id)
+        logger.bench('ProcessZipIndexWorker done: ', db.db_id, zip_id)
         return next_jobs, None
 
     def _make_open_zip_contents_job(self, job: ProcessZipIndexJob, unzip_file_pkgs: List[PathPackage], store: ReadOnlyStoreAdapter) -> Tuple[List[Job], Optional[Exception]]:
@@ -132,6 +132,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
 
             get_file_job=get_file_job,
         )
+        open_zip_contents_job.add_tag(job.db.db_id)
         validate_job.after_job = open_zip_contents_job
         return [get_file_job], None
 
@@ -176,7 +177,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         if path_error is not None:
             self._ctx.swallow_error(path_error)
 
-        if path_pkg.pext_props and path_pkg.is_pext_external:
+        if path_pkg.pext_props and path_pkg.is_pext_external():
             drive = path_pkg.pext_props.drive
             fragment['external_paths'][drive] = {'files': {}, 'folders': {}}
             for file_path, file_description in job.zip_index.files.items():
@@ -184,7 +185,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
 
             for folder_path, folder_description in job.zip_index.folders.items():
                 fragment['external_paths'][drive]['folders'][folder_path[1:]] = folder_description
-        elif path_pkg.is_pext_standard:
+        elif path_pkg.is_pext_standard():
             for file_path, file_description in job.zip_index.files.items():
                 fragment['base_paths']['files'][file_path[1:]] = file_description
 

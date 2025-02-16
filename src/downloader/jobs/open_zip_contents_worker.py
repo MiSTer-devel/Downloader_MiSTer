@@ -22,16 +22,13 @@ from downloader.job_system import WorkerResult
 from downloader.jobs.index import Index
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.process_db_index_worker import create_fetch_jobs
-from downloader.path_package import PathPackage
+from downloader.path_package import PATH_PACKAGE_KIND_STANDARD, PATH_TYPE_FILE, PATH_TYPE_FOLDER, PathPackage
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
 from downloader.file_system import UnzipError
 
 
 class OpenZipContentsWorker(DownloaderWorkerBase):
-    def __init__(self, ctx: DownloaderWorkerContext):
-        super().__init__(ctx)
-
     def job_type_id(self) -> int: return OpenZipContentsJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
@@ -66,10 +63,14 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         if should_extract_all:
             if len(job.filtered_data['files']) > 0:
-                job.files_to_remove = [PathPackage(full_path=file_path, rel_path=file_path, drive=None, description=file_description) for file_path, file_description in job.filtered_data['files'].items()]
+                job.files_to_remove = [
+                    PathPackage(file_path, None, file_description, PATH_TYPE_FILE, PATH_PACKAGE_KIND_STANDARD, None) for file_path, file_description in job.filtered_data['files'].items()
+                ]
 
             if len(job.filtered_data['folders']) > 0:
-                job.directories_to_remove = [PathPackage(full_path=folder_path, rel_path=folder_path, drive=None, description=folder_description) for folder_path, folder_description in job.filtered_data['folders'].items()]
+                job.directories_to_remove = [
+                    PathPackage(folder_path, None, folder_description, PATH_TYPE_FOLDER, PATH_PACKAGE_KIND_STANDARD, None) for folder_path, folder_description in job.filtered_data['folders'].items()
+                ]
 
         job.downloaded_files.extend(job.files_to_unzip)
 
@@ -105,12 +106,3 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         logger.bench('OpenZipContentsWorker launching recovery process index...', job.db.db_id, job.zip_id)
 
         return create_fetch_jobs(self._ctx, job.db.db_id, invalid_files, job.zip_description.get('base_files_url', job.db.base_files_url))
-        return [ProcessDbIndexJob(
-            db=job.db,
-            ini_description=job.ini_description,
-            config=job.config,
-            index=Index(files=files_to_recover, folders={}),
-            store=job.store.select(files=[pkg.rel_path for pkg in invalid_files]),  # @TODO: This store needs to be a fragment only for the invalid files...
-            full_resync=job.full_resync,
-            zip_id=job.zip_id
-        )], None

@@ -64,6 +64,7 @@ class OnlineImporter:
     def _make_jobs(self, db_pkgs: List[DbSectionPackage], local_store: LocalStoreWrapper, full_resync: bool) -> List[Job]:
         jobs: List[Job] = []
         for pkg in db_pkgs:
+            # @TODO: Use proper tempfile.mkstemp instead
             temp_path = str(Path(self._worker_ctx.file_system.persistent_temp_dir()) / pkg.db_id.replace('/', '_')) + Path(pkg.section['db_url']).suffix.lower()
             get_db_job = make_get_file_job(pkg.section['db_url'], target=temp_path, info=f'db {pkg.db_id}', silent=True, logger=self._logger)
             get_db_job.after_job = OpenDbJob(
@@ -261,7 +262,7 @@ class OnlineImporter:
             if self._worker_ctx.file_system.folder_has_items(pkg.full_path):
                 continue
 
-            if not pkg.is_pext_external_subfolder:
+            if not pkg.is_pext_external_subfolder():
                 self._worker_ctx.file_system.remove_folder(pkg.full_path)
 
             for db_id in dbs:
@@ -273,7 +274,7 @@ class OnlineImporter:
 
         def add_parent(el_pkg: PathPackage, db_id: str) -> None:
             if el_pkg.pext_props is not None:
-                if el_pkg.is_pext_standard:
+                if el_pkg.is_pext_standard():
                     parents_by_db[db_id].add(el_pkg.pext_props.parent)
                 else:
                     external_parents_by_db[db_id][el_pkg.pext_props.parent].add(el_pkg.pext_props.drive)
@@ -295,7 +296,7 @@ class OnlineImporter:
                         stores[file.db_id].write_only().remove_external_file(other_drive, file.pkg.rel_path)
                     else:
                         stores[file.db_id].write_only().remove_local_file(file.pkg.rel_path)
-                        
+
             stores[file.db_id].write_only().add_file_pkg(file.pkg)
 
             if file.pkg.pext_props is not None:
@@ -311,7 +312,7 @@ class OnlineImporter:
 
         for folder_path in sorted(box.installed_folders(), key=lambda x: len(x), reverse=True):
             for db_id, folder_pkg in report.processed_folder(folder_path).items():
-                if folder_pkg.is_pext_parent:
+                if folder_pkg.is_pext_parent():
                     continue
 
                 stores[db_id].write_only().add_folder_pkg(folder_pkg)
@@ -319,7 +320,7 @@ class OnlineImporter:
 
         for folder_path in sorted(box.installed_folders(), key=lambda x: len(x), reverse=True):
             for db_id, folder_pkg in report.processed_folder(folder_path).items():
-                if not folder_pkg.is_pext_parent:
+                if not folder_pkg.is_pext_parent():
                     continue
 
                 if folder_pkg.pext_props.parent in parents_by_db[db_id]:

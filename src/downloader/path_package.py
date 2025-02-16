@@ -17,19 +17,23 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 
-from dataclasses import dataclass
 from enum import auto, unique, Enum
-from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Final, Optional, Tuple
 import os
 
 from downloader.constants import SUFFIX_file_in_progress
 
 
+is_windows: Final = os.name == 'nt'
+
 @unique
 class PathType(Enum):
     FILE = auto()
     FOLDER = auto()
+
+PATH_TYPE_FILE: Final = PathType.FILE
+PATH_TYPE_FOLDER: Final = PathType.FOLDER
+
 
 @unique
 class PathPackageKind(Enum):
@@ -37,11 +41,21 @@ class PathPackageKind(Enum):
     SYSTEM = auto()
     PEXT = auto()
 
+PATH_PACKAGE_KIND_STANDARD: Final = PathPackageKind.STANDARD
+PATH_PACKAGE_KIND_SYSTEM: Final = PathPackageKind.SYSTEM
+PATH_PACKAGE_KIND_PEXT: Final = PathPackageKind.PEXT
+
+
 @unique
 class PextKind(Enum):
     PEXT_EXTERNAL = auto()
     PEXT_STANDARD = auto()
     PEXT_PARENT = auto()
+
+PEXT_KIND_EXTERNAL: Final = PextKind.PEXT_EXTERNAL
+PEXT_KIND_STANDARD: Final = PextKind.PEXT_STANDARD
+PEXT_KIND_PARENT: Final = PextKind.PEXT_PARENT
+
 
 @unique
 class PathExists(Enum):
@@ -49,95 +63,92 @@ class PathExists(Enum):
     EXISTS = auto()
     DOES_NOT_EXIST = auto()
 
-@dataclass
+PATH_EXISTS_UNCHECKED: Final = PathExists.UNCHECKED
+PATH_EXISTS_EXISTS: Final = PathExists.EXISTS
+PATH_EXISTS_DOES_NOT_EXIST: Final = PathExists.DOES_NOT_EXIST
+
+
 class PathPackage:
-    full_path: str
-    rel_path: str
-    drive: Optional[str]
-    description: Dict[str, Any]
-    pext_props: Optional['PextPathProps'] = None
-    ty: PathType = PathType.FILE
-    kind: PathPackageKind = PathPackageKind.STANDARD
-    exists: PathExists = PathExists.UNCHECKED
+    __slots__ = (
+        'rel_path', 'drive', 'description',
+        'ty', 'kind', 'pext_props', 'full_path', 'exists'
+    )
 
-    def __post_init__(self):
-        assert (self.kind == PathPackageKind.PEXT) == (self.pext_props is not None), "PathPackage is not consistent according to its kind"
+    def __init__(
+        self,
+        rel_path: str,
+        drive: Optional[str],
+        description:Dict[str, Any],
+        ty: PathType,
+        kind: PathPackageKind,
+        pext_props: Optional['PextPathProps'], /
+    ):
+        self.rel_path = rel_path
+        self.drive = drive
+        self.description = description
+        self.ty = ty
+        self.kind = kind
+        self.pext_props = pext_props
+        self.full_path = rel_path if drive is None else os.path.join(drive, rel_path) if is_windows else drive + '/' + rel_path
+        self.exists = PATH_EXISTS_UNCHECKED
 
-    @property
-    def is_file(self) -> bool:
-        return self.ty == PathType.FILE
-
-    @property
-    def is_folder(self) -> bool:
-        return self.ty == PathType.FOLDER
-
-    @property
-    def is_standard(self) -> bool:
-        return self.kind == PathPackageKind.STANDARD
-
-    @property
-    def is_system(self) -> bool:
-        return self.kind == PathPackageKind.SYSTEM
-
-    @property
-    def is_potentially_external(self) -> bool:
-        return self.kind == PathPackageKind.PEXT
-
-    @property
     def is_pext_external(self) -> bool:
-        return self.pext_props is not None and self.pext_props.kind == PextKind.PEXT_EXTERNAL
+        return self.pext_props is not None and self.pext_props.kind == PEXT_KIND_EXTERNAL
 
-    @property
     def is_pext_standard(self) -> bool:
-        return self.pext_props is not None and self.pext_props.kind == PextKind.PEXT_STANDARD
+        return self.pext_props is not None and self.pext_props.kind == PEXT_KIND_STANDARD
 
-    @property
     def is_pext_external_subfolder(self) -> bool:
-        return self.ty == PathType.FOLDER and self.pext_props is not None and self.pext_props.kind == PextKind.PEXT_EXTERNAL and self.pext_props.is_subfolder
+        return self.ty == PATH_TYPE_FOLDER and self.pext_props is not None and self.pext_props.kind == PEXT_KIND_EXTERNAL and self.pext_props.is_subfolder
 
-    @property
     def is_pext_parent(self) -> bool:
-        return self.pext_props is not None and self.pext_props.kind == PextKind.PEXT_PARENT
+        return self.pext_props is not None and self.pext_props.kind == PEXT_KIND_PARENT
 
     def db_path(self) -> str:
-        if self.kind == PathPackageKind.PEXT:
+        if self.kind == PATH_PACKAGE_KIND_PEXT:
             return '|' + self.rel_path
         else:
             return self.rel_path
 
     def pext_drive(self) -> Optional[str]:
-        if self.kind == PathPackageKind.PEXT and self.pext_props is not None:
+        if self.kind == PATH_PACKAGE_KIND_PEXT and self.pext_props is not None:
             return self.pext_props.drive
         else:
             return None
 
     def temp_path(self) -> str:
         if 'tmp' in self.description:
-            return os.path.join(self.drive, self.description['tmp']) if self.drive is not None else self.description['tmp']
+            return (os.path.join(self.drive, self.description['tmp']) if is_windows else self.drive + '/' + self.description['tmp']) if self.drive is not None else self.description['tmp']
         else:
-            return self.full_path if self.exists == PathExists.DOES_NOT_EXIST else self.full_path + SUFFIX_file_in_progress
+            return self.full_path if self.exists == PATH_EXISTS_DOES_NOT_EXIST else self.full_path + SUFFIX_file_in_progress
 
     def backup_path(self) -> Optional[str]:
         if 'backup' in self.description:
-            return os.path.join(self.drive, self.description['backup']) if self.drive is not None else self.description['backup']
+            return (os.path.join(self.drive, self.description['backup']) if is_windows else self.drive + '/' + self.description['backup']) if self.drive is not None else self.description['backup']
         else:
             return None
 
-@dataclass
 class PextPathProps:
-    kind: PextKind
-    parent: str
-    drive: str
-    other_drives: Tuple[str, ...]
-    is_subfolder: bool = False
+    __slots__ = ('kind', 'parent', 'drive', 'other_drives', 'is_subfolder')
 
-    def parent_full_path(self) -> str:
-        return os.path.join(self.drive, self.parent)
+    def __init__(
+        self,
+        kind: PextKind,
+        parent: str,
+        drive: str,
+        other_drives: Tuple[str, ...],
+        is_subfolder: bool,/
+    ):
+        self.kind = kind
+        self.parent = parent
+        self.drive = drive
+        self.other_drives = other_drives
+        self.is_subfolder = is_subfolder
 
     def parent_pkg(self) -> PathPackage:
-        return PathPackage(full_path=self.parent_full_path(), rel_path=self.parent, drive=self.drive, description={}, pext_props=PextPathProps(
-            kind=PextKind.PEXT_PARENT, parent=self.parent, drive=self.drive, other_drives=self.other_drives, is_subfolder=False
-        ), ty=PathType.FOLDER, kind=PathPackageKind.PEXT)
+        return PathPackage(self.parent, self.drive, {}, PATH_TYPE_FOLDER, PATH_PACKAGE_KIND_PEXT, PextPathProps(
+            PEXT_KIND_PARENT, self.parent, self.drive, self.other_drives, False
+        ))
 
 
 RemovedCopy = Tuple[bool, str, str, PathType]

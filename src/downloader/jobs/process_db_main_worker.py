@@ -58,6 +58,7 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
             zip_job_tags = []
 
             for zip_id, zip_description in job.db.zips.items():
+                #if zip_id != 'cheats_folder_psx': continue
                 zip_job, err = _make_zip_job(ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
                 if err is not None:
                     self._ctx.swallow_error(err)
