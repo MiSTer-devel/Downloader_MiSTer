@@ -22,14 +22,14 @@ import threading
 import os
 from collections import defaultdict
 
-from downloader.db_entity import DbEntity
+from downloader.db_entity import DbEntity, check_file, check_folders
 from downloader.file_filter import BadFileFilterPartException, Config, ZipData
 from downloader.file_system import FileWriteError, FolderCreationError, FsError, ReadOnlyFileSystem
 from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.path_package import PATH_EXISTS_DOES_NOT_EXIST, PATH_EXISTS_EXISTS, PATH_PACKAGE_KIND_STANDARD, PathExists, PathPackage, PathPackageKind, PathType, RemovedCopy
+from downloader.path_package import PATH_EXISTS_DOES_NOT_EXIST, PATH_EXISTS_EXISTS,  PathPackage, PathType, RemovedCopy
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job import ValidateFileJob
@@ -251,6 +251,11 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
     if len(create_folder_pkgs) == 0:
         return [], [], []
 
+    try:
+        check_folders([pkg.rel_path for pkg in create_folder_pkgs], db_id)
+    except Exception as e:
+        ctx.swallow_error(e)
+
     folder_copies_to_be_removed: List[Tuple[bool, str, str, PathType]] = []
     parents: Dict[str, Dict[str, PathPackage]] = defaultdict(defaultdict)
     processing_folders: List[PathPackage] = []
@@ -306,8 +311,10 @@ def create_fetch_jobs(ctx: DownloaderWorkerContext, db_id: str, fetch_pkgs: List
     jobs: List[Job] = []
     for pkg in fetch_pkgs:
         source = _url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url)
-        if not isinstance(source, str):
-            ctx.swallow_error(Exception(f"Invalid 'url' for file '{pkg.rel_path}' at database '{db_id}'."))
+        try:
+            check_file(pkg, db_id, source)
+        except Exception as e:
+            ctx.swallow_error(e)
             continue
 
         temp_path = pkg.temp_path()

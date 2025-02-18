@@ -17,7 +17,6 @@
 import unittest
 import ssl
 import tempfile
-import time
 import random
 import shutil
 import os

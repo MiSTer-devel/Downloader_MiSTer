@@ -16,6 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from typing import Any
 from downloader.db_entity import DbEntity, make_db_tag
 from downloader.job_system import WorkerResult
 from downloader.jobs.open_db_job import OpenDbJob
@@ -29,19 +30,18 @@ class OpenDbWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: OpenDbJob) -> WorkerResult:  # type: ignore[override]
         try:
-            db = self._open_db(section=job.section, temp_path=job.temp_path)
+            db = self._open_db(job.section, job.transfer_job.transfer())
         except Exception as e:
-            self._ctx.logger.debug(e)
+            self._ctx.swallow_error(e)
             return [], e
 
         ini_description, store, full_resync = job.ini_description, job.store, job.full_resync
         return [ProcessDbMainJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync).add_tag(make_db_tag(job.section))], None
 
-    def _open_db(self, section: str, temp_path: str) -> DbEntity:
+    def _open_db(self, section: str, transfer: Any) -> DbEntity:
         self._ctx.logger.bench('Loading database start: ', section)
-        db_raw = self._ctx.file_system.load_dict_from_file(temp_path)
+        db_raw = self._ctx.file_system.load_dict_from_transfer(transfer)
         self._ctx.logger.bench('Loading database end: ', section)
-        self._ctx.file_system.unlink(temp_path)
         self._ctx.logger.bench('Validating database start: ', section)
         db_entity = DbEntity(db_raw, section)
         self._ctx.logger.bench('Validating database end: ', section)

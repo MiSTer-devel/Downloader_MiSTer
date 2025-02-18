@@ -18,14 +18,14 @@
 
 from typing import Dict, Any, Optional, Tuple
 
-from downloader.db_entity import make_db_tag
+from downloader.db_entity import check_zip, fix_folders, make_db_tag
 from downloader.db_utils import build_db_config
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_summary_job, make_zip_tag, ZipJobContext
 from downloader.jobs.wait_db_zips_job import WaitDbZipsJob
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.index import Index
-from downloader.jobs.worker_context import DownloaderWorkerBase
+from downloader.jobs.worker_context import DownloaderWorkerBase, NilJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE
 
@@ -39,6 +39,8 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
         logger.bench('ProcessDbMainWorker start: ', job.db.db_id)
     
         read_only_store = job.store.read_only()
+
+        fix_folders(job.db.folders)
 
         self._ctx.file_download_session_logger.print_header(job.db)
         logger.debug("Building db config '%s'...", job.db.db_id)
@@ -96,6 +98,10 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
 
 
 def _make_zip_job(z: ZipJobContext) -> Tuple[Job, Optional[Exception]]:
+    try:
+        check_zip(z.zip_description, z.job.db.db_id, z.zip_id)
+    except Exception as e:
+        return NilJob(), e
     if 'summary_file' in z.zip_description:
         index = z.job.store.read_only().zip_summary(z.zip_id)
 
@@ -107,11 +113,8 @@ def _make_zip_job(z: ZipJobContext) -> Tuple[Job, Optional[Exception]]:
         else:
             job = make_open_zip_summary_job(z, z.zip_description['summary_file'], process_zip_job)
 
-    elif 'internal_summary' in z.zip_description:
-        job = _make_process_zip_job_from_ctx(z, zip_summary=z.zip_description['internal_summary'], has_new_zip_summary=True)
     else:
-        return z.job, Exception(f"Unknown zip description for zip '{z.zip_id}' in db '{z.job.db.db_id}'")
-        # @TODO: Set a more descriptive exception type here, is a exception validation error
+        job = _make_process_zip_job_from_ctx(z, zip_summary=z.zip_description['internal_summary'], has_new_zip_summary=True)
 
     return job, None
 

@@ -121,7 +121,7 @@ class SandboxTestBase(unittest.TestCase):
         env['ALLOW_REBOOT'] = '0'
         env['COMMIT'] = 'quick system test'
         env['DEBUG'] = 'true'
-        env['LOGLEVEL'] = '' # info, http
+        env['LOGLEVEL'] = 'debug' # info, http
         env['FAIL_ON_FILE_ERROR'] = 'true'
         env['CURL_SSL'] = ''
         env['DEFAULT_BASE_PATH'] = tmp_default_base_path

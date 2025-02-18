@@ -15,6 +15,7 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+import io
 import json
 import os
 from pathlib import Path
@@ -25,6 +26,7 @@ from downloader.file_system import FileSystemFactory as ProductionFileSystemFact
     absolute_parent_folder, is_windows, FolderCreationError, FsSharedState, FileCopyError
 from downloader.other import ClosableValue
 from downloader.path_package import PathPackage
+from test.fake_http_gateway import FakeBuf
 from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_logger import NoLogger
 
@@ -169,6 +171,9 @@ class FakeFileSystem(ProductionFileSystem):
     def read_file_contents(self, path):
         return self.state.files[self._path(path)]['content']
 
+    def read_file_bytes(self, path: str) -> io.BytesIO:
+        return FakeBuf(self.state.files[self._path(path)])
+
     def precache_is_file_with_folders(self, _folders: list[str], recheck: bool = False):
         pass
 
@@ -281,6 +286,13 @@ class FakeFileSystem(ProductionFileSystem):
         self.state.files[lower_path] = in_stream.description
         self._fs_cache.add_file(lower_path)
 
+
+    def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> Tuple[io.BytesIO, str]:
+        if in_stream.storing_problems:
+            return
+
+        return in_stream.buf, in_stream.description['hash'] if calc_md5 else ''
+
     def unlink(self, path, verbose=True):
         full_path = self._path(path)
         if full_path in self.state.files:
@@ -291,14 +303,30 @@ class FakeFileSystem(ProductionFileSystem):
         else:
             return False
 
-    def load_dict_from_file(self, path, suffix=None):
-        file_description = self.state.files[self._path(path)]
-        if 'unzipped_json' in file_description:
-            return file_description['unzipped_json']
-        elif 'json' in file_description:
-            return file_description['json']
+    def load_dict_from_transfer(self, transfer: Union[str, tuple[str, io.BytesIO]]):
+        if isinstance(transfer, str):
+            path = self._path(transfer)
+            result = self._load_dict_from_file(path)
+            self.state.files.pop(path)
+            return result
+        else: return self._load_dict_from_data(*transfer)
+
+    def load_dict_from_file(self, path):
+        full_path = self._path(path)
+        file_description = self.state.files[full_path]
+        return self._load_json_from_description(path, file_description)
+
+    def _load_dict_from_data(self, source: str, data: io.BytesIO) -> Dict[str, Any]:
+        if not isinstance(data, FakeBuf): raise FsError('This should have been a FakeBuf.')
+        return self._load_json_from_description(source, data.description)
+
+    def _load_json_from_description(self, info: str, description: Dict[str, Any]) -> Any:
+        if 'unzipped_json' in description:
+            return description['unzipped_json']
+        elif 'json' in description:
+            return description['json']
         else:
-            raise FsError(f'File {path} does not have a json content.')
+            raise FsError(f'Transfer {info} does not have a json content.')
 
     def save_json_on_zip(self, db, path):
         if self._path(path) not in self.state.files:
@@ -314,9 +342,15 @@ class FakeFileSystem(ProductionFileSystem):
         self.state.files[file]['json'] = db
         self._write_records.append(_Record('save_json', file))
 
-    def unzip_contents(self, file_path, target_path: Union[str, Dict[str, str]], test_info: Tuple[Optional[PathPackage], List[PathPackage], Dict[str, Dict[str, Any]]]):
+    def unzip_contents(self, transfer: Union[str, tuple[str, io.BytesIO]], target_path: Union[str, Dict[str, str]], test_info: Tuple[Optional[PathPackage], List[PathPackage], Dict[str, Dict[str, Any]]]):
+        if isinstance(transfer, str):
+            contents = self.state.files[self._path(transfer)]['zipped_files']
+            self.unlink(transfer)
+        else:
+            contents = transfer[1].description['zipped_files']
+
         if 'unzip_error' in self._fake_failures:
-            raise UnzipError(file_path)
+            raise UnzipError(transfer)
 
         target_path_by_relpath = None if isinstance(target_path, str) else target_path
 
@@ -339,7 +373,6 @@ class FakeFileSystem(ProductionFileSystem):
                 f = f_path.lstrip('|').removeprefix(zip_root_path)
                 extracting[f] = os.path.join(abs_zip_root_path, f)
 
-        contents = self.state.files[self._path(file_path)]['zipped_files']
         for file, description in contents['files'].items():
             full_path = extracting.get(file, None)
             if full_path is None:

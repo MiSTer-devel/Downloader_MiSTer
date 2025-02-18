@@ -16,15 +16,18 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from typing import Any, Optional
 import unittest
 
 from downloader.config import default_config
 from downloader.constants import K_BASE_PATH, FILE_MiSTer, FOLDER_gamecontrollerdb, FOLDER_linux, FILE_gamecontrollerdb, \
     FILE_gamecontrollerdb_user, DISTRIBUTION_MISTER_DB_ID
-from downloader.db_entity import DbEntityValidationException, invalid_paths, \
+from downloader.db_entity import DbEntityValidationException, check_file, check_folders, invalid_paths, \
     no_distribution_mister_invalid_paths, invalid_root_folders, distribution_mister_exceptional_paths
+from downloader.db_options import DbOptionsValidationException
+from downloader.path_package import PathPackage, PathPackageKind, PathType
 from test.fake_db_entity import DbEntity
-from test.objects import raw_db_empty_descr, db_empty, file_mister_descr, db_with_folders, file_a_descr, \
+from test.objects import db_test, raw_db_empty_descr, db_empty, file_mister_descr, db_with_folders, file_a_descr, \
     db_test_with_file, db_entity, file_save_psx_castlevania, file_save_psx_castlevania_descr, folder_save_psx, file_a
 
 
@@ -57,24 +60,24 @@ class TestDbEntity(unittest.TestCase):
 
     def test_construct_db_entity___with_wrong_files___raises_db_entity_validation_exception(self):
         wrong_files = [
-            '',
-            {file_a: {}},
-            {file_a: {**file_a_descr(), 'url': 3}},
-            {file_a: {**file_a_descr(), 'url': 'bad_url'}},
-            {file_a: {**file_a_descr(), 'url': 'https://adsf[asdf.com'}},
-            {file_a: {**file_a_descr(), 'reboot': 'car'}},
-            {file_a: {**file_a_descr(), 'tags': '1'}},
-            {file_a: {**file_a_descr(), 'tags': [2.23]}},
+            ('', {}),
+            (file_a, {}),
+            (file_a, {**file_a_descr(), 'url': 3}),
+            (file_a, {**file_a_descr(), 'url': 'bad_url'}),
+            (file_a, {**file_a_descr(), 'url': 'https://adsf[asdf.com'}),
+            # (file_a, {**file_a_descr(), 'reboot': 'car'}),  # No reboot validation needed as long as we strict check == True on usage.
+            # (file_a, {**file_a_descr(), 'tags': '1'}),  @TODO: Should I put tags validation somewhere?
+            # (file_a, {**file_a_descr(), 'tags': [2.23]}),
         ]
-        for i, files in enumerate(wrong_files):
+        for i, (fp, fd) in enumerate(wrong_files):
             with self.subTest(i):
-                self.assertRaises(DbEntityValidationException, lambda: db_entity(files=files))
+                self.assertRaises(DbEntityValidationException, lambda: check_file(pkg(fp, fd), db_test, None))
 
     def test_construct_db_entity___with_saves_files_that_allow_overwrite___raises_db_entity_validation_exception(self):
-        self.assertRaises(DbEntityValidationException, lambda: db_entity(files={file_save_psx_castlevania: file_save_psx_castlevania_descr(overwrite=True)}))
+        self.assertRaises(DbEntityValidationException, lambda: check_file(pkg(file_save_psx_castlevania, file_save_psx_castlevania_descr(overwrite=True)), db_test, None))
 
     def test_construct_db_entity___with_saves_files_without_overwrite_property___raises_db_entity_validation_exception(self):
-        self.assertRaises(DbEntityValidationException, lambda: db_entity(files={file_save_psx_castlevania: file_save_psx_castlevania_descr()}))
+        self.assertRaises(DbEntityValidationException, lambda: check_file(pkg(file_save_psx_castlevania, file_save_psx_castlevania_descr()), db_test, None))
 
     def test_construct_db_entity___with_saves_files_that_doesnt_allow_overwrite___returns_db(self):
         self.assertIsNotNone(db_entity(files={file_save_psx_castlevania: file_save_psx_castlevania_descr(overwrite=False)}))
@@ -88,26 +91,26 @@ class TestDbEntity(unittest.TestCase):
     def test_construct_db_entity___with_wrong_options___raises_db_entity_validation_exception(self):
         raw_db = raw_db_empty_descr()
         raw_db['default_options'] = {K_BASE_PATH: default_config()[K_BASE_PATH]}
-        self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
+        self.assertRaises(DbOptionsValidationException, lambda: DbEntity(raw_db, db_empty))
 
     def test_construct_db_entity___with_invalid_files___raises_error(self):
         invalids = [0, 'linux/file.txt', 'linux/something/something/file.txt', '../omg.txt', 'this/is/ok/../or/nope.txt', '/tmp/no', '.hidden'] + \
-                        ['%s/file.txt' % k for k in invalid_root_folders()] + \
-                        list(invalid_paths()) + \
-                        list(no_distribution_mister_invalid_paths())
+                        ['%s/file.txt' % k for k in invalid_root_folders] + \
+                        list(invalid_paths) + \
+                        list(no_distribution_mister_invalid_paths)
 
         for wrong_path in invalids:
             with self.subTest(wrong_path):
-                self.assertRaises(DbEntityValidationException, lambda: db_test_with_file(wrong_path, file_a_descr()))
+                self.assertRaises(DbEntityValidationException, lambda: check_file(pkg(wrong_path, file_a_descr()), db_test, None))
 
     def test_construct_db_entity___with_invalid_root_folders___raises_error(self):
-        invalids = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + tuple('%s/folder' % f for f in invalid_root_folders()) + distribution_mister_exceptional_paths()
+        invalids = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + tuple('%s/folder' % f for f in invalid_root_folders) + distribution_mister_exceptional_paths
         for wrong_path in invalids:
             with self.subTest(wrong_path):
-                self.assertRaises(DbEntityValidationException, lambda: db_with_folders('wrong_db', {wrong_path: {}}))
+                self.assertRaises(DbEntityValidationException, lambda: check_folders([pkg(wrong_path, {})], 'wrong_db'))
 
     def test_construct_db_entity___with_mister_file___raises_invalid_downloader_path_exception(self):
-        self.assertRaises(DbEntityValidationException, lambda: db_test_with_file(FILE_MiSTer, file_mister_descr()))
+        self.assertRaises(DbEntityValidationException, lambda: check_file(pkg(FILE_MiSTer, file_mister_descr()), db_test, None))
 
     def test_construct_db_entity___valid_folders___does_not_raise_an_error(self):
         invalids = (FOLDER_linux, FOLDER_gamecontrollerdb)
@@ -122,6 +125,10 @@ class TestDbEntity(unittest.TestCase):
                 self.assertIsNotNone(db_test_with_file('wrong_db', file_a_descr()))
 
     def test_construct_distribution_mister___valid_exceptional_files___does_not_raise_an_error(self):
-        for wrong_path in distribution_mister_exceptional_paths():
+        for wrong_path in distribution_mister_exceptional_paths:
             with self.subTest(wrong_path):
                 self.assertIsNotNone(db_with_folders(DISTRIBUTION_MISTER_DB_ID, {wrong_path: {}}))
+
+
+def pkg(path: str, description: Optional[dict[str, Any]] = None):
+    return PathPackage(path, None, description or {}, PathType.FILE, PathPackageKind.STANDARD, None)

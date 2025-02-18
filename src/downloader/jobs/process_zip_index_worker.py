@@ -18,13 +18,11 @@
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from downloader.db_entity import fix_folders
-from downloader.file_filter import ZipData
+from downloader.db_entity import check_no_url_files, fix_folders
 from downloader.file_system import FileWriteError, FolderCreationError
 from downloader.job_system import WorkerResult, Job
-from downloader.jobs.jobs_factory import make_get_zip_file_jobs, make_zip_kind
+from downloader.jobs.jobs_factory import get_data_job, make_zip_kind
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
-from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.process_db_index_worker import create_fetch_jobs, create_packages_from_index, process_check_file_packages, process_create_folder_packages, process_validate_packages, try_reserve_space
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter, StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
@@ -43,6 +41,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
 
         logger.bench('ProcessZipIndexWorker start: ', db.db_id, zip_id)
         store = job.store.select(job.zip_index).read_only()
+
         fix_folders(summary.folders)  # @TODO: Try to look for a better place to put this, while validating zip_index entity for example which we don't do yet.
 
         logger.bench('ProcessZipIndexWorker create pkgs: ', db.db_id, zip_id)
@@ -96,6 +95,11 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         if len(unzip_file_pkgs) == 0:
             return [], None
 
+        try:
+            check_no_url_files(unzip_file_pkgs, job.db.db_id)
+        except Exception as e:
+            return [], e
+
         zip_kind, kind_err = make_zip_kind(job.zip_description.get('kind', None), (job.zip_id, job.db.db_id))
         if kind_err is not None:
             self._ctx.swallow_error(kind_err)
@@ -110,7 +114,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             self._ctx.swallow_error(target_error)
             return [], target_error
 
-        get_file_job, validate_job = make_get_zip_file_jobs(db=job.db, zip_id=job.zip_id, description=job.zip_description['contents_file'], tag=None)
+        data_job = get_data_job(job.zip_description['contents_file'], None)
         open_zip_contents_job = OpenZipContentsJob(
             db=job.db,
             store=store,
@@ -125,16 +129,14 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             total_amount_of_files_in_zip=total_amount_of_files_in_zip,
             files_to_unzip=unzip_file_pkgs,
             recipient_folders=job.installed_folders,
-            contents_zip_temp_path=validate_job.target_file_path,
+            transfer_job=data_job,
             action_text=job.zip_description['description'],
             zip_base_files_url=job.zip_description.get('base_files_url', '').strip(),
             filtered_data=job.filtered_data,
-
-            get_file_job=get_file_job,
         )
         open_zip_contents_job.add_tag(job.db.db_id)
-        validate_job.after_job = open_zip_contents_job
-        return [get_file_job], None
+        data_job.after_job = open_zip_contents_job
+        return [data_job], None
 
     def _create_target_package(self, calculator: TargetPathsCalculator, kind: ZipKind, description: Dict[str, Any]) -> Tuple[Optional[str], Optional[Exception]]:
         if kind == ZipKind.EXTRACT_ALL_CONTENTS:

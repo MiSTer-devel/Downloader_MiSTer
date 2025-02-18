@@ -21,6 +21,7 @@ import unittest
 
 from downloader.constants import K_SECTION, K_DB_URL, MEDIA_FAT
 from downloader.db_utils import DbSectionPackage
+from downloader.jobs.worker_context import DownloaderWorkerFailPolicy
 from test.fake_importer_implicit_inputs import NetworkState
 from test.fake_local_store_wrapper import LocalStoreWrapper
 from test.fake_online_importer import OnlineImporter
@@ -29,12 +30,13 @@ from test.fake_file_system_factory import FileSystemFactory
 
 http_db_url = 'https://this_is_my_uri.json.zip'
 fs_db_path = '/this_is_my_uri.json.zip'
+db_info = 'db test'
 
 
 class TestOnlineImporterDbFetching(unittest.TestCase):
     def test_fetch_all___db_with_working_http_uri___returns_expected_db(self):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
-        self.assertEqual(db_test_descr().testable, fetch_all(http_db_url, network_state=NetworkState(remote_files={'db test': db_description})))
+        self.assertEqual(db_test_descr().testable, fetch_all(http_db_url, network_state=NetworkState(remote_files={http_db_url: db_description})))
 
     def test_fetch_all___db_with_fs_path___returns_expected_db(self):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
@@ -44,15 +46,15 @@ class TestOnlineImporterDbFetching(unittest.TestCase):
         self.assertEqual(db_test_descr().testable, fetch_all(fs_db_path, file_system_factory))
 
     def test_fetch_all___db_with_wrong_downloaded_file___returns_none(self):
-        self.assertEqual(None, fetch_all(http_db_url))
+        self.assertEqual(None, fetch_all(http_db_url, fail=DownloaderWorkerFailPolicy.FAULT_TOLERANT))
 
     def test_fetch_all___db_with_failing_http_uri___returns_none(self):
-        self.assertEqual(None, fetch_all(http_db_url, network_state=NetworkState(storing_problems={'db test': 99})))
+        self.assertEqual(None, fetch_all(http_db_url, network_state=NetworkState(storing_problems={http_db_url: 99})))
 
-
-def fetch_all(db_url: str, file_system_factory: Optional[FileSystemFactory] = None, network_state: Optional[NetworkState] = None):
+1
+def fetch_all(db_url: str, file_system_factory: Optional[FileSystemFactory] = None, network_state: Optional[NetworkState] = None, fail: Optional[DownloaderWorkerFailPolicy] = None):
     file_system_factory = file_system_factory or FileSystemFactory()
-    sut = OnlineImporter(file_system_factory=file_system_factory, network_state=network_state, start_on_db_processing=False)
+    sut = OnlineImporter(file_system_factory=file_system_factory, network_state=network_state, start_on_db_processing=False, fail_policy=fail)
     local_store = LocalStoreWrapper({'dbs': {db_test: empty_store(MEDIA_FAT)}})
     db_pkg = DbSectionPackage(
         db_id=db_test,

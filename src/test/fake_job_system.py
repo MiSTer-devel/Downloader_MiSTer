@@ -1,5 +1,4 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
-from typing import Any, List
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,8 +16,10 @@ from typing import Any, List
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.job_system import ProgressReporter, Job
+from typing import Any, Dict, List
 import copy
+
+from downloader.job_system import ProgressReporter, Job
 
 
 class ProgressReporterTracker(ProgressReporter):
@@ -33,7 +34,7 @@ class ProgressReporterTracker(ProgressReporter):
         self._reporter = reporter
 
     def notify_job_started(self, job: Job) -> None:
-        self.tracks["job_started"].append((job.__class__.__name__, copy.deepcopy(job.__dict__)))
+        self.tracks["job_started"].append((job.__class__.__name__, cp(job)))
         self._reporter.notify_job_started(job)
 
     def notify_work_in_progress(self) -> None:
@@ -45,13 +46,29 @@ class ProgressReporterTracker(ProgressReporter):
         self._reporter.notify_jobs_cancelled(jobs)
 
     def notify_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
-        self.tracks["job_completed"].append((job.__class__.__name__, copy.deepcopy(job.__dict__)))
+        self.tracks["job_completed"].append((job.__class__.__name__, cp(job)))
         self._reporter.notify_job_completed(job, next_jobs)
 
     def notify_job_failed(self, job: Job, exception: Exception) -> None:
-        self.tracks["job_failed"].append((job.__class__.__name__, copy.deepcopy(job.__dict__), exception))
+        self.tracks["job_failed"].append((job.__class__.__name__, cp(job), exception))
         self._reporter.notify_job_failed(job, exception)
 
     def notify_job_retried(self, job: Job, retry_job: Job, exception: Exception) -> None:
-        self.tracks["job_retried"].append((job.__class__.__name__, copy.deepcopy(job.__dict__), exception))
+        self.tracks["job_retried"].append((job.__class__.__name__, cp(job), exception))
         self._reporter.notify_job_retried(job, retry_job, exception)
+
+
+def cp(job: Job) -> Dict[str, Any]:
+    dict = getattr(job, '__dict__', None)
+    if dict is not None:
+        return copy.deepcopy(dict)
+    else:
+        return {
+            s: getattr(job, s)
+            for s in {
+                s
+                for cls in type(job).__mro__
+                for s in getattr(cls, '__slots__', ())
+            }
+            if hasattr(job, s)
+        }

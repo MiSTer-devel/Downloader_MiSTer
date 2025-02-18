@@ -16,6 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from io import BytesIO
+import io
 import os
 import hashlib
 import shutil
@@ -102,6 +104,10 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
+    def read_file_bytes(self, path: str) -> io.BytesIO:
+        """interface"""
+
+    @abstractmethod
     def touch(self, path: str) -> None:
         """interface"""
 
@@ -158,11 +164,19 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
+    def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> Tuple[io.BytesIO, str]:
+        """interface"""
+
+    @abstractmethod
     def unlink(self, path: str, verbose: bool = True) -> bool:
         """interface"""
 
     @abstractmethod
-    def load_dict_from_file(self, path: str, suffix: Optional[str] = None) -> Dict[str, Any]:
+    def load_dict_from_transfer(self, transfer: Union[str, tuple[str, io.BytesIO]], /) -> Dict[str, Any]:
+        """interface"""
+
+    @abstractmethod
+    def load_dict_from_file(self, file: str) -> Dict[str, Any]:
         """interface"""
 
     @abstractmethod
@@ -174,7 +188,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def unzip_contents(self, file: str, target_path: Union[str, Dict[str, str]], test_info: Any) -> None:
+    def unzip_contents(self, transfer: Union[str, tuple[str, io.BytesIO]], target_path: Union[str, Dict[str, str]], test_info: Any, /) -> None:
         """interface"""
 
     @abstractmethod
@@ -204,8 +218,14 @@ class ReadOnlyFileSystem:
     def read_file_contents(self, path):
         return self._fs.read_file_contents(path)
 
-    def load_dict_from_file(self, path, suffix=None):
-        return self._fs.load_dict_from_file(path, suffix)
+    def read_file_bytes(self, path: str) -> io.BytesIO:
+        return self._fs.read_file_bytes(path)
+
+    def load_dict_from_file(self, file: str) -> Dict[str, Any]:
+        return self._fs.load_dict_from_file(file)
+
+    def load_dict_from_transfer(self, transfer):
+        return self._fs.load_dict_from_transfer(transfer)
 
     def folder_has_items(self, path):
         return self._fs.folder_has_items(path)
@@ -302,6 +322,12 @@ class _FileSystem(FileSystem):
                 self._logger.debug('precache_is_file_with_folders error:', e)
                 return
         self._shared_state.add_many_files(files)
+
+    def read_file_bytes(self, path: str) -> io.BytesIO:
+        full_path = self._path(path)
+        self._debug_log('Reading file contents', (path, full_path))
+        with open(full_path, 'rb') as file:
+            return io.BytesIO(file.read())
 
     def read_file_contents(self, path: str) -> str:
         full_path = self._path(path)
@@ -447,6 +473,31 @@ class _FileSystem(FileSystem):
                     break
                 out_file.write(buf)
 
+    def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> Tuple[io.BytesIO, str]:
+        start_time = time.monotonic()
+        buf = io.BytesIO()
+        file_hash = hashlib.md5() if calc_md5 is not None else None
+        while True:
+            elapsed_time = time.monotonic() - start_time
+            if elapsed_time > timeout:
+                raise FsTimeoutError(f"Copy operation timed out after {timeout} seconds.")
+
+            if self._shared_state.interrupting_operations:
+                raise FsOperationsError("File system operations have been disabled.")
+
+            chunk = in_stream.read(COPY_BUFSIZE)
+            if not chunk:
+                break
+            buf.write(chunk)
+
+            if not calc_md5:
+                continue
+
+            file_hash.update(chunk)
+
+        buf.seek(0)
+        return buf, file_hash.hexdigest() if calc_md5 else ''
+
     def unlink(self, path: str, verbose: bool = True) -> bool:
         verbose = verbose and not path.startswith('/tmp/')
         if self._config['allow_delete'] != AllowDelete.ALL:
@@ -457,18 +508,36 @@ class _FileSystem(FileSystem):
 
         return self._unlink(path, verbose)
 
-    def load_dict_from_file(self, path: str, suffix: Optional[str] = None) -> Dict[str, Any]:
+    def load_dict_from_transfer(self, transfer: Union[str, tuple[str, io.BytesIO]]) -> Dict[str, Any]:
+        if isinstance(transfer, str):
+            try:
+                return self.load_dict_from_file(transfer)
+            finally:
+                self._unlink(transfer, False)
+        else: return self._load_dict_from_data(*transfer)
+
+    def load_dict_from_file(self, path: str) -> Dict[str, Any]:
         full_path = self._path(path)
         self._debug_log('Loading dict from file', (path, full_path))
 
-        if suffix is None:
-            suffix = Path(full_path).suffix.lower()
+        suffix = Path(full_path).suffix.lower()
         if suffix == '.json':
             return _load_json(full_path)
         elif suffix == '.zip':
             return load_json_from_zip(full_path)
         else:
             raise FileReadError('File type "%s" not supported' % suffix)
+
+    def _load_dict_from_data(self, source: str, data: io.BytesIO) -> Dict[str, Any]:
+        self._logger.debug('Loading dict from data: ', source)
+
+        suffix = Path(source).suffix.lower()
+        if suffix == '.json':
+            return json.loads(data.read().decode())
+        elif suffix == '.zip':
+            return load_json_from_zip(data)
+        else:
+            raise FileReadError('File type "%s" not supported: %s' % (suffix, source))
 
     def save_json_on_zip(self, db: Dict[str, Any], path: str) -> None:
         full_path = self._path(path)
@@ -486,8 +555,14 @@ class _FileSystem(FileSystem):
         with open(full_path, 'w') as f:
             json.dump(db, f)
 
-    def unzip_contents(self, zip_file: str, target_path: Union[str, Dict[str, str]], test_info: Any) -> None:
-        self._debug_log('Unzipping contents', (zip_file))
+    def unzip_contents(self, transfer: Union[str, tuple[str, io.BytesIO]], target_path: Union[str, Dict[str, str]], test_info: Any, /) -> None:
+        if isinstance(transfer, tuple):
+            zip_file = transfer[1]
+            self._logger.debug('Unzipping contents: ', transfer[0])
+        else:
+            zip_file = transfer
+            self._logger.debug('Unzipping contents: ', zip_file)
+
         files_to_unzip = None if isinstance(target_path, str) else target_path
         try:
             with zipfile.ZipFile(zip_file, 'r') as zipf:
@@ -513,6 +588,9 @@ class _FileSystem(FileSystem):
         except Exception as e:
             self._logger.debug(e)
             raise UnzipError(f"Cannot unzip '{zip_file}' ['{target_path if isinstance(target_path, str) else len(target_path)}']") from e
+        finally:
+            if isinstance(transfer, str):
+                self._unlink(transfer)
 
     def _debug_log(self, message: str, path: Tuple[str, str], target: Optional[Tuple[str, str]] = None) -> None:
         if path[0][0] == '/':
@@ -567,11 +645,11 @@ def absolute_parent_folder(absolute_path: str) -> str:
     return str(Path(absolute_path).parent)
 
 
-def load_json_from_zip(path: str) -> Dict[str, Any]:
-    with zipfile.ZipFile(path) as jsonzipf:
+def load_json_from_zip(input: Union[str, io.BytesIO]) -> Dict[str, Any]:
+    with zipfile.ZipFile(input) as jsonzipf:
         namelist = jsonzipf.namelist()
         if len(namelist) != 1:
-            raise FileReadError('Could not load "%s", because it has %s elements!' % (path, len(namelist)))
+            raise FileReadError('Could not load zipped json, because it has %s elements!' % len(namelist))
         with jsonzipf.open(namelist[0]) as store_json_file:
             return json.loads(store_json_file.read())
 

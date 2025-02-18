@@ -20,7 +20,7 @@ def scp_path(p): return f'root@{mister_ip()}:{p}' if p.startswith('/media') else
 def exports(env=None): return " ".join(f"export {key}={value};" for key, value in (env or {}).items())
 def scp_file(src, dest, **kwargs): _ssh_pass('scp', [scp_path(src), scp_path(dest)], **kwargs)
 def exec_ssh(cmd, env=None, **kwargs): return _ssh_pass('ssh', [f'root@{mister_ip()}', f'{exports(env)}{cmd}'], **kwargs)
-def run_build(**kwargs): send_build(**kwargs), exec_ssh(f'/media/fat/downloader.sh', **kwargs)
+def run_build(**kwargs): send_build(env={"SKIP_REMOVALS": "true"}), exec_ssh(f'/media/fat/downloader.sh', **kwargs)
 def run_launcher(**kwargs): send_build(**kwargs), exec_ssh(f'/media/fat/Scripts/downloader.sh', **kwargs)
 def store_push(**kwargs): scp_file('downloader.json', '/media/fat/Scripts/.config/downloader/downloader.json', **kwargs)
 def store_pull(**kwargs): scp_file('/media/fat/Scripts/.config/downloader/downloader.json', 'downloader.json', **kwargs)

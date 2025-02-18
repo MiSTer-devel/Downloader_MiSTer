@@ -18,7 +18,8 @@
 
 from dataclasses import field, dataclass
 from enum import IntEnum, auto, unique
-from typing import Callable, Dict, Any, List, Optional
+from io import BytesIO
+from typing import Callable, Dict, Any, List, Optional, Union
 
 from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFoldersHolder, Config
@@ -52,13 +53,12 @@ class OpenZipContentsJob(Job):
     total_amount_of_files_in_zip: int
     files_to_unzip: List[PathPackage]
     recipient_folders: List[PathPackage]
-    contents_zip_temp_path: str
+    transfer_job: Job # & Transferer @TODO: Python 3.10
     action_text: str
     zip_base_files_url: str
     filtered_data: FileFoldersHolder
-    get_file_job: GetFileJob
 
-    def retry_job(self): return self.get_file_job
+    def retry_job(self): return self.transfer_job
 
     # Results
     downloaded_files: List[PathPackage] = field(default_factory=list)

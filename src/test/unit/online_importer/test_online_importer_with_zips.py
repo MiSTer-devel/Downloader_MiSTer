@@ -159,7 +159,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
 
     def test_download_zipped_cheats_folder___with_summary_file_containing_already_existing_files_but_old_hash___when_file_count_threshold_is_surpassed_but_network_fails____reports_error_and_installs_from_zip_content_using_store_information(self):
         self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
-        self.implicit_inputs.network_state.remote_failures['temp zip file test:cheats_id:summary_file'] = 99
+        self.implicit_inputs.network_state.remote_failures['https://summary_file'] = 99
         self.assertEqual(fs_data(), self.sut.fs_data)
 
         store = self.download(db_test_descr(zips={
@@ -169,7 +169,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
             )
         }), store_with_unzipped_cheats(url=False, summary_hash='old'))
 
-        self.assertSutReports(list(cheats_folder_files()), errors=['temp zip file test:cheats_id:summary_file'], save=False)
+        self.assertSutReports(list(cheats_folder_files()), errors=['https://summary_file'], save=False)
         self.assertEqual(store_with_unzipped_cheats(url=False, summary_hash='old'), store)
         self.assertEqual(fs_data(
             folders=cheats_folder_folders(zip_id=False),
@@ -178,14 +178,14 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
 
     def test_download_zipped_cheats_folder___on_empty_store_when_file_count_threshold_is_surpassed_but_network_fails___reports_error_and_installs_nothing(self):
         self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
-        self.implicit_inputs.network_state.remote_failures['temp zip file test:cheats_id:summary_file'] = 99
+        self.implicit_inputs.network_state.remote_failures['https://summary_file'] = 99
         store = self.download(db_test_descr(zips={
             cheats_folder_id: cheats_folder_zip_desc(
                 zipped_files=zipped_files_from_cheats_folder(),
                 summary=summary_json_from_cheats_folder()
             )
         }), empty_test_store())
-        self.assertSutReports([], errors=['temp zip file test:cheats_id:summary_file'], save=False)
+        self.assertSutReports([], errors=['https://summary_file'], save=False)
         self.assertEqual(empty_test_store(), store)
         self.assertEqual(fs_data(), self.sut.fs_data)
 

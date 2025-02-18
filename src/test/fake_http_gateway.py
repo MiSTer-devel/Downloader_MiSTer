@@ -88,6 +88,7 @@ class FakeHTTPResponse:
         self.storing_problems = storing_problems
         self.description = description
         self.file_path = file_path
+        self.buf = FakeBuf(description)
         self._position = 0
 
     def read(self, size: int = -1) -> bytes:
@@ -98,3 +99,10 @@ class FakeHTTPResponse:
             result = binary_content[self._position:self._position + size]
             self._position += size
         return result
+
+class FakeBuf:
+    def __init__(self, description):
+        self.description = description
+        self.nbytes = description.get('size', 1)
+
+    def getbuffer(self): return self

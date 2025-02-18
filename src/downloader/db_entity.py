@@ -15,45 +15,49 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, List
+import ipaddress
+from typing import Dict, Any, Final, List, Optional
 from urllib.parse import urlparse
 
 from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FILE_MiSTer_alt_ini, \
     FILE_downloader_launcher_script, FILE_MiSTer_alt_3_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, \
     FILE_MiSTer_new, FOLDER_linux, FOLDER_saves, FOLDER_savestates, FOLDER_screenshots, FILE_PDFViewer, FILE_lesskey, \
     FILE_glow, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, DISTRIBUTION_MISTER_DB_ID, FILE_gamecontrollerdb_user, FILE_yc_txt
-from downloader.db_options import DbOptions, DbOptionsValidationException
-from downloader.other import test_only, cache
+from downloader.db_options import DbOptions
+from downloader.other import test_only
+from downloader.path_package import PathPackage
 
 
 class DbEntity:
     def __init__(self, db_raw, section):
-        try:
-            self._initialize(db_raw, section)
-        except _InternalDbValidationException as e:
-            raise DbEntityValidationException(message_from_internal_exception(e, section))
-        except DbOptionsValidationException as e:
-            raise DbEntityValidationException(f'ERROR: db "{section}" has invalid default options [{e.fields_to_string()}], contact the db maintainer if this error persists.')
-
-    def _initialize(self, db_raw, section) -> None:
-        if db_raw is None:
-            raise _EmptyDbException()
-
         if not isinstance(db_raw, dict):
-            raise _IncorrectFormatDbException()
+            raise DbEntityValidationException(f'ERROR: Database "{section}" has improper format. The database maintainer should fix this.')
 
-        self.db_id: str = _mandatory(db_raw, 'db_id', lambda db_id, _: _create_db_id(db_id, section))
-        self.timestamp: int = _mandatory(db_raw, 'timestamp', _guard(lambda v: isinstance(v, int)))
-        self.files: Dict[str, Any] = _mandatory(db_raw, 'files', _guard(_make_files_validator(section)))
-        self.folders: Dict[str, Any] = _mandatory(db_raw, 'folders', _guard(_make_folders_validator(section)))
+        if 'db_id' not in db_raw: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "db_id" field. The database maintainer should fix this.')
+        if 'files' not in db_raw: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "files" field. The database maintainer should fix this.')
+        if 'folders' not in db_raw: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "folders" field. The database maintainer should fix this.')
+        if 'timestamp' not in db_raw: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "timestamp" field. The database maintainer should fix this.')
 
-        self.zips: Dict[str, Any] = _optional(db_raw, 'zips', _guard(_zips_validator), {})
-        self.db_files: List[str] = _optional(db_raw, 'db_files', _guard(lambda v: isinstance(v, list)), [])
-        self.default_options: DbOptions = _optional(db_raw, 'default_options', lambda v, _: DbOptions(v), DbOptions({}))
-        self.base_files_url: str = _optional(db_raw, 'base_files_url', _guard(lambda v: isinstance(v, str)), '')
-        self.tag_dictionary: Dict[str, int] = _optional(db_raw, 'tag_dictionary', _guard(lambda v: isinstance(v, dict)), {})
-        self.linux: Dict[str, Any] = _optional(db_raw, 'linux', _guard(lambda v: isinstance(v, dict)), None)
-        self.header: List[str] = _optional(db_raw, 'header', _guard(lambda v: isinstance(v, list)), [])
+        self.db_id: str = db_raw['db_id'].lower()
+        if self.db_id != section.lower(): raise DbEntityValidationException(f'ERROR: Section "{section}" does not match database id "{self.db_id}". Fix your INI file.')
+        self.timestamp: int = db_raw['timestamp']
+        if not isinstance(self.timestamp, int): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "timestamp" field. The database maintainer should fix this.')
+        self.files: Dict[str, Any] = db_raw['files']
+        if not isinstance(self.files, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "files" field. The database maintainer should fix this.')
+        self.folders: Dict[str, Any] = db_raw['folders']
+        if not isinstance(self.folders, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "folders" field. The database maintainer should fix this.')
+
+        self.zips: Dict[str, Any] = db_raw.get('zips', {})
+        if not isinstance(self.zips, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "zips" field. The database maintainer should fix this.')
+        self.base_files_url: str = db_raw.get('base_files_url', '')
+        if not isinstance(self.base_files_url, str): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "base_files_url" field. The database maintainer should fix this.')
+        self.tag_dictionary: Dict[str, int] = db_raw.get('tag_dictionary', {})
+        if not isinstance(self.tag_dictionary, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "tag_dictionary" field. The database maintainer should fix this.')
+        self.linux: Dict[str, Any] = db_raw.get('linux', None)
+        if self.linux is not None and not isinstance(self.linux, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "linux" field. The database maintainer should fix this.')
+        self.header: List[str] = db_raw.get('header', [])
+        if not isinstance(self.header, list): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "header" field. The database maintainer should fix this.')
+        self.default_options: DbOptions = DbOptions(db_raw.get('default_options', None) or {})
 
     @property
     @test_only
@@ -66,197 +70,90 @@ class DbEntity:
             result.pop('header')
         return result
 
+def check_zip(desc: dict[str, Any], db_id: str, zip_id: str) -> None:
+    if 'kind' not in desc or desc['kind'] not in ('extract_all_contents', 'extract_single_files'):
+        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "kind" field. The database maintainer should fix this.')
+    if 'description' not in desc or not isinstance(desc['description'], str):
+        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "description" field. The database maintainer should fix this.')
+    if 'contents_file' not in desc or not isinstance(desc['contents_file'], dict):
+        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "contents_file" field. The database maintainer should fix this.')
+    if ('internal_summary' not in desc or not isinstance(desc['internal_summary'], dict)) and ('summary_file' not in desc or not isinstance(desc['summary_file'], dict)):
+        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid summary field. The database maintainer should fix this.')
 
-def _mandatory(raw, key, factory):
-    class _MissingKeyError:
-        pass
+    if 'hash' not in desc['contents_file'] or not isinstance(desc['contents_file']['hash'], str):
+        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Contents file needs a valid hash. The database maintainer should fix this.')
+    if 'size' not in desc['contents_file'] or not isinstance(desc['contents_file']['size'], int):
+        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Contents file needs a valid size. The database maintainer should fix this.')
+    if 'url' not in desc['contents_file'] or not is_url_valid(desc['contents_file']['url']):
+        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Contents file needs a valid url. The database maintainer should fix this.')
 
-    result = _optional(raw, key, factory, _MissingKeyError())
-    if isinstance(result, _MissingKeyError):
-        raise _MissingKeyException(key)
+    if 'internal_summary' in desc:
+        check_zip_summary(desc['internal_summary'], db_id, zip_id)
+    else:
+        if 'hash' not in desc['summary_file'] or not isinstance(desc['summary_file']['hash'], str):
+            raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Summary file needs a valid hash. The database maintainer should fix this.')
+        if 'size' not in desc['summary_file'] or not isinstance(desc['summary_file']['size'], int):
+            raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Summary file needs a valid size. The database maintainer should fix this.')
+        if 'url' not in desc['summary_file'] or not is_url_valid(desc['summary_file']['url']):
+            raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Summary file needs a valid url. The database maintainer should fix this.')
 
-    return result
+def check_zip_summary(summary: dict[str, Any], db_id: str, zip_id: str) -> None:
+    if 'files' not in summary or not isinstance(summary['files'], dict):
+        raise DbEntityValidationException(f'ERROR: Invalid zip summary "{zip_id}" for database: {db_id}. Summary needs valid files dictionary. The database maintainer should fix this.')
+    if 'folders' not in summary or not isinstance(summary['folders'], dict):
+        raise DbEntityValidationException(f'ERROR: Invalid zip summary "{zip_id}" for database: {db_id}. Summary needs valid folders dictionary. The database maintainer should fix this.')
 
+def check_no_url_files(files: list[PathPackage], db_id: str) -> None:
+    if len(files) == 0: return
 
-def _optional(raw, key, factory, default):
-    if key not in raw:
-        return default
+    for file_pkg in files:
+        file_path, file_description = file_pkg.rel_path, file_pkg.description
+        parts = _validate_and_extract_parts_from_path(db_id, file_path)
+        if parts[0] in folders_with_non_overridable_files and file_description.get('overwrite', True):
+            raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. Can not override in that folder. The database maintainer should fix this.')
 
-    return factory(raw[key], key)
+        if 'hash' not in file_description or not isinstance(file_description['hash'], str): raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. File needs a valid hash. The database maintainer should fix this.')
+        if 'size' not in file_description or not isinstance(file_description['size'], int): raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. File needs a valid size. The database maintainer should fix this.')
 
+def check_file(file_pkg: PathPackage, db_id: str, url: Optional[str], /) -> None:
+    file_path, file_description = file_pkg.rel_path, file_pkg.description
+    if not is_url_valid(url or file_description.get('url', None)):
+        raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. Invalid url "{url}". The database maintainer should fix this.')
 
-def _create_db_id(db_id, section):
-    valid_id = _guard(lambda v: isinstance(v, str))(db_id, 'db_id').lower()
-
-    if valid_id != section.lower():
-        raise DbEntityValidationException('ERROR: Section "%s" does not match database id "%s". Fix your INI file.' % (section, valid_id))
-
-    return valid_id
-
-
-def _guard(validator):
-    def func(v, k):
-        if validator(v):
-            return v
-        else:
-            raise _InvalidKeyException(k)
-
-    return func
-
-
-def zip_mandatory_fields():
-    return [
-        'kind',
-        'description',
-        'contents_file',
-    ]
-
-
-def _zips_validator(zips):
-    if not isinstance(zips, dict):
-        return False
-
-    for zip_id, zip_desc in zips.items():
-        if not isinstance(zip_id, str) or len(zip_id) == 0:
-            raise _InvalidZipId(str(zip_id))
-        try:
-            _validate_zip_description(zip_id, zip_desc)
-        except _InternalDbValidationException as e:
-            raise _ZipException(zip_id, e)
-
-    return True
-
-
-def _validate_zip_description(zip_id, zip_desc):
-    for field in zip_mandatory_fields():
-        if field not in zip_desc:
-            raise _MissingKeyException(field)
-
-    _validate_zip_contents_file(zip_desc['contents_file'])
-
-    if 'internal_summary' not in zip_desc and 'summary_file' not in zip_desc:
-        raise _MissingSummaryException()
-
-    if 'internal_summary' in zip_desc and 'summary_file' in zip_desc:
-        raise _AmbiguousSummaryException()
-
-    if 'internal_summary' in zip_desc:
-        _validate_zip_internal_summary(zip_id, zip_desc)
-    elif 'summary_file' in zip_desc:
-        _validate_zip_summary_file(zip_desc['summary_file'])
-
-    kind = zip_desc['kind']
-    if kind not in {'extract_all_contents', 'extract_single_files'}:
-        raise _WrongKindException(kind)
-
-    if kind == 'extract_all_contents':
-        _validate_zip_kind_extract_all_contents(zip_desc)
-    elif kind == 'extract_single_files':
-        _validate_zip_kind_extract_single_files(zip_desc)
-
-
-def _validate_zip_internal_summary(zip_id, zip_desc):
-    _mandatory(zip_desc['internal_summary'], 'files', _guard(_make_files_validator(None, zip_id, mandatory_zip_path=zip_desc['kind'] == 'extract_single_files')))
-    _mandatory(zip_desc['internal_summary'], 'folders', _guard(_make_folders_validator(None, zip_id)))
-
-
-def _validate_zip_contents_file(description):
-    _mandatory(description, 'hash', _guard(lambda v: isinstance(v, str)))
-    _mandatory(description, 'size', _guard(lambda v: isinstance(v, int)))
-    _mandatory(description, 'url', _guard(_is_url))
-
-
-def _validate_zip_summary_file(description):
-    _validate_zip_contents_file(description)  # Requires same fields as contents file for now, but is still semantically different
-
-
-def _validate_zip_kind_extract_all_contents(zip_desc):
-    if 'target_folder_path' not in zip_desc:
-        raise _MissingKeyException('target_folder_path')
-
-    # @TODO: add more validation
-
-
-def _validate_zip_kind_extract_single_files(zip_desc):
-    # @TODO: add more validation
-    pass
-
-
-def _make_files_validator(db_id, zip_id=None, mandatory_zip_path=False):
-    def validator(files):
-        if not isinstance(files, dict):
-            return False
-
-        for file_path, file_description in files.items():
-            try:
-                _validate_single_file(db_id, file_path, file_description, zip_id, mandatory_zip_path)
-            except _InternalDbValidationException as e:
-                raise _InvalidFileException(file_path, e)
-
-        return True
-
-    return validator
-
-
-def _validate_single_file(db_id, file_path, file_description, zip_id=None, mandatory_zip_path=False):
     parts = _validate_and_extract_parts_from_path(db_id, file_path)
-    if parts[0] in folders_with_non_overridable_files() and file_description.get('overwrite', True):
-        raise _InvalidSaveFileException(file_path)
+    if parts[0] in folders_with_non_overridable_files and file_description.get('overwrite', True):
+        raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. Can not override in that folder. The database maintainer should fix this.')
 
-    _mandatory(file_description, 'hash', _guard(lambda v: isinstance(v, str)))
-    _mandatory(file_description, 'size', _guard(lambda v: isinstance(v, int)))
-    if zip_id is not None:
-        _mandatory(file_description, 'zip_id', _guard(lambda v: v == zip_id))
-    if mandatory_zip_path:
-        _mandatory(file_description, 'zip_path', _guard(_validate_zip_path))
-    _optional(file_description, 'url', _guard(_is_url), None)
-    _optional(file_description, 'tags', _guard(_is_tags), None)
-    _optional(file_description, 'overwrite', _guard(_is_boolean), None)
-    _optional(file_description, 'reboot', _guard(_is_boolean), None)
+    if 'hash' not in file_description or not isinstance(file_description['hash'], str): raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. File needs a valid hash. The database maintainer should fix this.')
+    if 'size' not in file_description or not isinstance(file_description['size'], int): raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. File needs a valid size. The database maintainer should fix this.')
 
-
-def _is_url(url):
-    if not isinstance(url, str):
-        return False
+def is_url_valid(url: str) -> bool:
     try:
-        result = urlparse(url)
-        return all([result.scheme, result.netloc])
-    except ValueError:
-        return False
-
-
-def _is_boolean(v):
-    return isinstance(v, bool)
-
-
-def _is_tags(tags):
-    if not isinstance(tags, list):
-        return False
-
-    for tag in tags:
-        if not isinstance(tag, str) and not isinstance(tag, int):
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
             return False
-
-    return True
-
-
-def _make_folders_validator(db_id, zip_id=None):
-    def validator(folders):
-        if not isinstance(folders, dict):
+        if any(c in url for c in ("\r", "\n")):
             return False
-
-        fix_folders(folders)
-
-        for folder_path, folder_description in folders.items():
-            try:
-                _validate_single_folder(db_id, folder_path, folder_description, zip_id)
-            except _InternalDbValidationException as e:
-                raise _InvalidFolderException(folder_path, e)
-
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        if hostname.lower() == "localhost":
+            return False
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback:
+                return False
+        except ValueError:
+            pass
         return True
+    except:
+        return False
 
-    return validator
+def check_folders(folders, db_id: str):
+    if len(folders) == 0: return
 
+    for folder_path in folders:
+        _validate_and_extract_parts_from_path(db_id, folder_path)
 
 def fix_folders(folders):
     if len(folders) == 0: return
@@ -270,187 +167,41 @@ def fix_folders(folders):
         folders[folder_path[:-1]] = folder_description
         folders.pop(folder_path)
 
-
-def _validate_single_folder(db_id, folder_path, folder_description, zip_id=None):
-    _validate_and_extract_parts_from_path(db_id, folder_path)
-    _optional(folder_description, 'tags', _guard(_is_tags), None)
-    if zip_id is not None:
-        _mandatory(folder_description, 'zip_id', _guard(lambda v: v == zip_id))
-
-
 def _validate_and_extract_parts_from_path(db_id, path):
     if not isinstance(path, str):
-        raise _InvalidPathFormatException(path)
+        raise DbEntityValidationException(f'ERROR: Invalid file "{path}" for database: {db_id}. Path should be a string. The database maintainer should fix this.')
 
     if path == '' or path[0] == '/' or path[0] == '.' or path[0] == '\\':
-        raise _IllegalPathException(path)
+        raise DbEntityValidationException(f'ERROR: Invalid file "{path}" for database: {db_id}. Path should be valid. The database maintainer should fix this.')
 
     lower_path = path.lower()
     parts = lower_path.split('/')
 
-    if lower_path in exceptional_paths():
+    if lower_path in exceptional_paths:
         return parts
 
-    if db_id == DISTRIBUTION_MISTER_DB_ID and lower_path in distribution_mister_exceptional_paths():
+    if db_id == DISTRIBUTION_MISTER_DB_ID and lower_path in distribution_mister_exceptional_paths:
         return parts
 
-    if lower_path in invalid_paths():
-        raise _IllegalPathException(path)
+    if lower_path in invalid_paths:
+        raise DbEntityValidationException(f'ERROR: Invalid file "{path}" for database: {db_id}. Path should not be illegal. The database maintainer should fix this.')
 
-    if db_id != DISTRIBUTION_MISTER_DB_ID and lower_path in no_distribution_mister_invalid_paths():
-        raise _IllegalPathException(path)
+    if db_id != DISTRIBUTION_MISTER_DB_ID and lower_path in no_distribution_mister_invalid_paths:
+        raise DbEntityValidationException(f'ERROR: Invalid file "{path}" for database: {db_id}. Path should only valid for distribution_mister. The database maintainer should fix this.')
 
-    if '..' in parts or len(parts) == 0 or parts[0] in invalid_root_folders():
-        raise _IllegalPathException(path)
+    if '..' in parts or len(parts) == 0 or parts[0] in invalid_root_folders:
+        raise DbEntityValidationException(f'ERROR: Invalid file "{path}" for database: {db_id}. Path can\'t contain root folders. The database maintainer should fix this.')
 
     return parts
 
-
-def _validate_zip_path(zip_path):
-    if not isinstance(zip_path, str):
-        raise _InvalidPathFormatException(zip_path)
-
-    if zip_path == '' or zip_path[0] == '/' or zip_path[0] == '.' or zip_path[0] == '\\':
-        raise _IllegalPathException(zip_path)
-
-    return True
-
-
-@cache
-def no_distribution_mister_invalid_paths():
-    return tuple(item.lower() for item in [FILE_MiSTer, FILE_menu_rbf])
-
-
-@cache
-def invalid_paths():
-    return tuple(item.lower() for item in
-                 [FILE_MiSTer_ini, FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini,
-                  FILE_MiSTer_alt_3_ini, FILE_downloader_launcher_script, FILE_MiSTer_new])
-
-
-@cache
-def invalid_root_folders():
-    return tuple(item.lower() for item in [FOLDER_linux, FOLDER_screenshots, FOLDER_savestates])
-
-
-@cache
-def folders_with_non_overridable_files():
-    return tuple(item.lower() for item in [FOLDER_saves])
-
-@cache
-def exceptional_paths():
-    return tuple(item.lower() for item in [FOLDER_linux, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, FILE_gamecontrollerdb_user, FILE_yc_txt])
-
-@cache
-def distribution_mister_exceptional_paths():
-    return tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow])
-
+no_distribution_mister_invalid_paths: Final[tuple[str]] = tuple(item.lower() for item in [FILE_MiSTer, FILE_menu_rbf])
+invalid_paths: Final[tuple[str]] = tuple(item.lower() for item in [FILE_MiSTer_ini, FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, FILE_downloader_launcher_script, FILE_MiSTer_new])
+invalid_root_folders: Final[tuple[str]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_screenshots, FOLDER_savestates])
+folders_with_non_overridable_files: Final[tuple[str]] = tuple(item.lower() for item in [FOLDER_saves])
+exceptional_paths: Final[tuple[str]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, FILE_gamecontrollerdb_user, FILE_yc_txt])
+distribution_mister_exceptional_paths: Final[tuple[str]] = tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow])
 
 class DbEntityValidationException(Exception): pass
-class _InternalDbValidationException(Exception): pass
-class _EmptyDbException(_InternalDbValidationException): pass
-class _IncorrectFormatDbException(_InternalDbValidationException): pass
-class _MissingSummaryException(_InternalDbValidationException): pass
-class _AmbiguousSummaryException(_InternalDbValidationException): pass
-class _InvalidSaveFileException(_InternalDbValidationException): pass
-class _InvalidPathFormatException(_InternalDbValidationException): pass
-class _IllegalPathException(_InternalDbValidationException): pass
-
-
-class _MissingKeyException(_InternalDbValidationException):
-    def __init__(self, key):
-        self.key = key
-
-
-class _InvalidKeyException(_InternalDbValidationException):
-    def __init__(self, key):
-        self.key = key
-
-
-class _ZipException(_InternalDbValidationException):
-    def __init__(self, zip_id: str, exception: _InternalDbValidationException):
-        self.zip_id = zip_id
-        self.exception = exception
-
-
-class _InvalidZipId(_InternalDbValidationException):
-    def __init__(self, bad_zip_id: str):
-        self.bad_zip_id = bad_zip_id
-
-
-class _InvalidFileException(_InternalDbValidationException):
-    def __init__(self, file_path, exception):
-        self.file_path = file_path
-        self.exception = exception
-
-
-class _InvalidFolderException(_InternalDbValidationException):
-    def __init__(self, folder_path, exception):
-        self.folder_path = folder_path
-        self.exception = exception
-
-
-class _WrongKindException(_InternalDbValidationException):
-    def __init__(self, kind):
-        self.kind = kind
-
-
-def message_from_internal_exception(e: _InternalDbValidationException, section: str) -> str:
-    if isinstance(e, _ZipException):
-        message = message_from_zip_exception(e.exception, e.zip_id, section)
-    elif isinstance(e, _InvalidZipId):
-        message = f'db "{section}" has invalid zip id "{e.bad_zip_id}" in its zips section'
-    elif isinstance(e, _EmptyDbException):
-        message = f'db "{section}" is empty'
-    elif isinstance(e, _IncorrectFormatDbException):
-        message = f'db "{section}" has an incorrect format'
-    elif isinstance(e, _MissingKeyException):
-        message = f'db "{section}" does not have "{e.key}"'
-    elif isinstance(e, _InvalidKeyException):
-        message = f'db "{section}" has invalid "{e.key}"'
-    elif isinstance(e, _InvalidFileException):
-        message = f'db "{section}" contains invalid file "{e.file_path}" {file_folder_reason_from_exception(e.exception)}'
-    elif isinstance(e, _InvalidFolderException):
-        message = f'db "{section}" contains invalid folder "{e.folder_path}" {file_folder_reason_from_exception(e.exception)}'
-    else:
-        message = f'db "{section}" has an unknown error ({type(e).__name__})'
-
-    return f'ERROR: {message}, contact the db maintainer if this error persists.'
-
-
-def message_from_zip_exception(e: _InternalDbValidationException, zip_id: str, section: str) -> str:
-    if isinstance(e, _MissingKeyException):
-        return f'db "{section}" on zip "{zip_id}" does not have "{e.key}"'
-    if isinstance(e, _MissingSummaryException):
-        return f'db "{section}" on zip "{zip_id}" does not have summary field'
-    if isinstance(e, _AmbiguousSummaryException):
-        return f'db "{section}" on zip "{zip_id}" has an ambiguous summary, because both internal and external summaries are present'
-    if isinstance(e, _WrongKindException):
-        return f'db "{section}" on zip "{zip_id}" has wrong kind "{e.kind}"'
-    elif isinstance(e, _InvalidKeyException):
-        return f'db "{section}" on zip "{zip_id}" has invalid "{e.key}"'
-    elif isinstance(e, _InvalidFileException):
-        return f'db "{section}" on zip "{zip_id}" contains invalid file "{e.file_path}" {file_folder_reason_from_exception(e.exception)}'
-    elif isinstance(e, _InvalidFolderException):
-        return f'db "{section}" on zip "{zip_id}" contains invalid folder "{e.folder_path}" {file_folder_reason_from_exception(e.exception)}'
-    else:
-        return f'db "{section}" on zip "{zip_id}" has an unknown error ({type(e).__name__})'
-
-
-def file_folder_reason_from_exception(e: _InternalDbValidationException) -> str:
-    if isinstance(e, _MissingKeyException):
-        return f'with no key "{e.key}"'
-    elif isinstance(e, _InvalidKeyException):
-        return f'with invalid key "{e.key}"'
-    elif isinstance(e, _InvalidSaveFileException):
-        return f'with forbidden overwrite support'
-    elif isinstance(e, _InvalidPathFormatException):
-        return f'with a path that is not a proper string'
-    elif isinstance(e, _IllegalPathException):
-        return f'with an illegal path'
-    else:
-        return ''
-
 
 def make_db_tag(db_id: str) -> str:
     return f'db:{db_id}'

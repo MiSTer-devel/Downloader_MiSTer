@@ -26,7 +26,7 @@ from downloader.file_filter import FileFilterFactory
 from downloader.file_system import FileSystem
 from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
-from downloader.job_system import Worker, ProgressReporter, JobContext
+from downloader.job_system import Job, Worker, ProgressReporter, JobContext
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
 from downloader.logger import Logger
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
@@ -36,6 +36,9 @@ from downloader.waiter import Waiter
 class DownloaderWorkerFailPolicy(Enum):
     FAIL_FAST = auto()
     FAULT_TOLERANT = auto()
+
+
+class NilJob(Job): type_id = -1
 
 
 @dataclass

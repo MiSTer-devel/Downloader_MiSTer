@@ -37,10 +37,12 @@ class OpenZipSummaryJob(Job):
     ini_description: Dict[str, Any]
     zip_description: Dict[str, Any]
     full_resync: bool
-    download_path: str
     config: Config
-    get_file_job: GetFileJob
-    process_zip_backup: ProcessZipIndexJob
+    transfer_job: Job # & Transferer  @TODO: Python 3.10
+    backup: ProcessZipIndexJob
 
-    def retry_job(self) -> Optional[Job]: return self.get_file_job
-    def backup_job(self) -> Optional[Job]: return self.process_zip_backup
+    def retry_job(self) -> Optional[Job]:
+        return self.transfer_job
+
+    def backup_job(self) -> Optional[Job]:
+        return self.backup
