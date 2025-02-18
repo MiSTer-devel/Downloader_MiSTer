@@ -158,7 +158,7 @@ def _translate_items(ctx: DownloaderWorkerContext, calculator: TargetPathsCalcul
     removed = [pkg for pkg, error in removed_results if (error is None or ctx.swallow_error(error) is None)]
     return present, removed
 
-def process_check_file_packages(ctx: DownloaderWorkerContext, check_file_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_MovedFilePackage], List[_AlreadyInstalledFilePackage]]:
+def process_check_file_packages(ctx: DownloaderWorkerContext, check_file_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
     if len(check_file_pkgs) == 0:
         return [], [], []
 

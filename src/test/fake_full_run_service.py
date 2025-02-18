@@ -20,9 +20,6 @@ from pathlib import Path
 
 from downloader.config import default_config
 from downloader.full_run_service import FullRunService as ProductionFullRunService
-from downloader.interruptions import Interruptions
-from downloader.job_system import JobFailPolicy, JobSystem
-from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import DownloaderWorkerFailPolicy
 from test.fake_os_utils import SpyOsUtils
 from test.fake_waiter import NoWaiter
@@ -48,24 +45,14 @@ class FullRunService(ProductionFullRunService):
             os_utils=None,
             certificates_fix=None,
             external_drives_repository=None,
-            job_system=None,
-            file_download_reporter=None,
-            installation_report=None,
             start_on_db_processing: bool = False,
             fail_policy: DownloaderWorkerFailPolicy = DownloaderWorkerFailPolicy.FAULT_TOLERANT
     ):
 
         config = config or default_config()
-        installation_report = installation_report if installation_report is not None else InstallationReportImpl()
         file_system_factory = FileSystemFactory(config=config) if file_system_factory is None else file_system_factory
         system_file_system = file_system_factory.create_for_system_scope()
         linux_updater = linux_updater or LinuxUpdater(file_system=system_file_system)
-        file_download_reporter = file_download_reporter if file_download_reporter is not None else FileDownloadProgressReporter(
-            NoLogger(), NoWaiter(), Interruptions(file_system_factory), installation_report
-        )
-        job_system = job_system if job_system is not None else JobSystem(
-            file_download_reporter, logger=NoLogger(), max_threads=1, fail_policy=JobFailPolicy.FAIL_FAST if fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST else JobFailPolicy.FAULT_TOLERANT
-        )
         super().__init__(config,
                          NoLogger(),
                          NoLogger(),

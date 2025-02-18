@@ -32,7 +32,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_old
 from downloader.db_options import DbOptions
 from downloader.other import empty_store_without_base_path
-from test.fake_db_entity import DbEntity
+from downloader.db_entity import DbEntity
 import copy
 import tempfile
 

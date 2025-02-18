@@ -26,7 +26,7 @@ from downloader.db_entity import DbEntityValidationException, check_file, check_
     no_distribution_mister_invalid_paths, invalid_root_folders, distribution_mister_exceptional_paths
 from downloader.db_options import DbOptionsValidationException
 from downloader.path_package import PathPackage, PathPackageKind, PathType
-from test.fake_db_entity import DbEntity
+from downloader.db_entity import DbEntity
 from test.objects import db_test, raw_db_empty_descr, db_empty, file_mister_descr, db_with_folders, file_a_descr, \
     db_test_with_file, db_entity, file_save_psx_castlevania, file_save_psx_castlevania_descr, folder_save_psx, file_a
 

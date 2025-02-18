@@ -19,7 +19,7 @@
 import unittest
 
 from downloader.db_entity import DbEntityValidationException, check_zip
-from test.fake_db_entity import DbEntity
+from downloader.db_entity import DbEntity
 from test.objects import raw_db_empty_descr, db_empty
 from test.zip_objects import zipped_nes_palettes_id, zipped_nes_palettes_desc
 
