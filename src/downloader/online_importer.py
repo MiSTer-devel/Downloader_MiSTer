@@ -27,7 +27,8 @@ from downloader.db_entity import DbEntity, make_db_tag
 from downloader.db_utils import DbSectionPackage
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.errors import WrongDatabaseOptions
-from downloader.jobs.jobs_factory import make_get_file_job
+from downloader.jobs.fetch_data_job import FetchDataJob
+from downloader.jobs.jobs_factory import make_get_data_job
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
@@ -65,20 +66,18 @@ class OnlineImporter:
         jobs: List[Job] = []
         for pkg in db_pkgs:
             # @TODO: Use proper tempfile.mkstemp instead
-            temp_path = str(Path(self._worker_ctx.file_system.persistent_temp_dir()) / pkg.db_id.replace('/', '_')) + Path(pkg.section['db_url']).suffix.lower()
-            get_db_job = make_get_file_job(pkg.section['db_url'], target=temp_path, info=f'db {pkg.db_id}', silent=True, logger=self._logger)
-            get_db_job.after_job = OpenDbJob(
-                get_file_job=get_db_job,
-                temp_path=temp_path,
+            fetch_data_job = make_get_data_job(pkg.section['db_url'], {}, self._logger)
+            fetch_data_job.after_job = OpenDbJob(
+                transfer_job=fetch_data_job,
                 section=pkg.db_id,
                 ini_description=pkg.section,
                 store=local_store.store_by_id(pkg.db_id),
                 full_resync=full_resync,
             )
             db_tag = make_db_tag(pkg.db_id)
-            get_db_job.add_tag(db_tag)
-            get_db_job.after_job.add_tag(db_tag)
-            jobs.append(get_db_job)
+            fetch_data_job.add_tag(db_tag)
+            fetch_data_job.after_job.add_tag(db_tag)
+            jobs.append(fetch_data_job)
         return jobs
 
     def set_local_store(self, local_store: LocalStoreWrapper) -> None:
@@ -187,6 +186,9 @@ class OnlineImporter:
             if job.after_job is not None: continue
             box.add_validated_file(job.info)
 
+        for job, _e in report.get_failed_jobs(FetchDataJob):
+            box.add_failed_file(job.source)  # @TODO: This should not count as a file, but as a "source".
+
         for job, e in report.get_failed_jobs(ValidateFileJob):
             box.add_failed_file(job.get_file_job.info)
             if job.info != FILE_MiSTer:
@@ -281,7 +283,7 @@ class OnlineImporter:
 
         for file_path in box.installed_files():
             file = report.processed_file(file_path)
-            if 'reboot' in file.pkg.description and file.pkg.description['reboot']:
+            if 'reboot' in file.pkg.description and file.pkg.description['reboot'] == True:
                 self._needs_reboot = True
 
             add_parent(file.pkg, file.db_id)

@@ -52,12 +52,10 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         self._ctx.file_download_session_logger.print_progress_line(job.action_text)
         logger.bench('OpenZipContentsWorker unzipping...', job.db.db_id, job.zip_id)
         try:
-            self._ctx.file_system.unzip_contents(job.contents_zip_temp_path, target_path, (job.target_folder, job.files_to_unzip, job.filtered_data['files']))
+            self._ctx.file_system.unzip_contents(job.transfer_job.transfer(), target_path, (job.target_folder, job.files_to_unzip, job.filtered_data['files']))
         except UnzipError as e:
             self._ctx.swallow_error(e)
             return [], e
-        finally:
-            self._ctx.file_system.unlink(job.contents_zip_temp_path)
 
         logger.bench('OpenZipContentsWorker unzip done...', job.db.db_id, job.zip_id)
 

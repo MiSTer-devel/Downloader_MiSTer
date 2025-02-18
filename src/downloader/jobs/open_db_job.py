@@ -20,18 +20,16 @@ from dataclasses import field, dataclass
 from typing import Any
 
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.get_file_job import GetFileJob
 from downloader.local_store_wrapper import StoreWrapper
 
 
 @dataclass(eq=False, order=False)
 class OpenDbJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
-    get_file_job: GetFileJob
-    temp_path: str
+    transfer_job: Job # & Transferer @TODO: Python 3.10
     section: str
     ini_description: dict[str, Any]
     store: StoreWrapper
     full_resync: bool
 
-    def retry_job(self): return self.get_file_job
+    def retry_job(self): return self.transfer_job
