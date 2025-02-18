@@ -128,3 +128,6 @@ Thank you so much for supporting this project! If you would like to show up here
 <p align="center">
 <a href="https://www.patreon.com/bePatron?u=37499475"><img src="https://slrowland.com/wp-content/uploads/2018/02/patreonsupport.png"></img></a>
 </p>
+
+### Powered by
+[![PyCharm logo](https://resources.jetbrains.com/storage/products/company/brand/logos/PyCharm.svg)](https://jb.gg/OpenSourceSupport)
