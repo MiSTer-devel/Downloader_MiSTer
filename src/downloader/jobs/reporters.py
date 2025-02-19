@@ -373,8 +373,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
             if count_float > 100:
                 self._deactivate()
 
-            text = first_line + \
-                '################################################################################\n'
+            text = first_line
 
             for line in db.header:
                 if isinstance(line, float):
