@@ -38,9 +38,13 @@ class CopyDataJob(Job, Transferer):
 
         # Next job
         self.after_job: Optional[Job] = None
+        self.backup: Optional[Job] = None
 
         # Results
         self.data: Optional[io.BytesIO] = None
 
     def transfer(self) -> Union[str, tuple[str, io.BytesIO]]:
         return (self.source, self.data)
+
+    def backup_job(self) -> Optional[Job]:
+        return self.backup

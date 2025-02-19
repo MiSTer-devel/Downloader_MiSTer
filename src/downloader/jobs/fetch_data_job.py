@@ -22,12 +22,15 @@ from typing import Any, Optional, Protocol, Union
 from downloader.job_system import Job, JobSystem
 
 
-class Transferer(Protocol):
+class Transferrer(Protocol):
     def transfer(self) -> Union[str, tuple[str, io.BytesIO]]:
         ...
 
-class FetchDataJob(Job, Transferer):
-    __slots__ = ('_tags', 'source', 'valid_hash', 'valid_size', 'after_job', 'backup', 'data')
+    after_job: Optional[Job]
+    backup: Optional[Job]
+
+class FetchDataJob(Job, Transferrer):
+    __slots__ = ('_tags', 'source', 'description', 'after_job', 'backup', 'data')
     type_id: int = JobSystem.get_job_type_id()
     def __init__(self, source: str, description: dict[str, Any],/):
         self.source = source

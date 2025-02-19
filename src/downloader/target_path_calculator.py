@@ -27,6 +27,16 @@ from downloader.constants import K_STORAGE_PRIORITY, STORAGE_PRIORITY_OFF, STORA
 from downloader.path_package import PATH_PACKAGE_KIND_PEXT, PATH_PACKAGE_KIND_STANDARD, PATH_PACKAGE_KIND_SYSTEM, PATH_TYPE_FILE, PATH_TYPE_FOLDER, PEXT_KIND_EXTERNAL, PEXT_KIND_PARENT, PEXT_KIND_STANDARD, PextPathProps, PathPackage, PextKind, PathType
 
 
+def incomplete_path_package(path: str, description: dict[str, Any], path_type: PathType) -> PathPackage:
+    return PathPackage(
+        path,  # rel_path
+        None,  # drive
+        description,
+        path_type,
+        PATH_PACKAGE_KIND_STANDARD,
+        None  # extra
+    )
+
 class TargetPathsCalculatorFactory:
     def __init__(self, file_system: FileSystem, external_drives_repository: ExternalDrivesRepository):
         self._file_system = file_system
@@ -47,54 +57,55 @@ class TargetPathsCalculator:
         self._priority_top_folders: Dict[str, StoragePriorityRegistryEntry] = dict()
 
     def deduce_target_path(self, path: str, description: Dict[str, Any], path_type: PathType) -> Tuple[PathPackage, Optional['StoragePriorityError']]:
-        if path[0] == '/':
-            return PathPackage(
-                path,  # rel_path
-                None,  # drive
-                description,
-                path_type,
-                PATH_PACKAGE_KIND_STANDARD,
-                None  # extra
-            ), None
-        is_system_file = 'path' in description and description['path'] == 'system'
-        can_be_external = path[0] == '|'
-        if can_be_external:
-            rel_path = path[1:]
-            external, error = self._deduce_possible_external_target_path(path=rel_path, path_type=path_type)
-            if error is not None:
-                return self.deduce_target_path(path=rel_path, description=description, path_type=path_type)[0], error
+        pkg = incomplete_path_package(path, description, path_type)
+        _, errors = self.complete_path_pkgs([pkg])
+        return pkg, errors[0] if len(errors) > 0 else None
 
-            drive, extra = external
-            pkg = PathPackage(
-                rel_path,
-                drive,
-                description,
-                path_type,
-                PATH_PACKAGE_KIND_PEXT,
-                extra,
-            )
-            if is_system_file:
-                return pkg, StoragePriorityError(f"System Path '{path}' is incorrect because it starts with '|', please contact the database maintainer.")
+    def complete_path_pkgs(self, packages: list[PathPackage], /) -> Tuple[list[PathPackage], list['StoragePriorityError']]:
+        results: list[PathPackage] = []
+        errors: list[StoragePriorityError] = []
+
+        base_path = self._config['base_path']
+        for pkg in packages:
+            path = pkg.rel_path
+            if path[0] == '/':
+                pkg._full_path = path
+                pkg.drive = None
+                pkg.kind = PATH_PACKAGE_KIND_STANDARD
+                pkg.pext_props = None
+                continue
+
+            pkg._full_path = None
+            description = pkg.description
+            is_system_file = 'path' in description and description['path'] == 'system'
+            can_be_external = path[0] == '|'
+            if can_be_external:
+                pkg.rel_path =  path[1:]
+                external, error = self._deduce_possible_external_target_path(path=pkg.rel_path, path_type=pkg.ty)
+                if error is not None:
+                    errors.append(error)
+                    continue
+
+                pkg.drive, pkg.pext_props = external
+                pkg.kind = PATH_PACKAGE_KIND_PEXT
+
+                if is_system_file:
+                    results.append(pkg)
+                    errors.append(StoragePriorityError(f"System Path '{path}' is incorrect because it starts with '|', please contact the database maintainer."))
+                    continue
+
+            elif is_system_file:
+                pkg.drive = self._config['base_system_path']
+                pkg.kind = PATH_PACKAGE_KIND_SYSTEM
+                pkg.pext_props = None
             else:
-                return pkg, None
-        elif is_system_file:
-            return PathPackage(
-                path,  # rel_path
-                self._config['base_system_path'],
-                description,
-                path_type,
-                PATH_PACKAGE_KIND_SYSTEM,
-                None  # extra
-            ), None
-        else:
-            return PathPackage(
-                path,  # rel_path
-                self._config['base_path'],
-                description,
-                path_type,
-                PATH_PACKAGE_KIND_STANDARD,
-                None  # extra
-            ), None
+                pkg.drive = base_path
+                pkg.kind = PATH_PACKAGE_KIND_STANDARD
+                pkg.pext_props = None
+
+            results.append(pkg)
+        return results, errors
+
 
     def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> Tuple[Optional[Tuple[str, PextPathProps]], Optional['StoragePriorityError']]:
         path_obj = Path(path)

@@ -21,12 +21,12 @@ import io
 from typing import Any, Dict, Optional, Union
 
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.fetch_data_job import Transferer
+from downloader.jobs.fetch_data_job import Transferrer
 from downloader.jobs.get_file_job import GetFileJob
 
 
 @dataclass(eq=False, order=False)
-class ValidateFileJob(Job, Transferer):
+class ValidateFileJob(Job, Transferrer):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
     target_file_path: str
     description: Dict[str, Any]

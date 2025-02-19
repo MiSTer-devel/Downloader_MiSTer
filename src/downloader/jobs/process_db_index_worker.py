@@ -16,6 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from itertools import chain
 from typing import Dict, Any, List, Tuple, Optional, Set
 from pathlib import Path
 import threading
@@ -29,19 +30,18 @@ from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.path_package import PATH_EXISTS_DOES_NOT_EXIST, PATH_EXISTS_EXISTS,  PathPackage, PathType, RemovedCopy
+from downloader.path_package import PATH_PACKAGE_KIND_STANDARD, PathPackage, PathType, RemovedCopy
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 from downloader.other import calculate_url
-from downloader.target_path_calculator import TargetPathsCalculator, StoragePriorityError
+from downloader.target_path_calculator import TargetPathsCalculator, StoragePriorityError, incomplete_path_package
 
 _CheckFilePackage = PathPackage
 _FetchFilePackage = PathPackage
 _ValidateFilePackage = PathPackage
-_MovedFilePackage = PathPackage
 _AlreadyInstalledFilePackage = PathPackage
 _RemoveFilePackage = PathPackage
 _CreateFolderPackage = PathPackage
@@ -66,22 +66,24 @@ class ProcessDbIndexWorker(DownloaderWorkerBase):
             logger.bench('ProcessDbIndexWorker create pkgs: ', db.db_id, zip_id)
             check_file_pkgs, job.files_to_remove, create_folder_pkgs, job.directories_to_remove, _ = create_packages_from_index(self._ctx, config, summary, db, store, zip_id is not None)
 
+            logger.bench('ProcessDbIndexWorker checking duplicates: ', db.db_id)
+            job.non_duplicated_files, job.duplicated_files = self._ctx.installation_report.add_processed_files(check_file_pkgs)
+
             logger.bench('ProcessDbIndexWorker Precaching is_file: ', db.db_id, zip_id)
             self._ctx.file_system.precache_is_file_with_folders(create_folder_pkgs)
 
             logger.bench('ProcessDbIndexWorker check pkgs: ', db.db_id, zip_id)
-            fetch_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(self._ctx, check_file_pkgs, db.db_id, store, full_resync)
+            non_existing_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(self._ctx, job.non_duplicated_files, db.db_id, store, full_resync)
 
             logger.bench('ProcessDbIndexWorker validate pkgs: ', db.db_id, zip_id)
-            job.present_validated_files, job.skipped_updated_files, more_fetch_pkgs = process_validate_packages(self._ctx, validate_pkgs)
-            fetch_pkgs.extend(more_fetch_pkgs)
+            job.present_validated_files, job.skipped_updated_files, need_update_pkgs = process_validate_packages(self._ctx, validate_pkgs)
 
             logger.bench('ProcessDbIndexWorker Reserve space: ', db.db_id, zip_id)
-            job.full_partitions = try_reserve_space(self._ctx, fetch_pkgs)
+            job.full_partitions = try_reserve_space(self._ctx, non_existing_pkgs + need_update_pkgs)
             if len(job.full_partitions) > 0:
-                job.failed_files_no_space = fetch_pkgs
+                job.failed_files_no_space = non_existing_pkgs + need_update_pkgs
                 logger.debug("Not enough space '%s'!", db.db_id)
-                return [], FileWriteError(f"Could not allocate space for {len(fetch_pkgs)} files.")
+                return [], FileWriteError(f"Could not allocate space for {len(job.failed_files_no_space)} files.")
 
             logger.bench('ProcessDbIndexWorker Create folders: ', db.db_id, zip_id)
             job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(self._ctx, create_folder_pkgs, db.db_id, db.folders, store)
@@ -89,7 +91,7 @@ class ProcessDbIndexWorker(DownloaderWorkerBase):
                 return [], FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
 
             logger.bench('ProcessDbIndexWorker fetch jobs: ', db.db_id, zip_id)
-            next_jobs = create_fetch_jobs(self._ctx, db.db_id, fetch_pkgs, db.base_files_url)
+            next_jobs = create_fetch_jobs(self._ctx, db.db_id, non_existing_pkgs, need_update_pkgs, db.base_files_url)
             logger.bench('ProcessDbIndexWorker done: ', db.db_id, zip_id)
             return next_jobs, None
         except (BadFileFilterPartException, StoragePriorityError, FsError, OSError) as e:
@@ -149,55 +151,59 @@ def _folders_with_missing_parents(ctx: DownloaderWorkerContext, index: Index, st
         return index.folders
 
 def _translate_items(ctx: DownloaderWorkerContext, calculator: TargetPathsCalculator, items: Dict[str, Dict[str, Any]], path_type: PathType, stored: Dict[str, Dict[str, Any]]) -> Tuple[List[PathPackage], List[PathPackage]]:
-    # This list-comprehension implementation is an optimization, since python 3.9 works much faster this way than with a traditional loop and this is part is super hot for perf
-    present_results = [calculator.deduce_target_path(path, description, path_type) for path, description in items.items()]
-    present = [pkg for pkg, error in present_results if (error is None or ctx.swallow_error(error) is None)]
+    # This weird implementation is an optimization, since python 3.9 works much faster this way than with a traditional loop and this is part is super hot for perf
+
+    def _init_pkg(pkg, path, description):
+        pkg.rel_path = path
+        pkg.description = description
+        pkg.ty = path_type
+        return pkg
+
+    new = object.__new__
+    cls = PathPackage
+
+    present_results = [_init_pkg(new(cls), path, description) for path, description in items.items()]
+    present, present_errors = calculator.complete_path_pkgs(present_results)
     present_set = {pkg.rel_path for pkg in present}
+
     #removed_results = [calculator.deduce_target_path(path, stored[path], path_type) for path in (stored.keys() - present_set)]  # @TODO: The one below passes but if I check the store, there are no paths with | so maybe the test is wrong
-    removed_results = [calculator.deduce_target_path(path, stored[path], path_type) for path in (stored.keys() - present_set) if (path[1:] if len(path) > 0 and path[0] == '|' else path) not in present_set]
-    removed = [pkg for pkg, error in removed_results if (error is None or ctx.swallow_error(error) is None)]
+    removed_results = [_init_pkg(new(cls), path, stored[path]) for path in (stored.keys() - present_set) if (path[1:] if len(path) > 0 and path[0] == '|' else path) not in present_set]
+    removed, removed_errors = calculator.complete_path_pkgs(removed_results)
+
+    for e in removed_errors + present_errors:
+        ctx.swallow_error(e)
+
     return present, removed
 
-def process_check_file_packages(ctx: DownloaderWorkerContext, check_file_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
-    if len(check_file_pkgs) == 0:
+def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
+    if len(non_duplicated_pkgs) == 0:
         return [], [], []
 
     file_system = ReadOnlyFileSystem(ctx.file_system)
 
-    ctx.logger.bench('add_processing start: ', db_id, len(check_file_pkgs))
-    non_duplicated_pkgs, duplicated_files = ctx.installation_report.add_processed_files(check_file_pkgs, db_id)
-    ctx.logger.bench('add_processing done: ', db_id, len(check_file_pkgs))
-    for dup in duplicated_files:
-        ctx.file_download_session_logger.print_progress_line(f'DUPLICATED: {dup.pkg.rel_path} [using {dup.db_id} instead]')
+    ctx.logger.bench('are_files start: ', db_id, len(non_duplicated_pkgs))
+    existing, non_existing_pkgs = file_system.are_files(non_duplicated_pkgs)
+    ctx.logger.bench('are_files done: ', db_id, len(non_duplicated_pkgs))
 
-    ctx.logger.bench('are_files start: ', db_id, len(check_file_pkgs))
-    existing, fetch_pkgs = file_system.are_files(non_duplicated_pkgs)
-    ctx.logger.bench('are_files done: ', db_id, len(check_file_pkgs))
-
-    ctx.logger.bench('write pkg.exists start: ', db_id, len(check_file_pkgs))
-    for pkg in fetch_pkgs: pkg.exists = PATH_EXISTS_DOES_NOT_EXIST
-    for pkg in existing: pkg.exists = PATH_EXISTS_EXISTS
-    ctx.logger.bench('write pkg.exists done: ', db_id, len(check_file_pkgs))
-
-    ctx.logger.bench('existing loop start: ', db_id, len(check_file_pkgs))
+    ctx.logger.bench('existing loop start: ', db_id, len(non_duplicated_pkgs))
     already_installed_pkgs: List[_ValidateFilePackage]
     validate_pkgs: List[_ValidateFilePackage]
     if full_resync:
         validate_pkgs = existing
         already_installed_pkgs = []
     else:
-        ctx.logger.bench('invalid hashes start: ', db_id, len(check_file_pkgs))
+        ctx.logger.bench('invalid hashes start: ', db_id, len(non_duplicated_pkgs))
         invalid_hashes = store.invalid_hashes(existing)
-        ctx.logger.bench('invalid hashes end: ', db_id, len(check_file_pkgs))
+        ctx.logger.bench('invalid hashes end: ', db_id, len(non_duplicated_pkgs))
         if any(invalid_hashes):
             validate_pkgs = [pkg for pkg, inv in zip(existing, invalid_hashes) if inv]
             already_installed_pkgs = [pkg for pkg, inv in zip(existing, invalid_hashes) if not inv]
         else:
             validate_pkgs = []
             already_installed_pkgs = existing
-    ctx.logger.bench('existing loop done: ', db_id, len(check_file_pkgs))
+    ctx.logger.bench('existing loop done: ', db_id, len(non_duplicated_pkgs))
 
-    return fetch_pkgs, validate_pkgs, already_installed_pkgs
+    return non_existing_pkgs, validate_pkgs, already_installed_pkgs
 
 
 def process_validate_packages(ctx: DownloaderWorkerContext, validate_pkgs: List[_ValidateFilePackage]) -> Tuple[List[PathPackage], List[PathPackage], List[_FetchFilePackage]]:
@@ -270,9 +276,10 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
 
         if pkg.pext_props:
             if pkg.pext_props.drive not in parents[pkg.pext_props.parent]:
-                parents[pkg.pext_props.parent][pkg.pext_props.drive] = pkg.pext_props.parent_pkg()
+                p_pkg = pkg.pext_props.parent_pkg()
+                parents[pkg.pext_props.parent][pkg.pext_props.drive] = p_pkg
                 if pkg.pext_props.parent in parent_pkgs:
-                    parents[pkg.pext_props.parent][pkg.pext_props.drive].description = parent_pkgs[pkg.pext_props.parent].description
+                    p_pkg.description.update(parent_pkgs[pkg.pext_props.parent].description)
 
         _maybe_add_copies_to_remove(ctx, folder_copies_to_be_removed, store, pkg.rel_path, pkg.pext_drive())
 
@@ -281,7 +288,10 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
             processing_folders.append(parent_pkg)
             _maybe_add_copies_to_remove(ctx, folder_copies_to_be_removed, store, parent_path, d)
 
+    ctx.logger.bench('add_processed_folders start: ', db_id, len(processing_folders))
     non_existing_folders = ctx.installation_report.add_processed_folders(processing_folders, db_id)
+    ctx.logger.bench('add_processed_folders done: ', db_id, len(processing_folders))
+
     to_create = {folder_pkg.full_path for folder_pkg in non_existing_folders}
 
     errors = []
@@ -304,36 +314,40 @@ def _maybe_add_copies_to_remove(ctx: DownloaderWorkerContext, copies: List[Tuple
     ])
 
 
-def create_fetch_jobs(ctx: DownloaderWorkerContext, db_id: str, fetch_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
-    if len(fetch_pkgs) == 0:
+def create_fetch_jobs(ctx: DownloaderWorkerContext, db_id: str, non_existing_pkgs: List[_FetchFilePackage], need_update_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
+    if len(non_existing_pkgs) == 0 and len(need_update_pkgs) == 0:
         return []
 
-    jobs: List[Job] = []
-    for pkg in fetch_pkgs:
-        source = _url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url)
-        try:
-            check_file(pkg, db_id, source)
-        except Exception as e:
-            ctx.swallow_error(e)
-            continue
+    return [
+    job for job in chain(
+        (_fetch_job(ctx, pkg, False, db_id, base_files_url) for pkg in non_existing_pkgs),
+        (_fetch_job(ctx, pkg,  True, db_id, base_files_url) for pkg in need_update_pkgs)
+    ) if job is not None
+]
 
-        temp_path = pkg.temp_path()
-        fetch_job = FetchFileJob(
-            source=source,
-            info=pkg.rel_path,
-            temp_path=temp_path,
-            silent=False
-        )
-        fetch_job.after_job = ValidateFileJob(
-            temp_path=temp_path,
-            target_file_path=pkg.full_path,
-            description=pkg.description,
-            info=pkg.rel_path,
-            backup_path=pkg.backup_path(),
-            get_file_job=fetch_job
-        )
-        fetch_job.add_tag(db_id)
-        fetch_job.after_job.add_tag(db_id)
-        jobs.append(fetch_job)
+def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_id: str, base_files_url: str, /) -> Optional[FetchFileJob]:
+    source = _url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url)
+    try:
+        check_file(pkg, db_id, source)
+    except Exception as e:
+        ctx.swallow_error(e)
+        return None
 
-    return jobs
+    temp_path = pkg.temp_path(exists)
+    fetch_job = FetchFileJob(
+        source=source,
+        info=pkg.rel_path,
+        temp_path=temp_path,
+        silent=False
+    )
+    fetch_job.after_job = ValidateFileJob(
+        temp_path=temp_path,
+        target_file_path=pkg.full_path,
+        description=pkg.description,
+        info=pkg.rel_path,
+        backup_path=pkg.backup_path(),
+        get_file_job=fetch_job
+    )
+    fetch_job.add_tag(db_id)
+    fetch_job.after_job.add_tag(db_id)
+    return fetch_job
