@@ -546,58 +546,40 @@ class ReadOnlyStoreAdapter:
                     files.update(external['files'])
         return {f: d for f, d in files.items() if f not in db_files}
 
-    def zip_summary(self, zip_id) -> Optional[Dict[str, Any]]:
-        files = {}
-        folders = {}
-        for file_path, file_description in self._aggregated_summary['files'].items():
-            if 'zip_id' in file_description and file_description['zip_id'] == zip_id:
-                # @TODO: This if should not be necessary if we store all the zip information on the store
-                #        Explicit asking for games and cheats is a hack, as this should only be declared in
-                #        the database information. Remove ASAP
-                if file_path.startswith('games') or file_path.startswith('cheats'):
-                    files['|' + file_path] = file_description
-                else:
-                    files[file_path] = file_description
+    def zip_summaries(self) -> dict[str, Any]:
+        grouped = defaultdict(lambda: {'files': {}, 'folders': {}})
 
-        for folder_path, folder_description in self._aggregated_summary['folders'].items():
-            if 'zip_id' in folder_description and folder_description['zip_id'] == zip_id:
-                # @TODO: This if should not be necessary if we store all the zip information on the store
-                #        Explicit asking for games and cheats is a hack, as this should only be declared in
-                #        the database information. Remove ASAP
-                if folder_path.startswith('games') or folder_path.startswith('cheats'):
-                    folders['|' + folder_path] = folder_description
-                else:
-                    folders[folder_path] = folder_description
+        # @TODO: This if startswith('games') should be removed when we store all the zip information on the store
+        #        Explicit asking for games is a hack, as this should only be declared in the database information. Remove ASAP
 
-        for zip_id, zip_description in self._store.get('filtered_zip_data', {}).items():
-            if zip_id != zip_id:
-                continue
+        for fp, fd in self._store.get('files', {}).items():
+            if 'zip_id' not in fd: continue
+            grouped[fd['zip_id']]['files'][f'|{fp}' if fp.startswith('games') else fp] = fd
 
-            for file_path, file_description in zip_description['files'].items():
-                if 'zip_id' in file_description and file_description['zip_id'] == zip_id:
-                    # @TODO: This if should not be necessary if we store all the zip information on the store
-                    #        Explicit asking for games and cheats is a hack, as this should only be declared in
-                    #        the database information. Remove ASAP
-                    if file_path.startswith('games') or file_path.startswith('cheats'):
-                        files['|' + file_path] = file_description
-                    else:
-                        files[file_path] = file_description
+        for dp, dd in self._store.get('folders', {}).items():
+            if 'zip_id' not in dd: continue
+            grouped[dd['zip_id']]['folders'][f'|{dp}' if dp.startswith('games') else dp] = dd
 
-            for folder_path, folder_description in zip_description['folders'].items():
-                if 'zip_id' in folder_description and folder_description['zip_id'] == zip_id:
-                    # @TODO: This if should not be necessary if we store all the zip information on the store
-                    #        Explicit asking for games and cheats is a hack, as this should only be declared in
-                    #        the database information. Remove ASAP
-                    if folder_path.startswith('games') or folder_path.startswith('cheats'):
-                        folders['|' + folder_path] = folder_description
-                    else:
-                        folders[folder_path] = folder_description
+        for summary in self._store.get('external', {}).values():
+            for fp, fd in summary.get('files', {}).items():
+                if 'zip_id' not in fd: continue
+                grouped[fd['zip_id']]['files'][f'|{fp}' if fp.startswith('games') else fp] = fd
 
-        if len(files) == 0 and len(folders) == 0:
-            return None
+        for summary in self._store.get('external', {}).values():
+            for dp, dd in summary.get('folders', {}).items():
+                if 'zip_id' not in dd: continue
+                grouped[dd['zip_id']]['folders'][f'|{dp}' if dp.startswith('games') else dp] = dd
 
-        summary_hash = self._store.get('zips', {}).get(zip_id, {}).get('summary_file', {}).get('hash', NO_HASH_IN_STORE_CODE)
-        return {'files': files, 'folders': folders, 'hash': summary_hash}
+        for zip_id, summary in self._store.get('filtered_zip_data', {}).items():
+            for fp, fd in summary.get('files', {}).items():
+                grouped[zip_id]['files'][f'|{fp}' if fp.startswith('games') else fp] = fd
+            for dp, dd in summary.get('folders', {}).items():
+                grouped[zip_id]['folders'][f'|{dp}' if dp.startswith('games') else dp] = dd
+
+        for zip_id, data in grouped.items():
+            data['hash'] = self._store.get('zips', {}).get(zip_id, {}).get('summary_file', {}).get('hash', NO_HASH_IN_STORE_CODE)
+
+        return grouped
 
     @property
     def filtered_zip_data(self):
