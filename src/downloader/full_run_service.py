@@ -120,10 +120,7 @@ class FullRunService:
 
         failed_dbs = self._online_importer.dbs_that_failed()
 
-        self._display_summary(self._online_importer.box(),
-                              self._online_importer.unused_filter_tags(),
-                              self._online_importer.new_files_not_overwritten(),
-                              self._config['start_time'])
+        self._display_summary(self._online_importer.box(), self._config['start_time'])
 
         if self._config['update_linux']:
             self._linux_updater.update_linux(self._online_importer.correctly_downloaded_dbs())
@@ -156,7 +153,7 @@ class FullRunService:
 
         return False
 
-    def _display_summary(self, box: InstallationBox, unused_filter_tags, new_files_not_installed, start_time):
+    def _display_summary(self, box: InstallationBox, start_time):
         run_time = str(datetime.timedelta(seconds=time.time() - start_time))[0:-4]
 
         self._logger.print()
@@ -164,13 +161,13 @@ class FullRunService:
         self._logger.print(f'Downloader 2.0 ({self._config["commit"][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
         self._logger.debug('Commit: %s', self._config["commit"])
         self._logger.print(f'Log: {self._local_repository.logfile_path}')
-        if len(unused_filter_tags) > 0:
+        if len(box.unused_filter_tags()) > 0:
             self._logger.print()
             self._logger.print("Unused filter terms:")
-            if len(unused_filter_tags) != 1:
-                self._logger.print(format_files_message(unused_filter_tags) + " (Did you misspell them?)")
+            if len(box.unused_filter_tags()) != 1:
+                self._logger.print(format_files_message(box.unused_filter_tags()) + " (Did you misspell them?)")
             else:
-                self._logger.print(format_files_message(unused_filter_tags) + " (Did you misspell it?)")
+                self._logger.print(format_files_message(box.unused_filter_tags()) + " (Did you misspell it?)")
 
         if len(box.updated_dbs()) > 0 and len(box.installed_dbs()) > 1:
             db_with_updates_msg = []
@@ -198,7 +195,8 @@ class FullRunService:
             self._logger.print(format_folders_message(box.failed_folders()))
         if len(box.failed_zips()) > 0:
             self._logger.print(format_zips_message([f'{db_id}:{zip_id}' for db_id, zip_id in box.failed_zips()]))
-        if len(new_files_not_installed) > 0:
+        if len(box.skipped_updated_files()) > 0:
+            new_files_not_installed = box.skipped_updated_files()
             self._logger.print()
             self._logger.print('Following new versions were not installed:')
             for db_id in new_files_not_installed:
