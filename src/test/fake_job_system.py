@@ -16,9 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import fields, is_dataclass
-from typing import Any, Dict, List
-import copy
+from typing import List
 
 from downloader.job_system import ProgressReporter, Job
 
