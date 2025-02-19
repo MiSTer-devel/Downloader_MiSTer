@@ -60,9 +60,15 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
             zip_jobs = []
             zip_job_tags = []
 
+            logger.bench('zip_summaries start: ', job.db.db_id)
+            zip_summaries = read_only_store.zip_summaries()
+            logger.bench('zip_summaries end: ', job.db.db_id)
+
             for zip_id, zip_description in job.db.zips.items():
                 #if zip_id != 'cheats_folder_psx': continue
-                zip_job, err = _make_zip_job(ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job), self._ctx.logger)
+                logger.bench('make zip job start: ', job.db.db_id, zip_id)
+                zip_job, err = _make_zip_job(zip_summaries.get(zip_id, None), ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
+                logger.bench('make zip job end: ', job.db.db_id, zip_id)
                 if err is not None:
                     self._ctx.swallow_error(err)
                     job.ignored_zips.append(zip_id)
@@ -98,16 +104,12 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
         return next_jobs, None
 
 
-def _make_zip_job(z: ZipJobContext, logger: Logger) -> Tuple[Job, Optional[Exception]]:
-    logger.bench('make zip job start: ', z.job.db.db_id, z.zip_id)
+def _make_zip_job(index: Optional, z: ZipJobContext) -> Tuple[Job, Optional[Exception]]:
     try:
         check_zip(z.zip_description, z.job.db.db_id, z.zip_id)
     except Exception as e:
         return NilJob(), e
     if 'summary_file' in z.zip_description:
-        logger.bench('zip_summary start: ', z.job.db.db_id, z.zip_id)
-        index = z.job.store.read_only().zip_summary(z.zip_id)
-        logger.bench('zip_summary end: ', z.job.db.db_id, z.zip_id)
         process_zip_job = None if index is None else _make_process_zip_job_from_ctx(z, zip_summary=index, has_new_zip_summary=False)
 
         # if there is a recent enough index in the store, use it
@@ -119,7 +121,6 @@ def _make_zip_job(z: ZipJobContext, logger: Logger) -> Tuple[Job, Optional[Excep
     else:
         job = _make_process_zip_job_from_ctx(z, zip_summary=z.zip_description['internal_summary'], has_new_zip_summary=True)
 
-    logger.bench('make zip job end: ', z.job.db.db_id, z.zip_id)
     return job, None
 
 
