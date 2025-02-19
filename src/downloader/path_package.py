@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 
+from dataclasses import dataclass
 from enum import auto, unique, Enum
 from typing import Dict, Any, Final, Optional, Tuple
 import os
@@ -57,31 +58,20 @@ PEXT_KIND_STANDARD: Final = PextKind.PEXT_STANDARD
 PEXT_KIND_PARENT: Final = PextKind.PEXT_PARENT
 
 
-@unique
-class PathExists(Enum):
-    UNCHECKED = auto()
-    EXISTS = auto()
-    DOES_NOT_EXIST = auto()
-
-PATH_EXISTS_UNCHECKED: Final = PathExists.UNCHECKED
-PATH_EXISTS_EXISTS: Final = PathExists.EXISTS
-PATH_EXISTS_DOES_NOT_EXIST: Final = PathExists.DOES_NOT_EXIST
-
-
 class PathPackage:
     __slots__ = (
         'rel_path', 'drive', 'description',
-        'ty', 'kind', 'pext_props', 'full_path', 'exists'
+        'ty', 'kind', 'pext_props', '_full_path'
     )
 
     def __init__(
         self,
         rel_path: str,
         drive: Optional[str],
-        description:Dict[str, Any],
+        description: dict[str, Any],
         ty: PathType,
         kind: PathPackageKind,
-        pext_props: Optional['PextPathProps'], /
+        pext_props: Optional['PextPathProps']
     ):
         self.rel_path = rel_path
         self.drive = drive
@@ -89,8 +79,13 @@ class PathPackage:
         self.ty = ty
         self.kind = kind
         self.pext_props = pext_props
-        self.full_path = rel_path if drive is None else os.path.join(drive, rel_path) if is_windows else drive + '/' + rel_path
-        self.exists = PATH_EXISTS_UNCHECKED
+        self._full_path = None
+
+    @property
+    def full_path(self) -> str:
+        if self._full_path is None:
+            self._full_path = self.rel_path if self.drive is None else os.path.join(self.drive, self.rel_path) if is_windows else self.drive + '/' + self.rel_path
+        return self._full_path
 
     def is_pext_external(self) -> bool:
         return self.pext_props is not None and self.pext_props.kind == PEXT_KIND_EXTERNAL
@@ -116,11 +111,11 @@ class PathPackage:
         else:
             return None
 
-    def temp_path(self) -> str:
+    def temp_path(self, exists: bool) -> str:
         if 'tmp' in self.description:
             return (os.path.join(self.drive, self.description['tmp']) if is_windows else self.drive + '/' + self.description['tmp']) if self.drive is not None else self.description['tmp']
         else:
-            return self.full_path if self.exists == PATH_EXISTS_DOES_NOT_EXIST else self.full_path + SUFFIX_file_in_progress
+            return self.full_path if not exists else self.full_path + SUFFIX_file_in_progress
 
     def backup_path(self) -> Optional[str]:
         if 'backup' in self.description:

@@ -46,8 +46,12 @@ class ProcessDbIndexJob(Job):
     present_not_validated_files: List[PathPackage] = field(default_factory=list)
     present_validated_files: List[PathPackage] = field(default_factory=list)
     skipped_updated_files: List[PathPackage] = field(default_factory=list)
-    removed_folders: List[RemovedCopy] = field(default_factory=list)
+    non_duplicated_files: List[PathPackage] = field(default_factory=list)
+    duplicated_files: List[str] = field(default_factory=list)
+
     installed_folders: List[PathPackage] = field(default_factory=list)
+    removed_folders: List[RemovedCopy] = field(default_factory=list)  #  @TODO: Why there is removed_folders AND directories_to_remove?
+
     directories_to_remove: List[PathPackage] = field(default_factory=list)
     files_to_remove: List[PathPackage] = field(default_factory=list)
 

@@ -47,22 +47,27 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         logger.bench('ProcessZipIndexWorker create pkgs: ', db.db_id, zip_id)
         check_file_pkgs, job.files_to_remove, create_folder_pkgs, job.directories_to_remove, zip_data = create_packages_from_index(self._ctx, config, summary, db, store, zip_id is not None)
 
+        logger.bench('ProcessZipIndexWorker checking duplicates: ', db.db_id, zip_id)
+        job.non_duplicated_files, job.duplicated_files = self._ctx.installation_report.add_processed_files(check_file_pkgs)
+
         logger.bench('ProcessZipIndexWorker Precaching is_file: ', db.db_id, zip_id)
         self._ctx.file_system.precache_is_file_with_folders(create_folder_pkgs)
 
-        logger.bench('ProcessZipIndexWorker check pkgs: ', db.db_id, zip_id, len(check_file_pkgs))
-        unzip_file_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(self._ctx, check_file_pkgs, db.db_id, store, full_resync)
+        logger.bench('ProcessZipIndexWorker check pkgs: ', db.db_id, zip_id)
+        non_existing_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(self._ctx, job.non_duplicated_files, db.db_id, store, full_resync)
 
         logger.bench('ProcessZipIndexWorker validate pkgs: ', db.db_id, zip_id)
-        job.present_validated_files, job.skipped_updated_files, more_unzip_file_pkgs = process_validate_packages(self._ctx, validate_pkgs)
-        unzip_file_pkgs.extend(more_unzip_file_pkgs)
+        job.present_validated_files, job.skipped_updated_files, update_file_pkgs = process_validate_packages(self._ctx, validate_pkgs)
+
+        logger.bench('ProcessZipIndexWorker calculating unzip file pkgs: ', db.db_id, zip_id)
+        unzip_file_pkgs = non_existing_pkgs + update_file_pkgs
 
         logger.bench('ProcessZipIndexWorker Reserve space: ', db.db_id, zip_id)
         job.full_partitions = try_reserve_space(self._ctx, unzip_file_pkgs)
         if len(job.full_partitions) > 0:
             job.failed_files_no_space = unzip_file_pkgs
             logger.debug("Not enough space '%s'!", db.db_id)
-            return [], FileWriteError(f"Could not allocate space for {len(unzip_file_pkgs)} files.")
+            return [], FileWriteError(f"Could not allocate space for {len(job.failed_files_no_space)} files.")
 
         logger.bench('ProcessZipIndexWorker Create folders: ', db.db_id, zip_id)
         job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(self._ctx, create_folder_pkgs, db.db_id, summary.folders, store)
@@ -80,7 +85,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         less_accumulated_mbs = total_files_size < (1000 * 1000 * config['zip_accumulated_mb_threshold'])
 
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
-            next_jobs = create_fetch_jobs(self._ctx, db.db_id, unzip_file_pkgs, zip_description.get('base_files_url', db.base_files_url))
+            next_jobs = create_fetch_jobs(self._ctx, db.db_id, non_existing_pkgs, update_file_pkgs, zip_description.get('base_files_url', db.base_files_url))
 
         else:
             next_jobs, error = self._make_open_zip_contents_job(job, unzip_file_pkgs, store)

@@ -83,10 +83,7 @@ class InstallationReport(Protocol):
     def get_failed_jobs(self, type_class: Type[TJob]) ->  List[Tuple[TJob, BaseException]]: """Return all failed jobs for a job class."""
     def get_retried_jobs    (self, job_class: Type[TJob]) -> List[Tuple[TJob, BaseException]]: """Return all retried jobs for a job class."""
     def get_cancelled_jobs  (self, job_class: Type[TJob]) -> List[TJob]: """Return all cancelled jobs for a job class."""
-    def is_file_processed(self, path: str) -> bool: """Returns True if the file has been processed."""
-    def processed_file(self, path: str) -> ProcessedFile: """File that a database is currently processing."""
     def processed_folder(self, path: str) -> Dict[str, PathPackage]: """File that a database is currently processing."""
-    def all_processed_files(self) -> List[str]: """Returns all processed files."""
     def all_processed_folders(self) -> List[str]: """Returns all processed folders."""
     def get_jobs_completed_by_tag(self, tag: str) -> List[Job]: """Returns all jobs completed by a tag."""
     def get_jobs_failed_by_tag(self, tag: str) -> List[Job]: """Returns all jobs failed by a tag."""
@@ -180,7 +177,6 @@ class InstallationReportImpl(InstallationReport):
         self._jobs_retried: Dict[int, List[Tuple[Job, BaseException]]] = defaultdict(list)
 
         # Following might be modified by multiple threads, but read only in the main thread
-        self._processed_files = _WithLock[Dict[str, ProcessedFile]]({})
         self._processed_files_set = _WithLock[Set[str]](set())
         self._processed_folders = _WithLock[Dict[str, Dict[str, PathPackage]]]({})
         self._processed_folders_set = _WithLock[Set[str]](set())
@@ -233,49 +229,18 @@ class InstallationReportImpl(InstallationReport):
         with self._jobs_tag_failed as tag_failed:
             return tag_failed[tag]
 
-    def add_processed_files(self, files: List[PathPackage], db_id: str) -> Tuple[List[PathPackage], List[ProcessedFile]]:
+    def add_processed_files(self, files: List[PathPackage]) -> Tuple[List[PathPackage], List[str]]:
         if len(files) == 0: return [], []
 
         files_set = {pkg.rel_path for pkg in files}
         with self._processed_files_set as processed_files_set:
-            duplicates_set = files_set.intersection(processed_files_set)
+            duplicates = files_set.intersection(processed_files_set)
             processed_files_set.update(files_set)
 
-        non_duplicates_set = files_set - duplicates_set
+        non_duplicates_set = files_set - duplicates
         non_duplicates = [pkg for pkg in files if pkg.rel_path in non_duplicates_set]
-        # @TODO: Most of the time is spent creating ProcessedFile class, we need that data later for online_importer, let's see if we can provide this data in another way.
-        #        There should be a better way for linking file_paths to db_id and file_paths to pkgs.
-        to_add = {pkg.rel_path: ProcessedFile(pkg, db_id) for pkg in non_duplicates}
 
-        if len(duplicates_set):
-            with self._processed_files as processed_files:
-                duplicates = [processed_files[d] for d in duplicates_set]
-        else:
-            duplicates = []
-
-        if len(to_add):
-            with self._processed_files as processed_files:
-                processed_files.update(to_add)
-
-        return non_duplicates, duplicates
-    
-    def unmark_processed_files(self, files: List[PathPackage], db_id: str) -> None:
-        if len(files) == 0: return
-        with self._processed_files as processed_files:
-            for file in files:
-                if file.rel_path not in processed_files:
-                    continue
-                if processed_files[file.rel_path].db_id != db_id:
-                    continue
-                processed_files.pop(file.rel_path)
-
-    def any_file_processed(self, files: List[PathPackage]) -> Optional[ProcessedFile]:
-        if len(files) == 0: return None
-        with self._processed_files as processed_files:
-            for pkg in files:
-                if pkg.rel_path in processed_files:
-                    return processed_files[pkg.rel_path]
-        return None
+        return non_duplicates, list(duplicates)
 
     def add_processed_folders(self, folders: List[PathPackage], db_id: str) -> List[PathPackage]:
         if len(folders) == 0: return []
@@ -300,10 +265,7 @@ class InstallationReportImpl(InstallationReport):
     def get_cancelled_jobs  (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_cancelled [job_class.type_id]
 
     # All the rest are Non-thread-safe: Should only be used after threads are out
-    def is_file_processed(self, path: str) -> bool: return path in self._processed_files.data
-    def processed_file(self, path: str) -> ProcessedFile: return self._processed_files.data[path]
     def processed_folder(self, path: str) -> Dict[str, PathPackage]: return self._processed_folders.data[path]
-    def all_processed_files(self) -> List[str]: return list(self._processed_files.data.keys())
     def all_processed_folders(self) -> List[str]: return list(self._processed_folders.data.keys())
 
 
@@ -411,7 +373,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
             if count_float > 100:
                 self._deactivate()
 
-            text = first_line + '\n' + \
+            text = first_line + \
                 '################################################################################\n'
 
             for line in db.header:
@@ -428,7 +390,6 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         else:
             self._logger.print(
                 first_line +
-                '\n' +
                 '################################################################################\n' +
                 f'SECTION: {db.db_id}\n'
             )

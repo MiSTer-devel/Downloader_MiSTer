@@ -19,6 +19,7 @@
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import Optional
 
 from downloader.config import Config
 from downloader.external_drives_repository import ExternalDrivesRepository
@@ -58,7 +59,8 @@ class DownloaderWorkerContext:
     config: Config
     fail_policy: DownloaderWorkerFailPolicy = DownloaderWorkerFailPolicy.FAULT_TOLERANT
 
-    def swallow_error(self, e: Exception, print: bool = True):
+    def swallow_error(self, e: Optional[Exception], print: bool = True):
+        if e is None: return
         if self.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
             raise e
         self.logger.debug(e)

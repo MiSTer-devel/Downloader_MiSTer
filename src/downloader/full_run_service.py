@@ -30,7 +30,7 @@ from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository
 from downloader.logger import FilelogManager, Logger, ConfigLogManager
-from downloader.online_importer import OnlineImporter
+from downloader.online_importer import OnlineImporter, InstallationBox
 from downloader.os_utils import OsUtils
 from downloader.other import format_files_message, format_folders_message, format_zips_message
 from downloader.reboot_calculator import RebootCalculator
@@ -120,13 +120,9 @@ class FullRunService:
 
         failed_dbs = self._online_importer.dbs_that_failed()
 
-        self._display_summary(self._online_importer.correctly_installed_files(),
-                              self._online_importer.files_that_failed() + failed_dbs,
-                              self._online_importer.folders_that_failed(),
-                              self._online_importer.zips_that_failed(),
+        self._display_summary(self._online_importer.box(),
                               self._online_importer.unused_filter_tags(),
                               self._online_importer.new_files_not_overwritten(),
-                              self._online_importer.full_partitions(),
                               self._config['start_time'])
 
         if self._config['update_linux']:
@@ -160,7 +156,7 @@ class FullRunService:
 
         return False
 
-    def _display_summary(self, installed_files, failed_files, failed_folders, failed_zips, unused_filter_tags, new_files_not_installed, full_partitions, start_time):
+    def _display_summary(self, box: InstallationBox, unused_filter_tags, new_files_not_installed, start_time):
         run_time = str(datetime.timedelta(seconds=time.time() - start_time))[0:-4]
 
         self._logger.print()
@@ -176,16 +172,32 @@ class FullRunService:
             else:
                 self._logger.print(format_files_message(unused_filter_tags) + " (Did you misspell it?)")
 
+        if len(box.updated_dbs()) > 0 and len(box.installed_dbs()) > 1:
+            db_with_updates_msg = []
+            for db_id in box.updated_dbs():
+                if not db_with_updates_msg:
+                    db_with_updates_msg.append('\nUpdates found in the following databases:')
+                    db_with_updates_msg.append(f"[{db_id}]")
+                else:
+                    text = f" [{db_id}]"
+                    if len(db_with_updates_msg[-1]) + len(text) > 80:
+                        db_with_updates_msg.append(f"[{db_id}]")
+                    else:
+                        db_with_updates_msg[-1] += text
+
+            if db_with_updates_msg:
+                self._logger.print('\n'.join(db_with_updates_msg))
+
         self._logger.print()
         self._logger.print('Installed:')
-        self._logger.print(format_files_message(installed_files))
+        self._logger.print(format_files_message(box.installed_files()))
         self._logger.print()
         self._logger.print('Errors:')
-        self._logger.print(format_files_message(failed_files))
-        if len(failed_folders) > 0:
-            self._logger.print(format_folders_message(failed_folders))
-        if len(failed_zips) > 0:
-            self._logger.print(format_zips_message(failed_zips))
+        self._logger.print(format_files_message(box.failed_files() + [f'[{db}]' for db in box.failed_dbs()]))
+        if len(box.failed_folders()) > 0:
+            self._logger.print(format_folders_message(box.failed_folders()))
+        if len(box.failed_zips()) > 0:
+            self._logger.print(format_zips_message([f'{db_id}:{zip_id}' for db_id, zip_id in box.failed_zips()]))
         if len(new_files_not_installed) > 0:
             self._logger.print()
             self._logger.print('Following new versions were not installed:')
@@ -193,7 +205,8 @@ class FullRunService:
                 self._logger.print(' •%s: %s' % (db_id, ', '.join(new_files_not_installed[db_id])))
             self._logger.print()
             self._logger.print(' * Delete the file that you wish to upgrade from the previous list, and run this again.')
-        if len(full_partitions) > 0:
+        if len(box.full_partitions()) > 0:
+            full_partitions = [p for p, s in box.full_partitions().items()]
             has_system = any(partition == self._config['base_system_path'] for partition in full_partitions)
             has_external = any(partition != self._config['base_system_path'] for partition in full_partitions)
             self._logger.print()
