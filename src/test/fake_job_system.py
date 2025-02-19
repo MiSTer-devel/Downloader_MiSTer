@@ -57,25 +57,3 @@ class ProgressReporterTracker(ProgressReporter):
     def notify_job_retried(self, job: Job, retry_job: Job, exception: Exception) -> None:
         self.tracks["job_retried"].append((job.__class__.__name__, str(job), exception))
         self._reporter.notify_job_retried(job, retry_job, exception)
-
-
-def cp(job: Any) -> Dict[str, Any]:
-    if is_dataclass(job):
-        return {
-            field.name: copy.deepcopy(getattr(job, field.name))
-            for field in fields(job)
-        }
-
-    if hasattr(job, '__dict__'):
-        return copy.deepcopy(vars(job))
-
-    slot_attrs = set()
-    for cls in type(job).__mro__:
-        if hasattr(cls, '__slots__'):
-            slot_attrs.update(getattr(cls, '__slots__', ()))
-
-    return {
-        attr: copy.deepcopy(getattr(job, attr))
-        for attr in slot_attrs
-        if hasattr(job, attr)
-    }
