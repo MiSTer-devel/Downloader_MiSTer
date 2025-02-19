@@ -118,9 +118,8 @@ class FullRunService:
 
         self._local_repository.save_store(local_store)
 
-        failed_dbs = self._online_importer.dbs_that_failed()
-
-        self._display_summary(self._online_importer.box(), self._config['start_time'])
+        install_box = self._online_importer.box()
+        self._display_summary(install_box, self._config['start_time'])
 
         if self._config['update_linux']:
             self._linux_updater.update_linux(self._online_importer.correctly_downloaded_dbs())
@@ -131,11 +130,11 @@ class FullRunService:
                 self._logger.debug('Length of files_that_failed: %d' % len(self._online_importer.files_that_failed()))
                 self._logger.debug('Length of folders_that_failed: %d' % len(self._online_importer.folders_that_failed()))
                 self._logger.debug('Length of zips_that_failed: %d' % len(self._online_importer.zips_that_failed()))
-                self._logger.debug('Length of failed_dbs: %d' % len(failed_dbs))
+                self._logger.debug('Length of failed_dbs: %d' % len(install_box.failed_dbs()))
                 return 1
 
-        if len(failed_dbs) > 0:
-            self._logger.debug('Length of failed_dbs: %d' % len(failed_dbs))
+        if len(install_box.failed_dbs()) > 0:
+            self._logger.debug('Length of failed_dbs: %d' % len(install_box.failed_dbs()))
             return 1
 
         return 0
