@@ -19,11 +19,10 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from downloader.db_entity import check_no_url_files, fix_folders
-from downloader.file_system import FileWriteError, FolderCreationError
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import get_data_job, make_zip_kind
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
-from downloader.jobs.process_db_index_worker import create_fetch_jobs, create_packages_from_index, process_check_file_packages, process_create_folder_packages, process_validate_packages, try_reserve_space
+from downloader.jobs.process_db_index_worker import create_fetch_jobs, process_index_job_main_sequence
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter, StoreFragmentDrivePaths
 from downloader.path_package import PathPackage, PathType
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
@@ -42,42 +41,19 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         logger.bench('ProcessZipIndexWorker start: ', db.db_id, zip_id)
         store = job.store.select(job.zip_index).read_only()
 
+        logger.bench('ProcessZipIndexWorker fix folders: ', db.db_id, zip_id)
         fix_folders(summary.folders)  # @TODO: Try to look for a better place to put this, while validating zip_index entity for example which we don't do yet.
 
-        logger.bench('ProcessZipIndexWorker create pkgs: ', db.db_id, zip_id)
-        check_file_pkgs, job.files_to_remove, create_folder_pkgs, job.directories_to_remove, zip_data = create_packages_from_index(self._ctx, config, summary, db, store, zip_id is not None)
-
-        logger.bench('ProcessZipIndexWorker checking duplicates: ', db.db_id, zip_id)
-        job.non_duplicated_files, job.duplicated_files = self._ctx.installation_report.add_processed_files(check_file_pkgs)
-
-        logger.bench('ProcessZipIndexWorker Precaching is_file: ', db.db_id, zip_id)
-        self._ctx.file_system.precache_is_file_with_folders(create_folder_pkgs)
-
-        logger.bench('ProcessZipIndexWorker check pkgs: ', db.db_id, zip_id)
-        non_existing_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(self._ctx, job.non_duplicated_files, db.db_id, store, full_resync)
-
-        logger.bench('ProcessZipIndexWorker validate pkgs: ', db.db_id, zip_id)
-        job.present_validated_files, job.skipped_updated_files, update_file_pkgs = process_validate_packages(self._ctx, validate_pkgs)
-
-        logger.bench('ProcessZipIndexWorker calculating unzip file pkgs: ', db.db_id, zip_id)
-        unzip_file_pkgs = non_existing_pkgs + update_file_pkgs
-
-        logger.bench('ProcessZipIndexWorker Reserve space: ', db.db_id, zip_id)
-        job.full_partitions = try_reserve_space(self._ctx, unzip_file_pkgs)
-        if len(job.full_partitions) > 0:
-            job.failed_files_no_space = unzip_file_pkgs
-            logger.debug("Not enough space '%s'!", db.db_id)
-            return [], FileWriteError(f"Could not allocate space for {len(job.failed_files_no_space)} files.")
-
-        logger.bench('ProcessZipIndexWorker Create folders: ', db.db_id, zip_id)
-        job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(self._ctx, create_folder_pkgs, db.db_id, summary.folders, store)
-        if len(job.failed_folders) > 0:
-            return [], FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
+        non_existing_pkgs, need_update_pkgs, zip_data, error = process_index_job_main_sequence(self._ctx, job, summary, store, 'ProcessZipIndexWorker')
+        if error is not None:
+            return [], error
 
         job.filtered_data = zip_data[job.zip_id] if job.zip_id in zip_data else {'files': {}, 'folders': {}}
 
         total_files_size = 0
-        for file_pkg in unzip_file_pkgs:
+        for file_pkg in non_existing_pkgs:
+            total_files_size += file_pkg.description['size']
+        for file_pkg in need_update_pkgs:
             total_files_size += file_pkg.description['size']
 
         needs_extracting_single_files = 'kind' in zip_description and zip_description['kind'] == 'extract_single_files'
@@ -85,10 +61,10 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         less_accumulated_mbs = total_files_size < (1000 * 1000 * config['zip_accumulated_mb_threshold'])
 
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
-            next_jobs = create_fetch_jobs(self._ctx, db.db_id, non_existing_pkgs, update_file_pkgs, zip_description.get('base_files_url', db.base_files_url))
+            next_jobs = create_fetch_jobs(self._ctx, db.db_id, non_existing_pkgs, need_update_pkgs, zip_description.get('base_files_url', db.base_files_url))
 
         else:
-            next_jobs, error = self._make_open_zip_contents_job(job, unzip_file_pkgs, store)
+            next_jobs, error = self._make_open_zip_contents_job(job, non_existing_pkgs + need_update_pkgs, store)
             if error is not None:
                 return [], error
 

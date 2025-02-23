@@ -32,6 +32,7 @@ from downloader.path_package import PathPackage, RemovedCopy
 class ProcessDbIndexJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
+    # Inputs
     db: DbEntity
     store: StoreWrapper
     ini_description: Dict[str, Any]

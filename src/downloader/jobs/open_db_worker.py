@@ -39,10 +39,9 @@ class OpenDbWorker(DownloaderWorkerBase):
         return [ProcessDbMainJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync).add_tag(make_db_tag(job.section))], None
 
     def _open_db(self, section: str, transfer: Any) -> DbEntity:
-        self._ctx.logger.bench('Loading database start: ', section)
+        self._ctx.logger.bench('OpenDbWorker Loading database: ', section)
         db_raw = self._ctx.file_system.load_dict_from_transfer(transfer)
-        self._ctx.logger.bench('Loading database end: ', section)
-        self._ctx.logger.bench('Validating database start: ', section)
+        self._ctx.logger.bench('OpenDbWorker Validating database: ', section)
         db_entity = DbEntity(db_raw, section)
-        self._ctx.logger.bench('Validating database end: ', section)
+        self._ctx.logger.bench('OpenDbWorker end: ', section)
         return db_entity

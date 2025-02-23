@@ -280,6 +280,7 @@ class OnlineImporter:
 
         external_parents_by_db: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
         parents_by_db: dict[str, set[str]] = defaultdict(set)
+        all_parents_by_db: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
 
         def add_parent(el_pkg: PathPackage, db_id: str) -> None:
             if el_pkg.pext_props is not None:
@@ -294,8 +295,9 @@ class OnlineImporter:
                 self._needs_reboot = True
 
             add_parent(file.pkg, file.db_id)
+            all_parents_by_db[file.db_id][file.pkg.parent].add(file.pkg.drive)
     
-        for file_path in box.present_not_validated_files() + box.installed_files():
+        for file_path in box.installed_files():
             file = box.processed_file(file_path)
 
             for is_external, other_drive in stores[file.db_id].read_only().list_other_drives_for_file(file.pkg.rel_path, file.pkg.pext_drive()):
@@ -312,12 +314,6 @@ class OnlineImporter:
                 for other in file.pkg.pext_props.other_drives:
                     if self._worker_ctx.file_system.is_file(os.path.join(other, file.pkg.rel_path)):
                         stores[file.db_id].write_only().add_external_file(other, file.pkg.rel_path, file.pkg.description)
-
-        # for file_path in box.failed_files():
-        #     if not report.is_file_processed(file_path):
-        #         continue
-        #     file = box.processed_file(file_path)
-        #     stores[file.db_id].write_only().remove_file(file.pkg.rel_path)
 
         for folder_path in sorted(box.installed_folders(), key=lambda x: len(x), reverse=True):
             for db_id, folder_pkg in report.processed_folder(folder_path).items():

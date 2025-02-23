@@ -87,6 +87,13 @@ class PathPackage:
             self._full_path = self.rel_path if self.drive is None else os.path.join(self.drive, self.rel_path) if is_windows else self.drive + '/' + self.rel_path
         return self._full_path
 
+    @property
+    def parent(self) -> str:
+        pos = self.rel_path.rfind('/')
+        if pos == -1:
+            return ''
+        return self.rel_path[:pos]
+
     def is_pext_external(self) -> bool:
         return self.pext_props is not None and self.pext_props.kind == PEXT_KIND_EXTERNAL
 
