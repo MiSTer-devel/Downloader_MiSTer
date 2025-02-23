@@ -308,7 +308,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         self.assertEqual({}, sut.new_files_not_overwritten())
 
     def test_overwrite___when_on_empty_store_overwrite_no_file_a_is_present___should_not_overwrite_it_and_neither_fill_the_store(self):
-        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}))
+        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))
         store = empty_test_store()
 
         sut.add_db(db_test_with_file(file_a, with_overwrite(file_a_updated_descr(), False)), store)

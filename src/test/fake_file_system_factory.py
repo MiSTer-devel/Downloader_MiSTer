@@ -221,6 +221,11 @@ class FakeFileSystem(ProductionFileSystem):
 
     def make_dirs(self, path):
         folder = self._path(path)
+        path_parents = Path(folder).parents
+        for p in path_parents[:-3]:
+            parent = str(p)
+            if parent not in self.state.folders:
+                self.state.folders[parent] = {}
         self.state.folders[folder] = {}
         self._write_records.append(_Record('make_dirs', folder))
         if 'create_folders_error' in self._fake_failures:

@@ -56,7 +56,7 @@ class WaitDbZipsWorker(DownloaderWorkerBase):
         logger.bench('WaitDbZipsWorker deselect_all start: ', job.db.db_id)
         store = job.store.deselect_all(zip_indexes)
         logger.bench('WaitDbZipsWorker deselect_all done: ', job.db.db_id)
-
+        #sexit(0)
         resulting_job = ProcessDbIndexJob(
             db=job.db,
             ini_description=job.ini_description,

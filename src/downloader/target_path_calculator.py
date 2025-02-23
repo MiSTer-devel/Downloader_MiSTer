@@ -3,7 +3,6 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -15,7 +14,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, List, Optional, Tuple
+from typing import ItemsView, Dict, Any, List, Optional, Tuple, Union
 import os
 import threading
 from pathlib import Path
@@ -27,15 +26,6 @@ from downloader.constants import K_STORAGE_PRIORITY, STORAGE_PRIORITY_OFF, STORA
 from downloader.path_package import PATH_PACKAGE_KIND_PEXT, PATH_PACKAGE_KIND_STANDARD, PATH_PACKAGE_KIND_SYSTEM, PATH_TYPE_FILE, PATH_TYPE_FOLDER, PEXT_KIND_EXTERNAL, PEXT_KIND_PARENT, PEXT_KIND_STANDARD, PextPathProps, PathPackage, PextKind, PathType
 
 
-def incomplete_path_package(path: str, description: dict[str, Any], path_type: PathType) -> PathPackage:
-    return PathPackage(
-        path,  # rel_path
-        None,  # drive
-        description,
-        path_type,
-        PATH_PACKAGE_KIND_STANDARD,
-        None  # extra
-    )
 
 class TargetPathsCalculatorFactory:
     def __init__(self, file_system: FileSystem, external_drives_repository: ExternalDrivesRepository):
@@ -57,17 +47,23 @@ class TargetPathsCalculator:
         self._priority_top_folders: Dict[str, StoragePriorityRegistryEntry] = dict()
 
     def deduce_target_path(self, path: str, description: Dict[str, Any], path_type: PathType) -> Tuple[PathPackage, Optional['StoragePriorityError']]:
-        pkg = incomplete_path_package(path, description, path_type)
-        _, errors = self.complete_path_pkgs([pkg])
-        return pkg, errors[0] if len(errors) > 0 else None
+        result, errors = self.create_path_packages([(path, description)], path_type)
+        return result[0], errors[0] if len(errors) > 0 else None
 
-    def complete_path_pkgs(self, packages: list[PathPackage], /) -> Tuple[list[PathPackage], list['StoragePriorityError']]:
-        results: list[PathPackage] = []
+    def create_path_packages(self, packages: Union[ItemsView[str, dict[str, Any]], list[Tuple[str, dict[str, Any]]]], ty: PathType, /) -> Tuple[list[PathPackage], list['StoragePriorityError']]:
         errors: list[StoragePriorityError] = []
 
+        new = object.__new__
+        cls = PathPackage
+
+        # This weird obj creation is an optimization, since python 3.9 works much faster this way than with a traditional loop + traditional object initialization and this is part is super hot for perf
+        result_pkgs = [new(cls) for _ in range(len(packages))]
+
         base_path = self._config['base_path']
-        for pkg in packages:
-            path = pkg.rel_path
+        for (path, description), pkg in zip(packages, result_pkgs):
+            pkg.rel_path = path
+            pkg.description = description
+            pkg.ty = ty
             if path[0] == '/':
                 pkg._full_path = path
                 pkg.drive = None
@@ -76,13 +72,15 @@ class TargetPathsCalculator:
                 continue
 
             pkg._full_path = None
-            description = pkg.description
             is_system_file = 'path' in description and description['path'] == 'system'
             can_be_external = path[0] == '|'
             if can_be_external:
-                pkg.rel_path =  path[1:]
+                pkg.rel_path = path[1:]
                 external, error = self._deduce_possible_external_target_path(path=pkg.rel_path, path_type=pkg.ty)
                 if error is not None:
+                    pkg.drive = base_path
+                    pkg.kind = PATH_PACKAGE_KIND_STANDARD
+                    pkg.pext_props = None
                     errors.append(error)
                     continue
 
@@ -90,7 +88,6 @@ class TargetPathsCalculator:
                 pkg.kind = PATH_PACKAGE_KIND_PEXT
 
                 if is_system_file:
-                    results.append(pkg)
                     errors.append(StoragePriorityError(f"System Path '{path}' is incorrect because it starts with '|', please contact the database maintainer."))
                     continue
 
@@ -103,9 +100,7 @@ class TargetPathsCalculator:
                 pkg.kind = PATH_PACKAGE_KIND_STANDARD
                 pkg.pext_props = None
 
-            results.append(pkg)
-        return results, errors
-
+        return result_pkgs, errors
 
     def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> Tuple[Optional[Tuple[str, PextPathProps]], Optional['StoragePriorityError']]:
         path_obj = Path(path)

@@ -107,6 +107,7 @@ class FullRunService:
         local_store = self._local_repository.load_store()
 
         db_pkgs = [DbSectionPackage(db_id, section, local_store.store_by_id(db_id)) for db_id, section in sorted_db_sections(self._config)]
+        #db_pkgs = [db_pkg for db_pkg in db_pkgs  if db_pkg.db_id == 'distribution_mister']
 
         for relocation_package in self._base_path_relocator.relocating_base_paths(db_pkgs):
             self._base_path_relocator.relocate_non_system_files(relocation_package)

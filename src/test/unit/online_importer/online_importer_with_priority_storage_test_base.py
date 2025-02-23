@@ -215,11 +215,11 @@ def store_nes_zipped_palettes_on_fat():
 
 
 def _store_zips_nes_zipped_palettes(): return {zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes)}
-def _store_files_nes_zipped_palettes(): return {file_nes_palette_a: {"zip_id": zipped_nes_palettes_id, **file_nes_palette_a_descr_zipped()}}
+def _store_files_nes_zipped_palettes(): return {file_nes_palette_a[1:]: {"zip_id": zipped_nes_palettes_id, **file_nes_palette_a_descr_zipped()}}
 
 
 def _store_folders_nes_zipped_palettes(): return {
-        folder_games: {"zip_id": zipped_nes_palettes_id},
-        folder_games_nes: {"zip_id": zipped_nes_palettes_id},
-        folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id},
+        folder_games[1:]: {"zip_id": zipped_nes_palettes_id},
+        folder_games_nes[1:]: {"zip_id": zipped_nes_palettes_id},
+        folder_games_nes_palettes[1:]: {"zip_id": zipped_nes_palettes_id},
     }

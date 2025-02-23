@@ -33,6 +33,7 @@ from downloader.path_package import PathPackage, RemovedCopy
 class ProcessZipIndexJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
+    # Inputs
     db: DbEntity
     store: StoreWrapper
     config: Config

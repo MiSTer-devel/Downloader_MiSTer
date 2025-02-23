@@ -67,16 +67,6 @@ class ReadOnlyStoreException(Exception): pass
 
 class StoreWrapper:
     def __init__(self, store: Dict[str, Any], local_store_wrapper: LocalStoreWrapper, readonly: bool = False):
-        self._aggregated_summary = {'files': dict(), 'folders': dict(), 'files_no_pext': dict(), 'folders_no_pext': dict()}
-        if 'files' in store:
-            for file_path, file_description in store['files'].items():
-                self._aggregated_summary['files'][file_path] = file_description
-                self._aggregated_summary['files_no_pext'][file_path] = file_description
-        if 'folders' in store:
-            for folder_path, folder_description in store['folders'].items():
-                self._aggregated_summary['folders'][folder_path] = folder_description
-                self._aggregated_summary['folders_no_pext'][folder_path] = folder_description
-
         self._external_additions = {'files': defaultdict(list), 'folders': defaultdict(list)}
         if 'external' in store:
             for drive, external in store['external'].items():
@@ -85,8 +75,6 @@ class StoreWrapper:
                         if file_path in store['files']:
                             continue
                         #store['files'][file_path] = external['files'][file_path]
-                        self._aggregated_summary['files']['|' + file_path] = external['files'][file_path]
-                        self._aggregated_summary['files_no_pext'][file_path] = external['files'][file_path]
                         self._external_additions['files'][file_path].append(drive)
 
                 if 'folders' in external:
@@ -94,14 +82,12 @@ class StoreWrapper:
                         if folder_path in store['folders']:
                             continue
                         #store['folders'][folder_path] = external['folders'][folder_path]
-                        self._aggregated_summary['folders']['|' + folder_path] = external['folders'][folder_path]
-                        self._aggregated_summary['folders_no_pext'][folder_path] = external['folders'][folder_path]
                         self._external_additions['folders'][folder_path].append(drive)
 
         self._store = store
         self._local_store_wrapper = local_store_wrapper
-        self._read_only = ReadOnlyStoreAdapter(self._store, self._aggregated_summary)
-        self._write_only = WriteOnlyStoreAdapter(self._store, self._local_store_wrapper, self._external_additions, self._aggregated_summary)
+        self._read_only = ReadOnlyStoreAdapter(self._store)
+        self._write_only = WriteOnlyStoreAdapter(self._store, self._local_store_wrapper, self._external_additions)
         self._readonly = readonly
 
     def unwrap_store(self) -> Dict[str, Any]:
@@ -164,11 +150,10 @@ class StoreWrapper:
 
 
 class WriteOnlyStoreAdapter:
-    def __init__(self, store, top_wrapper, external_additions, aggregated_summary):
+    def __init__(self, store, top_wrapper, external_additions):
         self._store = store
         self._top_wrapper = top_wrapper
         self._external_additions = external_additions
-        self._aggregated_summary = aggregated_summary
 
     def add_file_pkg(self, file_pkg: PathPackage):
         if file_pkg.is_pext_external():
@@ -264,8 +249,7 @@ class WriteOnlyStoreAdapter:
     def _clean_external_additions(self, kind, path):
         if path in self._external_additions[kind]:
             self._external_additions[kind].pop(path)
-        if path in self._aggregated_summary[kind]:
-            self._aggregated_summary[kind].pop(path)
+
         if 'external' not in self._store:
             return
 
@@ -377,7 +361,6 @@ class WriteOnlyStoreAdapter:
         for file_path in self._external_additions['files']:
             if file_path in self._store['files']:
                 self._store['files'].pop(file_path)
-                self._aggregated_summary['files'].pop(file_path)
                 for drive in self._external_additions['files'][file_path]:
                     if 'external' not in self._store \
                             or drive not in self._store['external'] \
@@ -388,7 +371,6 @@ class WriteOnlyStoreAdapter:
         for folder_path in self._external_additions['folders']:
             if folder_path in self._store['folders']:
                 self._store['folders'].pop(folder_path)
-                self._aggregated_summary['folders'].pop(folder_path)
                 for drive in self._external_additions['files'][folder_path]:
                     if 'external' not in self._store \
                             or drive not in self._store['external'] \
@@ -477,9 +459,8 @@ class WriteOnlyStoreAdapter:
 
 
 class ReadOnlyStoreAdapter:
-    def __init__(self, store, aggregated_summary):
+    def __init__(self, store):
         self._store = store
-        self._aggregated_summary = aggregated_summary
 
     def hash_file(self, file_pkg: PathPackage):
         if file_pkg.is_pext_external():
@@ -554,30 +535,36 @@ class ReadOnlyStoreAdapter:
 
         for fp, fd in self._store.get('files', {}).items():
             if 'zip_id' not in fd: continue
-            grouped[fd['zip_id']]['files'][f'|{fp}' if fp.startswith('games') else fp] = fd
+            grouped[fd['zip_id']]['files'][fp] = fd
 
         for dp, dd in self._store.get('folders', {}).items():
             if 'zip_id' not in dd: continue
-            grouped[dd['zip_id']]['folders'][f'|{dp}' if dp.startswith('games') else dp] = dd
+            grouped[dd['zip_id']]['folders'][dp] = dd
 
         for summary in self._store.get('external', {}).values():
             for fp, fd in summary.get('files', {}).items():
                 if 'zip_id' not in fd: continue
-                grouped[fd['zip_id']]['files'][f'|{fp}' if fp.startswith('games') else fp] = fd
+                grouped[fd['zip_id']]['files'][fp] = fd
 
         for summary in self._store.get('external', {}).values():
             for dp, dd in summary.get('folders', {}).items():
                 if 'zip_id' not in dd: continue
-                grouped[dd['zip_id']]['folders'][f'|{dp}' if dp.startswith('games') else dp] = dd
+                grouped[dd['zip_id']]['folders'][dp] = dd
 
         for zip_id, summary in self._store.get('filtered_zip_data', {}).items():
             for fp, fd in summary.get('files', {}).items():
-                grouped[zip_id]['files'][f'|{fp}' if fp.startswith('games') else fp] = fd
+                grouped[zip_id]['files'][fp] = fd
             for dp, dd in summary.get('folders', {}).items():
-                grouped[zip_id]['folders'][f'|{dp}' if dp.startswith('games') else dp] = dd
+                grouped[zip_id]['folders'][dp] = dd
 
         for zip_id, data in grouped.items():
-            data['hash'] = self._store.get('zips', {}).get(zip_id, {}).get('summary_file', {}).get('hash', NO_HASH_IN_STORE_CODE)
+            zip_data = self._store.get('zips', {}).get(zip_id, {})
+            data['hash'] = zip_data.get('summary_file', {}).get('hash', NO_HASH_IN_STORE_CODE)
+            is_pext = 'target_folder_path' in zip_data and zip_data['target_folder_path'].startswith('|')
+            if not is_pext:
+                continue
+            data['files'] = {'|' + f: d for f, d in data['files'].items()}
+            data['folders'] = {'|' + f: d for f, d in data['folders'].items()}
 
         return grouped
 
@@ -594,11 +581,11 @@ class ReadOnlyStoreAdapter:
 
     @property
     def files(self) -> Dict[str, Dict[str, Any]]:
-        return self._aggregated_summary['files']
+        return self._store['files']
 
     @property
     def folders(self) -> Dict[str, Dict[str, Any]]:
-        return self._aggregated_summary['folders']
+        return self._store['folders']
 
     @property
     def has_externals(self) -> bool:

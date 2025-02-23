@@ -44,7 +44,7 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
         fix_folders(job.db.folders)
 
         self._ctx.file_download_session_logger.print_header(job.db)
-        logger.debug("Building db config '%s'...", job.db.db_id)
+        logger.bench("ProcessDbMainWorker Building db config: ", job.db.db_id)
         config = build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
 
         if not read_only_store.has_base_path():  # @TODO: should remove this from here at some point.
@@ -60,15 +60,13 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
             zip_jobs = []
             zip_job_tags = []
 
-            logger.bench('zip_summaries start: ', job.db.db_id)
+            logger.bench('ProcessDbMainWorker ZIP summaries calc: ', job.db.db_id)
             zip_summaries = read_only_store.zip_summaries()
-            logger.bench('zip_summaries end: ', job.db.db_id)
 
+            logger.bench('ProcessDbMainWorker ZIP make jobs: ', job.db.db_id)
             for zip_id, zip_description in job.db.zips.items():
                 #if zip_id != 'cheats_folder_psx': continue
-                logger.bench('make zip job start: ', job.db.db_id, zip_id)
                 zip_job, err = _make_zip_job(zip_summaries.get(zip_id, None), ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
-                logger.bench('make zip job end: ', job.db.db_id, zip_id)
                 if err is not None:
                     self._ctx.swallow_error(err)
                     job.ignored_zips.append(zip_id)
