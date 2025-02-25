@@ -106,6 +106,16 @@ class PathPackage:
     def is_pext_parent(self) -> bool:
         return self.pext_props is not None and self.pext_props.kind == PEXT_KIND_PARENT
 
+    def clone(self) -> 'PathPackage':
+        return PathPackage(
+            self.rel_path,
+            self.drive,
+            self.description,
+            self.ty,
+            self.kind,
+            None if self.pext_props is None else self.pext_props.clone(),
+        )
+
     def db_path(self) -> str:
         if self.kind == PATH_PACKAGE_KIND_PEXT:
             return '|' + self.rel_path
@@ -146,6 +156,15 @@ class PextPathProps:
         self.drive = drive
         self.other_drives = other_drives
         self.is_subfolder = is_subfolder
+
+    def clone(self) -> 'PextPathProps':
+        return PextPathProps(
+            self.kind,
+            self.parent,
+            self.drive,
+            self.other_drives,
+            self.is_subfolder,
+        )
 
     def parent_pkg(self) -> PathPackage:
         return PathPackage(self.parent, self.drive, {}, PATH_TYPE_FOLDER, PATH_PACKAGE_KIND_PEXT, PextPathProps(

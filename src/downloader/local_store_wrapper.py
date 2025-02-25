@@ -161,14 +161,29 @@ class WriteOnlyStoreAdapter:
         else:
             self.add_file(file_pkg.rel_path, file_pkg.description)
 
+    def remove_file_pkg(self, file_pkg: PathPackage):
+        if file_pkg.is_pext_external():
+            self.remove_external_file(file_pkg.drive, file_pkg.rel_path)
+        else:
+            self.remove_local_file(file_pkg.rel_path)
+
     def add_folder_pkg(self, folder_pkg: PathPackage):
         if folder_pkg.is_pext_external():
             self.add_external_folder(folder_pkg.pext_props.drive, folder_pkg.rel_path, folder_pkg.description)
         else:
             self.add_folder(folder_pkg.rel_path, folder_pkg.description)
 
-    def add_file(self, file, description):
-        self._add_entry('files', file, description)
+    def remove_folder_pkg(self, folder_pkg: PathPackage):
+        if folder_pkg.is_pext_external():
+            self.remove_external_folder(folder_pkg.drive, folder_pkg.rel_path)
+        else:
+            self.remove_local_folder(folder_pkg.rel_path)
+
+    def add_file(self, file_path, description):
+        if file_path in self._external_additions['files']:
+            for drive in self._external_additions['files'][file_path]:
+                self.remove_external_file(drive, file_path)
+        self._add_entry('files', file_path, description)
 
     def add_folder(self, folder, description):
         self._add_entry('folders', folder, description)
@@ -189,6 +204,13 @@ class WriteOnlyStoreAdapter:
         self._add_external_entry('folders', drive, folder_path, description)
 
     def add_external_file(self, drive, file_path, description):
+        if file_path in self._store['files']:
+            self.remove_file(file_path)
+        if file_path in self._external_additions['files']:
+            for d in self._external_additions['files'][file_path]:
+                if d == drive:
+                    continue
+                self.remove_external_file(d, file_path)
         self._add_external_entry('files', drive, file_path, description)
 
     def _add_external_entry(self, kind, drive, path, description):
@@ -262,7 +284,7 @@ class WriteOnlyStoreAdapter:
         if changed: self._top_wrapper.mark_force_save()
 
     def _remove_entry(self, kind, path):
-        self._clean_external_additions(kind, path)
+        #self._clean_external_additions(kind, path)
         self._remove_local_entry(kind, path)
 
     def _remove_local_entry(self, kind, path):
@@ -405,12 +427,12 @@ class WriteOnlyStoreAdapter:
         self.remove_zip_ids(removed_zip_ids)
 
     def save_filtered_zip_data(self, filtered_zip_data):
-        for drive in list(filtered_zip_data):
-            data = filtered_zip_data[drive]
+        for zip_id in list(filtered_zip_data):
+            data = filtered_zip_data[zip_id]
             empty_files = 'files' not in data or len(data['files']) == 0
             empty_folders = 'folders' not in data or len(data['folders']) == 0
             if empty_files and empty_folders:
-                filtered_zip_data.pop(drive)
+                filtered_zip_data.pop(zip_id)
 
         if len(filtered_zip_data):
             if 'filtered_zip_data' in self._store and equal_dicts(self._store['filtered_zip_data'], filtered_zip_data):
