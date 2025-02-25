@@ -30,7 +30,8 @@ from downloader.job_system import Job, WorkerResult
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
-from downloader.path_package import PathPackage, PathType, RemovedCopy
+from downloader.path_package import PathPackage, PathType, RemovedCopy, PEXT_KIND_EXTERNAL, PATH_PACKAGE_KIND_STANDARD, \
+    PEXT_KIND_STANDARD, PATH_PACKAGE_KIND_PEXT
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.validate_file_job import ValidateFileJob
@@ -225,30 +226,36 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
         ctx.swallow_error(e)
 
     folder_copies_to_be_removed: List[Tuple[bool, str, str, PathType]] = []
-    parents: Dict[str, Dict[str, PathPackage]] = defaultdict(defaultdict)
     processing_folders: List[PathPackage] = []
+
+    parent_drives: Dict[str, set[str]] = defaultdict(set)
     parent_pkgs: Dict[str, PathPackage] = dict()
+    parents_to_add: List[PathPackage] = []
 
     for pkg in sorted(create_folder_pkgs, key=lambda x: len(x.rel_path)):
-        if pkg.is_pext_parent():
+        if pkg.kind != PATH_PACKAGE_KIND_PEXT:
+            processing_folders.append(pkg)
+        elif pkg.is_pext_parent():
             parent_pkgs[pkg.rel_path] = pkg
             continue
+        else:
+            processing_folders.append(pkg)
 
-        processing_folders.append(pkg)
-
-        if pkg.pext_props:
-            if pkg.pext_props.drive not in parents[pkg.pext_props.parent]:
-                p_pkg = pkg.pext_props.parent_pkg()
-                parents[pkg.pext_props.parent][pkg.pext_props.drive] = p_pkg
-                if pkg.pext_props.parent in parent_pkgs:
-                    p_pkg.description.update(parent_pkgs[pkg.pext_props.parent].description)
+            pkg_parent = pkg.pext_props.parent
+            if pkg_parent in parent_pkgs and pkg.drive not in parent_drives[pkg_parent]:
+                parent_drives[pkg_parent].add(pkg.drive)
+                parent_pkg = parent_pkgs[pkg_parent].clone()
+                parent_pkg.drive = pkg.drive
+                parent_pkg.pext_props.kind = pkg.pext_props.kind
+                parent_pkg.pext_props.drive = pkg.pext_props.drive
+                parent_pkg.pext_props.parent = ''
+                parents_to_add.append(parent_pkg)
 
         _maybe_add_copies_to_remove(ctx, folder_copies_to_be_removed, store, pkg.rel_path, pkg.pext_drive())
 
-    for parent_path, drives in parents.items():
-        for d, parent_pkg in drives.items():
-            processing_folders.append(parent_pkg)
-            _maybe_add_copies_to_remove(ctx, folder_copies_to_be_removed, store, parent_path, d)
+    for parent_pkg in parents_to_add:
+        processing_folders.append(parent_pkg)
+        _maybe_add_copies_to_remove(ctx, folder_copies_to_be_removed, store, parent_pkg.rel_path, parent_pkg.drive)
 
     ctx.logger.bench('add_processed_folders start: ', db_id, len(processing_folders))
     non_existing_folders = ctx.installation_report.add_processed_folders(processing_folders, db_id)

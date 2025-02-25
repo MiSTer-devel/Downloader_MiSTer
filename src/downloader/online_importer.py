@@ -127,7 +127,7 @@ class OnlineImporter:
             box.add_processed_files(job.non_duplicated_files, job.db.db_id)
             box.add_present_validated_files(job.present_validated_files)
             box.add_skipped_updated_files(job.skipped_updated_files, job.db.db_id)
-            box.add_removed_copies(job.removed_folders)
+            box.add_removed_copies(job.removed_folders, job.db.db_id)
             box.add_installed_folders(job.installed_folders)
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
@@ -145,7 +145,7 @@ class OnlineImporter:
             box.add_processed_files(job.non_duplicated_files, job.db.db_id)
             box.add_present_validated_files(job.present_validated_files)
             box.add_skipped_updated_files(job.skipped_updated_files, job.db.db_id)
-            box.add_removed_copies(job.removed_folders)
+            box.add_removed_copies(job.removed_folders, job.db.db_id)
             box.add_installed_folders(job.installed_folders)
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
@@ -278,97 +278,36 @@ class OnlineImporter:
                 stores[db_id].write_only().remove_folder(pkg.rel_path)
                 stores[db_id].write_only().remove_folder_from_zips(pkg.rel_path)
 
-        external_parents_by_db: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
-        parents_by_db: dict[str, set[str]] = defaultdict(set)
-        all_parents_by_db: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
-
-        def add_parent(el_pkg: PathPackage, db_id: str) -> None:
-            if el_pkg.pext_props is not None:
-                if el_pkg.is_pext_standard():
-                    parents_by_db[db_id].add(el_pkg.pext_props.parent)
-                else:
-                    external_parents_by_db[db_id][el_pkg.pext_props.parent].add(el_pkg.pext_props.drive)
-
         for file_path in box.installed_files():
             file = box.processed_file(file_path)
             if 'reboot' in file.pkg.description and file.pkg.description['reboot'] == True:
                 self._needs_reboot = True
-
-            add_parent(file.pkg, file.db_id)
-            all_parents_by_db[file.db_id][file.pkg.parent].add(file.pkg.drive)
-    
-        for file_path in box.installed_files():
-            file = box.processed_file(file_path)
-
-            for is_external, other_drive in stores[file.db_id].read_only().list_other_drives_for_file(file.pkg.rel_path, file.pkg.pext_drive()):
-                other_file = os.path.join(other_drive, file.pkg.rel_path)
-                if not self._worker_ctx.file_system.is_file(other_file):
-                    if is_external:
-                        stores[file.db_id].write_only().remove_external_file(other_drive, file.pkg.rel_path)
-                    else:
-                        stores[file.db_id].write_only().remove_local_file(file.pkg.rel_path)
-
             stores[file.db_id].write_only().add_file_pkg(file.pkg)
 
-            if file.pkg.pext_props is not None:
-                for other in file.pkg.pext_props.other_drives:
-                    if self._worker_ctx.file_system.is_file(os.path.join(other, file.pkg.rel_path)):
-                        stores[file.db_id].write_only().add_external_file(other, file.pkg.rel_path, file.pkg.description)
-
         for folder_path in sorted(box.installed_folders(), key=lambda x: len(x), reverse=True):
             for db_id, folder_pkg in report.processed_folder(folder_path).items():
-                if folder_pkg.is_pext_parent():
-                    continue
-
                 stores[db_id].write_only().add_folder_pkg(folder_pkg)
-                add_parent(folder_pkg, db_id)
-
-        for folder_path in sorted(box.installed_folders(), key=lambda x: len(x), reverse=True):
-            for db_id, folder_pkg in report.processed_folder(folder_path).items():
-                if not folder_pkg.is_pext_parent():
-                    continue
-
-                if folder_pkg.pext_props.parent in parents_by_db[db_id]:
-                    stores[db_id].write_only().add_folder(folder_pkg.rel_path, folder_pkg.description)
-                if folder_pkg.pext_props.parent in external_parents_by_db[db_id]:
-                    for drive in external_parents_by_db[db_id][folder_pkg.pext_props.parent]:
-                        stores[db_id].write_only().add_external_folder(drive, folder_pkg.rel_path, folder_pkg.description)
 
         for file_path in box.removed_files():
             file = box.processed_file(file_path)
-            stores[file.db_id].write_only().remove_file(file.pkg.rel_path)
+            stores[file.db_id].write_only().remove_file_pkg(file.pkg)
 
-        for is_external, el_path, drive, ty in box.removed_copies():
+        for db_id, is_external, el_path, drive, ty in box.removed_copies():
             if ty == PathType.FILE:
                 file = box.processed_file(el_path)
-                if is_external:
-                    stores[file.db_id].write_only().remove_external_file(drive, el_path)
-                else:
-                    stores[file.db_id].write_only().remove_local_file(el_path)
+                stores[file.db_id].write_only().remove_file_pkg(file.pkg)
 
             elif ty == PathType.FOLDER:
-                for db_id, folder_pkg in report.processed_folder(el_path).items():
-                    if is_external:
-                        stores[db_id].write_only().remove_external_folder(drive, el_path)
-                    else:
-                        stores[db_id].write_only().remove_local_folder(el_path)
+                if is_external:
+                    stores[db_id].write_only().remove_external_folder(el_path)
+                else:
+                    stores[db_id].write_only().remove_folder(el_path)
 
         for db_id, zip_id, zip_summary, zip_description in box.installed_zip_summary():
             stores[db_id].write_only().add_zip_summary(zip_id, zip_summary, zip_description)
 
-        filtered_zip_data = {}
-        for db_id, zip_id, files, folders in box.filtered_zip_data():
-            if db_id not in filtered_zip_data:
-                filtered_zip_data[db_id] = {}
-
-            if zip_id not in filtered_zip_data[db_id]:
-                filtered_zip_data[db_id][zip_id] = {'files': {}, 'folders': {}}
-
-            filtered_zip_data[db_id][zip_id]['files'].update(files)
-            filtered_zip_data[db_id][zip_id]['folders'].update(folders)
-
-        for db_id, filtered_zip_data_by_db in filtered_zip_data.items():
-            stores[db_id].write_only().save_filtered_zip_data(filtered_zip_data_by_db)
+        for db_id, filtered_zip_data in box.filtered_zip_data().items():
+            stores[db_id].write_only().save_filtered_zip_data(filtered_zip_data)
 
         for store in stores.values():
             store.write_only().cleanup_externals()
@@ -459,10 +398,10 @@ class InstallationBox:
         self._full_partitions: dict[str, int] = dict()
         self._failed_db_options: list[WrongDatabaseOptions] = []
         self._removed_files: list[str] = []
-        self._removed_copies: list[RemovedCopy] = []
+        self._removed_copies: list[tuple[str, bool, str, str, PathType]] = []
         self._removed_zips: list[tuple[str, str]] = []
         self._skipped_updated_files: dict[str, list[str]] = dict()
-        self._filtered_zip_data: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = []
+        self._filtered_zip_data: dict[str, dict[str, dict[str, dict[str, Any]]]] = defaultdict(dict)
         self._installed_zip_summary: list[tuple[str, str, StoreFragmentDrivePaths, dict[str, Any]]] = []
         self._installed_folders: set[str] = set()
         self._directories = dict()
@@ -534,9 +473,7 @@ class InstallationBox:
     def add_updated_db(self, db_id: str):
         self._updated_dbs.append(db_id)
     def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
-        files, folders = filtered_data['files'], filtered_data['folders']
-        #if len(files) == 0 and len(folders) == 0: return
-        self._filtered_zip_data.append((db_id, zip_id, files, folders))
+        self._filtered_zip_data[db_id][zip_id] = filtered_data
     def add_failed_db_options(self, exception: WrongDatabaseOptions):
         self._failed_db_options.append(exception)
     def add_removed_file(self, file: str):
@@ -545,9 +482,9 @@ class InstallationBox:
         if len(files) == 0: return
         for pkg in files:
             self._removed_files.append(pkg.rel_path)
-    def add_removed_copies(self, copies: list[RemovedCopy]):
+    def add_removed_copies(self, copies: list[RemovedCopy], db_id: str):
         if len(copies) == 0: return
-        self._removed_copies.extend(copies)
+        self._removed_copies.extend([(db_id, is_external, folder_path, other_drive, el_kind) for is_external, folder_path, other_drive, el_kind  in copies])
     def add_installed_folders(self, folders: list[PathPackage]):
         if len(folders) == 0: return
         for pkg in folders:
