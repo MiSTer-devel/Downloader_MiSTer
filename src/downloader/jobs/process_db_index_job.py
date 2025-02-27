@@ -51,7 +51,7 @@ class ProcessDbIndexJob(Job):
     duplicated_files: List[str] = field(default_factory=list)
 
     installed_folders: List[PathPackage] = field(default_factory=list)
-    removed_folders: List[RemovedCopy] = field(default_factory=list)  #  @TODO: Why there is removed_folders AND directories_to_remove?
+    removed_folders: List[PathPackage] = field(default_factory=list)  #  @TODO: Why there is removed_folders AND directories_to_remove?
 
     directories_to_remove: List[PathPackage] = field(default_factory=list)
     files_to_remove: List[PathPackage] = field(default_factory=list)

@@ -127,8 +127,8 @@ def create_packages_from_index(ctx: DownloaderWorkerContext, config: Config, sum
     List[_DeleteFolderPackage]
 ]:
     calculator = ctx.target_paths_calculator_factory.target_paths_calculator(config)
-    check_file_pkgs, remove_files_pkgs = _translate_items(ctx, calculator, summary.files, PathType.FILE, store.files)
-    create_folder_pkgs, delete_folder_pkgs = _translate_items(ctx, calculator, summary.folders, PathType.FOLDER, store.folders)
+    check_file_pkgs, remove_files_pkgs = _translate_items(ctx, calculator, summary.files, PathType.FILE, store.all_files())
+    create_folder_pkgs, delete_folder_pkgs = _translate_items(ctx, calculator, summary.folders, PathType.FOLDER, store.all_folders())
     return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs
 
 def _translate_items(ctx: DownloaderWorkerContext, calculator: TargetPathsCalculator, items: Dict[str, Dict[str, Any]], path_type: PathType, stored: Dict[str, Dict[str, Any]]) -> Tuple[List[PathPackage], List[PathPackage]]:
@@ -216,7 +216,7 @@ def try_reserve_space(ctx: DownloaderWorkerContext, file_pkgs: Iterable[PathPack
         return full_partitions
 
 
-def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter) -> Tuple[List[RemovedCopy], List[PathPackage], List[str]]:
+def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter) -> Tuple[List[PathPackage], List[PathPackage], List[str]]:
     if len(create_folder_pkgs) == 0:
         return [], [], []
 
@@ -225,37 +225,52 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
     except Exception as e:
         ctx.swallow_error(e)
 
-    folder_copies_to_be_removed: List[Tuple[bool, str, str, PathType]] = []
+    folder_copies_to_be_removed: List[PathPackage] = []
     processing_folders: List[PathPackage] = []
 
     parent_drives: Dict[str, set[str]] = defaultdict(set)
     parent_pkgs: Dict[str, PathPackage] = dict()
-    parents_to_add: List[PathPackage] = []
 
     for pkg in sorted(create_folder_pkgs, key=lambda x: len(x.rel_path)):
-        if pkg.kind != PATH_PACKAGE_KIND_PEXT:
-            processing_folders.append(pkg)
-        elif pkg.is_pext_parent():
+        if pkg.is_pext_parent():
             parent_pkgs[pkg.rel_path] = pkg
             continue
-        else:
-            processing_folders.append(pkg)
 
-            pkg_parent = pkg.pext_props.parent
-            if pkg_parent in parent_pkgs and pkg.drive not in parent_drives[pkg_parent]:
-                parent_drives[pkg_parent].add(pkg.drive)
-                parent_pkg = parent_pkgs[pkg_parent].clone()
-                parent_pkg.drive = pkg.drive
-                parent_pkg.pext_props.kind = pkg.pext_props.kind
-                parent_pkg.pext_props.drive = pkg.pext_props.drive
-                parent_pkg.pext_props.parent = ''
-                parents_to_add.append(parent_pkg)
+        processing_folders.append(pkg)
+        if pkg.kind != PATH_PACKAGE_KIND_PEXT:
+            continue
 
-        _maybe_add_copies_to_remove(ctx, folder_copies_to_be_removed, store, pkg.rel_path, pkg.pext_drive())
+        pkg_parent = pkg.pext_props.parent
+        if pkg_parent not in parent_pkgs or pkg.drive in parent_drives:
+            continue
 
-    for parent_pkg in parents_to_add:
+        parent_drives[pkg_parent].add(pkg.drive)
+        parent_pkg = parent_pkgs[pkg_parent].clone()
+        parent_pkg.drive = pkg.drive
+        parent_pkg.pext_props.kind = pkg.pext_props.kind
+        parent_pkg.pext_props.drive = pkg.pext_props.drive
+        parent_pkg.pext_props.parent = ''
         processing_folders.append(parent_pkg)
-        _maybe_add_copies_to_remove(ctx, folder_copies_to_be_removed, store, parent_pkg.rel_path, parent_pkg.drive)
+
+    for pkg in processing_folders:
+        folder_path, drive = pkg.rel_path, pkg.drive
+        for is_external, other_drive in store.list_other_drives_for_folder(pkg):
+            if ctx.file_system.is_folder(os.path.join(other_drive, folder_path)):
+                continue
+
+            if is_external:
+                removed_pkg = pkg.clone_as_pext()
+                removed_pkg.drive = other_drive
+                removed_pkg.pext_props.drive = other_drive
+                removed_pkg.pext_props.kind = PEXT_KIND_EXTERNAL
+            else:
+                removed_pkg = pkg.clone()
+                removed_pkg.drive = other_drive
+                if removed_pkg.pext_props is not None:
+                    removed_pkg.pext_props.kind = PEXT_KIND_STANDARD
+                    removed_pkg.pext_props.drive = other_drive
+
+            folder_copies_to_be_removed.append(removed_pkg)
 
     ctx.logger.bench('add_processed_folders start: ', db_id, len(processing_folders))
     non_existing_folders = ctx.installation_report.add_processed_folders(processing_folders, db_id)
@@ -272,15 +287,6 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
 
     installed_folders = [f for f in processing_folders if f.db_path() in db_folder_index]
     return folder_copies_to_be_removed, installed_folders, errors
-
-def _maybe_add_copies_to_remove(ctx: DownloaderWorkerContext, copies: List[Tuple[bool, str, str, PathType]], store: ReadOnlyStoreAdapter, folder_path: str, drive: Optional[str]):
-    if store.folder_drive(folder_path) == drive: return
-    copies.extend([
-        (is_external, folder_path, other_drive, PathType.FOLDER)
-        for is_external, other_drive in store.list_other_drives_for_folder(folder_path, drive)
-        if not ctx.file_system.is_folder(os.path.join(other_drive, folder_path))
-    ])
-
 
 def create_fetch_jobs(ctx: DownloaderWorkerContext, db_id: str, non_existing_pkgs: List[_FetchFilePackage], need_update_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
     if len(non_existing_pkgs) == 0 and len(need_update_pkgs) == 0:

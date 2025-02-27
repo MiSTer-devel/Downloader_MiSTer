@@ -19,9 +19,9 @@
 
 import configparser
 import re
-import time
 from pathlib import Path
-from typing import Optional, List, TypeVar, Union, Dict, Any, SupportsInt
+from typing import Optional, List, TypeVar, Union, SupportsInt
+
 
 from downloader.config import Environment, Config, default_config, InvalidConfigParameter, AllowReboot, \
     ConfigDatabaseSection, ConfigMisterSection, AllowDelete
@@ -30,13 +30,14 @@ from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, 
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL
 from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
-from downloader.logger import Logger
+from downloader.logger import Logger, time_str
 
 
 class ConfigReader:
-    def __init__(self, logger: Logger, env: Environment):
+    def __init__(self, logger: Logger, env: Environment, start_time: float):
         self._logger = logger
         self._env = env
+        self._start_time = start_time
 
     def calculate_config_path(self, current_working_dir: str) -> str:
         if self._env['PC_LAUNCHER'] is not None:
@@ -75,12 +76,24 @@ class ConfigReader:
         result['debug'] = self._env['DEBUG'] == 'true'
         if result['debug']:
             result['verbose'] = True
+        if self._env['LOGLEVEL'] != '':
+            if 'info' in self._env['LOGLEVEL']:
+                result['verbose'] = False
+            if 'debug' in self._env['LOGLEVEL']:
+                result['verbose'] = True
+            if 'http' in self._env['LOGLEVEL']:
+                result['http_logging'] = True
+
+        if result['verbose']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read config start.')
 
         if self._env['DEFAULT_BASE_PATH'] is not None:
             result['base_path'] = self._env['DEFAULT_BASE_PATH']
             result['base_system_path'] = self._env['DEFAULT_BASE_PATH']
 
         ini_config = self._load_ini_config(config_path)
+
+        if result['verbose']: self._logger.print(f'BENCH {time_str(self._start_time)}| Load ini done.')
+
         default_db = self._default_db_config()
 
         for section in ini_config.sections():
@@ -96,6 +109,8 @@ class ConfigReader:
 
             self._logger.print("Reading '%s' db section" % section)
             result['databases'][section_id] = self._parse_database_section(default_db, parser, section_id)
+
+        if result['verbose']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read sections done.')
 
         if len(result['databases']) == 0:
             self._logger.print('Reading default db')
@@ -115,7 +130,7 @@ class ConfigReader:
         result['fail_on_file_error'] = self._env['FAIL_ON_FILE_ERROR'] == 'true'
         result['commit'] = self._valid_max_length('COMMIT', self._env['COMMIT'], 50)
         result['default_db_id'] = self._valid_db_id(K_DEFAULT_DB_ID, self._env['DEFAULT_DB_ID'])
-        result['start_time'] = time.time()
+        result['start_time'] = self._start_time
         result['logfile'] = self._env['LOGFILE']
         result['config_path'] = Path(config_path)
 
@@ -149,15 +164,9 @@ class ConfigReader:
             result['logfile'] = str(launcher_path.with_suffix('.log'))
             result['curl_ssl'] = ''
 
-        if self._env['LOGLEVEL'] != '':
-            if 'info' in self._env['LOGLEVEL']:
-                result['verbose'] = False
-            if 'debug' in self._env['LOGLEVEL']:
-                result['verbose'] = True
-            if 'http' in self._env['LOGLEVEL']:
-                result['http_logging'] = True
-
         result['environment'] = self._env
+
+        if result['verbose']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read config done.')
         return result
 
     @staticmethod
