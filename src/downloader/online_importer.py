@@ -44,7 +44,7 @@ from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.local_store_wrapper import LocalStoreWrapper, StoreFragmentDrivePaths
-from downloader.path_package import PathPackage, PathType, RemovedCopy
+from downloader.path_package import PathPackage, RemovedCopy
 
 
 class OnlineImporter:
@@ -127,8 +127,8 @@ class OnlineImporter:
             box.add_processed_files(job.non_duplicated_files, job.db.db_id)
             box.add_present_validated_files(job.present_validated_files)
             box.add_skipped_updated_files(job.skipped_updated_files, job.db.db_id)
-            box.add_removed_copies(job.removed_folders, job.db.db_id)
-            box.add_installed_folders(job.installed_folders)
+            box.add_removed_folders(job.removed_folders, job.db.db_id)
+            box.add_installed_folders(job.installed_folders, job.db.db_id)
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
 
@@ -145,8 +145,8 @@ class OnlineImporter:
             box.add_processed_files(job.non_duplicated_files, job.db.db_id)
             box.add_present_validated_files(job.present_validated_files)
             box.add_skipped_updated_files(job.skipped_updated_files, job.db.db_id)
-            box.add_removed_copies(job.removed_folders, job.db.db_id)
-            box.add_installed_folders(job.installed_folders)
+            box.add_removed_folders(job.removed_folders, job.db.db_id)
+            box.add_installed_folders(job.installed_folders, job.db.db_id)
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
             if job.summary_download_failed is not None:
@@ -284,24 +284,15 @@ class OnlineImporter:
                 self._needs_reboot = True
             stores[file.db_id].write_only().add_file_pkg(file.pkg)
 
-        for folder_path in sorted(box.installed_folders(), key=lambda x: len(x), reverse=True):
-            for db_id, folder_pkg in report.processed_folder(folder_path).items():
-                stores[db_id].write_only().add_folder_pkg(folder_pkg)
+        for db_id, folder_pkg in box.installed_folders():
+            stores[db_id].write_only().add_folder_pkg(folder_pkg)
 
         for file_path in box.removed_files():
             file = box.processed_file(file_path)
             stores[file.db_id].write_only().remove_file_pkg(file.pkg)
 
-        for db_id, is_external, el_path, drive, ty in box.removed_copies():
-            if ty == PathType.FILE:
-                file = box.processed_file(el_path)
-                stores[file.db_id].write_only().remove_file_pkg(file.pkg)
-
-            elif ty == PathType.FOLDER:
-                if is_external:
-                    stores[db_id].write_only().remove_external_folder(el_path)
-                else:
-                    stores[db_id].write_only().remove_folder(el_path)
+        for db_id, folder_pkg in box.removed_folders():
+            stores[db_id].write_only().remove_folder_pkg(folder_pkg)
 
         for db_id, zip_id, zip_summary, zip_description in box.installed_zip_summary():
             stores[db_id].write_only().add_zip_summary(zip_id, zip_summary, zip_description)
@@ -398,12 +389,13 @@ class InstallationBox:
         self._full_partitions: dict[str, int] = dict()
         self._failed_db_options: list[WrongDatabaseOptions] = []
         self._removed_files: list[str] = []
-        self._removed_copies: list[tuple[str, bool, str, str, PathType]] = []
+        self._removed_folders: list[tuple[str, PathPackage]] = []
         self._removed_zips: list[tuple[str, str]] = []
         self._skipped_updated_files: dict[str, list[str]] = dict()
         self._filtered_zip_data: dict[str, dict[str, dict[str, dict[str, Any]]]] = defaultdict(dict)
         self._installed_zip_summary: list[tuple[str, str, StoreFragmentDrivePaths, dict[str, Any]]] = []
-        self._installed_folders: set[str] = set()
+        self._installed_folders: list[tuple[str, PathPackage]] = []
+        self._installed_folders_set: set[str] = set()
         self._directories = dict()
         self._files = dict()
         self._installed_dbs: list[DbEntity] = []
@@ -482,15 +474,15 @@ class InstallationBox:
         if len(files) == 0: return
         for pkg in files:
             self._removed_files.append(pkg.rel_path)
-    def add_removed_copies(self, copies: list[RemovedCopy], db_id: str):
-        if len(copies) == 0: return
-        self._removed_copies.extend([(db_id, is_external, folder_path, other_drive, el_kind) for is_external, folder_path, other_drive, el_kind  in copies])
-    def add_installed_folders(self, folders: list[PathPackage]):
+    def add_removed_folders(self, folders: list[PathPackage], db_id: str):
         if len(folders) == 0: return
-        for pkg in folders:
-            self._installed_folders.add(pkg.rel_path)
+        self._removed_folders.extend([(db_id, pkg) for pkg  in folders])
+    def add_installed_folders(self, folders: list[PathPackage], db_id: str):
+        if len(folders) == 0: return
+        self._installed_folders.extend([(db_id, pkg) for pkg in folders])
+        self._installed_folders_set.update([pkg.rel_path for pkg in folders])
 
-    def is_folder_installed(self, path: str) -> bool:  return path in self._installed_folders
+    def is_folder_installed(self, path: str) -> bool:  return path in self._installed_folders_set
     def downloaded_files(self): return self._downloaded_files
     def present_validated_files(self): return self._present_validated_files
     def present_not_validated_files(self): return self._present_not_validated_files
@@ -500,10 +492,10 @@ class InstallationBox:
     def failed_folders(self): return self._failed_folders
     def failed_zips(self): return self._failed_zips
     def removed_files(self): return self._removed_files
-    def removed_copies(self): return self._removed_copies
+    def removed_folders(self): return self._removed_folders
     def removed_zips(self): return self._removed_zips
     def installed_files(self): return list(set(self._present_validated_files) | set(self._validated_files))
-    def installed_folders(self): return list(self._installed_folders)
+    def installed_folders(self): return self._installed_folders
     def uninstalled_files(self): return self._removed_files + self._failed_files
     def wrong_db_options(self): return self._failed_db_options
     def installed_zip_summary(self): return self._installed_zip_summary

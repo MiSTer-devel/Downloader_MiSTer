@@ -30,7 +30,7 @@ from downloader.logger import FileLogger, PrintLogger, TopLogger
 from downloader.full_run_service_factory import FullRunServiceFactory
 
 
-def main(env: Environment) -> int:
+def main(env: Environment, start_time: float) -> int:
     # This function should be called in __main__.py which just bootstraps the application.
     # It should receive an 'env' dictionary produced by calling the "read_env" function below.
 
@@ -39,7 +39,7 @@ def main(env: Environment) -> int:
     try:
         exit_code = execute_full_run(
             FullRunServiceFactory.for_main(logger),
-            ConfigReader(logger, env),
+            ConfigReader(logger, env, start_time),
             sys.argv
         )
     except Exception as _:

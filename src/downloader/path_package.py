@@ -116,6 +116,22 @@ class PathPackage:
             None if self.pext_props is None else self.pext_props.clone(),
         )
 
+    def clone_as_pext(self) -> 'PathPackage':
+        return PathPackage(
+            self.rel_path,
+            self.drive,
+            self.description,
+            self.ty,
+            PATH_PACKAGE_KIND_PEXT,
+            PextPathProps(
+                PEXT_KIND_STANDARD,
+                '',  # parent
+                self.drive,
+                (),  # other drives
+                False  # is subfolder
+            ) if self.pext_props is None else self.pext_props.clone(),
+        )
+
     def db_path(self) -> str:
         if self.kind == PATH_PACKAGE_KIND_PEXT:
             return '|' + self.rel_path
@@ -172,4 +188,4 @@ class PextPathProps:
         ))
 
 
-RemovedCopy = Tuple[bool, str, str, PathType]
+RemovedCopy = Tuple[bool, str, str]

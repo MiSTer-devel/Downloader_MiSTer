@@ -17,6 +17,9 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+import time
+start_time = time.time()
+
 from sys import exit
 
 try:
@@ -36,5 +39,5 @@ except ImportError as e:
     default_commit = None
 
 if __name__ == '__main__':
-    exit_code = main(read_env(default_commit))
+    exit_code = main(read_env(default_commit), start_time)
     exit(exit_code)

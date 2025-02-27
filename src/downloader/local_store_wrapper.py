@@ -20,9 +20,9 @@ from downloader.constants import K_BASE_PATH
 from downloader.jobs.index import Index
 from downloader.other import empty_store_without_base_path
 from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict
-from collections import defaultdict
+from collections import defaultdict, ChainMap
 
-from downloader.path_package import PathPackage
+from downloader.path_package import PathPackage, PATH_PACKAGE_KIND_PEXT, PextPathProps, PEXT_KIND_EXTERNAL, PathType
 
 NO_HASH_IN_STORE_CODE = 'file_does_not_exist_so_cant_get_hash'
 
@@ -183,25 +183,25 @@ class WriteOnlyStoreAdapter:
         if file_path in self._external_additions['files']:
             for drive in self._external_additions['files'][file_path]:
                 self.remove_external_file(drive, file_path)
-        self._add_entry('files', file_path, description)
+        self._add_entry('files', PathType.FILE, file_path, description)
 
     def add_folder(self, folder, description):
-        self._add_entry('folders', folder, description)
+        self._add_entry('folders', PathType.FOLDER, folder, description)
 
-    def _add_entry(self, kind, path, description):
+    def _add_entry(self, kind: str, ty: PathType, path: str, description: dict[str, Any]):
         self._clean_external_additions(kind, path)
 
         if 'zip_id' not in description and 'tags' in description:
             description.pop('tags')
 
-        if path in self._store[kind] and equal_dicts(self._store[kind][path], description):
+        if path in self._store[kind] and equal_descriptions(self._store[kind][path], description, ty):
             return
 
         self._store[kind][path] = description
         self._top_wrapper.mark_force_save()
 
     def add_external_folder(self, drive, folder_path, description):
-        self._add_external_entry('folders', drive, folder_path, description)
+        self._add_external_entry('folders', PathType.FOLDER, drive, folder_path, description)
 
     def add_external_file(self, drive, file_path, description):
         if file_path in self._store['files']:
@@ -211,19 +211,17 @@ class WriteOnlyStoreAdapter:
                 if d == drive:
                     continue
                 self.remove_external_file(d, file_path)
-        self._add_external_entry('files', drive, file_path, description)
+        self._add_external_entry('files', PathType.FILE, drive, file_path, description)
 
-    def _add_external_entry(self, kind, drive, path, description):
+    def _add_external_entry(self, kind: str, ty: PathType, drive: str, path: str, description: dict[str, Any]):
         external = self._external_by_drive(drive)
 
         if 'zip_id' not in description and 'tags' in description:
             description.pop('tags')
 
         entries = external[kind]
-        if path in entries and equal_dicts(entries[path], description):
+        if path in entries and equal_descriptions(entries[path], description, ty):
             return
-
-        #if path in self._store[kind]: del self._store[kind][path]
 
         entries[path] = description
         self._top_wrapper.mark_force_save()
@@ -605,9 +603,21 @@ class ReadOnlyStoreAdapter:
     def files(self) -> Dict[str, Dict[str, Any]]:
         return self._store['files']
 
+    def all_files(self):
+        if not 'external' in self._store:
+            return self._store['files']
+
+        return ChainMap(self._store['files'], *[external['files'] for external in self._store['external'].values() if 'files' in external])
+
     @property
     def folders(self) -> Dict[str, Dict[str, Any]]:
         return self._store['folders']
+
+    def all_folders(self):
+        if not 'external' in self._store:
+            return self._store['folders']
+
+        return ChainMap(self._store['folders'], *[external['folders'] for external in self._store['external'].values() if 'folders' in external])
 
     @property
     def has_externals(self) -> bool:
@@ -668,8 +678,8 @@ class ReadOnlyStoreAdapter:
 
         return result
 
-    def list_other_drives_for_folder(self, folder_path: str, drive: Optional[str]) -> List[Tuple[bool, str]]:
-        if drive is None: drive = self.base_path
+    def list_other_drives_for_folder(self, folder_pkg: PathPackage) -> List[Tuple[bool, str]]:
+        folder_path, drive = folder_pkg.rel_path, folder_pkg.drive
         if 'external' in self._store:
             result = [
                 (True, external_drive)
@@ -687,6 +697,24 @@ class ReadOnlyStoreAdapter:
     @property
     def has_no_files(self):
         return len(self._store['files']) == 0
+
+
+def equal_descriptions(lhs: dict[str, Any], b: dict[str, Any], ty: PathType) -> bool:
+    if ty == PathType.FOLDER: return equal_dicts_or_lhs_bigger(lhs, b)
+    else: return equal_dicts(lhs, b)
+
+def equal_dicts_or_lhs_bigger(lhs: dict[str, Any], b: dict[str, Any]) -> bool:
+    if len(b) > len(lhs):
+        return False
+
+    for key, value in lhs.items():
+        if key not in b:
+            continue
+
+        if not equal_values(value, b[key]):
+            return False
+
+    return True
 
 
 def equal_dicts(a, b):

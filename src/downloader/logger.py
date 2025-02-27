@@ -136,8 +136,7 @@ class TopLogger(Logger, ConfigLogManager):
         if self._start_time is None:
             return
 
-        time_str = str(datetime.timedelta(seconds=time.time() - self._start_time))[0:-3]
-        bench_header = f'BENCH {time_str}| '
+        bench_header = f'BENCH {time_str(self._start_time)}| '
         self.print_logger.bench(bench_header, *args)
         self.file_logger.bench(bench_header, *args)
 
@@ -193,3 +192,6 @@ class DebugOnlyLoggerDecorator(Logger):
 
     def bench(self, *args):
         self._decorated_logger.bench(*args)
+
+def time_str(start_time: float) -> str:
+    return str(datetime.timedelta(seconds=time.time() - start_time))[0:-3]
