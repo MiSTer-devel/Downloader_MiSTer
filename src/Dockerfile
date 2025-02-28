@@ -9,7 +9,7 @@ COPY downloader /app/downloader/
 COPY __main__.py commit.py /app/
 
 ENV CFLAGS="-Os -march=armv7-a"
-RUN nuitka --lto=no --follow-imports \
+RUN nuitka --lto=yes --follow-imports \
     --remove-output \
     --include-module=_json \
     --python-flag=no_site \
