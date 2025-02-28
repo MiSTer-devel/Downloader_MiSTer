@@ -22,10 +22,10 @@ def scp_file(src, dest, **kwargs): _ssh_pass('scp', [scp_path(src), scp_path(des
 def exec_ssh(cmd, env=None, **kwargs): return _ssh_pass('ssh', [f'root@{mister_ip()}', f'{exports(env)}{cmd}'], **kwargs)
 def run_build(**kwargs): send_build(env={"SKIP_REMOVALS": "true"}), exec_ssh(f'/media/fat/downloader.sh', **kwargs)
 def run_launcher(**kwargs): send_build(**kwargs), exec_ssh(f'/media/fat/Scripts/downloader.sh', **kwargs)
+def run_compile(**kwargs): send_compile(**kwargs), exec_ssh(f'/media/fat/downloader_bin', **kwargs)
 def store_push(**kwargs): scp_file('downloader.json', '/media/fat/Scripts/.config/downloader/downloader.json', **kwargs)
 def store_pull(**kwargs): scp_file('/media/fat/Scripts/.config/downloader/downloader.json', 'downloader.json', **kwargs)
 def log_pull(**kwargs): scp_file('/media/fat/Scripts/.config/downloader/downloader.log', 'downloader.log', **kwargs)
-
 
 def send_build(env=None, **kwargs):
     env = {'DEBUG': 'true', **os.environ.copy(), **(env or {}), 'MISTER': 'true'}
@@ -39,17 +39,24 @@ def send_build(env=None, **kwargs):
 
     os.remove(tmp.name)
 
+def send_compile(env=None, **kwargs):
+    with tempfile.NamedTemporaryFile(delete=False) as tmp: subprocess.run(['./src/compile.sh'], stdout=tmp, env=env, check=True)
+    os.chmod(tmp.name, 0o755)
+    scp_file(tmp.name, '/media/fat/downloader_bin', **kwargs)
+    os.remove(tmp.name)
 
-def run_operation(op, env=None, retries=False):
-    {
+def operations_dict(env=None, retries=False):
+    return {
         'store_push': lambda: store_push(retries=retries),
         'store_pull': lambda: store_pull(retries=retries),
         'log_pull': lambda: log_pull(retries=retries),
+        'build': lambda: [send_build(env=env, retries=retries), print('OK')],
         'run': lambda: run_build(env=env, retries=retries),
+        'compile': lambda: send_compile(env=env, retries=retries),
+        'run_compile': lambda: run_compile(env=env, retries=retries),
         'launcher': lambda: run_launcher(env=env, retries=retries),
         'copy': lambda: scp_file(sys.argv[2], f'/media/fat/{sys.argv[2]}'),
-    }.get(op, lambda: [send_build(env=env, retries=retries), print('OK')])()
-
+    }
 
 def _ssh_pass(cmd, args, out=None, retries=True):
     for i in range(4):
@@ -59,13 +66,13 @@ def _ssh_pass(cmd, args, out=None, retries=True):
             traceback.print_exc()
             time.sleep(30 * (i + 1))
 
-
 def _main():
+    operations = operations_dict()
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', choices=['store_push', 'store_pull', 'log_pull', 'run', 'launcher', 'copy'], nargs='?', default=None)
+    parser.add_argument('command', choices=list(operations), nargs='?', default=None)
     parser.add_argument('parameter', nargs='?', default='')
-    run_operation(parser.parse_args().command)
-
+    op = operations.get(parser.parse_args().command, operations['build'])
+    op()
 
 if __name__ == '__main__':
     _main()
