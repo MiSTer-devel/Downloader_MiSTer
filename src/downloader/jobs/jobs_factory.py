@@ -100,7 +100,6 @@ def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any]
     )
     open_zip_summary_job.add_tag(make_zip_tag(z.job.db, z.zip_id))
     data_job.after_job = open_zip_summary_job
-    data_job.backup = process_zip_backup
     if process_zip_backup is not None:
         process_zip_backup.summary_download_failed = data_job.source
     return data_job

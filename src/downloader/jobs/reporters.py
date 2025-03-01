@@ -24,6 +24,7 @@ from typing import Dict, Optional, Tuple, List, Set, Type, TypeVar, Generic, Pro
 
 from downloader.db_entity import DbEntity
 from downloader.interruptions import Interruptions
+from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.get_file_job import GetFileJob
 from downloader.path_package import PathPackage
 from downloader.jobs.validate_file_job import ValidateFileJob
@@ -322,6 +323,11 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
 
     def print_job_completed(self, job: Job, _next_jobs: List[Job]):
         if isinstance(job, GetFileJob) and not job.silent:
+            self._symbols.append('.')
+            if self._needs_newline or self._check_time < time.time():
+                self._print_symbols()
+
+        elif isinstance(job, FetchFileJob2) and job.db_id is not None:
             self._symbols.append('.')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()

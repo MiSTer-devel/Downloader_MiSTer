@@ -160,7 +160,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int):
+    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /) -> tuple[int, str]:
         """interface"""
 
     @abstractmethod
@@ -457,8 +457,10 @@ class _FileSystem(FileSystem):
     def download_target_path(self, path: str) -> str:
         return self._path(path)
 
-    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int):
+    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /) -> tuple[int, str]:
         start_time = time.time()
+        md5_hasher = hashlib.md5()
+        file_size = 0
         with open(target_path, 'wb') as out_file:
             while True:
                 elapsed_time = time.time() - start_time
@@ -468,15 +470,20 @@ class _FileSystem(FileSystem):
                 if self._shared_state.interrupting_operations:
                     raise FsOperationsError("File system operations have been disabled.")
 
-                buf = in_stream.read(COPY_BUFSIZE)
-                if not buf:
+                chunk = in_stream.read(COPY_BUFSIZE)
+                if not chunk:
                     break
-                out_file.write(buf)
+
+                out_file.write(chunk)
+                md5_hasher.update(chunk)
+                file_size += len(chunk)
+
+        return file_size, md5_hasher.hexdigest()
 
     def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> Tuple[io.BytesIO, str]:
         start_time = time.monotonic()
         buf = io.BytesIO()
-        file_hash = hashlib.md5() if calc_md5 is not None else None
+        md5_hasher = hashlib.md5() if calc_md5 is not None else None
         while True:
             elapsed_time = time.monotonic() - start_time
             if elapsed_time > timeout:
@@ -493,10 +500,10 @@ class _FileSystem(FileSystem):
             if not calc_md5:
                 continue
 
-            file_hash.update(chunk)
+            md5_hasher.update(chunk)
 
         buf.seek(0)
-        return buf, file_hash.hexdigest() if calc_md5 else ''
+        return buf, md5_hasher.hexdigest() if calc_md5 else ''
 
     def unlink(self, path: str, verbose: bool = True) -> bool:
         verbose = verbose and not path.startswith('/tmp/')

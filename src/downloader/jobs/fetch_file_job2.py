@@ -16,33 +16,27 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import io
-from typing import Any, Optional, Protocol, Union
+from dataclasses import dataclass, field
+from typing import Optional, Any
 
 from downloader.job_system import Job, JobSystem
+from downloader.jobs.get_file_job import GetFileJob
 
-
-class Transferrer(Protocol):
-    def transfer(self) -> Union[str, tuple[str, io.BytesIO]]:
-        ...
-
-    after_job: Optional[Job]
-
-class FetchDataJob(Job, Transferrer):
-    __slots__ = ('_tags', 'source', 'description', 'after_job', 'data')
-    type_id: int = JobSystem.get_job_type_id()
-    def __init__(self, source: str, description: dict[str, Any],/):
+@dataclass(eq=False, order=False)
+class FetchFileJob2(Job):
+    __slots__ = ('_tags', 'source', 'target_path', 'info', 'description', 'temp_path', 'backup_path', 'db_id', 'after_job')
+    type_id: int = field(init=False, default=JobSystem.get_job_type_id())
+    def __init__(self, source: str, target_path: str, info: str, description: dict[str, Any], temp_path: Optional[str], backup_path: Optional[str], db_id: Optional[str], /):
         self.source = source
+        self.target_path = target_path
+        self.info = info
         self.description = description
+        self.temp_path = temp_path
+        self.backup_path = backup_path
+        self.db_id = db_id
 
         # Next job
         self.after_job: Optional[Job] = None
 
-        # Results
-        self.data: Optional[io.BytesIO] = None
-
-    def transfer(self) -> Union[str, tuple[str, io.BytesIO]]:
-        return (self.source, self.data)
-
     def backup_job(self) -> Optional[Job]:
-        return None if self.after_job else self.after_job.backup_job()
+        return None if self.after_job is None else self.after_job.backup_job()
