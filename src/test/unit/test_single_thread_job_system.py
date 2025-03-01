@@ -67,7 +67,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
     def test_wait_for_other_jobs___when_execute_jobs_is_not_called___throws(self):
         with self.assertRaises(Exception) as context:
-            self.system.wait_for_other_jobs()
+            self.system.wait_for_other_jobs(0.001)
 
         self.assertIsInstance(context.exception, JobSystemAbortException)
         self.assertIsInstance(context.exception, CantWaitWhenNotExecutingJobs)

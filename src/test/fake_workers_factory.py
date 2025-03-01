@@ -22,6 +22,8 @@ from downloader.job_system import WorkerResult, Job
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_data_worker import FetchDataWorker
 from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.fetch_file_job2 import FetchFileJob2
+from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
 from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorkerContext, DownloaderWorker
 from downloader.jobs.workers_factory import make_workers as production_make_workers
@@ -34,6 +36,9 @@ def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
     if isinstance(ctx.http_gateway, FakeHttpGateway):
         fake_http: FakeHttpGateway = ctx.http_gateway
         replacement_workers.extend([
+            FakeWorkerDecorator(FetchFileWorker2(
+                progress_reporter=ctx.progress_reporter, http_gateway=fake_http, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout'],
+            ), fake_http),
             FakeWorkerDecorator(FetchFileWorker(
                 progress_reporter=ctx.progress_reporter, http_gateway=fake_http, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout'],
             ), fake_http),
@@ -61,6 +66,12 @@ class FakeWorkerDecorator(DownloaderWorker):
                 description = None
             self._fake_http.set_file_ctx({
                 'description': description,
+                'path': job.temp_path,
+                'info': job.info
+            })
+        elif isinstance(job, FetchFileJob2):
+            self._fake_http.set_file_ctx({
+                'description': {**job.description},
                 'path': job.temp_path,
                 'info': job.info
             })

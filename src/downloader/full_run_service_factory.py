@@ -30,7 +30,7 @@ from downloader.full_run_service import FullRunService
 from downloader.http_gateway import HttpGateway
 from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem
-from downloader.jobs.fetch_file_worker import SafeFileFetcher
+from downloader.jobs.fetch_file_worker2 import SafeFileFetcher
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import DownloaderWorkerContext
 from downloader.logger import DebugOnlyLoggerDecorator, Logger, FilelogManager, ConfigLogManager, FileLogger, \

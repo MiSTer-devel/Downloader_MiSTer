@@ -68,7 +68,7 @@ class TestSmallDbInstall(unittest.TestCase):
     def assertRunOk(self, ini_path, save=True):
         env = debug_env()
         env['DEFAULT_BASE_PATH'] = tmp_default_base_path
-        config = ConfigReader(NoLogger(), env).read_config(ini_path)
+        config = ConfigReader(NoLogger(), env, time.time()).read_config(ini_path)
         shutil.rmtree(config['base_path'], ignore_errors=True)
         shutil.rmtree(config['base_system_path'], ignore_errors=True)
         mister_path = Path('%s/MiSTer' % config['base_system_path'])

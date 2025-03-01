@@ -18,6 +18,7 @@
 import unittest
 import shutil
 import os
+import time
 import json
 from pathlib import Path, PurePosixPath
 
@@ -54,7 +55,7 @@ class SandboxTestBase(unittest.TestCase):
 
         transform_windows_paths_from_expected(expected)
 
-        config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
+        config = ConfigReader(NoLogger(), debug_env(), time.time()).read_config(ini_path)
         self.file_system = make_production_filesystem_factory(config).create_for_system_scope()
         counter = 0
         if 'local_store' in expected:

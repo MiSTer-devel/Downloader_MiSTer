@@ -19,6 +19,7 @@
 import unittest
 import shutil
 import os
+import time
 import os.path
 from pathlib import Path
 from downloader.config_reader import ConfigReader
@@ -69,7 +70,7 @@ class TestFullInstall(unittest.TestCase):
         self.assertNotEqual(correct_hash, corrupt_hash)
 
     def assertRunOk(self, ini_path):
-        config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
+        config = ConfigReader(NoLogger(), debug_env(), time.time()).read_config(ini_path)
         shutil.rmtree(config['base_path'], ignore_errors=True)
         shutil.rmtree(config['base_system_path'], ignore_errors=True)
         mister_path = Path('%s/MiSTer' % config['base_system_path'])

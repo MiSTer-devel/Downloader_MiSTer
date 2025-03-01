@@ -17,13 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from downloader.config_reader import ConfigReader
 from downloader.constants import KENV_DOWNLOADER_LAUNCHER_PATH, KENV_DOWNLOADER_INI_PATH, KENV_PC_LAUNCHER
-from test.fake_logger import NoLogger
+from fake_config_reader import ConfigReader
 
 
 def calculate_config_path(env_vars, working_dir):
-    return ConfigReader(NoLogger(), env_vars).calculate_config_path(working_dir)
+    return ConfigReader(env_vars).calculate_config_path(working_dir)
 
 
 class TestConfigFilePath(unittest.TestCase):

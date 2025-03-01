@@ -38,7 +38,7 @@ class WaitDbZipsWorker(DownloaderWorkerBase):
         logger.bench('WaitDbZipsWorker wait start: ', job.db.db_id)
 
         while self._ctx.installation_report.any_in_progress_job_with_tags(job.zip_job_tags):
-            self._ctx.job_ctx.wait_for_other_jobs()
+            self._ctx.job_ctx.wait_for_other_jobs(0.1)
 
         logger.bench('WaitDbZipsWorker wait done: ', job.db.db_id)
         index = Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url)

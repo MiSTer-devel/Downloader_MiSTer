@@ -38,7 +38,7 @@ class JobContext(Protocol):
     def cancel_pending_jobs(self) -> None:
         """Allows a worker to cancel all pending jobs."""
 
-    def wait_for_other_jobs(self) -> None:
+    def wait_for_other_jobs(self, wait_time: float) -> None:
         """Allows a worker to wait for other jobs to progress."""
 
 
@@ -58,7 +58,7 @@ class JobSystem(JobContext):
         JobSystem._next_job_type_id += 1
         return JobSystem._next_job_type_id
 
-    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', max_threads: int = 6, max_tries: int = 3, wait_time: float = 0.001, max_cycle: int = 3, max_timeout: float = 300, fail_policy: JobFailPolicy = JobFailPolicy.FAULT_TOLERANT):
+    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', max_threads: int = 6, max_tries: int = 3, wait_time: float = 0.25, max_cycle: int = 3, max_timeout: float = 300, fail_policy: JobFailPolicy = JobFailPolicy.FAULT_TOLERANT):
         self._reporter: ProgressReporter = reporter
         self._logger: JobSystemLogger = logger
         self._max_threads: int = max_threads
@@ -126,7 +126,7 @@ class JobSystem(JobContext):
             else:
                 self._execute_without_threads()
 
-            self._handle_notifications()
+            self._handle_notifications(False)
             self._jobs_cancelled.extend([p.job for p in self._job_queue])
             self._job_queue.clear()
             if self._jobs_cancelled:
@@ -143,7 +143,7 @@ class JobSystem(JobContext):
         with self._lock:
             self._are_jobs_cancelled = True
 
-    def wait_for_other_jobs(self):
+    def wait_for_other_jobs(self, wait_time: float):
         # This must be thread-safe. But we don't need to lock next two checks, because
         # we are only reading and we are fine with eventual consistency here.
 
@@ -151,7 +151,7 @@ class JobSystem(JobContext):
         if not self._is_executing_jobs: raise CantWaitWhenNotExecutingJobs('Can not wait when not executing jobs')
 
         if self._max_threads > 1:
-            time.sleep(self._wait_time)
+            time.sleep(wait_time)
         else:
             # This branch does not need to be thread-safe at all, since concurrency is off.
             self._check_clock()
@@ -186,10 +186,8 @@ class JobSystem(JobContext):
                     if assert_success:
                         future = thread_executor.submit(self._operate_on_next_job, package, self._notifications)
                         futures.append((package, future))
-                else:
-                    time.sleep(self._wait_time)
 
-                self._handle_notifications()
+                self._handle_notifications(True)
                 futures = self._remove_done_futures(futures)
                 self._record_work_in_progress()
                 self._check_clock()
@@ -210,10 +208,10 @@ class JobSystem(JobContext):
                     try:
                         self._operate_on_next_job(package, self._notifications)
                     except Exception as e:
-                        self._handle_notifications()
+                        self._handle_notifications(False)
                         self._handle_raised_exception(package, e)
                     else:
-                        self._handle_notifications()
+                        self._handle_notifications(False)
 
             self._record_work_in_progress()
             self._check_clock()
@@ -279,10 +277,10 @@ class JobSystem(JobContext):
 
         return job
 
-    def _handle_notifications(self) -> None:
+    def _handle_notifications(self, block: bool) -> None:
         while True:
             try:
-                notification = self._notifications.get(block=False)
+                notification = self._notifications.get(block=block, timeout=self._wait_time)
             except queue.Empty:
                 break
 
@@ -307,6 +305,9 @@ class JobSystem(JobContext):
                 self._jobs_cancelled.append(package.job)
             else:
                 self._add_unhandled_exception(ValueError(f'Unhandled JobState notification: {status}'), package=package, ctx='handle-notifications-switch-status')
+
+            if block and status != _JobState.JOB_STARTED:
+                break
 
     def _handle_returned_error(self, package: '_JobPackage', e: Exception) -> None:
         retry_job = self._retry_package(package)

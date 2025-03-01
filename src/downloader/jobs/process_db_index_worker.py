@@ -29,6 +29,7 @@ from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.path_package import PathPackage, PathType, RemovedCopy, PEXT_KIND_EXTERNAL, PATH_PACKAGE_KIND_STANDARD, \
     PEXT_KIND_STANDARD, PATH_PACKAGE_KIND_PEXT
@@ -293,11 +294,11 @@ def create_fetch_jobs(ctx: DownloaderWorkerContext, db_id: str, non_existing_pkg
         return []
 
     return [
-    job for job in chain(
-        (_fetch_job(ctx, pkg, False, db_id, base_files_url) for pkg in non_existing_pkgs),
-        (_fetch_job(ctx, pkg,  True, db_id, base_files_url) for pkg in need_update_pkgs)
-    ) if job is not None
-]
+        job for job in chain(
+            (_fetch_job(ctx, pkg, False, db_id, base_files_url) for pkg in non_existing_pkgs),
+            (_fetch_job(ctx, pkg,  True, db_id, base_files_url) for pkg in need_update_pkgs)
+        ) if job is not None
+    ]
 
 def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_id: str, base_files_url: str, /) -> Optional[FetchFileJob]:
     source = _url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url)
@@ -312,6 +313,17 @@ def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_
         ctx.file_system.make_dirs(pkg.drive + '/' + parent_folder)
 
     temp_path = pkg.temp_path(exists)
+    fetch_job2 = FetchFileJob2(
+        source,
+        pkg.full_path,
+        pkg.rel_path,
+        pkg.description,
+        temp_path,
+        pkg.backup_path(),
+        db_id
+    )
+    fetch_job2.add_tag(db_id)
+    return fetch_job2
     fetch_job = FetchFileJob(
         source=source,
         info=pkg.rel_path,

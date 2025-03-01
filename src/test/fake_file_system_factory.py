@@ -282,15 +282,15 @@ class FakeFileSystem(ProductionFileSystem):
     def download_target_path(self, path):
         return self._path(path)
 
-    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int):
+    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /) -> tuple[int, str]:
         if in_stream.storing_problems:
-            return
+            return 0, ''
 
         lower_path = target_path.lower()
         self._write_records.append(_Record('write_incoming_stream', lower_path))
         self.state.files[lower_path] = in_stream.description
         self._fs_cache.add_file(lower_path)
-
+        return self.size(lower_path), self.hash(lower_path)
 
     def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> Tuple[io.BytesIO, str]:
         if in_stream.storing_problems:
