@@ -16,17 +16,18 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import dataclass
-from typing import Optional
-from abc import ABC
+
+import io
+from typing import Protocol, Union, Optional
 
 from downloader.job_system import Job
 
 
-@dataclass(eq=False, order=False)
-class GetFileJob(ABC):
-    temp_path: str
-    info: str
+class Transferrer(Protocol):
+    def transfer(self) -> Union[str, tuple[str, io.BytesIO]]:
+        ...
+
     source: str
-    silent: bool
-    after_job: Optional[Job] = None
+    after_job: Optional[Job]
+
+TransferrerJob = Union[Transferrer, Job]

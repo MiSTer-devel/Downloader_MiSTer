@@ -17,16 +17,11 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import io
-from typing import Any, Optional, Protocol, Union
+from typing import Any, Optional, Union
 
 from downloader.job_system import Job, JobSystem
+from downloader.jobs.transferrer_job import Transferrer
 
-
-class Transferrer(Protocol):
-    def transfer(self) -> Union[str, tuple[str, io.BytesIO]]:
-        ...
-
-    after_job: Optional[Job]
 
 class FetchDataJob(Job, Transferrer):
     __slots__ = ('_tags', 'source', 'description', 'after_job', 'data')
@@ -45,4 +40,4 @@ class FetchDataJob(Job, Transferrer):
         return (self.source, self.data)
 
     def backup_job(self) -> Optional[Job]:
-        return None if self.after_job else self.after_job.backup_job()
+        return None if self.after_job is None else self.after_job.backup_job()

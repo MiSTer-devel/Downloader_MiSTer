@@ -24,10 +24,8 @@ from typing import Dict, Optional, Tuple, List, Set, Type, TypeVar, Generic, Pro
 
 from downloader.db_entity import DbEntity
 from downloader.interruptions import Interruptions
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
-from downloader.jobs.get_file_job import GetFileJob
+from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.path_package import PathPackage
-from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.waiter import Waiter
 from downloader.job_system import ProgressReporter, Job
 from downloader.logger import Logger
@@ -272,19 +270,19 @@ class InstallationReportImpl(InstallationReport):
 
 class FileDownloadSessionLogger(Protocol):
     def start_session(self):
-        '''Starts a new session.'''
+        """Starts a new session."""
 
     def print_progress_line(self, line: str):
-        '''Prints a progress line.'''
+        """Prints a progress line."""
 
     def print_pending(self):
-        '''Prints pending progress.'''
+        """Prints pending progress."""
 
     def print_header(self, db: DbEntity):
-        '''Prints a header.'''
+        """Prints a header."""
 
     def report(self) -> InstallationReport:
-        '''Returns the report.'''
+        """Returns the report."""
 
 
 class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
@@ -305,7 +303,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._deactivated = True
 
     def print_job_started(self, job: Job):
-        if isinstance(job, GetFileJob) and not job.silent:
+        if isinstance(job, FetchFileJob) and job.db_id is not None:
             self._print_line(job.info)
 
         self._check_time = time.time() + 2.0
@@ -322,18 +320,8 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._logger.print(f"Cancelled {len(jobs)} jobs.")
 
     def print_job_completed(self, job: Job, _next_jobs: List[Job]):
-        if isinstance(job, GetFileJob) and not job.silent:
+        if isinstance(job, FetchFileJob) and job.db_id is not None:
             self._symbols.append('.')
-            if self._needs_newline or self._check_time < time.time():
-                self._print_symbols()
-
-        elif isinstance(job, FetchFileJob2) and job.db_id is not None:
-            self._symbols.append('.')
-            if self._needs_newline or self._check_time < time.time():
-                self._print_symbols()
-
-        elif isinstance(job, ValidateFileJob) and job.after_job is None:
-            self._symbols.append('+')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
@@ -409,7 +397,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._print_job_error(job, exception)
 
     def _print_job_error(self, job: Job, exception: BaseException):
-        if (isinstance(job, GetFileJob) and not job.silent) or isinstance(job, ValidateFileJob):
+        if isinstance(job, FetchFileJob) and job.db_id is not None:
             self._logger.debug(exception)
             self._symbols.append('~')
             self._print_symbols()

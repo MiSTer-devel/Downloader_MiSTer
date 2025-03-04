@@ -22,22 +22,17 @@ from dataclasses import dataclass
 
 from downloader.config import Config
 from downloader.db_entity import DbEntity
-from pathlib import Path
 
-from downloader.job_system import Job
 from downloader.jobs.copy_data_job import CopyDataJob
-from downloader.jobs.copy_file_job import CopyFileJob
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.index import Index
 from downloader.jobs.open_zip_contents_job import ZipKind
 from downloader.jobs.open_zip_summary_job import OpenZipSummaryJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
-from downloader.jobs.validate_file_job import ValidateFileJob
+from downloader.jobs.transferrer_job import TransferrerJob
 from downloader.local_store_wrapper import StoreWrapper, new_store_fragment_drive_paths
-from downloader.logger import Logger
 
 
 @dataclass
@@ -47,46 +42,23 @@ class ZipJobContext:
     config: Config
     job: ProcessDbMainJob
 
-
-def make_get_file_job(source: str, target: str, info: str, silent: bool, logger: Optional[Logger] = None) -> GetFileJob:
+def make_heavy_transfer_job(source: str, target_path: str, info: str, description: dict[str, Any], temp_path: Optional[str], backup_path: Optional[str], db_id: Optional[str]) -> TransferrerJob:
     if not source.startswith("http"):
-        if logger: logger.debug('Loading db from fs: %s', source)
-        return CopyFileJob(source=source, temp_path=target, info=info, silent=silent)
-    else:
-        if logger: logger.debug('Loading db from url: %s', source)
-        return FetchFileJob(source=source, temp_path=target, info=info, silent=silent)
-
-
-def make_get_data_job(source: str, description: dict[str, Any], logger: Optional[Logger] = None, /) -> FetchDataJob:
-    if not source.startswith("http"):
-        if logger: logger.debug('Loading db from fs: %s', source)
         return CopyDataJob(source, description)
     else:
-        if logger: logger.debug('Loading db from url: %s', source)
-        return FetchDataJob(source, description)
+        return FetchFileJob(source, target_path, info, description, temp_path, backup_path, db_id)
 
-
-def get_data_job(description: Dict[str, Any], tag: Optional[str], /) -> FetchDataJob:
-    job = make_get_data_job(description['url'], description)
+def make_transfer_job(source: str, description: dict[str, Any], tag: Optional[str], /) -> TransferrerJob:
+    if not source.startswith("http"):
+        job = CopyDataJob(source, description)
+    else:
+        job = FetchDataJob(source, description)
     if tag is not None:
         job.add_tag(tag)
     return job
 
-def make_get_zip_file_jobs(db: DbEntity, zip_id: str, description: Dict[str, Any], tag: Optional[str]) -> Tuple[GetFileJob, ValidateFileJob]:
-    url = description['url']
-    download_path = '/tmp/' + db.db_id.replace('/', '__') + '_._' + zip_id + '_._' + Path(url).name  # @TODO: Use proper tempfile.mkstemp instead
-    info = f'temp zip file {db.db_id}:{zip_id}:{Path(url).name}'
-    get_file_job = make_get_file_job(source=url, info=info, target=download_path, silent=True)
-    validate_job = ValidateFileJob(temp_path=download_path, target_file_path=download_path, description=description, info=info, get_file_job=get_file_job)
-    get_file_job.after_job = validate_job
-    if tag is not None:
-        get_file_job.add_tag(tag)
-        validate_job.add_tag(tag)
-    return get_file_job, validate_job
-
-
-def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any], process_zip_backup: Optional[ProcessZipIndexJob]) -> Job:
-    data_job = get_data_job(file_description, make_zip_tag(z.job.db, z.zip_id))
+def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any], process_zip_backup: Optional[ProcessZipIndexJob]) -> TransferrerJob:
+    transfer_job = make_transfer_job(file_description['url'], file_description, make_zip_tag(z.job.db, z.zip_id))
     open_zip_summary_job = OpenZipSummaryJob(
         zip_id=z.zip_id,
         zip_description=z.zip_description,
@@ -94,15 +66,15 @@ def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any]
         ini_description=z.job.ini_description,
         store=z.job.store,
         full_resync=z.job.full_resync,
-        transfer_job=data_job,
+        transfer_job=transfer_job,
         config=z.config,
         backup=process_zip_backup
     )
     open_zip_summary_job.add_tag(make_zip_tag(z.job.db, z.zip_id))
-    data_job.after_job = open_zip_summary_job
+    transfer_job.after_job = open_zip_summary_job
     if process_zip_backup is not None:
-        process_zip_backup.summary_download_failed = data_job.source
-    return data_job
+        process_zip_backup.summary_download_failed = transfer_job.source
+    return transfer_job
 
 
 def make_process_zip_job(zip_id: str, zip_description: Dict[str, Any], zip_summary: Dict[str, Any], config: Config, db: DbEntity, ini_description: Dict[str, Any], store: StoreWrapper, full_resync: bool, has_new_zip_summary: bool) -> ProcessZipIndexJob:

@@ -19,10 +19,8 @@
 from typing import List
 
 from downloader.jobs.copy_data_worker import CopyDataWorker
-from downloader.jobs.copy_file_worker import CopyFileWorker
-from downloader.jobs.fetch_file_worker import FetchFileWorker
 from downloader.jobs.fetch_data_worker import FetchDataWorker
-from downloader.jobs.fetch_file_worker2 import FetchFileWorker2
+from downloader.jobs.fetch_file_worker import FetchFileWorker
 from downloader.jobs.open_db_worker import OpenDbWorker
 from downloader.jobs.open_zip_contents_worker import OpenZipContentsWorker
 from downloader.jobs.open_zip_summary_worker import OpenZipSummaryWorker
@@ -30,18 +28,14 @@ from downloader.jobs.process_db_main_worker import ProcessDbMainWorker
 from downloader.jobs.wait_db_zips_worker import WaitDbZipsWorker
 from downloader.jobs.process_db_index_worker import ProcessDbIndexWorker
 from downloader.jobs.process_zip_index_worker import ProcessZipIndexWorker
-from downloader.jobs.validate_file_worker import ValidateFileWorker
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 
 
 def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
     return [
-        CopyFileWorker(ctx),
         CopyDataWorker(ctx),
-        FetchFileWorker2(progress_reporter=ctx.progress_reporter, http_gateway=ctx.http_gateway, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout']),
         FetchFileWorker(progress_reporter=ctx.progress_reporter, http_gateway=ctx.http_gateway, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout']),
         FetchDataWorker(progress_reporter=ctx.progress_reporter, http_gateway=ctx.http_gateway, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout']),
-        ValidateFileWorker(progress_reporter=ctx.progress_reporter, file_system=ctx.file_system),
         OpenDbWorker(ctx),
         ProcessDbIndexWorker(ctx),
         WaitDbZipsWorker(ctx),

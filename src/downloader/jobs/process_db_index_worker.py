@@ -29,13 +29,11 @@ from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.fetch_file_job2 import FetchFileJob2
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
-from downloader.path_package import PathPackage, PathType, RemovedCopy, PEXT_KIND_EXTERNAL, PATH_PACKAGE_KIND_STANDARD, \
+from downloader.path_package import PathPackage, PathType, PEXT_KIND_EXTERNAL, \
     PEXT_KIND_STANDARD, PATH_PACKAGE_KIND_PEXT
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.index import Index
-from downloader.jobs.validate_file_job import ValidateFileJob
 from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 from downloader.other import calculate_url
@@ -313,7 +311,7 @@ def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_
         ctx.file_system.make_dirs(pkg.drive + '/' + parent_folder)
 
     temp_path = pkg.temp_path(exists)
-    fetch_job2 = FetchFileJob2(
+    fetch_job2 = FetchFileJob(
         source,
         pkg.full_path,
         pkg.rel_path,
@@ -324,20 +322,3 @@ def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_
     )
     fetch_job2.add_tag(db_id)
     return fetch_job2
-    fetch_job = FetchFileJob(
-        source=source,
-        info=pkg.rel_path,
-        temp_path=temp_path,
-        silent=False
-    )
-    fetch_job.after_job = ValidateFileJob(
-        temp_path=temp_path,
-        target_file_path=pkg.full_path,
-        description=pkg.description,
-        info=pkg.rel_path,
-        backup_path=pkg.backup_path(),
-        get_file_job=fetch_job
-    )
-    fetch_job.add_tag(db_id)
-    fetch_job.after_job.add_tag(db_id)
-    return fetch_job

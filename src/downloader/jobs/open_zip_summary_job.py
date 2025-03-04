@@ -22,8 +22,8 @@ from typing import Dict, Any, Optional
 from downloader.config import Config
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.get_file_job import GetFileJob
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
+from downloader.jobs.transferrer_job import TransferrerJob
 from downloader.local_store_wrapper import StoreWrapper
 
 
@@ -38,7 +38,7 @@ class OpenZipSummaryJob(Job):
     zip_description: Dict[str, Any]
     full_resync: bool
     config: Config
-    transfer_job: Job # & Transferer  @TODO: Python 3.10
+    transfer_job: TransferrerJob # Job & Transferrer  @TODO: Python 3.10
     backup: ProcessZipIndexJob
 
     def retry_job(self) -> Optional[Job]:
