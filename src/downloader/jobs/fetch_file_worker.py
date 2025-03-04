@@ -34,15 +34,34 @@ from downloader.waiter import Waiter
 class FetchFileWorker(DownloaderWorker):
     def __init__(self, progress_reporter: ProgressReporter, http_gateway: HttpGateway, file_system: FileSystem, timeout: int):
         self._progress_reporter = progress_reporter
+        self._file_system = file_system
         self._fetcher = FileFetcher(http_gateway=http_gateway, file_system=file_system, timeout=timeout)
 
     def job_type_id(self) -> int: return FetchFileJob.type_id
     def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: FetchFileJob) -> WorkerResult:  # type: ignore[override]
-        error = self._fetcher.fetch_file(url=job.source, download_path=job.temp_path)
+        if job.temp_path is None and job.backup_path is not None and self._file_system.is_file(job.target_path, use_cache=False):
+            self._file_system.copy(job.target_path, job.backup_path)
+
+        file_path = job.temp_path or job.target_path
+        file_size, file_hash, error = self._fetcher.fetch_file(job.source, file_path)
         if error is not None:
             return [], error
+
+        try:
+            desc = job.description
+            if file_hash != desc['hash']:
+                self._file_system.unlink(file_path, verbose=False)
+                return [], FileDownloadError(f"Bad hash on {job.info} ({desc['hash']} != {file_hash})")
+
+            if file_path != job.target_path:
+                if job.backup_path is not None and self._file_system.is_file(job.target_path, use_cache=False):
+                    self._file_system.move(job.target_path, job.backup_path)
+                self._file_system.move(file_path, job.target_path)
+
+        except Exception as e:
+            return [], FileDownloadError(f'Exception during validation! {job.info}: {str(e)}')
 
         return [] if job.after_job is None else [job.after_job], None
 
@@ -53,31 +72,31 @@ class FileFetcher:
         self._file_system = file_system
         self._timeout = timeout
 
-    def fetch_file(self, url: str, download_path: str) -> Optional[FileDownloadError]:
+    def fetch_file(self, url: str, download_path: str) -> tuple[int, str, Optional[FileDownloadError]]:
         try:
             with self._http_gateway.open(url) as (final_url, in_stream):
                 if in_stream.status != 200:
-                    return FileDownloadError(f'Bad http status! {final_url}: {in_stream.status}')
+                    return 0, '', FileDownloadError(f'Bad http status! {final_url}: {in_stream.status}')
 
-                self._file_system.write_incoming_stream(in_stream, download_path, timeout=self._timeout)
+                file_size, file_hash = self._file_system.write_incoming_stream(in_stream, download_path, self._timeout)
 
         except socket.gaierror as e:
-            return FileDownloadError(f'Socket Address Error! {url}: {str(e)}', e)
+            return 0, '', FileDownloadError(f'Socket Address Error! {url}: {str(e)}', e)
         except URLError as e:
-            return FileDownloadError(f'URL Error! {url}: {e.reason}', e)
+            return 0, '', FileDownloadError(f'URL Error! {url}: {e.reason}', e)
         except HTTPException as e:
-            return FileDownloadError(f'HTTP Error! {url}: {str(e)}', e)
+            return 0, '', FileDownloadError(f'HTTP Error! {url}: {str(e)}', e)
         except ConnectionResetError as e:
-            return FileDownloadError(f'Connection reset error! {url}: {str(e)}', e)
+            return 0, '', FileDownloadError(f'Connection reset error! {url}: {str(e)}', e)
         except OSError as e:
-            return FileDownloadError(f'OS Error! {url}: {e.errno} {str(e)}', e)
+            return 0, '', FileDownloadError(f'OS Error! {url}: {e.errno} {str(e)}', e)
         except BaseException as e:
-            return FileDownloadError(f'Exception during download! {url}: {str(e)}', e)
+            return 0, '', FileDownloadError(f'Exception during download! {url}: {str(e)}', e)
 
         if not self._file_system.is_file(download_path, use_cache=False):
-            return FileDownloadError(f'File from {url} could not be stored.')
+            return 0, '', FileDownloadError(f'File from {url} could not be stored.')
 
-        return None
+        return file_size, file_hash, None
 
 
 class SafeFetchInfo(TypedDict):
@@ -100,16 +119,14 @@ class SafeFileFetcher:
     def fetch_file(self, description: SafeFetchInfo, path: str) -> Optional[FileDownloadError]:
         i = self._retries
         while True:
-            error = self._fetcher.fetch_file(description['url'], path)
+            file_size, file_hash, error = self._fetcher.fetch_file(description['url'], path)
             if error is None:
-                calculated_hash = self._file_system.hash(path)
-                if calculated_hash != description['hash']:
-                    error = FileDownloadError(f'Hash mismatch! {description["url"]}: calculated hash {calculated_hash} != {description["hash"]}')
+                if file_hash != description['hash']:
+                    error = FileDownloadError(f'Hash mismatch! {description["url"]}: calculated hash {file_hash} != {description["hash"]}')
 
             if error is None:
-                calculated_size = self._file_system.size(path)
-                if calculated_size != description['size']:
-                    error = FileDownloadError(f'Size mismatch! {description["url"]}: calculated size {calculated_size} != {description["size"]}')
+                if file_size != description['size']:
+                    error = FileDownloadError(f'Size mismatch! {description["url"]}: calculated size {file_size} != {description["size"]}')
 
             i -= 1
             if error is None or i <= 0:

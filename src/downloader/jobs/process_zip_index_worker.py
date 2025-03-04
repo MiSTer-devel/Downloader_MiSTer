@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from downloader.db_entity import check_no_url_files, fix_folders
 from downloader.job_system import WorkerResult, Job
-from downloader.jobs.jobs_factory import get_data_job, make_zip_kind
+from downloader.jobs.jobs_factory import make_zip_kind, make_transfer_job
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
 from downloader.jobs.process_db_index_worker import create_fetch_jobs, process_index_job_main_sequence
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter, StoreFragmentDrivePaths
@@ -95,7 +95,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             self._ctx.swallow_error(target_error)
             return [], target_error
 
-        data_job = get_data_job(job.zip_description['contents_file'], None)
+        data_job = make_transfer_job(job.zip_description['contents_file']['url'], job.zip_description['contents_file'], None)
         open_zip_contents_job = OpenZipContentsJob(
             db=job.db,
             store=store,
@@ -119,7 +119,8 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         data_job.after_job = open_zip_contents_job
         return [data_job], None
 
-    def _create_target_package(self, calculator: TargetPathsCalculator, kind: ZipKind, description: Dict[str, Any]) -> Tuple[Optional[str], Optional[Exception]]:
+    @staticmethod
+    def _create_target_package(calculator: TargetPathsCalculator, kind: ZipKind, description: Dict[str, Any]) -> Tuple[Optional[PathPackage], Optional[Exception]]:
         if kind == ZipKind.EXTRACT_ALL_CONTENTS:
             if 'target_folder_path' not in description or not isinstance(description['target_folder_path'], str):
                 return None, Exception('extract_all_contents zip requires string "target_folder_path".')
