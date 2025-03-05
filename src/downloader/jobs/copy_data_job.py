@@ -20,7 +20,7 @@ import io
 from typing import Any, Optional, Union
 
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.transferrer_job import Transferrer
+from downloader.jobs.transfer_job import Transferrer
 
 
 class CopyDataJob(Job, Transferrer):
@@ -36,8 +36,10 @@ class CopyDataJob(Job, Transferrer):
         # Results
         self.data: Optional[io.BytesIO] = None
 
-    def transfer(self) -> Union[str, tuple[str, io.BytesIO]]:
-        return (self.source, self.data)
+    def transfer(self) -> Union[str, io.BytesIO]:
+        if self.data is None:
+            raise Exception('data not ready!')
+        return self.data
 
     def backup_job(self) -> Optional[Job]:
         return None if self.after_job is None else self.after_job.backup_job()

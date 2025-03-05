@@ -20,7 +20,7 @@ from typing import Optional, Any, Union
 import io
 
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.transferrer_job import Transferrer
+from downloader.jobs.transfer_job import Transferrer
 
 
 class FetchFileJob(Job, Transferrer):
@@ -38,7 +38,7 @@ class FetchFileJob(Job, Transferrer):
         # Next job
         self.after_job: Optional[Job] = None
 
-    def transfer(self) -> Union[str, tuple[str, io.BytesIO]]:
+    def transfer(self) -> Union[str, io.BytesIO]:
         return self.target_path
 
     def backup_job(self) -> Optional[Job]:

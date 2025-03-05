@@ -23,7 +23,7 @@ from typing import Dict, Any, List, Optional
 from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFoldersHolder, Config
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.transferrer_job import TransferrerJob
+from downloader.jobs.transfer_job import TransferJob
 from downloader.path_package import PathPackage
 from downloader.local_store_wrapper import StoreWrapper
 
@@ -51,7 +51,7 @@ class OpenZipContentsJob(Job):
     total_amount_of_files_in_zip: int
     files_to_unzip: List[PathPackage]
     recipient_folders: List[PathPackage]
-    transfer_job: TransferrerJob # Job & Transferrer @TODO: Python 3.10
+    transfer_job: TransferJob # Job & Transferrer @TODO: Python 3.10
     action_text: str
     zip_base_files_url: str
     filtered_data: FileFoldersHolder

@@ -172,7 +172,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def load_dict_from_transfer(self, transfer: Union[str, tuple[str, io.BytesIO]], /) -> Dict[str, Any]:
+    def load_dict_from_transfer(self, source: str, transfer: Union[str, io.BytesIO], /) -> Dict[str, Any]:
         """interface"""
 
     @abstractmethod
@@ -188,7 +188,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def unzip_contents(self, transfer: Union[str, tuple[str, io.BytesIO]], target_path: Union[str, Dict[str, str]], test_info: Any, /) -> None:
+    def unzip_contents(self, transfer: Union[str, io.BytesIO], target_path: Union[str, Dict[str, str]], test_info: Any, /) -> None:
         """interface"""
 
     @abstractmethod
@@ -224,8 +224,8 @@ class ReadOnlyFileSystem:
     def load_dict_from_file(self, file: str) -> Dict[str, Any]:
         return self._fs.load_dict_from_file(file)
 
-    def load_dict_from_transfer(self, transfer):
-        return self._fs.load_dict_from_transfer(transfer)
+    def load_dict_from_transfer(self, source: str, transfer):
+        return self._fs.load_dict_from_transfer(source, transfer)
 
     def folder_has_items(self, path):
         return self._fs.folder_has_items(path)
@@ -515,13 +515,13 @@ class _FileSystem(FileSystem):
 
         return self._unlink(path, verbose)
 
-    def load_dict_from_transfer(self, transfer: Union[str, tuple[str, io.BytesIO]]) -> Dict[str, Any]:
+    def load_dict_from_transfer(self, source: str, transfer: Union[str, io.BytesIO]) -> Dict[str, Any]:
         if isinstance(transfer, str):
             try:
                 return self.load_dict_from_file(transfer)
             finally:
                 self._unlink(transfer, False)
-        else: return self._load_dict_from_data(*transfer)
+        else: return self._load_dict_from_data(source, transfer)
 
     def load_dict_from_file(self, path: str) -> Dict[str, Any]:
         full_path = self._path(path)
@@ -562,12 +562,10 @@ class _FileSystem(FileSystem):
         with open(full_path, 'w') as f:
             json.dump(db, f)
 
-    def unzip_contents(self, transfer: Union[str, tuple[str, io.BytesIO]], target_path: Union[str, Dict[str, str]], test_info: Any, /) -> None:
-        if isinstance(transfer, tuple):
-            zip_file = transfer[1]
-            self._logger.debug('Unzipping contents: ', transfer[0])
+    def unzip_contents(self, zip_file: Union[str, io.BytesIO], target_path: Union[str, Dict[str, str]], test_info: Any, /) -> None:
+        if not isinstance(zip_file, str):
+            self._logger.debug('Unzipping contents from io.BytesIO.')
         else:
-            zip_file = transfer
             self._logger.debug('Unzipping contents: ', zip_file)
 
         files_to_unzip = None if isinstance(target_path, str) else target_path
