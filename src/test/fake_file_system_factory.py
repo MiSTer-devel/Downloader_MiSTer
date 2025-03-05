@@ -308,13 +308,13 @@ class FakeFileSystem(ProductionFileSystem):
         else:
             return False
 
-    def load_dict_from_transfer(self, transfer: Union[str, tuple[str, io.BytesIO]]):
+    def load_dict_from_transfer(self, source: str, transfer: Union[str, io.BytesIO]):
         if isinstance(transfer, str):
             path = self._path(transfer)
-            result = self._load_dict_from_file(path)
+            result = self.load_dict_from_file(path)
             self.state.files.pop(path)
             return result
-        else: return self._load_dict_from_data(*transfer)
+        else: return self._load_dict_from_data(source, transfer)
 
     def load_dict_from_file(self, path):
         full_path = self._path(path)
@@ -347,12 +347,12 @@ class FakeFileSystem(ProductionFileSystem):
         self.state.files[file]['json'] = db
         self._write_records.append(_Record('save_json', file))
 
-    def unzip_contents(self, transfer: Union[str, tuple[str, io.BytesIO]], target_path: Union[str, Dict[str, str]], test_info: Tuple[Optional[PathPackage], List[PathPackage], Dict[str, Dict[str, Any]]]):
+    def unzip_contents(self, transfer: Union[str, io.BytesIO], target_path: Union[str, Dict[str, str]], test_info: Tuple[Optional[PathPackage], List[PathPackage], Dict[str, Dict[str, Any]]]):
         if isinstance(transfer, str):
             contents = self.state.files[self._path(transfer)]['zipped_files']
             self.unlink(transfer)
         else:
-            contents = transfer[1].description['zipped_files']
+            contents = transfer.description['zipped_files']
 
         if 'unzip_error' in self._fake_failures:
             raise UnzipError(transfer)

@@ -31,7 +31,7 @@ from downloader.jobs.open_zip_contents_job import ZipKind
 from downloader.jobs.open_zip_summary_job import OpenZipSummaryJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
-from downloader.jobs.transferrer_job import TransferrerJob
+from downloader.jobs.transfer_job import TransferJob
 from downloader.local_store_wrapper import StoreWrapper, new_store_fragment_drive_paths
 
 
@@ -42,13 +42,13 @@ class ZipJobContext:
     config: Config
     job: ProcessDbMainJob
 
-def make_heavy_transfer_job(source: str, target_path: str, info: str, description: dict[str, Any], temp_path: Optional[str], backup_path: Optional[str], db_id: Optional[str]) -> TransferrerJob:
+def make_heavy_transfer_job(source: str, target_path: str, info: str, description: dict[str, Any], temp_path: Optional[str], backup_path: Optional[str], db_id: Optional[str]) -> TransferJob:
     if not source.startswith("http"):
         return CopyDataJob(source, description)
     else:
         return FetchFileJob(source, target_path, info, description, temp_path, backup_path, db_id)
 
-def make_transfer_job(source: str, description: dict[str, Any], tag: Optional[str], /) -> TransferrerJob:
+def make_transfer_job(source: str, description: dict[str, Any], tag: Optional[str], /) -> TransferJob:
     if not source.startswith("http"):
         job = CopyDataJob(source, description)
     else:
@@ -57,7 +57,7 @@ def make_transfer_job(source: str, description: dict[str, Any], tag: Optional[st
         job.add_tag(tag)
     return job
 
-def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any], process_zip_backup: Optional[ProcessZipIndexJob]) -> TransferrerJob:
+def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any], process_zip_backup: Optional[ProcessZipIndexJob]) -> TransferJob:
     transfer_job = make_transfer_job(file_description['url'], file_description, make_zip_tag(z.job.db, z.zip_id))
     open_zip_summary_job = OpenZipSummaryJob(
         zip_id=z.zip_id,

@@ -20,14 +20,14 @@ from dataclasses import field, dataclass
 from typing import Any
 
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.transferrer_job import TransferrerJob
+from downloader.jobs.transfer_job import TransferJob
 from downloader.local_store_wrapper import StoreWrapper
 
 
 @dataclass(eq=False, order=False)
 class OpenDbJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
-    transfer_job: TransferrerJob # Job & Transferrer @TODO: Python 3.10
+    transfer_job: TransferJob # Job & Transferrer @TODO: Python 3.10
     section: str
     ini_description: dict[str, Any]
     store: StoreWrapper

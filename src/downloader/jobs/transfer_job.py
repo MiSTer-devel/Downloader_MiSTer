@@ -24,10 +24,10 @@ from downloader.job_system import Job
 
 
 class Transferrer(Protocol):
-    def transfer(self) -> Union[str, tuple[str, io.BytesIO]]:
+    def transfer(self) -> Union[str, io.BytesIO]:
         ...
 
     source: str
     after_job: Optional[Job]
 
-TransferrerJob = Union[Transferrer, Job]
+TransferJob = Union[Transferrer, Job]
