@@ -187,7 +187,7 @@ class FullRunService:
 
         self._logger.print()
         self._logger.print('Installed:')
-        self._logger.print(format_files_message(box.installed_files()))
+        self._logger.print(format_files_message(box.installed_file_names()))
         self._logger.print()
         self._logger.print('Errors:')
         self._logger.print(format_files_message(box.failed_files() + [f'[{db}]' for db in box.failed_dbs()]))

@@ -42,13 +42,7 @@ class ZipJobContext:
     config: Config
     job: ProcessDbMainJob
 
-def make_heavy_transfer_job(source: str, target_path: str, info: str, description: dict[str, Any], temp_path: Optional[str], backup_path: Optional[str], db_id: Optional[str]) -> TransferJob:
-    if not source.startswith("http"):
-        return CopyDataJob(source, description)
-    else:
-        return FetchFileJob(source, target_path, info, description, temp_path, backup_path, db_id)
-
-def make_transfer_job(source: str, description: dict[str, Any], tag: Optional[str], /) -> TransferJob:
+def make_ephemeral_transfer_job(source: str, description: dict[str, Any], tag: Optional[str], /) -> TransferJob:
     if not source.startswith("http"):
         job = CopyDataJob(source, description)
     else:
@@ -58,7 +52,7 @@ def make_transfer_job(source: str, description: dict[str, Any], tag: Optional[st
     return job
 
 def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any], process_zip_backup: Optional[ProcessZipIndexJob]) -> TransferJob:
-    transfer_job = make_transfer_job(file_description['url'], file_description, make_zip_tag(z.job.db, z.zip_id))
+    transfer_job = make_ephemeral_transfer_job(file_description['url'], file_description, make_zip_tag(z.job.db, z.zip_id))
     open_zip_summary_job = OpenZipSummaryJob(
         zip_id=z.zip_id,
         zip_description=z.zip_description,
