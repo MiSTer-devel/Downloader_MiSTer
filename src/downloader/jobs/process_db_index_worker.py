@@ -118,7 +118,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
 
     if need_install_pkgs is not None or job.present_validated_files:
         logger.bench(bench_label, ' Checking non external store presence: ', db.db_id, zip_id)
-        job.non_external_store_presence = check_non_external_store_presence(ctx, store, chain(need_install_pkgs or [], job.present_validated_files))
+        job.repeated_store_presence = check_repeated_store_presence(ctx, store, chain(need_install_pkgs or [], job.present_validated_files))
 
     logger.bench(bench_label, ' Create folders: ', db.db_id, zip_id)
     job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(ctx, create_folder_pkgs, db.db_id, filtered_summary.folders, store)
@@ -222,14 +222,15 @@ def try_reserve_space(ctx: DownloaderWorkerContext, file_pkgs: Iterable[PathPack
 
         return full_partitions
 
-def check_non_external_store_presence(ctx: DownloaderWorkerContext, store: ReadOnlyStoreAdapter, keep_store_candidate_pkgs: Iterable[PathPackage]) -> set[str]:
+def check_repeated_store_presence(ctx: DownloaderWorkerContext, store: ReadOnlyStoreAdapter, keep_store_candidate_pkgs: Iterable[PathPackage]) -> set[str]:
     result = set()
     for pkg in keep_store_candidate_pkgs:
         if not pkg.is_pext_external():
             continue
-        base_drive = ctx.config['base_path']
-        if pkg.rel_path in store.files and ctx.file_system.is_file(os.path.join(base_drive, pkg.rel_path), use_cache=False):
-            result.add(pkg.rel_path)  # @TODO: See if use_cache is needed, and if we should optimzie this fs access
+
+        for _, drive in store.list_other_drives_for_file(pkg.rel_path, pkg.drive):
+            if ctx.file_system.is_file(os.path.join(drive, pkg.rel_path), use_cache=False):
+                result.add(pkg.rel_path)  # @TODO: See if use_cache is needed, and if we should optimzie this fs access
     return result
 
 def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter) -> Tuple[List[PathPackage], List[PathPackage], List[str]]:
