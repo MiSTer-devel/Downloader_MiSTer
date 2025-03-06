@@ -64,7 +64,7 @@ class ProcessDbIndexWorker(DownloaderWorkerBase):
 
         logger.bench('ProcessDbIndexWorker start: ', db.db_id, zip_id)
         try:
-            non_existing_pkgs, need_update_pkgs, _, error = process_index_job_main_sequence(self._ctx, job, summary, store, 'ProcessDbIndexWorker')
+            non_existing_pkgs, need_update_pkgs, _, error = process_index_job_main_sequence(self._ctx, job, summary, store)
             if error is not None:
                 return [], error
 
@@ -77,7 +77,7 @@ class ProcessDbIndexWorker(DownloaderWorkerBase):
             return [], e
 
 # @TODO(python 3.12): Use ProcessDbIndexJob & ProcessZipIndexJob instead of Union, which is incorrect
-def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[ProcessDbIndexJob, ProcessZipIndexJob], summary: Index, store: ReadOnlyStoreAdapter, bench_label: str) -> Tuple[
+def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[ProcessDbIndexJob, ProcessZipIndexJob], summary: Index, store: ReadOnlyStoreAdapter, /) -> Tuple[
     List[PathPackage],
     List[PathPackage],
     ZipData,
@@ -86,6 +86,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
     logger = ctx.logger
     config, db, zip_id, full_resync = job.config, job.db, job.zip_id, job.full_resync
 
+    bench_label = job.__class__.__name__
     logger.bench(bench_label, ' filter summary: ', db.db_id, zip_id)
     filtered_summary, zip_data = ctx.file_filter_factory.create(db, summary, config).select_filtered_files(summary)
 
@@ -104,13 +105,20 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
     logger.bench(bench_label, ' validate pkgs: ', db.db_id, zip_id)
     job.present_validated_files, job.skipped_updated_files, need_update_pkgs = process_validate_packages(ctx, validate_pkgs)
 
-    logger.bench(bench_label, ' Reserve space: ', db.db_id, zip_id)
     if non_existing_pkgs or need_update_pkgs:
-        job.full_partitions = try_reserve_space(ctx, chain(non_existing_pkgs, need_update_pkgs))
+        logger.bench(bench_label, ' Reserve space: ', db.db_id, zip_id)
+        need_install_pkgs = chain(non_existing_pkgs, need_update_pkgs)
+        job.full_partitions = try_reserve_space(ctx, need_install_pkgs)
         if len(job.full_partitions) > 0:
             job.failed_files_no_space = non_existing_pkgs + need_update_pkgs
             logger.debug("Not enough space '%s'!", db.db_id)
             return [], [], {}, FileWriteError(f"Could not allocate space for {len(job.failed_files_no_space)} files.")
+    else:
+        need_install_pkgs = None
+
+    if need_install_pkgs is not None or job.present_validated_files:
+        logger.bench(bench_label, ' Checking non external store presence: ', db.db_id, zip_id)
+        job.non_external_store_presence = check_non_external_store_presence(ctx, store, chain(need_install_pkgs or [], job.present_validated_files))
 
     logger.bench(bench_label, ' Create folders: ', db.db_id, zip_id)
     job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(ctx, create_folder_pkgs, db.db_id, filtered_summary.folders, store)
@@ -214,6 +222,15 @@ def try_reserve_space(ctx: DownloaderWorkerContext, file_pkgs: Iterable[PathPack
 
         return full_partitions
 
+def check_non_external_store_presence(ctx: DownloaderWorkerContext, store: ReadOnlyStoreAdapter, keep_store_candidate_pkgs: Iterable[PathPackage]) -> set[str]:
+    result = set()
+    for pkg in keep_store_candidate_pkgs:
+        if not pkg.is_pext_external():
+            continue
+        base_drive = ctx.config['base_path']
+        if pkg.rel_path in store.files and ctx.file_system.is_file(os.path.join(base_drive, pkg.rel_path), use_cache=False):
+            result.add(pkg.rel_path)  # @TODO: See if use_cache is needed, and if we should optimzie this fs access
+    return result
 
 def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter) -> Tuple[List[PathPackage], List[PathPackage], List[str]]:
     if len(create_folder_pkgs) == 0:

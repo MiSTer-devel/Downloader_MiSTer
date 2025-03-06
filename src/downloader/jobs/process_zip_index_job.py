@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from downloader.config import Config
 from downloader.db_entity import DbEntity
@@ -26,7 +26,7 @@ from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.index import Index
 from downloader.local_store_wrapper import StoreWrapper, StoreFragmentDrivePaths
-from downloader.path_package import PathPackage, RemovedCopy
+from downloader.path_package import PathPackage
 
 
 @dataclass(eq=False, order=False)
@@ -38,8 +38,8 @@ class ProcessZipIndexJob(Job):
     store: StoreWrapper
     config: Config
     zip_id: str
-    ini_description: Dict[str, Any]
-    zip_description: Dict[str, Any]
+    ini_description: dict[str, Any]
+    zip_description: dict[str, Any]
     zip_index: Index
     has_new_zip_summary: bool
     full_resync: bool
@@ -50,22 +50,24 @@ class ProcessZipIndexJob(Job):
     result_zip_index: StoreFragmentDrivePaths
     filtered_data: Optional[FileFoldersHolder] = field(default=None)
 
-    present_not_validated_files: List[PathPackage] = field(default_factory=list)
-    present_validated_files: List[PathPackage] = field(default_factory=list)
-    skipped_updated_files: List[PathPackage] = field(default_factory=list)
-    non_duplicated_files: List[PathPackage] = field(default_factory=list)
-    duplicated_files: List[str] = field(default_factory=list)
+    present_not_validated_files: list[PathPackage] = field(default_factory=list)
+    present_validated_files: list[PathPackage] = field(default_factory=list)
+    skipped_updated_files: list[PathPackage] = field(default_factory=list)
+    non_duplicated_files: list[PathPackage] = field(default_factory=list)
+    duplicated_files: list[str] = field(default_factory=list)
 
-    installed_folders: List[PathPackage] = field(default_factory=list)
-    removed_folders: List[PathPackage] = field(default_factory=list)  #  @TODO: Why there is removed_folders AND directories_to_remove?
+    installed_folders: list[PathPackage] = field(default_factory=list)
+    removed_folders: list[PathPackage] = field(default_factory=list)  #  @TODO: Why there is removed_folders AND directories_to_remove?
 
-    directories_to_remove: List[PathPackage] = field(default_factory=list)
-    files_to_remove: List[PathPackage] = field(default_factory=list)
+    directories_to_remove: list[PathPackage] = field(default_factory=list)
+    files_to_remove: list[PathPackage] = field(default_factory=list)
+
+    non_external_store_presence: set[str] = field(default_factory=set)
 
     # Failure results
-    full_partitions: List[Tuple[Partition, int]] = field(default_factory=list)
-    failed_files_no_space: List[PathPackage] = field(default_factory=list)
-    failed_folders: List[str] = field(default_factory=list)
+    full_partitions: list[tuple[Partition, int]] = field(default_factory=list)
+    failed_files_no_space: list[PathPackage] = field(default_factory=list)
+    failed_folders: list[str] = field(default_factory=list)
 
     # Success & Failure results
     summary_download_failed: Optional[str] = field(default=None)

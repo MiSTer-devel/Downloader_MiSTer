@@ -127,7 +127,7 @@ class SandboxTestBase(unittest.TestCase):
         env['CURL_SSL'] = ''
         env['DEFAULT_BASE_PATH'] = tmp_default_base_path
 
-        config_reader = ConfigReader(logger, env)
+        config_reader = ConfigReader(logger, env, time.time())
         factory = FullRunServiceFactory(logger, NoLogger(), log_mgr, external_drives_repository_factory=external_drives_repository_factory)
         return execute_full_run(factory, config_reader, argv or [])
 
@@ -180,7 +180,7 @@ def fix_relative_files(files):
 def cleanup(ini_path):
     env = debug_env()
     env['DEFAULT_BASE_PATH'] = tmp_default_base_path
-    config = ConfigReader(NoLogger(), env).read_config(ini_path)
+    config = ConfigReader(NoLogger(), env, time.time()).read_config(ini_path)
     delete_folder(config['base_path'])
     delete_folder(config['base_system_path'])
     create_folder(config['base_path'])

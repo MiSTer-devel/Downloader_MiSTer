@@ -126,6 +126,7 @@ class OnlineImporter:
             box.add_processed_files(job.non_duplicated_files, job.db.db_id)
             box.add_present_validated_files(job.present_validated_files)
             box.add_skipped_updated_files(job.skipped_updated_files, job.db.db_id)
+            box.add_non_external_store_presence(job.non_external_store_presence, job.db.db_id)
             box.add_removed_folders(job.removed_folders, job.db.db_id)
             box.add_installed_folders(job.installed_folders, job.db.db_id)
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
@@ -144,6 +145,7 @@ class OnlineImporter:
             box.add_processed_files(job.non_duplicated_files, job.db.db_id)
             box.add_present_validated_files(job.present_validated_files)
             box.add_skipped_updated_files(job.skipped_updated_files, job.db.db_id)
+            box.add_non_external_store_presence(job.non_external_store_presence, job.db.db_id)
             box.add_removed_folders(job.removed_folders, job.db.db_id)
             box.add_installed_folders(job.installed_folders, job.db.db_id)
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
@@ -275,7 +277,7 @@ class OnlineImporter:
             file = box.processed_file(file_path)
             if 'reboot' in file.pkg.description and file.pkg.description['reboot'] == True:
                 self._needs_reboot = True
-            stores[file.db_id].write_only().add_file_pkg(file.pkg)
+            stores[file.db_id].write_only().add_file_pkg(file.pkg, file.pkg.rel_path in box.non_external_store_presence()[file.db_id])
 
         for db_id, folder_pkg in box.installed_folders():
             stores[db_id].write_only().add_folder_pkg(folder_pkg)
@@ -389,6 +391,7 @@ class InstallationBox:
         self._installed_zip_summary: list[tuple[str, str, StoreFragmentDrivePaths, dict[str, Any]]] = []
         self._installed_folders: list[tuple[str, PathPackage]] = []
         self._installed_folders_set: set[str] = set()
+        self._non_external_store_presence: dict[str, set[str]] = defaultdict(set)
         self._directories = dict()
         self._files = dict()
         self._installed_dbs: list[DbEntity] = []
@@ -412,6 +415,8 @@ class InstallationBox:
         if len(files) == 0: return
         for pkg in files:
             self._validated_files.append(pkg.rel_path)
+    def add_non_external_store_presence(self, non_external_store_entries: set[str], db_id: str):
+        self._non_external_store_presence[db_id].update(non_external_store_entries)
     def add_installed_zip_summary(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: dict[str, Any]):
         self._installed_zip_summary.append((db_id, zip_id, fragment, description))
     def add_present_validated_files(self, paths: list[PathPackage]):
@@ -491,6 +496,7 @@ class InstallationBox:
     def installed_folders(self): return self._installed_folders
     def uninstalled_files(self): return self._removed_files + self._failed_files
     def wrong_db_options(self): return self._failed_db_options
+    def non_external_store_presence(self): return self._non_external_store_presence
     def installed_zip_summary(self): return self._installed_zip_summary
     def skipped_updated_files(self): return self._skipped_updated_files
     def filtered_zip_data(self): return self._filtered_zip_data
