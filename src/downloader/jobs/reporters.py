@@ -62,14 +62,6 @@ class DownloaderProgressReporter(ProgressReporter):
     def notify_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
         pass
 
-
-class ProcessedFile:
-    __slots__ = ('pkg', 'db_id')
-    def __init__(self, pkg: PathPackage, db_id: str,/):
-        self.pkg = pkg
-        self.db_id = db_id
-
-
 @dataclasses.dataclass
 class ProcessedFolder:
     pkg: PathPackage

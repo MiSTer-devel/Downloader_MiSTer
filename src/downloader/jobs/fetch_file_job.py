@@ -19,20 +19,22 @@
 from typing import Optional, Any, Union
 import io
 
+from delme2 import PathPackage
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.transfer_job import Transferrer
 
 
 class FetchFileJob(Job, Transferrer):
-    __slots__ = ('_tags', 'source', 'target_path', 'info', 'description', 'temp_path', 'backup_path', 'db_id', 'after_job')
+    __slots__ = ('_tags', 'source', 'target_path', 'info', 'description', 'temp_path', 'backup_path', 'pkg', 'db_id', 'after_job')
     type_id: int = JobSystem.get_job_type_id()
-    def __init__(self, source: str, target_path: str, info: str, description: dict[str, Any], temp_path: Optional[str], backup_path: Optional[str], db_id: Optional[str], /):
+    def __init__(self, source: str, target_path: str, info: str, description: dict[str, Any], temp_path: Optional[str], backup_path: Optional[str], pkg: Optional[PathPackage], db_id: Optional[str], /):
         self.source = source
         self.target_path = target_path
         self.info = info
         self.description = description
         self.temp_path = temp_path
         self.backup_path = backup_path
+        self.pkg = pkg
         self.db_id = db_id
 
         # Next job

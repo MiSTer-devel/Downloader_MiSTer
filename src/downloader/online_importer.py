@@ -28,10 +28,9 @@ from downloader.job_system import Job
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.jobs_factory import make_transfer_job
+from downloader.jobs.jobs_factory import make_ephemeral_transfer_job
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
-from downloader.jobs.reporters import ProcessedFile
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 from downloader.jobs.workers_factory import make_workers
 from downloader.logger import Logger
@@ -63,7 +62,7 @@ class OnlineImporter:
         jobs: list[Job] = []
         for pkg in db_pkgs:
             # @TODO: Use proper tempfile.mkstemp instead
-            fetch_data_job = make_transfer_job(pkg.section['db_url'], {}, None)
+            fetch_data_job = make_ephemeral_transfer_job(pkg.section['db_url'], {}, None)
             self._logger.debug('Loading db from: ', pkg.section['db_url'])
             fetch_data_job.after_job = OpenDbJob(
                 transfer_job=fetch_data_job,
@@ -123,8 +122,8 @@ class OnlineImporter:
         for job in report.get_completed_jobs(ProcessDbIndexJob):
             box.add_present_not_validated_files(job.present_not_validated_files)
             box.add_duplicated_files(job.duplicated_files, job.db.db_id)
-            box.add_processed_files(job.non_duplicated_files, job.db.db_id)
-            box.add_present_validated_files(job.present_validated_files)
+            box.add_non_duplicated_files(job.non_duplicated_files, job.db.db_id)
+            box.add_present_validated_files(job.present_validated_files, job.db.db_id)
             box.add_skipped_updated_files(job.skipped_updated_files, job.db.db_id)
             box.add_non_external_store_presence(job.non_external_store_presence, job.db.db_id)
             box.add_removed_folders(job.removed_folders, job.db.db_id)
@@ -142,8 +141,8 @@ class OnlineImporter:
         for job in report.get_completed_jobs(ProcessZipIndexJob):
             box.add_present_not_validated_files(job.present_not_validated_files)
             box.add_duplicated_files(job.duplicated_files, job.db.db_id)
-            box.add_processed_files(job.non_duplicated_files, job.db.db_id)
-            box.add_present_validated_files(job.present_validated_files)
+            box.add_non_duplicated_files(job.non_duplicated_files, job.db.db_id)
+            box.add_present_validated_files(job.present_validated_files, job.db.db_id)
             box.add_skipped_updated_files(job.skipped_updated_files, job.db.db_id)
             box.add_non_external_store_presence(job.non_external_store_presence, job.db.db_id)
             box.add_removed_folders(job.removed_folders, job.db.db_id)
@@ -166,7 +165,7 @@ class OnlineImporter:
 
         for job in report.get_completed_jobs(OpenZipContentsJob):
             box.add_downloaded_files(job.downloaded_files)
-            box.add_validated_files(job.validated_files)
+            box.add_validated_files(job.validated_files, job.db.db_id)
             # We should be able to comment previous line and the test still pass
             box.add_failed_files(job.failed_files)
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
@@ -179,9 +178,9 @@ class OnlineImporter:
             box.add_file_fetch_started(job.info)
 
         for job in report.get_completed_jobs(FetchFileJob):
-            if job.db_id is None: continue
+            if job.db_id is None or job.pkg is None: continue
             box.add_downloaded_file(job.info)
-            box.add_validated_file(job.info)
+            box.add_validated_file(job.pkg, job.db_id)
 
         for job, _e in report.get_failed_jobs(FetchDataJob):
             box.add_failed_file(job.source)  # @TODO: This should not count as a file, but as a "source".
@@ -213,11 +212,6 @@ class OnlineImporter:
 
         logger.bench('OnlineImporter applying changes on stores...')
 
-        for duplicates, db_id in box.duplicated_files():
-            self._logger.print(f'Warning! {len(duplicates)} duplicates found in [{db_id}]:')
-            for file in duplicates:
-                self._logger.print(f'DUPLICATED: {file} [using {box.processed_file(file).db_id} instead]')
-
         stores = {}
         for db in db_pkgs:
             stores[db.db_id] = local_store.store_by_id(db.db_id)
@@ -225,32 +219,48 @@ class OnlineImporter:
         for db_id, zip_id in box.removed_zips():
             stores[db_id].write_only().remove_zip_id(zip_id)
 
-        removed_files = []
-        processed_files = defaultdict(list)
-        for pkg, dbs in box.consume_files():
-            for db_id in dbs:
-                stores[db_id].write_only().remove_file(pkg.rel_path)
-                stores[db_id].write_only().remove_file_from_zips(pkg.rel_path)
+        if len(files_to_consume := box.consume_files()) > 0:
+            logger.bench('OnlineImporter files_to_consume start.')
+            processed_file_names: set[str] = {file_pkg.rel_path for file_pkgs, db_id in box.non_duplicated_files() for file_pkg in file_pkgs}
+            processed_files: dict[str, list[PathPackage]] = defaultdict(list)
+            removed_files: list[tuple[PathPackage, set[str]]] = []
 
-            if box.is_file_processed(pkg.rel_path): continue
+            for pkg, dbs in files_to_consume:
+                for db_id in dbs:
+                    stores[db_id].write_only().remove_file(pkg.rel_path)
+                    stores[db_id].write_only().remove_file_from_zips(pkg.rel_path)
 
-            for db_id in dbs:
-                if not stores[db_id].read_only().has_externals:
-                    continue
+                if pkg.rel_path in processed_file_names: continue
 
-                for drive in stores[db_id].read_only().external_drives:
-                    file_path = os.path.join(drive, pkg.rel_path)
-                    if self._worker_ctx.file_system.is_file(file_path):
-                        self._worker_ctx.file_system.unlink(file_path)
+                for db_id in dbs:
+                    if not stores[db_id].read_only().has_externals:
+                        continue
 
-            self._worker_ctx.file_system.unlink(pkg.full_path)
-            processed_files[list(dbs)[0]].append(pkg)
-            removed_files.append(pkg)
+                    for drive in stores[db_id].read_only().external_drives:
+                        file_path = os.path.join(drive, pkg.rel_path)
+                        if self._worker_ctx.file_system.is_file(file_path):
+                            self._worker_ctx.file_system.unlink(file_path)
 
-        for db_id, pkgs in processed_files.items():
-            box.add_processed_files(pkgs, db_id)
+                self._worker_ctx.file_system.unlink(pkg.full_path)
+                processed_files[list(dbs)[0]].append(pkg)
+                processed_file_names.add(pkg.rel_path)
+                removed_files.append((pkg, dbs))
 
-        box.add_removed_files(removed_files)
+            box.add_removed_files(removed_files)
+            logger.bench('OnlineImporter files_to_consume done.')
+        else:
+            processed_files = {}
+
+        if len(duplicated_files := box.duplicated_files()) > 0:
+            logger.bench('OnlineImporter calculating db_id_by_rel_path start.')
+            db_id_by_rel_path = {file_pkg.rel_path: db_id for file_pkgs, db_id in box.non_duplicated_files() for file_pkg in file_pkgs} | \
+                                {file_pkg.rel_path: db_id for db_id, file_pkgs in processed_files.items() for file_pkg in file_pkgs}
+            logger.bench('OnlineImporter calculating db_id_by_rel_path done.')
+
+            for duplicates, db_id in duplicated_files:
+                self._logger.print(f'Warning! {len(duplicates)} duplicates found in [{db_id}]:')
+                for file in duplicates:
+                    self._logger.print(f'DUPLICATED: {file} [using {db_id_by_rel_path[file]} instead]')
 
         for pkg, dbs in sorted(box.consume_directories(), key=lambda x: len(x[0].full_path), reverse=True):
             if box.is_folder_installed(pkg.rel_path):
@@ -273,18 +283,18 @@ class OnlineImporter:
                 stores[db_id].write_only().remove_folder(pkg.rel_path)
                 stores[db_id].write_only().remove_folder_from_zips(pkg.rel_path)
 
-        for file_path in box.installed_files():
-            file = box.processed_file(file_path)
-            if 'reboot' in file.pkg.description and file.pkg.description['reboot'] == True:
-                self._needs_reboot = True
-            stores[file.db_id].write_only().add_file_pkg(file.pkg, file.pkg.rel_path in box.non_external_store_presence()[file.db_id])
+        for db_id, file_pkgs in box.installed_file_pkgs().items():
+            for file_pkg in file_pkgs:
+                if 'reboot' in file_pkg.description and file_pkg.description['reboot'] == True:
+                    self._needs_reboot = True
+                stores[db_id].write_only().add_file_pkg(file_pkg, file_pkg.rel_path in box.non_external_store_presence()[db_id])
 
         for db_id, folder_pkg in box.installed_folders():
             stores[db_id].write_only().add_folder_pkg(folder_pkg)
 
-        for file_path in box.removed_files():
-            file = box.processed_file(file_path)
-            stores[file.db_id].write_only().remove_file_pkg(file.pkg)
+        for file_pkg, dbs in box.removed_files():
+            for db_id in dbs:
+                stores[db_id].write_only().remove_file_pkg(file_pkg)
 
         for db_id, folder_pkg in box.removed_folders():
             stores[db_id].write_only().remove_folder_pkg(folder_pkg)
@@ -357,7 +367,7 @@ class OnlineImporter:
         return self._box.installed_dbs()
 
     def correctly_installed_files(self):
-        return self._box.installed_files()
+        return self._box.installed_file_names()
 
     def run_files(self):
         return self._box.fetch_started_files()
@@ -374,8 +384,10 @@ def is_system_path(description: dict[str, str]) -> bool:
 class InstallationBox:
     def __init__(self):
         self._downloaded_files: list[str] = []
-        self._validated_files: list[str] = []
-        self._present_validated_files: list[str] = []
+        self._validated_files: dict[str, list[PathPackage]] = defaultdict(list)  # @TODO: Remove this?
+        self._present_validated_files: dict[str, list[PathPackage]] = defaultdict(list)
+        self._installed_file_pkgs: dict[str, list[PathPackage]] = defaultdict(list)
+        self._installed_file_names: list[str] = []
         self._present_not_validated_files: list[str] = []
         self._fetch_started_files: list[str] = []
         self._failed_files: list[str] = []
@@ -383,7 +395,7 @@ class InstallationBox:
         self._failed_zips: list[tuple[str, str]] = []
         self._full_partitions: dict[str, int] = dict()
         self._failed_db_options: list[WrongDatabaseOptions] = []
-        self._removed_files: list[str] = []
+        self._removed_files: list[tuple[PathPackage, set[str]]] = []
         self._removed_folders: list[tuple[str, PathPackage]] = []
         self._removed_zips: list[tuple[str, str]] = []
         self._skipped_updated_files: dict[str, list[str]] = dict()
@@ -398,7 +410,7 @@ class InstallationBox:
         self._updated_dbs: list[str] = []
         self._failed_dbs: list[str] = []
         self._duplicated_files: list[tuple[list[str], str]] = []
-        self._processed_files: dict[str, ProcessedFile] = dict()
+        self._non_duplicated_files: list[tuple[list[PathPackage], str]] = []
         self._unused_filter_tags: list[str] = []
 
     def set_unused_filter_tags(self, tags: list[str]):
@@ -409,19 +421,24 @@ class InstallationBox:
         if len(files) == 0: return
         for pkg in files:
             self._downloaded_files.append(pkg.rel_path)
-    def add_validated_file(self, path: str):
-        self._validated_files.append(path)
-    def add_validated_files(self, files: list[PathPackage]):
+    def add_validated_file(self, path_pkg: PathPackage, db_id: str):
+        self._validated_files[db_id].append(path_pkg)
+        self._installed_file_pkgs[db_id].append(path_pkg)
+        self._installed_file_names.append(path_pkg.rel_path)
+    def add_validated_files(self, files: list[PathPackage], db_id: str):
         if len(files) == 0: return
-        for pkg in files:
-            self._validated_files.append(pkg.rel_path)
+        self._validated_files[db_id].extend(files)
+        self._installed_file_pkgs[db_id].extend(files)
+        self._installed_file_names.extend(pkg.rel_path for pkg in files)
     def add_non_external_store_presence(self, non_external_store_entries: set[str], db_id: str):
         self._non_external_store_presence[db_id].update(non_external_store_entries)
     def add_installed_zip_summary(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: dict[str, Any]):
         self._installed_zip_summary.append((db_id, zip_id, fragment, description))
-    def add_present_validated_files(self, paths: list[PathPackage]):
+    def add_present_validated_files(self, paths: list[PathPackage], db_id: str):
         if len(paths) == 0: return
-        self._present_validated_files.extend([p.rel_path for p in paths])
+        self._present_validated_files[db_id].extend(paths)
+        self._installed_file_pkgs[db_id].extend(paths)
+        self._installed_file_names.extend(pkg.rel_path for pkg in paths)
     def add_present_not_validated_files(self, paths: list[PathPackage]):
         if len(paths) == 0: return
         self._present_not_validated_files.extend([p.rel_path for p in paths])
@@ -440,11 +457,12 @@ class InstallationBox:
         if len(file_pkgs) == 0: return
         for pkg in file_pkgs:
             self._failed_files.append(pkg.rel_path)
-    def add_processed_files(self, pkgs: list[PathPackage], db_id: str):
-        self._processed_files.update({p.rel_path: ProcessedFile(p, db_id) for p in pkgs})
     def add_duplicated_files(self, files: list[str], db_id: str):
         if len(files) == 0: return
         self._duplicated_files.append((files, db_id))
+    def add_non_duplicated_files(self, files: list[PathPackage], db_id: str):
+        if len(files) == 0: return
+        self._non_duplicated_files.append((files, db_id))
     def add_failed_zip(self, db_id: str, zip_id: str):
         self._failed_zips.append((db_id, zip_id))
     def add_removed_zip(self, db_id: str, zip_id: str):
@@ -466,12 +484,9 @@ class InstallationBox:
         self._filtered_zip_data[db_id][zip_id] = filtered_data
     def add_failed_db_options(self, exception: WrongDatabaseOptions):
         self._failed_db_options.append(exception)
-    def add_removed_file(self, file: str):
-        self._removed_files.append(file)
-    def add_removed_files(self, files: list[PathPackage]):
+    def add_removed_files(self, files: list[tuple[PathPackage, set[str]]]):
         if len(files) == 0: return
-        for pkg in files:
-            self._removed_files.append(pkg.rel_path)
+        self._removed_files.extend(files)
     def add_removed_folders(self, folders: list[PathPackage], db_id: str):
         if len(folders) == 0: return
         self._removed_folders.extend([(db_id, pkg) for pkg  in folders])
@@ -482,19 +497,20 @@ class InstallationBox:
 
     def is_folder_installed(self, path: str) -> bool:  return path in self._installed_folders_set
     def downloaded_files(self): return self._downloaded_files
-    def present_validated_files(self): return self._present_validated_files
+    def present_validated_files(self) -> list[str]: return [pkg.rel_path for path_pkgs in self._present_validated_files.values() for pkg in path_pkgs]
     def present_not_validated_files(self): return self._present_not_validated_files
     def fetch_started_files(self): return self._fetch_started_files
     def failed_files(self): return self._failed_files
     def duplicated_files(self): return self._duplicated_files
+    def non_duplicated_files(self): return self._non_duplicated_files
     def failed_folders(self): return self._failed_folders
     def failed_zips(self): return self._failed_zips
     def removed_files(self): return self._removed_files
     def removed_folders(self): return self._removed_folders
     def removed_zips(self): return self._removed_zips
-    def installed_files(self): return list(set(self._present_validated_files) | set(self._validated_files))
+    def installed_file_pkgs(self): return self._installed_file_pkgs
+    def installed_file_names(self): return self._installed_file_names
     def installed_folders(self): return self._installed_folders
-    def uninstalled_files(self): return self._removed_files + self._failed_files
     def wrong_db_options(self): return self._failed_db_options
     def non_external_store_presence(self): return self._non_external_store_presence
     def installed_zip_summary(self): return self._installed_zip_summary
@@ -505,9 +521,6 @@ class InstallationBox:
     def updated_dbs(self) -> list[str]: return self._updated_dbs
     def failed_dbs(self) -> list[str]: return self._failed_dbs
     def unused_filter_tags(self): return self._unused_filter_tags
-    def is_file_processed(self, path: str) -> bool: return path in self._processed_files
-    def processed_file(self, path: str) -> ProcessedFile: return self._processed_files[path]
-    def all_processed_files(self) -> list[str]: return list(self._processed_files.keys())
 
     def queue_directory_removal(self, dirs: list[PathPackage], db_id: str) -> None:
         if len(dirs) == 0: return

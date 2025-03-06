@@ -328,13 +328,14 @@ def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_
         ctx.file_system.make_dirs(pkg.drive + '/' + parent_folder)
 
     temp_path = pkg.temp_path(exists)
-    fetch_job2 = FetchFileJob(
+    fetch_job2 = FetchFileJob(  # @TODO: Make fetch file job just take a pkg instead? Need to think about make_ephemeral_transfer_job vs make_file_install_transfer_job
         source,
         pkg.full_path,
         pkg.rel_path,
         pkg.description,
         temp_path,
         pkg.backup_path(),
+        pkg,
         db_id
     )
     fetch_job2.add_tag(db_id)

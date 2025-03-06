@@ -28,7 +28,7 @@ class OnlineImporterTestBase(unittest.TestCase):
         self.assertReports(sut, [], save=save, failed_folders=failed_folders, failed_zips=failed_zips)
 
     def assertReports(self, sut, installed=None, errors=None, needs_reboot=False, save=True, failed_folders=None, failed_zips=None, full_partitions=None, validated=None, downloaded=None):
-        report = sut.box()
+        box = sut.box()
         if installed is None and validated is None and downloaded is None:
             installed = []
         if errors is None:
@@ -40,12 +40,12 @@ class OnlineImporterTestBase(unittest.TestCase):
         if full_partitions is None:
             full_partitions = []
         if downloaded is not None:
-            self.assertEqual(sorted(remove_all_priority_paths(downloaded)), sorted(report.downloaded_files()), 'downloaded')
+            self.assertEqual(sorted(remove_all_priority_paths(downloaded)), sorted(box.downloaded_files()), 'downloaded')
         if validated is not None:
-            self.assertEqual(sorted(remove_all_priority_paths(validated)), sorted(report.present_validated_files()), 'validated')
+            self.assertEqual(sorted(remove_all_priority_paths(validated)), sorted(box.present_validated_files()), 'validated')
         if installed is not None:
-            self.assertEqual(sorted(remove_all_priority_paths(installed)), sorted(report.installed_files()), 'installed')
-        self.assertEqual(sorted(remove_all_priority_paths(errors)), sorted(report.failed_files()), 'errors')
+            self.assertEqual(sorted(remove_all_priority_paths(installed)), sorted(box.installed_file_names()), 'installed')
+        self.assertEqual(sorted(remove_all_priority_paths(errors)), sorted(box.failed_files()), 'errors')
         self.assertEqual(needs_reboot, sut.needs_reboot(), 'needs reboot')
         self.assertEqual(sorted(remove_all_priority_paths(failed_folders)), sorted(sut.folders_that_failed()), 'failed folders')
         self.assertEqual(sorted(remove_all_priority_paths(failed_zips)), sorted(sut.zips_that_failed()), 'failed zips')
