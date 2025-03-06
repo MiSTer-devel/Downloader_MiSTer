@@ -19,9 +19,9 @@
 from typing import Optional, Any, Union
 import io
 
-from delme2 import PathPackage
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.transfer_job import Transferrer
+from downloader.path_package import PathPackage
 
 
 class FetchFileJob(Job, Transferrer):

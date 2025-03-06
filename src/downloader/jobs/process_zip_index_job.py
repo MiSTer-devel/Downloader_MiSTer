@@ -62,7 +62,7 @@ class ProcessZipIndexJob(Job):
     directories_to_remove: list[PathPackage] = field(default_factory=list)
     files_to_remove: list[PathPackage] = field(default_factory=list)
 
-    non_external_store_presence: set[str] = field(default_factory=set)
+    repeated_store_presence: set[str] = field(default_factory=set)
 
     # Failure results
     full_partitions: list[tuple[Partition, int]] = field(default_factory=list)

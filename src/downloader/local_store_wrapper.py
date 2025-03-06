@@ -155,9 +155,9 @@ class WriteOnlyStoreAdapter:
         self._top_wrapper = top_wrapper
         self._external_additions = external_additions
 
-    def add_file_pkg(self, file_pkg: PathPackage, keep_non_external_presence: bool = False):
+    def add_file_pkg(self, file_pkg: PathPackage, has_repeated_presence: bool = False):
         if file_pkg.is_pext_external():
-            self.add_external_file(file_pkg.pext_props.drive, file_pkg.rel_path, file_pkg.description, keep_non_external_presence)
+            self.add_external_file(file_pkg.pext_props.drive, file_pkg.rel_path, file_pkg.description, has_repeated_presence)
         else:
             self.add_file(file_pkg.rel_path, file_pkg.description)
 
@@ -203,10 +203,10 @@ class WriteOnlyStoreAdapter:
     def add_external_folder(self, drive, folder_path, description):
         self._add_external_entry('folders', PathType.FOLDER, drive, folder_path, description)
 
-    def add_external_file(self, drive, file_path, description, keep_non_external_presence: bool = False):
-        if file_path in self._store['files'] and not keep_non_external_presence:
+    def add_external_file(self, drive, file_path, description, has_repeated_presence: bool = False):
+        if file_path in self._store['files'] and not has_repeated_presence:
             self.remove_file(file_path)
-        if file_path in self._external_additions['files']:
+        if file_path in self._external_additions['files'] and not has_repeated_presence:
             for d in self._external_additions['files'][file_path]:
                 if d == drive:
                     continue

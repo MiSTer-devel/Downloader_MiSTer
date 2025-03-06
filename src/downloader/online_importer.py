@@ -125,7 +125,7 @@ class OnlineImporter:
             box.add_non_duplicated_files(job.non_duplicated_files, job.db.db_id)
             box.add_present_validated_files(job.present_validated_files, job.db.db_id)
             box.add_skipped_updated_files(job.skipped_updated_files, job.db.db_id)
-            box.add_non_external_store_presence(job.non_external_store_presence, job.db.db_id)
+            box.add_repeated_store_presence(job.repeated_store_presence, job.db.db_id)
             box.add_removed_folders(job.removed_folders, job.db.db_id)
             box.add_installed_folders(job.installed_folders, job.db.db_id)
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
@@ -144,7 +144,7 @@ class OnlineImporter:
             box.add_non_duplicated_files(job.non_duplicated_files, job.db.db_id)
             box.add_present_validated_files(job.present_validated_files, job.db.db_id)
             box.add_skipped_updated_files(job.skipped_updated_files, job.db.db_id)
-            box.add_non_external_store_presence(job.non_external_store_presence, job.db.db_id)
+            box.add_repeated_store_presence(job.repeated_store_presence, job.db.db_id)
             box.add_removed_folders(job.removed_folders, job.db.db_id)
             box.add_installed_folders(job.installed_folders, job.db.db_id)
             box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
@@ -287,7 +287,7 @@ class OnlineImporter:
             for file_pkg in file_pkgs:
                 if 'reboot' in file_pkg.description and file_pkg.description['reboot'] == True:
                     self._needs_reboot = True
-                stores[db_id].write_only().add_file_pkg(file_pkg, file_pkg.rel_path in box.non_external_store_presence()[db_id])
+                stores[db_id].write_only().add_file_pkg(file_pkg, file_pkg.rel_path in box.repeated_store_presence()[db_id])
 
         for db_id, folder_pkg in box.installed_folders():
             stores[db_id].write_only().add_folder_pkg(folder_pkg)
@@ -403,7 +403,7 @@ class InstallationBox:
         self._installed_zip_summary: list[tuple[str, str, StoreFragmentDrivePaths, dict[str, Any]]] = []
         self._installed_folders: list[tuple[str, PathPackage]] = []
         self._installed_folders_set: set[str] = set()
-        self._non_external_store_presence: dict[str, set[str]] = defaultdict(set)
+        self._repeated_store_presence: dict[str, set[str]] = defaultdict(set)
         self._directories = dict()
         self._files = dict()
         self._installed_dbs: list[DbEntity] = []
@@ -430,8 +430,8 @@ class InstallationBox:
         self._validated_files[db_id].extend(files)
         self._installed_file_pkgs[db_id].extend(files)
         self._installed_file_names.extend(pkg.rel_path for pkg in files)
-    def add_non_external_store_presence(self, non_external_store_entries: set[str], db_id: str):
-        self._non_external_store_presence[db_id].update(non_external_store_entries)
+    def add_repeated_store_presence(self, non_external_store_entries: set[str], db_id: str):
+        self._repeated_store_presence[db_id].update(non_external_store_entries)
     def add_installed_zip_summary(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: dict[str, Any]):
         self._installed_zip_summary.append((db_id, zip_id, fragment, description))
     def add_present_validated_files(self, paths: list[PathPackage], db_id: str):
@@ -512,7 +512,7 @@ class InstallationBox:
     def installed_file_names(self): return self._installed_file_names
     def installed_folders(self): return self._installed_folders
     def wrong_db_options(self): return self._failed_db_options
-    def non_external_store_presence(self): return self._non_external_store_presence
+    def repeated_store_presence(self): return self._repeated_store_presence
     def installed_zip_summary(self): return self._installed_zip_summary
     def skipped_updated_files(self): return self._skipped_updated_files
     def filtered_zip_data(self): return self._filtered_zip_data
