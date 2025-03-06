@@ -44,7 +44,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         logger.bench('ProcessZipIndexWorker fix folders: ', db.db_id, zip_id)
         fix_folders(summary.folders)  # @TODO: Try to look for a better place to put this, while validating zip_index entity for example which we don't do yet.
 
-        non_existing_pkgs, need_update_pkgs, zip_data, error = process_index_job_main_sequence(self._ctx, job, summary, store, 'ProcessZipIndexWorker')
+        non_existing_pkgs, need_update_pkgs, zip_data, error = process_index_job_main_sequence(self._ctx, job, summary, store)
         if error is not None:
             return [], error
 
