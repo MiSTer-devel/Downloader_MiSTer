@@ -25,7 +25,7 @@ import traceback
 from datetime import datetime
 import os
 from subprocess import CalledProcessError
-from src.debug import exec_ssh, run_operation, chdir_root
+from src.debug import exec_ssh, operations_dict, chdir_root
 
 
 def main(operation, iterations, target):
@@ -49,10 +49,10 @@ def iterate(op, target, results):
 
     before = time.time()
     try:
-        run_operation(op, env={
+        operations_dict(env={
             'DEBUG': 'false', 'FAIL_ON_FILE_ERROR': 'true', 'LOGFILE': log_file,
             'ALLOW_REBOOT': '0', 'UPDATE_LINUX': 'false',
-        }, retries=False)
+        }, retries=False)[op]()
     except CalledProcessError: log(f'[{cur_i:0>2} {op:>8}] ERRORED! See {log_file} for details.')
     duration = time.time() - before
 
