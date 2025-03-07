@@ -30,14 +30,16 @@ from downloader.file_system import FileSystemFactory
 from downloader.job_system import JobSystem, ProgressReporter, Job
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.fetch_file_worker import FetchFileWorker
+from downloader.jobs.jobs_factory import make_persistent_transfer_job
 from downloader.logger import PrintLogger, Logger
 from downloader.http_gateway import HttpGateway
+from downloader.path_package import PathPackage, PATH_TYPE_FILE, PATH_PACKAGE_KIND_STANDARD
 from test.exploratory.http_gateway_connections.explore_http_gateway_with_real_urls import urls
 from test.fake_logger import DescribeNowDecorator
 
 
 def main() -> None:
-    logger = DescribeNowDecorator(PrintLogger(int(time.time())))
+    logger = DescribeNowDecorator(PrintLogger())
     with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gw:
 
         fs = FileSystemFactory(default_config(), {}, logger=logger)
@@ -54,12 +56,18 @@ def main() -> None:
 
         for i in range(20):
             for u in urls:
-                fetch = FetchFileJob(
-                    temp_path=f'{dir_path}/{i}_{Path(u).name[-30:]}_{len(u)}',
-                    info=f'{i}_{Path(u).name}_{len(u)}',
-                    source=u,
-                    silent=False,
-                    after_job=None
+                fetch = make_persistent_transfer_job(
+                    u,
+                    True,
+                    PathPackage(
+                        f'{i}_{Path(u).name}_{len(u)}',
+                        dir_path,
+                        {'tmp': f'{i}_{Path(u).name[-30:]}_{len(u)}'},
+                        PATH_TYPE_FILE,
+                        PATH_PACKAGE_KIND_STANDARD,
+                        None
+                    ),
+                    None
                 )
                 job_system.push_job(fetch)
 

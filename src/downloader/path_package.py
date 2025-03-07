@@ -17,15 +17,11 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 
-from dataclasses import dataclass
 from enum import auto, unique, Enum
-from typing import Dict, Any, Final, Optional, Tuple
-import os
+from typing import Any, Final, Optional, Tuple
 
 from downloader.constants import SUFFIX_file_in_progress
 
-
-is_windows: Final = os.name == 'nt'
 
 @unique
 class PathType(Enum):
@@ -84,7 +80,7 @@ class PathPackage:
     @property
     def full_path(self) -> str:
         if self._full_path is None:
-            self._full_path = self.rel_path if self.drive is None else os.path.join(self.drive, self.rel_path) if is_windows else self.drive + '/' + self.rel_path
+            self._full_path = self.rel_path if self.drive is None else self.drive + '/' + self.rel_path
         return self._full_path
 
     @property
@@ -144,15 +140,15 @@ class PathPackage:
         else:
             return None
 
-    def temp_path(self, exists: bool) -> str:
+    def temp_path(self, already_exists: bool) -> Optional[str]:
         if 'tmp' in self.description:
-            return (os.path.join(self.drive, self.description['tmp']) if is_windows else self.drive + '/' + self.description['tmp']) if self.drive is not None else self.description['tmp']
+            return (self.drive + '/' + self.description['tmp']) if self.drive is not None else self.description['tmp']
         else:
-            return self.full_path if not exists else self.full_path + SUFFIX_file_in_progress
+            return self.full_path + SUFFIX_file_in_progress if already_exists else None
 
     def backup_path(self) -> Optional[str]:
         if 'backup' in self.description:
-            return (os.path.join(self.drive, self.description['backup']) if is_windows else self.drive + '/' + self.description['backup']) if self.drive is not None else self.description['backup']
+            return (self.drive + '/' + self.description['backup']) if self.drive is not None else self.description['backup']
         else:
             return None
 

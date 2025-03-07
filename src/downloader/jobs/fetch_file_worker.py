@@ -41,27 +41,32 @@ class FetchFileWorker(DownloaderWorker):
     def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: FetchFileJob) -> WorkerResult:  # type: ignore[override]
-        if job.temp_path is None and job.backup_path is not None and self._file_system.is_file(job.target_path, use_cache=False):
-            self._file_system.copy(job.target_path, job.backup_path)
+        source = job.source
+        temp_path = job.pkg.temp_path(job.already_exists)
+        backup_path = job.pkg.backup_path()
+        target_path = job.pkg.full_path
+        desc = job.pkg.description
 
-        file_path = job.temp_path or job.target_path
-        file_size, file_hash, error = self._fetcher.fetch_file(job.source, file_path)
+        if temp_path is None and backup_path is not None and self._file_system.is_file(target_path, use_cache=False):
+            self._file_system.copy(target_path, backup_path)
+
+        file_path = temp_path or target_path
+        file_size, file_hash, error = self._fetcher.fetch_file(source, file_path)
         if error is not None:
             return [], error
 
         try:
-            desc = job.description
             if file_hash != desc['hash']:
                 self._file_system.unlink(file_path, verbose=False)
-                return [], FileDownloadError(f"Bad hash on {job.info} ({desc['hash']} != {file_hash})")
+                return [], FileDownloadError(f"Bad hash on {job.pkg.rel_path} ({desc['hash']} != {file_hash})")
 
-            if file_path != job.target_path:
-                if job.backup_path is not None and self._file_system.is_file(job.target_path, use_cache=False):
-                    self._file_system.move(job.target_path, job.backup_path)
-                self._file_system.move(file_path, job.target_path)
+            if file_path != target_path:
+                if backup_path is not None and self._file_system.is_file(target_path, use_cache=False):
+                    self._file_system.move(target_path, backup_path)
+                self._file_system.move(file_path, target_path)
 
         except Exception as e:
-            return [], FileDownloadError(f'Exception during validation! {job.info}: {str(e)}')
+            return [], FileDownloadError(f'Exception during validation! {job.pkg.rel_path}: {str(e)}')
 
         return [] if job.after_job is None else [job.after_job], None
 

@@ -202,6 +202,3 @@ exceptional_paths: Final[tuple[str]] = tuple(item.lower() for item in [FOLDER_li
 distribution_mister_exceptional_paths: Final[tuple[str]] = tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow])
 
 class DbEntityValidationException(Exception): pass
-
-def make_db_tag(db_id: str) -> str:
-    return f'db:{db_id}'

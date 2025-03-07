@@ -55,9 +55,9 @@ class FakeWorkerDecorator(DownloaderWorker):
     def operate_on(self, job: Job) -> WorkerResult:
         if isinstance(job, FetchFileJob):
             self._fake_http.set_file_ctx({
-                'description': {**job.description},
-                'path': job.temp_path,
-                'info': job.info
+                'description': {**job.pkg.description},
+                'path': job.pkg.full_path,
+                'info': job.pkg.rel_path
             })
         elif isinstance(job, FetchDataJob):
             self._fake_http.set_file_ctx({

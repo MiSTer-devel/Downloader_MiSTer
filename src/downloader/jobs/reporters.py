@@ -296,7 +296,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
 
     def print_job_started(self, job: Job):
         if isinstance(job, FetchFileJob) and job.db_id is not None:
-            self._print_line(job.info)
+            self._print_line(job.pkg.rel_path)
 
         self._check_time = time.time() + 2.0
 
