@@ -360,7 +360,7 @@ class JobSystem(JobContext):
 
         if package is not None:
             info = getattr(package.job, 'info', None)
-            msg += f' while operating on job [{package.job.type_id}|{type(package.job).__name__}{f": {info}" if info else ""}]'
+            msg += f' while operating on job [{package.job.type_id}|{type(package.job).__name__}{f": {info}" if info else ""}] {str(package.job)}'
 
         if sub_job is not None:
             info = getattr(sub_job[1], 'info', None)

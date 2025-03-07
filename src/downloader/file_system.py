@@ -594,8 +594,8 @@ class _FileSystem(FileSystem):
             self._logger.debug(e)
             raise UnzipError(f"Cannot unzip '{zip_file}' ['{target_path if isinstance(target_path, str) else len(target_path)}']") from e
         finally:
-            if isinstance(transfer, str):
-                self._unlink(transfer)
+            if isinstance(zip_file, str):
+                self._unlink(zip_file, verbose=False)
 
     def _debug_log(self, message: str, path: Tuple[str, str], target: Optional[Tuple[str, str]] = None) -> None:
         if path[0][0] == '/':
