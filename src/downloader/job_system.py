@@ -38,7 +38,7 @@ class JobContext(Protocol):
     def cancel_pending_jobs(self) -> None:
         """Allows a worker to cancel all pending jobs."""
 
-    def wait_for_other_jobs(self, wait_time: float) -> None:
+    def wait_for_other_jobs(self, sleep_time: float) -> None:
         """Allows a worker to wait for other jobs to progress."""
 
 
@@ -143,7 +143,7 @@ class JobSystem(JobContext):
         with self._lock:
             self._are_jobs_cancelled = True
 
-    def wait_for_other_jobs(self, wait_time: float):
+    def wait_for_other_jobs(self, sleep_time: float):
         # This must be thread-safe. But we don't need to lock next two checks, because
         # we are only reading and we are fine with eventual consistency here.
 
@@ -151,7 +151,7 @@ class JobSystem(JobContext):
         if not self._is_executing_jobs: raise CantWaitWhenNotExecutingJobs('Can not wait when not executing jobs')
 
         if self._max_threads > 1:
-            time.sleep(wait_time)
+            time.sleep(sleep_time)
         else:
             # This branch does not need to be thread-safe at all, since concurrency is off.
             self._check_clock()
