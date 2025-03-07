@@ -221,7 +221,7 @@ class FakeFileSystem(ProductionFileSystem):
 
     def make_dirs(self, path):
         folder = self._path(path)
-        path_parents = Path(folder).parents
+        path_parents = list(Path(folder).parents)
         for p in path_parents[:-3]:
             parent = str(p)
             if parent not in self.state.folders:
