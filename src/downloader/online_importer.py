@@ -211,12 +211,15 @@ class OnlineImporter:
 
         logger.bench('OnlineImporter applying changes on stores...')
 
-        stores = {}
+        write_stores = {}
+        read_stores = {}
         for db in db_pkgs:
-            stores[db.db_id] = local_store.store_by_id(db.db_id)
+            store = local_store.store_by_id(db.db_id)
+            write_stores[db.db_id] = store.write_only()
+            read_stores[db.db_id] = store.read_only()
 
         for db_id, zip_id in box.removed_zips():
-            stores[db_id].write_only().remove_zip_id(zip_id)
+            write_stores[db_id].remove_zip_id(zip_id)
 
         if len(files_to_consume := box.consume_files()) > 0:
             logger.bench('OnlineImporter files_to_consume start.')
@@ -226,16 +229,16 @@ class OnlineImporter:
 
             for pkg, dbs in files_to_consume:
                 for db_id in dbs:
-                    stores[db_id].write_only().remove_file(pkg.rel_path)
-                    stores[db_id].write_only().remove_file_from_zips(pkg.rel_path)
+                    write_stores[db_id].remove_file(pkg.rel_path)
+                    write_stores[db_id].remove_file_from_zips(pkg.rel_path)
 
                 if pkg.rel_path in processed_file_names: continue
 
                 for db_id in dbs:
-                    if not stores[db_id].read_only().has_externals:
+                    if not read_stores[db_id].has_externals:
                         continue
 
-                    for drive in stores[db_id].read_only().external_drives:
+                    for drive in read_stores[db_id].external_drives:
                         file_path = os.path.join(drive, pkg.rel_path)
                         if self._worker_ctx.file_system.is_file(file_path):
                             self._worker_ctx.file_system.unlink(file_path)
@@ -268,65 +271,66 @@ class OnlineImporter:
                 # The for-loop is for when two+ dbs used to have the same folder but one of them has removed it, it should be kept because
                 # one db still uses it. But it should be removed from the store in the other dbs.
                 for db_id in dbs:
-                    stores[db_id].write_only().remove_local_folder(pkg.rel_path)
-                    stores[db_id].write_only().remove_local_folder_from_zips(pkg.rel_path)
+                    write_stores[db_id].remove_local_folder(pkg.rel_path)
+                    write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
                 continue
 
             if self._worker_ctx.file_system.folder_has_items(pkg.full_path):
                 continue
 
             for db_id in dbs:
-                for is_external, drive in stores[db_id].read_only().list_other_drives_for_folder(pkg):
+                for is_external, drive in read_stores[db_id].list_other_drives_for_folder(pkg):
                     if is_external:
                         # @TODO: This count part blow is for checking if previously it was previously stored as "is_pext_external_subfolder", but since this information is lost, we need to do this. When we store "path" = "pext" we will have this information again, so we can do this much cleaner.
                         if pkg.rel_path.count('/') >= 2 and pkg.rel_path.count('/') >= 2 \
                                 and not self._worker_ctx.file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
-                            stores[db_id].write_only().remove_external_folder(drive, pkg.rel_path)
-                            stores[db_id].write_only().remove_external_folder_from_zips(drive, pkg.rel_path)
+                            write_stores[db_id].remove_external_folder(drive, pkg.rel_path)
+                            write_stores[db_id].remove_external_folder_from_zips(drive, pkg.rel_path)
                             self._worker_ctx.file_system.remove_folder(full_ext_path)
                     else:
                         if not self._worker_ctx.file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
                             self._worker_ctx.file_system.remove_folder(full_ext_path)
-                            stores[db_id].write_only().remove_local_folder(pkg.rel_path)
-                            stores[db_id].write_only().remove_local_folder_from_zips(pkg.rel_path)
+                            write_stores[db_id].remove_local_folder(pkg.rel_path)
+                            write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
 
                 self._worker_ctx.file_system.remove_folder(pkg.full_path)
 
                 if pkg.is_pext_external():
-                    stores[db_id].write_only().remove_external_folder(pkg.drive, pkg.rel_path)
-                    stores[db_id].write_only().remove_external_folder_from_zips(pkg.drive, pkg.rel_path)
+                    write_stores[db_id].remove_external_folder(pkg.drive, pkg.rel_path)
+                    write_stores[db_id].remove_external_folder_from_zips(pkg.drive, pkg.rel_path)
                 else:
-                    stores[db_id].write_only().remove_local_folder(pkg.rel_path)
-                    stores[db_id].write_only().remove_local_folder_from_zips(pkg.rel_path)
+                    write_stores[db_id].remove_local_folder(pkg.rel_path)
+                    write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
 
         for db_id, file_pkgs in box.installed_file_pkgs().items():
             for file_pkg in file_pkgs:
                 if 'reboot' in file_pkg.description and file_pkg.description['reboot'] == True:
                     self._needs_reboot = True
-                stores[db_id].write_only().add_file_pkg(file_pkg, file_pkg.rel_path in box.repeated_store_presence()[db_id])
+                write_stores[db_id].add_file_pkg(file_pkg, file_pkg.rel_path in box.repeated_store_presence()[db_id])
 
         for db_id, folder_pkg in box.installed_folders():
-            stores[db_id].write_only().add_folder_pkg(folder_pkg)
+            write_stores[db_id].add_folder_pkg(folder_pkg)
 
         for file_pkg, dbs in box.removed_files():
             for db_id in dbs:
-                stores[db_id].write_only().remove_file_pkg(file_pkg)
+                write_stores[db_id].remove_file_pkg(file_pkg)
 
         for db_id, folder_pkg in box.removed_folders():
-            stores[db_id].write_only().remove_folder_pkg(folder_pkg)
+            write_stores[db_id].remove_folder_pkg(folder_pkg)
 
         for db_id, zip_id, zip_summary, zip_description in box.installed_zip_summary():
-            stores[db_id].write_only().add_zip_summary(zip_id, zip_summary, zip_description)
+            write_stores[db_id].add_zip_summary(zip_id, zip_summary, zip_description)
 
         for db_id, filtered_zip_data in box.filtered_zip_data().items():
-            stores[db_id].write_only().save_filtered_zip_data(filtered_zip_data)
+            write_stores[db_id].save_filtered_zip_data(filtered_zip_data)
 
-        for store in stores.values():
-            store.write_only().cleanup_externals()
+        for store in write_stores.values():
+            store.cleanup_externals()
 
         self._needs_save = local_store.needs_save()
 
-        for store in stores.values():
+        for db in db_pkgs:
+            store = local_store.store_by_id(db.db_id)
             self._clean_store(store.unwrap_store())
 
         for e in box.wrong_db_options():
