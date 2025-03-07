@@ -213,10 +213,12 @@ class OnlineImporter:
 
         write_stores = {}
         read_stores = {}
+        stores = []
         for db in db_pkgs:
             store = local_store.store_by_id(db.db_id)
             write_stores[db.db_id] = store.write_only()
             read_stores[db.db_id] = store.read_only()
+            stores.append(store)
 
         for db_id, zip_id in box.removed_zips():
             write_stores[db_id].remove_zip_id(zip_id)
@@ -329,8 +331,7 @@ class OnlineImporter:
 
         self._needs_save = local_store.needs_save()
 
-        for db in db_pkgs:
-            store = local_store.store_by_id(db.db_id)
+        for store in stores:
             self._clean_store(store.unwrap_store())
 
         for e in box.wrong_db_options():
