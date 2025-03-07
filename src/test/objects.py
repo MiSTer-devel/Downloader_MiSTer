@@ -320,9 +320,13 @@ def _add_external_drive_to_store(store, drive, folders=None, files=None):
     external = {}
     if files is not None:
         external['files'] = remove_all_priority_paths(files)
+        if folders is None:
+            external['folders'] = {}
 
     if folders is not None:
         external['folders'] = remove_all_priority_paths(folders)
+        if files is None:
+            external['files'] = {}
 
     if 'external' not in store:
         store['external'] = {}

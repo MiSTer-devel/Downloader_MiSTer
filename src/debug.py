@@ -29,7 +29,7 @@ def log_pull(**kwargs): scp_file('/media/fat/Scripts/.config/downloader/download
 
 def send_build(env=None, **kwargs):
     env = {'DEBUG': 'true', **os.environ.copy(), **(env or {}), 'MISTER': 'true'}
-    with tempfile.NamedTemporaryFile(delete=False) as tmp: subprocess.run(['./src/build.sh'], stdout=tmp, env=env, check=True)
+    with tempfile.NamedTemporaryFile(delete=False) as tmp: subprocess.run(['./src/build.sh'], stderr=sys.stdout, stdout=tmp, env=env, check=True)
     os.chmod(tmp.name, 0o755)
 
     if os.path.exists('dont_download.ini'): scp_file('dont_download.ini', '/media/fat/downloader.ini', **kwargs)
@@ -40,7 +40,7 @@ def send_build(env=None, **kwargs):
     os.remove(tmp.name)
 
 def send_compile(env=None, **kwargs):
-    with tempfile.NamedTemporaryFile(delete=False) as tmp: subprocess.run(['./src/compile.sh'], stdout=tmp, env=env, check=True)
+    with tempfile.NamedTemporaryFile(delete=False) as tmp: subprocess.run(['./src/compile.sh'], stderr=sys.stdout, stdout=tmp, env=env, check=True)
     os.chmod(tmp.name, 0o755)
     scp_file(tmp.name, '/media/fat/downloader_bin', **kwargs)
     os.remove(tmp.name)

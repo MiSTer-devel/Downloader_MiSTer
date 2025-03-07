@@ -269,19 +269,36 @@ class OnlineImporter:
                 # The for-loop is for when two+ dbs used to have the same folder but one of them has removed it, it should be kept because
                 # one db still uses it. But it should be removed from the store in the other dbs.
                 for db_id in dbs:
-                    stores[db_id].write_only().remove_folder(pkg.rel_path)
-                    stores[db_id].write_only().remove_folder_from_zips(pkg.rel_path)
+                    stores[db_id].write_only().remove_local_folder(pkg.rel_path)
+                    stores[db_id].write_only().remove_local_folder_from_zips(pkg.rel_path)
                 continue
 
             if self._worker_ctx.file_system.folder_has_items(pkg.full_path):
                 continue
 
-            if not pkg.is_pext_external_subfolder():
+            for db_id in dbs:
+                for is_external, drive in stores[db_id].read_only().list_other_drives_for_folder(pkg):
+                    if is_external:
+                        # @TODO: This count part blow is for checking if previously it was previously stored as "is_pext_external_subfolder", but since this information is lost, we need to do this. When we store "path" = "pext" we will have this information again, so we can do this much cleaner.
+                        if pkg.rel_path.count('/') >= 2 and pkg.rel_path.count('/') >= 2 \
+                                and not self._worker_ctx.file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
+                            stores[db_id].write_only().remove_external_folder(drive, pkg.rel_path)
+                            stores[db_id].write_only().remove_external_folder_from_zips(drive, pkg.rel_path)
+                            self._worker_ctx.file_system.remove_folder(full_ext_path)
+                    else:
+                        if not self._worker_ctx.file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
+                            self._worker_ctx.file_system.remove_folder(full_ext_path)
+                            stores[db_id].write_only().remove_local_folder(pkg.rel_path)
+                            stores[db_id].write_only().remove_local_folder_from_zips(pkg.rel_path)
+
                 self._worker_ctx.file_system.remove_folder(pkg.full_path)
 
-            for db_id in dbs:
-                stores[db_id].write_only().remove_folder(pkg.rel_path)
-                stores[db_id].write_only().remove_folder_from_zips(pkg.rel_path)
+                if pkg.is_pext_external():
+                    stores[db_id].write_only().remove_external_folder(pkg.drive, pkg.rel_path)
+                    stores[db_id].write_only().remove_external_folder_from_zips(pkg.drive, pkg.rel_path)
+                else:
+                    stores[db_id].write_only().remove_local_folder(pkg.rel_path)
+                    stores[db_id].write_only().remove_local_folder_from_zips(pkg.rel_path)
 
         for db_id, file_pkgs in box.installed_file_pkgs().items():
             for file_pkg in file_pkgs:
@@ -404,8 +421,8 @@ class InstallationBox:
         self._installed_folders: list[tuple[str, PathPackage]] = []
         self._installed_folders_set: set[str] = set()
         self._repeated_store_presence: dict[str, set[str]] = defaultdict(set)
-        self._directories = dict()
-        self._files = dict()
+        self._directory_removals: dict[str, tuple[PathPackage, set[str]]] = dict()
+        self._file_removals: dict[str, tuple[PathPackage, set[str]]] = dict()
         self._installed_dbs: list[DbEntity] = []
         self._updated_dbs: list[str] = []
         self._failed_dbs: list[str] = []
@@ -525,19 +542,23 @@ class InstallationBox:
     def queue_directory_removal(self, dirs: list[PathPackage], db_id: str) -> None:
         if len(dirs) == 0: return
         for pkg in dirs:
-            self._directories.setdefault(pkg.rel_path, (pkg, set()))[1].add(db_id)
+            if pkg.rel_path not in self._directory_removals:
+                self._directory_removals[pkg.rel_path] = (pkg, set())
+            self._directory_removals[pkg.rel_path][1].add(db_id)
     def queue_file_removal(self, files: list[PathPackage], db_id: str) -> None:
         if len(files) == 0: return
         for pkg in files:
-            self._files.setdefault(pkg.rel_path, (pkg, set()))[1].add(db_id)
+            if pkg.rel_path not in self._file_removals:
+                self._file_removals[pkg.rel_path] = (pkg, set())
+            self._file_removals[pkg.rel_path][1].add(db_id)
 
     def consume_files(self) -> list[tuple[PathPackage, set[str]]]:
-        result = sorted([(x[0], x[1]) for x in self._files.values()], key=lambda x: x[0].rel_path)
-        self._files.clear()
+        result = sorted([(x[0], x[1]) for x in self._file_removals.values()], key=lambda x: x[0].rel_path)
+        self._file_removals.clear()
         return result
 
     def consume_directories(self) -> list[tuple[PathPackage, set[str]]]:
-        result = sorted([(x[0], x[1]) for x in self._directories.values()], key=lambda x: len(x[0].rel_path))
-        self._directories.clear()
+        result = sorted([(x[0], x[1]) for x in self._directory_removals.values()], key=lambda x: len(x[0].rel_path))
+        self._directory_removals.clear()
         return result
     
