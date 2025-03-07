@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from itertools import chain
+from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional, Set, Union, Iterable
 import threading
 import os
@@ -64,12 +65,12 @@ class ProcessDbIndexWorker(DownloaderWorkerBase):
 
         logger.bench('ProcessDbIndexWorker start: ', db.db_id, zip_id)
         try:
-            non_existing_pkgs, need_update_pkgs, _, error = process_index_job_main_sequence(self._ctx, job, summary, store)
+            non_existing_pkgs, need_update_pkgs, created_folders, _, error = process_index_job_main_sequence(self._ctx, job, summary, store)
             if error is not None:
                 return [], error
 
             logger.bench('ProcessDbIndexWorker fetch jobs: ', db.db_id, zip_id)
-            next_jobs = create_fetch_jobs(self._ctx, db.db_id, non_existing_pkgs, need_update_pkgs, db.base_files_url)
+            next_jobs = create_fetch_jobs(self._ctx, db.db_id, non_existing_pkgs, need_update_pkgs, created_folders, db.base_files_url)
             logger.bench('ProcessDbIndexWorker done: ', db.db_id, zip_id)
             return next_jobs, None
         except (BadFileFilterPartException, StoragePriorityError, FsError, OSError) as e:
@@ -78,8 +79,9 @@ class ProcessDbIndexWorker(DownloaderWorkerBase):
 
 # @TODO(python 3.12): Use ProcessDbIndexJob & ProcessZipIndexJob instead of Union, which is incorrect
 def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[ProcessDbIndexJob, ProcessZipIndexJob], summary: Index, store: ReadOnlyStoreAdapter, /) -> Tuple[
-    List[PathPackage],
-    List[PathPackage],
+    list[PathPackage],
+    list[PathPackage],
+    set[str],
     ZipData,
     Optional[Exception]
 ]:
@@ -112,7 +114,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
         if len(job.full_partitions) > 0:
             job.failed_files_no_space = non_existing_pkgs + need_update_pkgs
             logger.debug("Not enough space '%s'!", db.db_id)
-            return [], [], {}, FileWriteError(f"Could not allocate space for {len(job.failed_files_no_space)} files.")
+            return [], [], set(), {}, FileWriteError(f"Could not allocate space for {len(job.failed_files_no_space)} files.")
     else:
         need_install_pkgs = None
 
@@ -121,11 +123,11 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
         job.repeated_store_presence = check_repeated_store_presence(ctx, store, chain(need_install_pkgs or [], job.present_validated_files))
 
     logger.bench(bench_label, ' Create folders: ', db.db_id, zip_id)
-    job.removed_folders, job.installed_folders, job.failed_folders = process_create_folder_packages(ctx, create_folder_pkgs, db.db_id, filtered_summary.folders, store)
+    job.removed_folders, job.installed_folders, created_folders, job.failed_folders = process_create_folder_packages(ctx, create_folder_pkgs, db.db_id, filtered_summary.folders, store)
     if len(job.failed_folders) > 0:
-        return [], [], {}, FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
+        return [], [], set(), {}, FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
 
-    return non_existing_pkgs, need_update_pkgs, zip_data, None
+    return non_existing_pkgs, need_update_pkgs, created_folders, zip_data, None
 
 def create_packages_from_index(ctx: DownloaderWorkerContext, config: Config, summary: Index, store: ReadOnlyStoreAdapter) -> Tuple[
     List[_CheckFilePackage],
@@ -233,9 +235,14 @@ def check_repeated_store_presence(ctx: DownloaderWorkerContext, store: ReadOnlyS
                 result.add(pkg.rel_path)  # @TODO: See if use_cache is needed, and if we should optimzie this fs access
     return result
 
-def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter) -> Tuple[List[PathPackage], List[PathPackage], List[str]]:
+def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter) -> Tuple[
+    list[PathPackage],
+    list[PathPackage],
+    set[str],
+    list[str]
+]:
     if len(create_folder_pkgs) == 0:
-        return [], [], []
+        return [], [], set(), []
 
     try:
         check_folders([pkg.rel_path for pkg in create_folder_pkgs], db_id)
@@ -294,6 +301,7 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
     ctx.logger.bench('add_processed_folders done: ', db_id, len(processing_folders))
 
     errors = []
+    created_folders = set()
 
     for folder_pkg in sorted(non_existing_folders, key=lambda x: len(x.rel_path)):
         try:
@@ -301,22 +309,24 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
         except FolderCreationError as e:
             ctx.swallow_error(e)
             errors.append(folder_pkg.full_path)
+        else:
+            created_folders.add(folder_pkg.full_path)
 
     installed_folders = [f for f in processing_folders if f.db_path() in db_folder_index]
-    return folder_copies_to_be_removed, installed_folders, errors
+    return folder_copies_to_be_removed, installed_folders, created_folders, errors
 
-def create_fetch_jobs(ctx: DownloaderWorkerContext, db_id: str, non_existing_pkgs: List[_FetchFilePackage], need_update_pkgs: List[_FetchFilePackage], base_files_url: str) -> List[Job]:
+def create_fetch_jobs(ctx: DownloaderWorkerContext, db_id: str, non_existing_pkgs: list[_FetchFilePackage], need_update_pkgs: list[_FetchFilePackage], created_folders: set[str], base_files_url: str) -> List[Job]:
     if len(non_existing_pkgs) == 0 and len(need_update_pkgs) == 0:
         return []
 
     return [
         job for job in chain(
-            (_fetch_job(ctx, pkg, False, db_id, base_files_url) for pkg in non_existing_pkgs),
-            (_fetch_job(ctx, pkg,  True, db_id, base_files_url) for pkg in need_update_pkgs)
+            (_fetch_job(ctx, pkg, False, db_id, created_folders, base_files_url) for pkg in non_existing_pkgs),
+            (_fetch_job(ctx, pkg,  True, db_id, created_folders, base_files_url) for pkg in need_update_pkgs)
         ) if job is not None
     ]
 
-def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_id: str, base_files_url: str, /) -> Optional[FetchFileJob]:
+def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_id: str, created_folders: set[str], base_files_url: str, /) -> Optional[FetchFileJob]:
     source = _url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url)
     try:
         check_file(pkg, db_id, source)
@@ -326,7 +336,9 @@ def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_
 
     parent_folder = pkg.parent
     if parent_folder:
-        ctx.file_system.make_dirs(pkg.drive + '/' + parent_folder)
+        parent_full_path = pkg.drive + '/' + parent_folder
+        if parent_full_path not in created_folders:
+            ctx.file_system.make_dirs(parent_full_path)
 
     temp_path = pkg.temp_path(exists)
     fetch_job2 = FetchFileJob(  # @TODO: Make fetch file job just take a pkg instead? Need to think about make_ephemeral_transfer_job vs make_file_install_transfer_job

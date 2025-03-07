@@ -44,7 +44,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         logger.bench('ProcessZipIndexWorker fix folders: ', db.db_id, zip_id)
         fix_folders(summary.folders)  # @TODO: Try to look for a better place to put this, while validating zip_index entity for example which we don't do yet.
 
-        non_existing_pkgs, need_update_pkgs, zip_data, error = process_index_job_main_sequence(self._ctx, job, summary, store)
+        non_existing_pkgs, need_update_pkgs, created_folders, zip_data, error = process_index_job_main_sequence(self._ctx, job, summary, store)
         if error is not None:
             return [], error
 
@@ -61,7 +61,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         less_accumulated_mbs = total_files_size < (1000 * 1000 * config['zip_accumulated_mb_threshold'])
 
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
-            next_jobs = create_fetch_jobs(self._ctx, db.db_id, non_existing_pkgs, need_update_pkgs, zip_description.get('base_files_url', db.base_files_url))
+            next_jobs = create_fetch_jobs(self._ctx, db.db_id, non_existing_pkgs, need_update_pkgs, created_folders, zip_description.get('base_files_url', db.base_files_url))
 
         else:
             next_jobs, error = self._make_open_zip_contents_job(job, non_existing_pkgs + need_update_pkgs, store)
