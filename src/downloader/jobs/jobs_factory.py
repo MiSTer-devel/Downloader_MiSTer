@@ -33,7 +33,24 @@ from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.jobs.transfer_job import TransferJob
 from downloader.local_store_wrapper import StoreWrapper, new_store_fragment_drive_paths
+from downloader.path_package import PathPackage
 
+
+def make_ephemeral_transfer_job(source: str, description: dict[str, Any], db_id: Optional[str], /) -> TransferJob:
+    if not source.startswith("http"):
+        job = CopyDataJob(source, description, db_id)
+    else:
+        job = FetchDataJob(source, description, db_id)
+    return job
+
+def make_persistent_transfer_job(source: str, already_exists: bool, pkg: PathPackage, db_id: Optional[str], /) -> TransferJob:
+    job = FetchFileJob(  # @TODO: Make fetch file job just take a pkg instead? Need to think about make_ephemeral_transfer_job vs make_file_install_transfer_job
+        source,
+        already_exists,
+        pkg,
+        db_id
+    )
+    return job
 
 @dataclass
 class ZipJobContext:
@@ -42,17 +59,10 @@ class ZipJobContext:
     config: Config
     job: ProcessDbMainJob
 
-def make_ephemeral_transfer_job(source: str, description: dict[str, Any], tag: Optional[str], /) -> TransferJob:
-    if not source.startswith("http"):
-        job = CopyDataJob(source, description)
-    else:
-        job = FetchDataJob(source, description)
-    if tag is not None:
-        job.add_tag(tag)
-    return job
-
 def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any], process_zip_backup: Optional[ProcessZipIndexJob]) -> TransferJob:
-    transfer_job = make_ephemeral_transfer_job(file_description['url'], file_description, make_zip_tag(z.job.db, z.zip_id))
+    zip_tag = make_zip_tag(z.job.db, z.zip_id)
+    transfer_job = make_ephemeral_transfer_job(file_description['url'], file_description, z.job.db.db_id)
+    transfer_job.add_tag(zip_tag)
     open_zip_summary_job = OpenZipSummaryJob(
         zip_id=z.zip_id,
         zip_description=z.zip_description,
@@ -64,14 +74,14 @@ def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any]
         config=z.config,
         backup=process_zip_backup
     )
-    open_zip_summary_job.add_tag(make_zip_tag(z.job.db, z.zip_id))
+    open_zip_summary_job.add_tag(zip_tag)
     transfer_job.after_job = open_zip_summary_job
     if process_zip_backup is not None:
         process_zip_backup.summary_download_failed = transfer_job.source
     return transfer_job
 
 
-def make_process_zip_job(zip_id: str, zip_description: Dict[str, Any], zip_summary: Dict[str, Any], config: Config, db: DbEntity, ini_description: Dict[str, Any], store: StoreWrapper, full_resync: bool, has_new_zip_summary: bool) -> ProcessZipIndexJob:
+def make_process_zip_index_job(zip_id: str, zip_description: Dict[str, Any], zip_summary: Dict[str, Any], config: Config, db: DbEntity, ini_description: Dict[str, Any], store: StoreWrapper, full_resync: bool, has_new_zip_summary: bool) -> ProcessZipIndexJob:
     base_files_url = db.base_files_url
     if 'base_files_url' in zip_description:
         base_files_url = zip_description['base_files_url']

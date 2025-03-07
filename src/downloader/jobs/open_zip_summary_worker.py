@@ -19,7 +19,7 @@
 from downloader.db_entity import check_zip_summary
 from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.jobs.open_zip_summary_job import OpenZipSummaryJob
-from downloader.jobs.jobs_factory import make_process_zip_job
+from downloader.jobs.jobs_factory import make_process_zip_index_job
 from downloader.job_system import WorkerResult
 
 class OpenZipSummaryWorker(DownloaderWorkerBase):
@@ -30,7 +30,7 @@ class OpenZipSummaryWorker(DownloaderWorkerBase):
         try:
             summary = self._ctx.file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())
             check_zip_summary(summary, job.db.db_id, job.zip_id)
-            return [make_process_zip_job(
+            return [make_process_zip_index_job(
                 zip_id=job.zip_id,
                 zip_description=job.zip_description,
                 zip_summary=summary,

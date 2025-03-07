@@ -16,7 +16,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.db_entity import make_db_tag
 from downloader.job_system import WorkerResult
 from downloader.jobs.index import Index
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
@@ -56,7 +55,7 @@ class WaitDbZipsWorker(DownloaderWorkerBase):
         logger.bench('WaitDbZipsWorker deselect_all start: ', job.db.db_id)
         store = job.store.deselect_all(zip_indexes)
         logger.bench('WaitDbZipsWorker deselect_all done: ', job.db.db_id)
-        #sexit(0)
+
         resulting_job = ProcessDbIndexJob(
             db=job.db,
             ini_description=job.ini_description,
@@ -65,6 +64,5 @@ class WaitDbZipsWorker(DownloaderWorkerBase):
             store=store,
             full_resync=job.full_resync,
         )
-        resulting_job.add_tag(make_db_tag(job.db.db_id))
         logger.bench('WaitDbZipsWorker done: ', job.db.db_id)
         return [resulting_job], None

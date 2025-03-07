@@ -95,7 +95,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             self._ctx.swallow_error(target_error)
             return [], target_error
 
-        data_job = make_ephemeral_transfer_job(job.zip_description['contents_file']['url'], job.zip_description['contents_file'], None)
+        data_job = make_ephemeral_transfer_job(job.zip_description['contents_file']['url'], job.zip_description['contents_file'], job.db.db_id)
         open_zip_contents_job = OpenZipContentsJob(
             db=job.db,
             store=store,
@@ -115,7 +115,6 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             zip_base_files_url=job.zip_description.get('base_files_url', '').strip(),
             filtered_data=job.filtered_data,
         )
-        open_zip_contents_job.add_tag(job.db.db_id)
         data_job.after_job = open_zip_contents_job
         return [data_job], None
 

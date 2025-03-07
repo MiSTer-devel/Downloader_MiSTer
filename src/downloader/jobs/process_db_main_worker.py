@@ -18,17 +18,16 @@
 
 from typing import Dict, Any, Optional, Tuple
 
-from downloader.db_entity import check_zip, fix_folders, make_db_tag
+from downloader.db_entity import check_zip, fix_folders
 from downloader.db_utils import build_db_config
 from downloader.job_system import WorkerResult, Job
-from downloader.jobs.jobs_factory import make_process_zip_job, make_open_zip_summary_job, make_zip_tag, ZipJobContext
+from downloader.jobs.jobs_factory import make_process_zip_index_job, make_open_zip_summary_job, make_zip_tag, ZipJobContext
 from downloader.jobs.wait_db_zips_job import WaitDbZipsJob
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.index import Index
 from downloader.jobs.worker_context import DownloaderWorkerBase, NilJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE
-from downloader.logger import Logger
 
 
 class ProcessDbMainWorker(DownloaderWorkerBase):
@@ -94,7 +93,6 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
                 store=job.store,
                 full_resync=job.full_resync,
             )
-            index_job.add_tag(make_db_tag(job.db.db_id))
             next_jobs = [index_job]
 
         logger.bench('ProcessDbMainWorker end: ', job.db.db_id)
@@ -123,7 +121,7 @@ def _make_zip_job(index: Optional, z: ZipJobContext) -> Tuple[Job, Optional[Exce
 
 
 def _make_process_zip_job_from_ctx(z: ZipJobContext, zip_summary: Dict[str, Any], has_new_zip_summary: bool):
-    return make_process_zip_job(
+    return make_process_zip_index_job(
         zip_id=z.zip_id,
         zip_description=z.zip_description,
         zip_summary=zip_summary,

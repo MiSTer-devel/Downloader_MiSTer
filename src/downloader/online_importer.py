@@ -22,9 +22,10 @@ from collections import defaultdict
 import os
 
 from downloader.constants import FILE_MiSTer
-from downloader.db_entity import DbEntity, make_db_tag
+from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.job_system import Job
+from downloader.jobs.copy_data_job import CopyDataJob
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_file_job import FetchFileJob
@@ -62,19 +63,16 @@ class OnlineImporter:
         jobs: list[Job] = []
         for pkg in db_pkgs:
             # @TODO: Use proper tempfile.mkstemp instead
-            fetch_data_job = make_ephemeral_transfer_job(pkg.section['db_url'], {}, None)
+            transfer_job = make_ephemeral_transfer_job(pkg.section['db_url'], {}, pkg.db_id)
             self._logger.debug('Loading db from: ', pkg.section['db_url'])
-            fetch_data_job.after_job = OpenDbJob(
-                transfer_job=fetch_data_job,
+            transfer_job.after_job = OpenDbJob(
+                transfer_job=transfer_job,
                 section=pkg.db_id,
                 ini_description=pkg.section,
                 store=local_store.store_by_id(pkg.db_id),
                 full_resync=full_resync,
             )
-            db_tag = make_db_tag(pkg.db_id)
-            fetch_data_job.add_tag(db_tag)
-            fetch_data_job.after_job.add_tag(db_tag)
-            jobs.append(fetch_data_job)
+            jobs.append(transfer_job)
         return jobs
 
     def set_local_store(self, local_store: LocalStoreWrapper) -> None:
@@ -100,14 +98,8 @@ class OnlineImporter:
 
         box.set_unused_filter_tags(self._worker_ctx.file_filter_factory.unused_filter_parts())
 
-        for db in db_pkgs:
-            changes = len(report.get_jobs_completed_by_tag(db.db_id))
-            if changes > 0:
-                box.add_updated_db(db.db_id)
-
-            failures = len(report.get_jobs_failed_by_tag(make_db_tag(db.db_id)))
-            if failures > 0:
-                box.add_failed_db(db.db_id)
+        for job, _e in report.get_failed_jobs(OpenDbJob):
+            box.add_failed_db(job.section)
 
         for job in report.get_completed_jobs(ProcessDbMainJob):
             box.add_installed_db(job.db)
@@ -132,6 +124,7 @@ class OnlineImporter:
             box.queue_file_removal(job.files_to_remove, job.db.db_id)
 
         for job, e in report.get_failed_jobs(ProcessDbIndexJob):
+            box.add_failed_db(job.db.db_id)
             box.add_full_partitions(job.full_partitions)
             box.add_failed_files(job.failed_files_no_space)
             box.add_failed_folders(job.failed_folders)
@@ -157,6 +150,7 @@ class OnlineImporter:
                 box.add_installed_zip_summary(job.db.db_id, job.zip_id, job.result_zip_index, job.zip_description)
 
         for job, _e in report.get_failed_jobs(ProcessZipIndexJob):
+            box.add_failed_db(job.db.db_id)
             if job.summary_download_failed is not None:
                 box.add_failed_file(job.summary_download_failed)
             box.add_failed_files(job.failed_files_no_space)
@@ -175,32 +169,32 @@ class OnlineImporter:
             box.add_failed_files(job.files_to_unzip)
 
         for job in report.get_started_jobs(FetchFileJob):
-            box.add_file_fetch_started(job.info)
+            box.add_file_fetch_started(job.pkg.rel_path)
 
         for job in report.get_completed_jobs(FetchFileJob):
             if job.db_id is None or job.pkg is None: continue
-            box.add_downloaded_file(job.info)
+            box.add_downloaded_file(job.pkg.rel_path)
             box.add_validated_file(job.pkg, job.db_id)
 
-        for job, _e in report.get_failed_jobs(FetchDataJob):
-            box.add_failed_file(job.source)  # @TODO: This should not count as a file, but as a "source".
-
         for job, e in report.get_failed_jobs(FetchFileJob):
-            box.add_failed_file(job.info)
-            if job.info != FILE_MiSTer:
+            box.add_failed_file(job.pkg.rel_path)
+            if job.pkg.rel_path != FILE_MiSTer:
                 continue
 
             self._logger.debug(e)
             fs = self._worker_ctx.file_system
-            if fs.is_file(job.target_path, use_cache=False):
+            full_path = job.pkg.full_path
+            if fs.is_file(full_path, use_cache=False):
                 continue
 
-            if job.backup_path is not None and fs.is_file(job.backup_path, use_cache=False):
-                fs.move(job.backup_path, job.target_path)
-            elif job.temp_path is not None and fs.is_file(job.temp_path, use_cache=False) and fs.hash(job.temp_path) == job.description['hash']:
-                fs.move(job.temp_path, job.target_path)
+            backup_path = job.pkg.backup_path()
+            temp_path = job.pkg.temp_path(job.already_exists)
+            if backup_path is not None and fs.is_file(backup_path, use_cache=False):
+                fs.move(backup_path, full_path)
+            elif temp_path is not None and fs.is_file(temp_path, use_cache=False) and fs.hash(temp_path) == job.pkg.description['hash']:
+                fs.move(temp_path, full_path)
 
-            if fs.is_file(job.target_path, use_cache=False):
+            if fs.is_file(full_path, use_cache=False):
                 continue
 
             # This error message should never happen.
@@ -209,6 +203,11 @@ class OnlineImporter:
             self._logger.print('Please manually rename the file MiSTer.new as MiSTer')
             self._logger.print('Your system won\'nt be able to boot until you do so!')
             sys.exit(1)
+
+        for job, _e in report.get_failed_jobs(FetchDataJob) + report.get_failed_jobs(CopyDataJob):
+            if job.db_id is not None:
+                box.add_failed_db(job.db_id)
+            box.add_failed_file(job.source)  # @TODO: This should not count as a file, but as a "source".
 
         logger.bench('OnlineImporter applying changes on stores...')
 
@@ -424,8 +423,7 @@ class InstallationBox:
         self._directory_removals: dict[str, tuple[PathPackage, set[str]]] = dict()
         self._file_removals: dict[str, tuple[PathPackage, set[str]]] = dict()
         self._installed_dbs: list[DbEntity] = []
-        self._updated_dbs: list[str] = []
-        self._failed_dbs: list[str] = []
+        self._failed_dbs: set[str] = set()
         self._duplicated_files: list[tuple[list[str], str]] = []
         self._non_duplicated_files: list[tuple[list[PathPackage], str]] = []
         self._unused_filter_tags: list[str] = []
@@ -469,7 +467,7 @@ class InstallationBox:
     def add_failed_file(self, path: str):
         self._failed_files.append(path)
     def add_failed_db(self, db_id: str):
-        self._failed_dbs.append(db_id)
+        self._failed_dbs.add(db_id)
     def add_failed_files(self, file_pkgs: list[PathPackage]):
         if len(file_pkgs) == 0: return
         for pkg in file_pkgs:
@@ -495,8 +493,6 @@ class InstallationBox:
                 self._full_partitions[partition.path] += failed_reserve
     def add_installed_db(self, db: DbEntity):
         self._installed_dbs.append(db)
-    def add_updated_db(self, db_id: str):
-        self._updated_dbs.append(db_id)
     def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
         self._filtered_zip_data[db_id][zip_id] = filtered_data
     def add_failed_db_options(self, exception: WrongDatabaseOptions):
@@ -535,8 +531,8 @@ class InstallationBox:
     def filtered_zip_data(self): return self._filtered_zip_data
     def full_partitions(self) -> dict[str, int]: return self._full_partitions
     def installed_dbs(self) -> list[DbEntity]: return self._installed_dbs
-    def updated_dbs(self) -> list[str]: return self._updated_dbs
-    def failed_dbs(self) -> list[str]: return self._failed_dbs
+    def updated_dbs(self) -> list[str]: return list(self._validated_files)
+    def failed_dbs(self) -> list[str]: return list(self._failed_dbs)
     def unused_filter_tags(self): return self._unused_filter_tags
 
     def queue_directory_removal(self, dirs: list[PathPackage], db_id: str) -> None:

@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from typing import Any
-from downloader.db_entity import DbEntity, make_db_tag
+from downloader.db_entity import DbEntity
 from downloader.job_system import WorkerResult
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
@@ -36,7 +36,7 @@ class OpenDbWorker(DownloaderWorkerBase):
             return [], e
 
         ini_description, store, full_resync = job.ini_description, job.store, job.full_resync
-        return [ProcessDbMainJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync).add_tag(make_db_tag(job.section))], None
+        return [ProcessDbMainJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync)], None
 
     def _open_db(self, section: str, source: str, transfer: Any, /) -> DbEntity:
         self._ctx.logger.bench('OpenDbWorker Loading database: ', section)

@@ -24,11 +24,12 @@ from downloader.jobs.transfer_job import Transferrer
 
 
 class CopyDataJob(Job, Transferrer):
-    __slots__ = ('_tags', 'source', 'description', 'after_job', 'data')
+    __slots__ = ('_tags', 'source', 'description', 'db_id', 'after_job', 'data')
     type_id: int = JobSystem.get_job_type_id()
-    def __init__(self, source: str, description: dict[str, Any],/):
+    def __init__(self, source: str, description: dict[str, Any], db_id: Optional[str], /):
         self.source = source
         self.description = description
+        self.db_id = db_id
 
         # Next job
         self.after_job: Optional[Job] = None
