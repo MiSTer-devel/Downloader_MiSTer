@@ -77,6 +77,7 @@ verbose = false
 - [x] Configurable custom download filters
 - [x] Storage Priority Resolution for automatically detecting connected drives
 - [x] Free space checks
+- [ ] Opt-in parameter to bypass strict file checks
 - [ ] Fast check for update availability (without triggering an actual update)
 - [ ] HTTP cookie support
 - [ ] Uninstall database feature
