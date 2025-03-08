@@ -1,8 +1,10 @@
 # Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
+
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -17,6 +19,7 @@
 from typing import ItemsView, Dict, Any, List, Optional, Tuple, Union
 import os
 import threading
+from itertools import repeat
 from pathlib import Path
 
 from downloader.config import Config
@@ -57,7 +60,7 @@ class TargetPathsCalculator:
         cls = PathPackage
 
         # This weird obj creation is an optimization, since python 3.9 works much faster this way than with a traditional loop + traditional object initialization and this is part is super hot for perf
-        result_pkgs = [new(cls) for _ in range(len(packages))]
+        result_pkgs = [new(cls) for _ in repeat(None, len(packages))]
 
         base_path = self._config['base_path']
         for (path, description), pkg in zip(packages, result_pkgs):

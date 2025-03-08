@@ -69,16 +69,18 @@ downloader_retries = 3
 verbose = false
 ```
 
-### Roadmap
+### Feature Roadmap
 
 - [x] Initial Release
 - [x] [Cheats](https://gamehacking.org/mister/) fetching
 - [x] First-run optimisations
 - [x] Configurable custom download filters
-- [x] Storage Priority Resolution for auto-detecting connected drives
-- [x] Free space check
+- [x] Storage Priority Resolution for automatically detecting connected drives
+- [x] Free space checks
+- [ ] Fast check for update availability (without triggering an actual update)
+- [ ] HTTP cookie support
 - [ ] Uninstall database feature
-- [ ] Integration with *MiSTer* binary
+- [ ] Firmware integration
 
 Check the [CHANGELOG](CHANGELOG.md) for more information about past releases.
 
@@ -121,7 +123,7 @@ If not done manually, the launcher will automatically install that build on its 
 
 ### Supporters+ shout-out!
 
-Daniel Tarsky, James D Eberhart, Koala Koa, MiSTerFPGA.co.uk, Tony Escobar, turbochop3300 and Wayne Booker
+Thomas Williams and Wayne Booker
 
 Thank you so much for supporting this project! If you would like to show up here, join us as **Supporter+** on Patreon:
 

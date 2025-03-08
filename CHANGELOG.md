@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Version 2.0 - 2025-03-X
+
+### Added
+- The launcher now uses the latest build of Downloader if it's present in the filesystem. The newer version of Downloader will now be installed from [MiSTer Distribution](https://github.com/MiSTer-devel/Distribution_MiSTer) database just like any other standard MiSTer file. Thanks to this, you may now avoid executing remote code altogether by taking [this additional step](README.md#how-to-avoid-executing-remote-code-altogether) during installation. Otherwise, remote code execution only happens once on your first run of Downloader.
+- Documented **Custom INI file** support in [README.md](README.md#custom-ini-file), in case you want to use a separate launcher and INI file to install different databases in isolation through that launcher.
+
+### Changed
+- Improved release script.
+- Fixed bug in error handling when restoring user system files during a Linux update by [daph](https://github.com/MiSTer-devel/Downloader_MiSTer/commits?author=daph).
+- Better **custom download filters** documentation by [NFGman](https://github.com/MiSTer-devel/Downloader_MiSTer/commits?author=NFGman). Check it [here](docs/download-filters.md).
+- Expanded filesystem precaching to speed up the check of already installed files.
+- Many minor bug fixes.
+- The SSL check mechanism in the launcher has been made more flexible by covering more return codes. From just 60 to codes: 60, 77, 35, 51, 58, 59, 82, 83. It also has an improved routine to install new certificates, in case they are missing in the system.
+
+### Removed
+- The distutils dependency was removed, since it's been deprecated for a while (PEP 632) and removed in Python 3.12.
+- Removed `base_path` in database-scoped options. Files installed in different locations because of this option will be moved to the standard location. As a reminder, general `base_path` usage was deprecated in the version 1.8, as now multi-drive setups are handled with the **Storage Priority** feature introduced in Downloader 1.5.
+- The *offline importer*, a mechanism designed to assist during the migration from the old updater to Downloader, has been removed. Its role was to amend the file duplications that happened with the old updater, but unfortunately it never worked. It required the publication of the original file lists that were renamed, and although some contributors were initially committed to provide them, they could not deliver them in the end. 
+
 ## Version 1.8 - 2023-09-21
 
 ### Added
