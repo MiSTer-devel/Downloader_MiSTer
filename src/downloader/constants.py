@@ -179,3 +179,4 @@ KENV_LOGLEVEL: Final[str] = 'LOGLEVEL'
 DB_STATE_SIGNATURE_NO_HASH: Final[str] = 'non_initialized_hash'
 DB_STATE_SIGNATURE_NO_SIZE: Final[int] = -123
 DB_STATE_SIGNATURE_NO_TIMESTAMP: Final[int] = 0
+DB_STATE_SIGNATURE_NO_FILTER: Final[str] = ''

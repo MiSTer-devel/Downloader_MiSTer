@@ -19,6 +19,8 @@
 from dataclasses import field, dataclass
 from typing import Any, Dict, List
 
+from downloader.config import Config, default_config
+from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
 from downloader.local_store_wrapper import StoreWrapper
@@ -32,9 +34,12 @@ class ProcessDbMainJob(Job):
     store: StoreWrapper
     ini_description: Dict[str, Any]
     full_resync: bool
+    db_hash: str = field(default=DB_STATE_SIGNATURE_NO_HASH)
+    db_size: int = field(default=DB_STATE_SIGNATURE_NO_SIZE)
 
     def retry_job(self): return None
 
     # Results
     ignored_zips: List[str] = field(default_factory=list)
     removed_zips: List[str] = field(default_factory=list)
+    config: Config = field(default_factory=default_config)

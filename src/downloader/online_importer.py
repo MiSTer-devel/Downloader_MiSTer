@@ -21,6 +21,7 @@ from typing import Optional, Any
 from collections import defaultdict
 import os
 
+from downloader.config import Config
 from downloader.constants import FILE_MiSTer
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
@@ -102,7 +103,7 @@ class OnlineImporter:
             box.add_failed_db(job.section)
 
         for job in report.get_completed_jobs(ProcessDbMainJob):
-            box.add_installed_db(job.db)
+            box.add_installed_db(job.db, job.config, job.db_hash, job.db_size)
             for zip_id in job.ignored_zips:
                 box.add_failed_zip(job.db.db_id, zip_id)
             for zip_id in job.removed_zips:
@@ -220,8 +221,8 @@ class OnlineImporter:
             read_stores[db.db_id] = store.read_only()
             stores.append(store)
 
-        for db in box.installed_dbs():
-            write_stores[db.db_id].set_db_state_signature(db.transfer_hash, db.transfer_size, db.timestamp)
+        for db, config, db_hash, db_size in box.installed_db_sigs():
+            write_stores[db.db_id].set_db_state_signature(db_hash, db_size, db.timestamp, config['filter'])
 
         for db_id, zip_id in box.removed_zips():
             write_stores[db_id].remove_zip_id(zip_id)
@@ -431,6 +432,7 @@ class InstallationBox:
         self._directory_removals: dict[str, tuple[PathPackage, set[str]]] = dict()
         self._file_removals: dict[str, tuple[PathPackage, set[str]]] = dict()
         self._installed_dbs: list[DbEntity] = []
+        self._installed_db_sigs: list[tuple[DbEntity, Config, str, int]] = []
         self._failed_dbs: set[str] = set()
         self._duplicated_files: list[tuple[list[str], str]] = []
         self._non_duplicated_files: list[tuple[list[PathPackage], str]] = []
@@ -499,8 +501,9 @@ class InstallationBox:
                 self._full_partitions[partition.path] = failed_reserve
             else:
                 self._full_partitions[partition.path] += failed_reserve
-    def add_installed_db(self, db: DbEntity):
+    def add_installed_db(self, db: DbEntity, config: Config, db_hash: str, db_size: int):
         self._installed_dbs.append(db)
+        self._installed_db_sigs.append((db, config, db_hash, db_size))
     def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
         self._filtered_zip_data[db_id][zip_id] = filtered_data
     def add_failed_db_options(self, exception: WrongDatabaseOptions):
@@ -538,6 +541,7 @@ class InstallationBox:
     def skipped_updated_files(self): return self._skipped_updated_files
     def filtered_zip_data(self): return self._filtered_zip_data
     def full_partitions(self) -> dict[str, int]: return self._full_partitions
+    def installed_db_sigs(self): return self._installed_db_sigs
     def installed_dbs(self) -> list[DbEntity]: return self._installed_dbs
     def updated_dbs(self) -> list[str]: return list(self._validated_files)
     def failed_dbs(self) -> list[str]: return list(self._failed_dbs)

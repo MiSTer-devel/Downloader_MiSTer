@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.constants import K_BASE_PATH, DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, \
-    DB_STATE_SIGNATURE_NO_TIMESTAMP
+    DB_STATE_SIGNATURE_NO_TIMESTAMP, DB_STATE_SIGNATURE_NO_FILTER
 from downloader.jobs.index import Index
 from downloader.other import empty_store_without_base_path
 from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict
@@ -45,8 +45,9 @@ class DbStateSig(TypedDict):
     hash: str
     size: int
     timestamp: int
+    filter: str
 
-def empty_db_state_signature() -> DbStateSig: return {'hash': DB_STATE_SIGNATURE_NO_HASH, 'size': DB_STATE_SIGNATURE_NO_SIZE, 'timestamp': DB_STATE_SIGNATURE_NO_TIMESTAMP}
+def empty_db_state_signature() -> DbStateSig: return {'hash': DB_STATE_SIGNATURE_NO_HASH, 'size': DB_STATE_SIGNATURE_NO_SIZE, 'timestamp': DB_STATE_SIGNATURE_NO_TIMESTAMP, 'filter': DB_STATE_SIGNATURE_NO_FILTER}
 
 class LocalStoreWrapper:
     def __init__(self, local_store: Dict[str, Any]):
@@ -373,7 +374,7 @@ class WriteOnlyStoreAdapter:
 
         self._store[K_BASE_PATH] = base_path
 
-    def set_db_state_signature(self, transfer_hash: str, transfer_size: int, timestamp: int):
+    def set_db_state_signature(self, transfer_hash: str, transfer_size: int, timestamp: int, filter: str):
         if self._db_state_signature['hash'] != transfer_hash:
             self._db_state_signature['hash'] = transfer_hash
             self._top_wrapper.mark_force_save()
@@ -382,6 +383,9 @@ class WriteOnlyStoreAdapter:
             self._top_wrapper.mark_force_save()
         if self._db_state_signature['timestamp'] != timestamp:
             self._db_state_signature['timestamp'] = timestamp
+            self._top_wrapper.mark_force_save()
+        if self._db_state_signature['filter'] != filter:
+            self._db_state_signature['filter'] = filter
             self._top_wrapper.mark_force_save()
 
     def remove_zip_id(self, zip_id):
