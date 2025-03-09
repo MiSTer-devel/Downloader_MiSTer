@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 import unittest
 
 from downloader.config import default_config
-from downloader.online_importer import WrongDatabaseOptions
+from downloader.jobs.errors import WrongDatabaseOptions
 from test.objects import db_test_descr, store_descr, file_descr, file_b, file_a, file_c, folder_a, folder_b, \
     folder_c, config_with_filter, file_one, empty_test_store
 from test.fake_online_importer import OnlineImporter
@@ -159,7 +159,7 @@ def db_with_files_a_b_c():
 
 
 def db_with_files_a_b_c_alt():
-    return db_test_descr(files={
+    return db_test_descr(db_id='test_alt', files={
         'alt' + file_a: file_descr(tags=['a']),
         'alt' + file_b: file_descr(tags=['b']),
         'alt' + file_c: file_descr(tags=['c'])

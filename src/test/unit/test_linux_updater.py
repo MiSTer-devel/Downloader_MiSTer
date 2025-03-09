@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,12 +18,11 @@
 
 import unittest
 
-from downloader.constants import FILE_MiSTer_version
+from downloader.constants import FILE_Linux_uninstalled, FILE_MiSTer_version
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_importer_implicit_inputs import NetworkState, FileSystemState
 from test.fake_linux_updater import LinuxUpdater
 from test.objects import db_entity
-from test.fake_file_downloader_factory import FileDownloaderFactory
 
 
 class TestLinuxUpdater(unittest.TestCase):
@@ -66,8 +65,7 @@ class TestLinuxUpdater(unittest.TestCase):
         self.assertEqual(self.sut.file_system.read_file_contents(FILE_MiSTer_version), "222222")
 
     def test_update_linux___new_linux_but_failed_download___no_need_to_reboot(self):
-        factory = FileDownloaderFactory(network_state=NetworkState(remote_failures={"linux.7z": 99}))
-        self.sut = LinuxUpdater(file_downloader_factory=factory)
+        self.sut = LinuxUpdater(network_state=NetworkState(remote_failures={FILE_Linux_uninstalled: 99}))
         self.sut.add_db(db_entity(db_id='new', linux=linux_description()))
         self.sut.update()
         self.assertFalse(self.sut.needs_reboot())

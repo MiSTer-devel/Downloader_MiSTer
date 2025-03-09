@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -50,6 +50,7 @@ class StoreMigrator:
 def make_new_local_store(store_migrator):
     return {
         'dbs': {},
+        'db_sigs': {},
         'migration_version': store_migrator.latest_migration_version(),
         'internal': True
     }

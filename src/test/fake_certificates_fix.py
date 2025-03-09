@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,10 +17,10 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.certificates_fix import CertificatesFix as ProductionCertificatesFix
 from downloader.config import default_config
-from downloader.constants import DEFAULT_CURL_SSL_OPTIONS, K_CURL_SSL
+from downloader.constants import DEFAULT_CURL_SSL_OPTIONS
 from test.fake_waiter import NoWaiter
 from test.fake_file_system_factory import FileSystemFactory
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 
 
 class CertificatesFix(ProductionCertificatesFix):
@@ -52,7 +52,7 @@ class CertificatesFix(ProductionCertificatesFix):
 
 def _config():
     config = default_config()
-    config[K_CURL_SSL] = DEFAULT_CURL_SSL_OPTIONS
+    config['curl_ssl'] = DEFAULT_CURL_SSL_OPTIONS
     return config
 
 

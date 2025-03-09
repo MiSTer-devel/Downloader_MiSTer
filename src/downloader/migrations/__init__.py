@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.migrations.migration_v1 import MigrationV1
+from downloader.migrations.migration_v10 import MigrationV10
 from downloader.migrations.migration_v2 import MigrationV2
 from downloader.migrations.migration_v3 import MigrationV3
 from downloader.migrations.migration_v4 import MigrationV4
@@ -27,15 +28,16 @@ from downloader.migrations.migration_v8 import MigrationV8
 from downloader.migrations.migration_v9 import MigrationV9
 
 
-def migrations(config, file_system_factory, path_resolver_factory):
+def migrations(config, file_system_factory):
     return [
         MigrationV1(),
         MigrationV2(),
         MigrationV3(),
         MigrationV4(),
-        MigrationV5(file_system_factory, path_resolver_factory, config),
+        MigrationV5(config, file_system_factory),
         MigrationV6(file_system_factory),
         MigrationV7(config),
         MigrationV8(),
-        MigrationV9()
+        MigrationV9(),
+        MigrationV10(),
     ]

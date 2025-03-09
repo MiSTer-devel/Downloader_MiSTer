@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ import traceback
 from datetime import datetime
 import os
 from subprocess import CalledProcessError
-from src.debug import exec_ssh, run_operation, chdir_root
+from src.debug import exec_ssh, operations_dict, chdir_root
 
 
 def main(operation, iterations, target):
@@ -49,10 +49,10 @@ def iterate(op, target, results):
 
     before = time.time()
     try:
-        run_operation(op, env={
+        operations_dict(env={
             'DEBUG': 'false', 'FAIL_ON_FILE_ERROR': 'true', 'LOGFILE': log_file,
             'ALLOW_REBOOT': '0', 'UPDATE_LINUX': 'false',
-        }, retries=False)
+        }, retries=False)[op]()
     except CalledProcessError: log(f'[{cur_i:0>2} {op:>8}] ERRORED! See {log_file} for details.')
     duration = time.time() - before
 
@@ -103,7 +103,7 @@ def files_in(path):
     return int(exec_ssh(f"find /media/fat/{path} -type f | wc -l", out=subprocess.PIPE).stdout.decode().strip())
 
 
-def average(results, threshold=2):
+def average(results, threshold=4):
     def median(data): return sorted(data)[len(data) // 2]
     def mean(data): return sum(data) / len(data)
     def standard_deviation(data): return (sum((x - mean(data)) ** 2 for x in data) / len(data)) ** 0.5

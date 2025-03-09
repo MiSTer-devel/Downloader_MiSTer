@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,13 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from downloader.config import ConfigReader
 from downloader.constants import KENV_DOWNLOADER_LAUNCHER_PATH, KENV_DOWNLOADER_INI_PATH, KENV_PC_LAUNCHER
-from downloader.logger import NoLogger
+from test.fake_config_reader import ConfigReader
 
 
-def calculate_config_path(env, working_dir):
-    return ConfigReader(NoLogger(), env).calculate_config_path(working_dir)
+def calculate_config_path(env_vars, working_dir):
+    return ConfigReader(env_vars).calculate_config_path(working_dir)
 
 
 class TestConfigFilePath(unittest.TestCase):

@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 from downloader.config import default_config
 from downloader.reboot_calculator import RebootCalculator as ProductionRebootCalculator
 from test.fake_file_system_factory import FileSystemFactory
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 
 
 class RebootCalculator(ProductionRebootCalculator):

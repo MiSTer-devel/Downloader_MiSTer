@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,31 +16,40 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, Tuple, Generator, Optional
+from typing import Dict, Any, Tuple, Generator, Optional, TypedDict
 from contextlib import contextmanager
+import ssl
 
-from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.job_system import _thread_local_storage
+from downloader.http_gateway import HttpGateway
 from test.objects import binary_content
 
 
-class FakeHttpGateway:
+class FileContextRequired(TypedDict):
+    description: Dict[str, Any]
+    path: str
+
+class FileContext(FileContextRequired, total=False):
+    info: str
+
+class FakeHttpGateway(HttpGateway):
     def __init__(self, config, network_state):
+        super().__init__(ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT), 200, None)
         self._config = config
         self._network_state = network_state
+        self._file_ctx: Optional[FileContext] = None
+
+    def set_file_ctx(self, file_ctx: Optional[Tuple[FileContext, str]]) -> None:
+        self._file_ctx = file_ctx
 
     @contextmanager
     def open(self, url: str, _method: str = None, _body: Any = None, _headers: Any = None) -> Generator[Tuple[str, 'FakeHTTPResponse'], None, None]:
-        parent_package = getattr(_thread_local_storage, 'current_package', None)
-        job = None if parent_package is None else parent_package.job
-
         description = None
-        file_path = None
-        if isinstance(job, FetchFileJob):
-            description = {**job.description}
-            file_path = job.path
+        target_file_path = None
+        info_path = None
+        if self._file_ctx is not None:
+            description, target_file_path, info_path = self._file_ctx['description'], self._file_ctx['path'], self._file_ctx.get('info', None)
 
-        match_path = file_path if file_path is not None else url
+        match_path = info_path if info_path is not None else target_file_path if target_file_path is not None else url
 
         status = 200
         self._network_state.remote_failures[match_path] = self._network_state.remote_failures.get(match_path, 0)
@@ -53,13 +62,19 @@ class FakeHttpGateway:
             description = {'hash': match_path, 'size': 1}
         if 'url' in description:
             del description['url']
+        if 'delete' in description:
+            del description['delete']
+
+        storing_problems = match_path in self._network_state.storing_problems and self._network_state.storing_problems[match_path] > 0
+        if storing_problems:
+            self._network_state.storing_problems[match_path] -= 1
 
         yield url, FakeHTTPResponse(
             url=url,
             status=status,
-            storing_problems=file_path in self._network_state.storing_problems,
+            storing_problems=storing_problems,
             description=description,
-            file_path=file_path
+            file_path=target_file_path
         )
 
     def cleanup(self) -> None:
@@ -73,6 +88,7 @@ class FakeHTTPResponse:
         self.storing_problems = storing_problems
         self.description = description
         self.file_path = file_path
+        self.buf = FakeBuf(description)
         self._position = 0
 
     def read(self, size: int = -1) -> bytes:
@@ -83,3 +99,12 @@ class FakeHTTPResponse:
             result = binary_content[self._position:self._position + size]
             self._position += size
         return result
+
+class FakeBuf:
+    def __init__(self, description):
+        self.description = description
+        self.nbytes = description.get('size', 1)
+
+    def getbuffer(self): return self
+    def seek(self, n: int): pass
+    def read(self): return b'0'
