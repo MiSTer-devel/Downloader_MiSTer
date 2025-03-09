@@ -102,7 +102,7 @@ class OnlineImporter:
             box.add_failed_db(job.section)
 
         for job in report.get_completed_jobs(ProcessDbMainJob):
-            box.add_installed_db(job.db, job.db_hash, job.db_size)
+            box.add_installed_db(job.db)
             for zip_id in job.ignored_zips:
                 box.add_failed_zip(job.db.db_id, zip_id)
             for zip_id in job.removed_zips:
@@ -219,6 +219,9 @@ class OnlineImporter:
             write_stores[db.db_id] = store.write_only()
             read_stores[db.db_id] = store.read_only()
             stores.append(store)
+
+        for db in box.installed_dbs():
+            write_stores[db.db_id].set_db_state_signature(db.transfer_hash, db.transfer_size, db.timestamp)
 
         for db_id, zip_id in box.removed_zips():
             write_stores[db_id].remove_zip_id(zip_id)
@@ -496,7 +499,7 @@ class InstallationBox:
                 self._full_partitions[partition.path] = failed_reserve
             else:
                 self._full_partitions[partition.path] += failed_reserve
-    def add_installed_db(self, db: DbEntity, db_hash: str, db_size: int):
+    def add_installed_db(self, db: DbEntity):
         self._installed_dbs.append(db)
     def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
         self._filtered_zip_data[db_id][zip_id] = filtered_data

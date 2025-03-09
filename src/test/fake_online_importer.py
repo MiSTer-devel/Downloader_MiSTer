@@ -36,7 +36,7 @@ from downloader.logger import Logger
 from downloader.waiter import Waiter
 from test.fake_http_gateway import FakeHttpGateway
 from test.fake_job_system import ProgressReporterTracker
-from test.fake_local_store_wrapper import LocalStoreWrapper
+from test.fake_local_store_wrapper import LocalStoreWrapper, local_store_wrapper
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_logger import NoLogger
 from test.fake_workers_factory import make_workers
@@ -115,7 +115,7 @@ class OnlineImporter(ProductionOnlineImporter):
 
         jobs = []
         for db, _store, ini_description in self.dbs:
-            jobs.append(ProcessDbMainJob(db=db, db_hash='', db_size=-1, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
+            jobs.append(ProcessDbMainJob(db=db, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
         return jobs
 
     @staticmethod
@@ -144,7 +144,7 @@ class OnlineImporter(ProductionOnlineImporter):
         return self._report_tracker.tracks
 
     def download(self, full_resync: bool):
-        self.set_local_store(LocalStoreWrapper({'dbs': {db.db_id: store for db, store, _ in self.dbs}}))
+        self.set_local_store(local_store_wrapper({db.db_id: store for db, store, _ in self.dbs}))
         db_pkgs: List[DbSectionPackage] = []
         for db, store, ini_description in self.dbs:
             db_pkgs.append(DbSectionPackage(db_id=db.db_id, section=ini_description, store=store))

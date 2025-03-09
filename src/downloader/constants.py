@@ -174,3 +174,8 @@ KENV_DEBUG: Final[str] = 'DEBUG'
 KENV_FAIL_ON_FILE_ERROR: Final[str] = 'FAIL_ON_FILE_ERROR'
 KENV_LOGFILE: Final[str] = 'LOGFILE'
 KENV_LOGLEVEL: Final[str] = 'LOGLEVEL'
+
+# Db State Signature
+DB_STATE_SIGNATURE_NO_HASH: Final[str] = 'non_initialized_hash'
+DB_STATE_SIGNATURE_NO_SIZE: Final[int] = -123
+DB_STATE_SIGNATURE_NO_TIMESTAMP: Final[int] = 0
