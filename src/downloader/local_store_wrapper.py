@@ -16,10 +16,11 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import K_BASE_PATH
+from downloader.constants import K_BASE_PATH, DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, \
+    DB_STATE_SIGNATURE_NO_TIMESTAMP
 from downloader.jobs.index import Index
 from downloader.other import empty_store_without_base_path
-from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict
+from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict, NotRequired
 from collections import defaultdict, ChainMap
 
 from downloader.path_package import PathPackage, PATH_PACKAGE_KIND_PEXT, PextPathProps, PEXT_KIND_EXTERNAL, PathType
@@ -40,6 +41,12 @@ class StoreFragmentDrivePaths(TypedDict):
 
 def new_store_fragment_drive_paths(): return {"base_paths": new_store_fragment_paths(), "external_paths": dict()}
 
+class DbStateSig(TypedDict):
+    hash: str
+    size: int
+    timestamp: int
+
+def empty_db_state_signature() -> DbStateSig: return {'hash': DB_STATE_SIGNATURE_NO_HASH, 'size': DB_STATE_SIGNATURE_NO_SIZE, 'timestamp': DB_STATE_SIGNATURE_NO_TIMESTAMP}
 
 class LocalStoreWrapper:
     def __init__(self, local_store: Dict[str, Any]):
@@ -56,7 +63,10 @@ class LocalStoreWrapper:
         if db_id not in self._local_store['dbs'] or self._local_store['dbs'] is None:
             self._local_store['dbs'][db_id] = empty_store_without_base_path()
 
-        return StoreWrapper(self._local_store['dbs'][db_id], self)
+        if db_id not in self._local_store['db_sigs'] or self._local_store['db_sigs'] is None:
+            self._local_store['db_sigs'][db_id] = empty_db_state_signature()
+
+        return StoreWrapper(self._local_store['dbs'][db_id], self._local_store['db_sigs'][db_id], self)
 
     def needs_save(self) -> bool:
         return self._dirty
@@ -66,7 +76,7 @@ class ReadOnlyStoreException(Exception): pass
 
 
 class StoreWrapper:
-    def __init__(self, store: Dict[str, Any], local_store_wrapper: LocalStoreWrapper, readonly: bool = False):
+    def __init__(self, store: Dict[str, Any], db_state_signature: DbStateSig, local_store_wrapper: LocalStoreWrapper, readonly: bool = False):
         self._external_additions = {'files': defaultdict(list), 'folders': defaultdict(list)}
         if 'external' in store:
             for drive, external in store['external'].items():
@@ -85,9 +95,10 @@ class StoreWrapper:
                         self._external_additions['folders'][folder_path].append(drive)
 
         self._store = store
+        self._db_state_signature = db_state_signature
         self._local_store_wrapper = local_store_wrapper
-        self._read_only = ReadOnlyStoreAdapter(self._store)
-        self._write_only = WriteOnlyStoreAdapter(self._store, self._local_store_wrapper, self._external_additions)
+        self._read_only = ReadOnlyStoreAdapter(self._store, self._db_state_signature)
+        self._write_only = WriteOnlyStoreAdapter(self._store, self._db_state_signature, self._local_store_wrapper, self._external_additions)
         self._readonly = readonly
 
     def unwrap_store(self) -> Dict[str, Any]:
@@ -122,7 +133,7 @@ class StoreWrapper:
                 for drive, summary in self._store['external'].items()
             }
 
-        return StoreWrapper(new_store, self._local_store_wrapper, readonly=True)
+        return StoreWrapper(new_store, empty_db_state_signature(), self._local_store_wrapper, readonly=True)
 
     def deselect_all(self, indexes: List[Index]) -> 'StoreWrapper':
         # @TODO: Remove this | handling after we change the pext path format in the stores
@@ -146,12 +157,13 @@ class StoreWrapper:
                 for drive, summary in self._store['external'].items()
             }
 
-        return StoreWrapper(new_store, self._local_store_wrapper, readonly=True)
+        return StoreWrapper(new_store, empty_db_state_signature(), self._local_store_wrapper, readonly=True)
 
 
 class WriteOnlyStoreAdapter:
-    def __init__(self, store, top_wrapper, external_additions):
+    def __init__(self, store, db_state_signature, top_wrapper, external_additions):
         self._store = store
+        self._db_state_signature = db_state_signature
         self._top_wrapper = top_wrapper
         self._external_additions = external_additions
 
@@ -361,6 +373,17 @@ class WriteOnlyStoreAdapter:
 
         self._store[K_BASE_PATH] = base_path
 
+    def set_db_state_signature(self, transfer_hash: str, transfer_size: int, timestamp: int):
+        if self._db_state_signature['hash'] != transfer_hash:
+            self._db_state_signature['hash'] = transfer_hash
+            self._top_wrapper.mark_force_save()
+        if self._db_state_signature['size'] != transfer_size:
+            self._db_state_signature['size'] = transfer_size
+            self._top_wrapper.mark_force_save()
+        if self._db_state_signature['timestamp'] != timestamp:
+            self._db_state_signature['timestamp'] = timestamp
+            self._top_wrapper.mark_force_save()
+
     def remove_zip_id(self, zip_id):
         self.remove_zip_ids([zip_id])
 
@@ -513,8 +536,9 @@ class WriteOnlyStoreAdapter:
 
 
 class ReadOnlyStoreAdapter:
-    def __init__(self, store):
+    def __init__(self, store, db_state_signature):
         self._store = store
+        self._db_state_signature = db_state_signature
 
     def hash_file(self, file_pkg: PathPackage):
         if file_pkg.is_pext_external():

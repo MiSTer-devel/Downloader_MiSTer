@@ -17,6 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.migrations.migration_v1 import MigrationV1
+from downloader.migrations.migration_v10 import MigrationV10
 from downloader.migrations.migration_v2 import MigrationV2
 from downloader.migrations.migration_v3 import MigrationV3
 from downloader.migrations.migration_v4 import MigrationV4
@@ -37,5 +38,6 @@ def migrations(config, file_system_factory):
         MigrationV6(file_system_factory),
         MigrationV7(config),
         MigrationV8(),
-        MigrationV9()
+        MigrationV9(),
+        MigrationV10(),
     ]

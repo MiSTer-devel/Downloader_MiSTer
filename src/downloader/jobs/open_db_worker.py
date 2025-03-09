@@ -17,6 +17,8 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from typing import Any
+
+from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
 from downloader.db_entity import DbEntity
 from downloader.job_system import WorkerResult
 from downloader.jobs.open_db_job import OpenDbJob
@@ -35,11 +37,17 @@ class OpenDbWorker(DownloaderWorkerBase):
             self._ctx.swallow_error(e)
             return [], e
 
+        calcs = job.transfer_job.calcs
+        if calcs is None:
+            self._ctx.swallow_error(Exception(f'OpenDbWorker [{db.db_id}] must receive a transfer_job with calcs not null.'))
+            calcs = {}
+
+        db.transfer_hash = calcs.get('hash', DB_STATE_SIGNATURE_NO_HASH)
+        db.transfer_size = calcs.get('size', DB_STATE_SIGNATURE_NO_SIZE)
+
         ini_description, store, full_resync = job.ini_description, job.store, job.full_resync
         return [ProcessDbMainJob(
             db=db,
-            db_hash=job.transfer_job.calcs['hash'],
-            db_size=job.transfer_job.calcs['size'],
             ini_description=ini_description,
             store=store,
             full_resync=full_resync

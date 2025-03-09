@@ -111,16 +111,23 @@ class FullRunService:
 
         for relocation_package in self._base_path_relocator.relocating_base_paths(db_pkgs):
             self._base_path_relocator.relocate_non_system_files(relocation_package)
-            self._local_repository.save_store(local_store)
+            err = self._local_repository.save_store(local_store)
+            if err is not None:
+                self._logger.debug('WARNING! Base path relocation could not be saved in the store!')
+                continue
 
         full_resync = not self._local_repository.has_last_successful_run()
         self._online_importer.set_local_store(local_store)
         self._online_importer.download_dbs_contents(db_pkgs, full_resync)
 
-        self._local_repository.save_store(local_store)
+        save_err = self._local_repository.save_store(local_store)
 
         install_box = self._online_importer.box()
         self._display_summary(install_box, self._config['start_time'])
+
+        if save_err is not None:
+            self._logger.print('WARNING! Store could not be saved because of a File System Error!')
+            return 1
 
         if self._config['update_linux']:
             self._linux_updater.update_linux(self._online_importer.correctly_downloaded_dbs())

@@ -16,10 +16,11 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import os
+from typing import Optional
 
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
     FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json
-from downloader.file_system import FileSystem
+from downloader.file_system import FileSystem, FsError
 from downloader.local_store_wrapper import LocalStoreWrapper
 from downloader.logger import FilelogSaver, Logger
 from downloader.other import empty_store_without_base_path
@@ -135,10 +136,10 @@ class LocalRepository(FilelogSaver):
     def _store_drives(self):
         return self._external_drives_repository.connected_drives_except_base_path_drives(self._config)
 
-    def save_store(self, local_store_wrapper):
+    def save_store(self, local_store_wrapper) -> Optional[Exception]:
         if not local_store_wrapper.needs_save():
             self._logger.debug('Skipping local_store saving...')
-            return
+            return None
 
         self._logger.bench('Save store start.')
         local_store = local_store_wrapper.unwrap_local_store()
@@ -156,30 +157,37 @@ class LocalRepository(FilelogSaver):
 
             del store['external']
 
-        self._file_system.make_dirs_parent(self._storage_save_path)
-        self._logger.bench('Write main json start.')
-        self._file_system.save_json(local_store, self._storage_save_path)
-        self._logger.bench('Write main json done.')
-        if self._file_system.is_file(self._storage_old_path) and \
-                self._file_system.is_file(self._storage_save_path, use_cache=False):
-            self._file_system.unlink(self._storage_old_path)
+        try:
+            self._file_system.make_dirs_parent(self._storage_save_path)
+            self._logger.bench('Write main json start.')
+            self._file_system.save_json(local_store, self._storage_save_path)
+            self._logger.bench('Write main json done.')
+            if self._file_system.is_file(self._storage_old_path) and \
+                    self._file_system.is_file(self._storage_save_path, use_cache=False):
+                self._file_system.unlink(self._storage_old_path)
 
-        external_drives = set(self._store_drives())
+            external_drives = set(self._store_drives())
 
-        for drive, store in external_stores.items():
-            self._logger.bench('Write external json start: ', drive)
-            self._file_system.save_json(store, os.path.join(drive, FILE_downloader_external_storage))
-            self._logger.bench('Write external json done: ', drive)
-            if drive in external_drives:
-                external_drives.remove(drive)
+            for drive, store in external_stores.items():
+                self._logger.bench('Write external json start: ', drive)
+                self._file_system.save_json(store, os.path.join(drive, FILE_downloader_external_storage))
+                self._logger.bench('Write external json done: ', drive)
+                if drive in external_drives:
+                    external_drives.remove(drive)
 
-        for drive in external_drives:
-            db_to_clean = os.path.join(drive, FILE_downloader_external_storage)
-            if self._file_system.is_file(db_to_clean):
-                self._file_system.unlink(db_to_clean)
+            for drive in external_drives:
+                db_to_clean = os.path.join(drive, FILE_downloader_external_storage)
+                if self._file_system.is_file(db_to_clean):
+                    self._file_system.unlink(db_to_clean)
 
-        self._file_system.touch(self._last_successful_run)
-        self._logger.bench('Save store end.')
+            self._file_system.touch(self._last_successful_run)
+        except FsError as e:
+            self._logger.debug(e)
+            return e
+        else:
+            return None
+        finally:
+            self._logger.bench('Save store end.')
 
     def save_log_from_tmp(self, path):
         self._file_system.turn_off_logs()
