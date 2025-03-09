@@ -44,10 +44,10 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
 
         self._ctx.file_download_session_logger.print_header(job.db)
         logger.bench("ProcessDbMainWorker Building db config: ", job.db.db_id)
-        config = build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
+        job.config = build_db_config(input_config=self._ctx.config, db=job.db, ini_description=job.ini_description)
 
         if not read_only_store.has_base_path():  # @TODO: should remove this from here at some point.
-            job.store.write_only().set_base_path(config['base_path'])  # After that, all worker stores will be read-only.
+            job.store.write_only().set_base_path(job.config['base_path'])  # After that, all worker stores will be read-only.
 
         for zip_id in list(read_only_store.zips):
             if zip_id in job.db.zips:
@@ -65,7 +65,7 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
             logger.bench('ProcessDbMainWorker ZIP make jobs: ', job.db.db_id)
             for zip_id, zip_description in job.db.zips.items():
                 #if zip_id != 'cheats_folder_psx': continue
-                zip_job, err = _make_zip_job(zip_summaries.get(zip_id, None), ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
+                zip_job, err = _make_zip_job(zip_summaries.get(zip_id, None), ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=job.config, job=job))
                 if err is not None:
                     self._ctx.swallow_error(err)
                     job.ignored_zips.append(zip_id)
@@ -76,7 +76,7 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
 
             waiter_job = WaitDbZipsJob(
                 db=job.db,
-                config=config,
+                config=job.config,
                 store=job.store,
                 ini_description=job.ini_description,
                 full_resync=job.full_resync,
@@ -88,7 +88,7 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
             index_job = ProcessDbIndexJob(
                 db=job.db,
                 ini_description=job.ini_description,
-                config=config,
+                config=job.config,
                 index=Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url),
                 store=job.store,
                 full_resync=job.full_resync,

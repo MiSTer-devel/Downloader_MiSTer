@@ -284,7 +284,7 @@ def db_test_with_default_filter_descr(db_default_option_filter=None):
     )
 
 
-def db_test_descr(db_id=None, zips=None, folders=None, files=None, db_files=None, tag_dictionary=None, transfer_size=None, transfer_hash=None):
+def db_test_descr(db_id=None, zips=None, folders=None, files=None, db_files=None, tag_dictionary=None):
     return db_entity(
         db_id=db_id or db_test,
         db_files=db_files if db_files is not None else [],
@@ -295,8 +295,6 @@ def db_test_descr(db_id=None, zips=None, folders=None, files=None, db_files=None
         default_options={},
         timestamp=0,
         tag_dictionary=tag_dictionary,
-        transfer_size=transfer_size,
-        transfer_hash=transfer_hash,
     )
 
 
@@ -373,7 +371,7 @@ def db_description(db_url: str = None, section: str = None, options: DbOptions =
     return description
 
 
-def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, default_options=None, timestamp=None, linux=None, header=None, section=None, tag_dictionary=None, transfer_size=None, transfer_hash=None):
+def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, default_options=None, timestamp=None, linux=None, header=None, section=None, tag_dictionary=None):
     db_raw = {
         'db_id': db_id if db_id is not None else db_test,
         'db_files': db_files if db_files is not None else [],
@@ -391,10 +389,6 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
     if header is not None:
         db_raw['header'] = header
     entity = DbEntity(db_raw, section if section is not None else db_id if db_id is not None else db_test)
-    if transfer_size is not None:
-        entity.transfer_size = transfer_size
-    if transfer_hash is not None:
-        entity.transfer_hash = transfer_hash
     return entity
 
 

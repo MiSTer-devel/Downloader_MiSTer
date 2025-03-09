@@ -36,14 +36,14 @@ db_info = 'db test'
 class TestOnlineImporterDbFetching(unittest.TestCase):
     def test_fetch_all___db_with_working_http_uri___returns_expected_db(self):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
-        self.assertEqual(db_test_descr(transfer_hash='ignore', transfer_size=1).testable, fetch_all(http_db_url, network_state=NetworkState(remote_files={http_db_url: db_description})))
+        self.assertEqual(db_test_descr().testable, fetch_all(http_db_url, network_state=NetworkState(remote_files={http_db_url: db_description})))
 
     def test_fetch_all___db_with_fs_path___returns_expected_db(self):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
 
         file_system_factory = FileSystemFactory.from_state(files={fs_db_path: db_description})
 
-        self.assertEqual(db_test_descr(transfer_hash='cfcd208495d565ef66e7dff9f98764da', transfer_size=1).testable, fetch_all(fs_db_path, file_system_factory))
+        self.assertEqual(db_test_descr().testable, fetch_all(fs_db_path, file_system_factory))
 
     def test_fetch_all___db_with_wrong_downloaded_file___returns_none(self):
         self.assertEqual(None, fetch_all(http_db_url, fail=DownloaderWorkerFailPolicy.FAULT_TOLERANT))
