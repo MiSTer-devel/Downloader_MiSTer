@@ -164,26 +164,12 @@ class FullRunService:
         if len(box.unused_filter_tags()) > 0:
             self._logger.print()
             self._logger.print("Unused filter terms:")
-            if len(box.unused_filter_tags()) != 1:
-                self._logger.print(format_files_message(box.unused_filter_tags()) + " (Did you misspell them?)")
-            else:
-                self._logger.print(format_files_message(box.unused_filter_tags()) + " (Did you misspell it?)")
+            self._logger.print(format_files_message(box.unused_filter_tags()) + f" (Did you misspell {'it' if len(box.unused_filter_tags()) == 1 else 'them'}?)")
 
         if len(box.updated_dbs()) > 0 and len(box.installed_dbs()) > 1:
-            db_with_updates_msg = []
-            for db_id in box.updated_dbs():
-                if not db_with_updates_msg:
-                    db_with_updates_msg.append('\nUpdates found in the following databases:')
-                    db_with_updates_msg.append(f"[{db_id}]")
-                else:
-                    text = f" [{db_id}]"
-                    if len(db_with_updates_msg[-1]) + len(text) > 80:
-                        db_with_updates_msg.append(f"[{db_id}]")
-                    else:
-                        db_with_updates_msg[-1] += text
-
-            if db_with_updates_msg:
-                self._logger.print('\n'.join(db_with_updates_msg))
+            self._logger.print()
+            self._logger.print('Updates found in the following databases:')
+            self._logger.print(' '.join([f'[{db_id}]' for db_id in box.updated_dbs()]))
 
         self._logger.print()
         self._logger.print('Installed:')
