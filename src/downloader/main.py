@@ -26,7 +26,7 @@ from typing import Optional
 from downloader.config import Environment
 from downloader.config_reader import ConfigReader
 from downloader.constants import KENV_LOGLEVEL
-from downloader.logger import FileLogger, PrintLogger, TopLogger
+from downloader.logger import TopLogger
 from downloader.full_run_service_factory import FullRunServiceFactory
 
 
