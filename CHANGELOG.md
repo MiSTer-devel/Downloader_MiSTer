@@ -15,7 +15,8 @@ Reproduce bug in test: filter out palettes, filter in palettes. It happens too w
 - Documented **Custom INI file** support in [README.md](README.md#custom-ini-file), in case you want to use a separate launcher and INI file to install different databases in isolation through that launcher.
 
 ### Changed
-- Improved release script.
+- Improved exit error codes. Previously, we were using only exit code 1 to represent any error, but now values from 10 to 19 represent system errors, and values of 20 or above represent update failures. Check the [constants.py](src/downloader/constants.py) file to see the specific error codes.
+- Improved release script. Now it's also implemented in python.
 - Fixed bug in error handling when restoring user system files during a Linux update by [daph](https://github.com/MiSTer-devel/Downloader_MiSTer/commits?author=daph).
 - Better **custom download filters** documentation by [NFGman](https://github.com/MiSTer-devel/Downloader_MiSTer/commits?author=NFGman). Check it [here](docs/download-filters.md).
 - Expanded filesystem precaching to speed up the check of already installed files.
