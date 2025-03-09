@@ -35,5 +35,6 @@ class CopyDataWorker(DownloaderWorker):
         if job.calcs is not None:
             job.calcs['hash'] = hashlib.md5(buf.read()).hexdigest()
             job.calcs['size'] = buf.getbuffer().nbytes
+        buf.seek(0)
         job.data = buf
         return [] if job.after_job is None else [job.after_job], None

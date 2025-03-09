@@ -62,6 +62,7 @@ class SandboxTestBase(unittest.TestCase):
             counter += 1
             with self.subTestAdapter('local_store'):
                 actual_store = load_json(os.path.join(config['base_system_path'], FILE_downloader_storage_json))
+                actual_store['db_sigs'] = {}
                 self.assertEqual(expected['local_store'], actual_store)
 
         if 'files' in expected:

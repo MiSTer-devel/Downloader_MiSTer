@@ -378,15 +378,19 @@ class WriteOnlyStoreAdapter:
         if self._db_state_signature['hash'] != transfer_hash:
             self._db_state_signature['hash'] = transfer_hash
             self._top_wrapper.mark_force_save()
+
         if self._db_state_signature['size'] != transfer_size:
             self._db_state_signature['size'] = transfer_size
             self._top_wrapper.mark_force_save()
+
         if self._db_state_signature['timestamp'] != timestamp:
             self._db_state_signature['timestamp'] = timestamp
             self._top_wrapper.mark_force_save()
+
         if self._db_state_signature['filter'] != filter:
             self._db_state_signature['filter'] = filter
             self._top_wrapper.mark_force_save()
+
 
     def remove_zip_id(self, zip_id):
         self.remove_zip_ids([zip_id])

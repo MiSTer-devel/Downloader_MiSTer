@@ -53,7 +53,8 @@ class TestSmallDbInstall(unittest.TestCase):
 
     def test_small_db_3(self):
         print('test_small_db_3')
-        self.assertRunOk("test/system/fixtures/small_db_install/small_db_3.ini", save=False)
+        self.assertRunOk("test/system/fixtures/small_db_install/small_db_3.ini")
+        self.assertRunOk("test/system/fixtures/small_db_install/small_db_3.ini", save=False, from_scratch=False)
         self.assertFalse(os.path.isfile(FILE_mister_downloader_needs_reboot))
 
     def test_small_db_4(self):
@@ -65,15 +66,19 @@ class TestSmallDbInstall(unittest.TestCase):
         self.assertFalse(os.path.isfile(f'{tmp_default_base_path}/_Cores/core.rbf'))
         self.assertTrue(os.path.isfile('/tmp/special_base_path/_Cores/core.rbf'))
 
-    def assertRunOk(self, ini_path, save=True):
+    def assertRunOk(self, ini_path, save=True, from_scratch=True):
         env = debug_env()
         env['DEFAULT_BASE_PATH'] = tmp_default_base_path
         config = ConfigReader(NoLogger(), env, time.time()).read_config(ini_path)
-        shutil.rmtree(config['base_path'], ignore_errors=True)
-        shutil.rmtree(config['base_system_path'], ignore_errors=True)
-        mister_path = Path('%s/MiSTer' % config['base_system_path'])
-        os.makedirs(str(mister_path.parent), exist_ok=True)
-        mister_path.touch()
+        if from_scratch:
+            shutil.rmtree(config['base_path'], ignore_errors=True)
+            shutil.rmtree(config['base_system_path'], ignore_errors=True)
+            mister_path = Path('%s/MiSTer' % config['base_system_path'])
+            os.makedirs(str(mister_path.parent), exist_ok=True)
+            mister_path.touch()
+
+        store_path = Path("%s/Scripts/.config/downloader/downloader.json" % config['base_system_path'])
+        mtime = 0 if not store_path.is_file() else store_path.stat().st_mtime
 
         test_env = os.environ.copy()
         test_env[KENV_CURL_SSL] = ''
@@ -95,4 +100,8 @@ class TestSmallDbInstall(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0)
         time.sleep(0.25)
-        self.assertEqual(save, os.path.isfile("%s/Scripts/.config/downloader/downloader.json" % config['base_system_path']))
+        new_mtime = 0 if not store_path.is_file() else store_path.stat().st_mtime
+        if save:
+            self.assertNotEqual(mtime, new_mtime)
+        else:
+            self.assertEqual(mtime, new_mtime)
