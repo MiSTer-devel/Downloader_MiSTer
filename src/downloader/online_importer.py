@@ -22,7 +22,7 @@ from collections import defaultdict
 import os
 
 from downloader.config import Config
-from downloader.constants import FILE_MiSTer
+from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.job_system import Job
@@ -203,7 +203,7 @@ class OnlineImporter:
             self._logger.print('CRITICAL ERROR!!! Could not restore the MiSTer binary!')
             self._logger.print('Please manually rename the file MiSTer.new as MiSTer')
             self._logger.print('Your system won\'nt be able to boot until you do so!')
-            sys.exit(1)
+            sys.exit(EXIT_ERROR_BAD_NEW_BINARY)
 
         for job, _e in report.get_failed_jobs(FetchDataJob) + report.get_failed_jobs(CopyDataJob):
             if job.db_id is not None:

@@ -380,7 +380,6 @@ class _FileSystem(FileSystem):
             return hash_file(self._path(path))
         except Exception as e:
             self._logger.debug(e)
-            sys.exit(1)
             return HASH_file_does_not_exist
 
     def size(self, path: str) -> int:
