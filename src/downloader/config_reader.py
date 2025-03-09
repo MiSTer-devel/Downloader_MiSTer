@@ -29,7 +29,8 @@ from downloader.config import Environment, Config, default_config, InvalidConfig
 from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, K_DEFAULT_DB_ID, K_OPTIONS, K_BASE_PATH, \
     K_DB_URL, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER, K_BASE_SYSTEM_PATH, \
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
-    K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL
+    K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, \
+    STORAGE_PRIORITY_PREFER_EXTERNAL, EXIT_ERROR_WRONG_SETUP
 from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
 from downloader.logger import Logger, time_str
 
@@ -174,7 +175,7 @@ class ConfigReader:
     def _abort_pc_launcher_wrong_paths(path_kind: str, path_variable: str, section: str) -> None:
         print('Can not run the PC Launcher with custom "%s" under the [%s] section of the downloader.ini file.' % (path_variable, section))
         print('PC Launcher and custom %s paths are not possible simultaneously.' % path_kind)
-        exit(1)
+        exit(EXIT_ERROR_WRONG_SETUP)
 
     def _load_ini_config(self, config_path) -> configparser.ConfigParser:
         ini_config = configparser.ConfigParser(inline_comment_prefixes=(';', '#'))

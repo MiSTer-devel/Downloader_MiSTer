@@ -31,7 +31,7 @@ except (ImportError, SyntaxError) as e:
     print('Please upgrade your OS before running Downloader')
     print('More info at https://github.com/MiSTer-devel/mr-fusion')
     print()
-    exit(1)
+    exit(10)  # Same exit value as: downloader.constants.EXIT_ERROR_WRONG_SETUP
 
 try:
     from commit import default_commit

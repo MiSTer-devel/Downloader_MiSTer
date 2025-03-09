@@ -25,6 +25,8 @@ from pathlib import Path
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config
+from downloader.constants import EXIT_ERROR_NO_CERTS, EXIT_ERROR_STORE_NOT_SAVED, EXIT_ERROR_FAILED_FILES, \
+    EXIT_ERROR_FAILED_DBS
 from downloader.db_utils import DbSectionPackage, sorted_db_sections
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.linux_updater import LinuxUpdater
@@ -102,7 +104,7 @@ class FullRunService:
             self._logger.print()
             self._logger.print("Please, reboot your system and try again.")
             self._waiter.sleep(50)
-            return 1
+            return EXIT_ERROR_NO_CERTS
 
         local_store = self._local_repository.load_store()
 
@@ -127,7 +129,7 @@ class FullRunService:
 
         if save_err is not None:
             self._logger.print('WARNING! Store could not be saved because of a File System Error!')
-            return 1
+            return EXIT_ERROR_STORE_NOT_SAVED
 
         if self._config['update_linux']:
             self._linux_updater.update_linux(self._online_importer.correctly_downloaded_dbs())
@@ -139,11 +141,11 @@ class FullRunService:
                 self._logger.debug('Length of folders_that_failed: %d' % len(self._online_importer.folders_that_failed()))
                 self._logger.debug('Length of zips_that_failed: %d' % len(self._online_importer.zips_that_failed()))
                 self._logger.debug('Length of failed_dbs: %d' % len(install_box.failed_dbs()))
-                return 1
+                return EXIT_ERROR_FAILED_FILES
 
         if len(install_box.failed_dbs()) > 0:
             self._logger.debug('Length of failed_dbs: %d' % len(install_box.failed_dbs()))
-            return 1
+            return EXIT_ERROR_FAILED_DBS
 
         return 0
 
