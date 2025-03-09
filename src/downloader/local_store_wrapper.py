@@ -20,10 +20,10 @@ from downloader.constants import K_BASE_PATH, DB_STATE_SIGNATURE_NO_HASH, DB_STA
     DB_STATE_SIGNATURE_NO_TIMESTAMP
 from downloader.jobs.index import Index
 from downloader.other import empty_store_without_base_path
-from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict, NotRequired
+from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict
 from collections import defaultdict, ChainMap
 
-from downloader.path_package import PathPackage, PATH_PACKAGE_KIND_PEXT, PextPathProps, PEXT_KIND_EXTERNAL, PathType
+from downloader.path_package import PathPackage, PathType
 
 NO_HASH_IN_STORE_CODE = 'file_does_not_exist_so_cant_get_hash'
 
