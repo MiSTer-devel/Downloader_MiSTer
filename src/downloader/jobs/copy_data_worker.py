@@ -1,4 +1,5 @@
 # Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
+import hashlib
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,5 +30,10 @@ class CopyDataWorker(DownloaderWorker):
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: CopyDataJob) -> WorkerResult:  # type: ignore[override]
-        job.data = self._ctx.file_system.read_file_bytes(job.source if job.source.startswith('/') else self._ctx.file_system.resolve(job.source))
+        buf = self._ctx.file_system.read_file_bytes(job.source if job.source.startswith('/') else self._ctx.file_system.resolve(job.source))
+        buf.seek(0)
+        if job.calcs is not None:
+            job.calcs['hash'] = hashlib.md5(buf.read()).hexdigest()
+            job.calcs['size'] = buf.getbuffer().nbytes
+        job.data = buf
         return [] if job.after_job is None else [job.after_job], None

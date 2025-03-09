@@ -25,7 +25,6 @@ from downloader.db_entity import DbEntity
 
 from downloader.jobs.copy_data_job import CopyDataJob
 from downloader.jobs.fetch_data_job import FetchDataJob
-from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.index import Index
 from downloader.jobs.open_zip_contents_job import ZipKind
 from downloader.jobs.open_zip_summary_job import OpenZipSummaryJob
@@ -33,23 +32,13 @@ from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.jobs.transfer_job import TransferJob
 from downloader.local_store_wrapper import StoreWrapper, new_store_fragment_drive_paths
-from downloader.path_package import PathPackage
 
 
-def make_ephemeral_transfer_job(source: str, description: dict[str, Any], db_id: Optional[str], /) -> TransferJob:
+def make_transfer_job(source: str, description: dict[str, Any], do_calcs: bool, db_id: Optional[str], /) -> TransferJob:
     if not source.startswith("http"):
-        job = CopyDataJob(source, description, db_id)
+        job = CopyDataJob(source, description, {} if do_calcs else None, db_id)
     else:
-        job = FetchDataJob(source, description, db_id)
-    return job
-
-def make_persistent_transfer_job(source: str, already_exists: bool, pkg: PathPackage, db_id: Optional[str], /) -> TransferJob:
-    job = FetchFileJob(  # @TODO: Make fetch file job just take a pkg instead? Need to think about make_ephemeral_transfer_job vs make_file_install_transfer_job
-        source,
-        already_exists,
-        pkg,
-        db_id
-    )
+        job = FetchDataJob(source, description, {} if do_calcs else None, db_id)
     return job
 
 @dataclass
@@ -61,7 +50,7 @@ class ZipJobContext:
 
 def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any], process_zip_backup: Optional[ProcessZipIndexJob]) -> TransferJob:
     zip_tag = make_zip_tag(z.job.db, z.zip_id)
-    transfer_job = make_ephemeral_transfer_job(file_description['url'], file_description, z.job.db.db_id)
+    transfer_job = make_transfer_job(file_description['url'], file_description, False, z.job.db.db_id)
     transfer_job.add_tag(zip_tag)
     open_zip_summary_job = OpenZipSummaryJob(
         zip_id=z.zip_id,

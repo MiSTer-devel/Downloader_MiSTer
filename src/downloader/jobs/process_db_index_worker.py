@@ -29,7 +29,6 @@ from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, WorkerResult
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.jobs_factory import make_persistent_transfer_job
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.path_package import PathPackage, PathType, PEXT_KIND_EXTERNAL, \
     PEXT_KIND_STANDARD, PATH_PACKAGE_KIND_PEXT
@@ -340,5 +339,5 @@ def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_
         if parent_full_path not in created_folders:
             ctx.file_system.make_dirs(parent_full_path)
 
-    job = make_persistent_transfer_job(source, exists, pkg, db_id)
-    return job
+    fetch_job = FetchFileJob(source, exists, pkg, db_id)
+    return fetch_job

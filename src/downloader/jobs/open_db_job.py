@@ -33,4 +33,9 @@ class OpenDbJob(Job):
     store: StoreWrapper
     full_resync: bool
 
+    # Results
+    db_hash: str = ''
+    db_size: int = -1
+    db_timestamp: int = -1
+
     def retry_job(self): return self.transfer_job

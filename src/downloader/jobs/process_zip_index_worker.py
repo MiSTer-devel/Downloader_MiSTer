@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from downloader.db_entity import check_no_url_files, fix_folders
 from downloader.job_system import WorkerResult, Job
-from downloader.jobs.jobs_factory import make_zip_kind, make_ephemeral_transfer_job
+from downloader.jobs.jobs_factory import make_zip_kind, make_transfer_job
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
 from downloader.jobs.process_db_index_worker import create_fetch_jobs, process_index_job_main_sequence
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter, StoreFragmentDrivePaths
@@ -95,7 +95,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             self._ctx.swallow_error(target_error)
             return [], target_error
 
-        data_job = make_ephemeral_transfer_job(job.zip_description['contents_file']['url'], job.zip_description['contents_file'], job.db.db_id)
+        data_job = make_transfer_job(job.zip_description['contents_file']['url'], job.zip_description['contents_file'], False, job.db.db_id)
         open_zip_contents_job = OpenZipContentsJob(
             db=job.db,
             store=store,

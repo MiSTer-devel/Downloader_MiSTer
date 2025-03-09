@@ -29,7 +29,7 @@ from downloader.jobs.copy_data_job import CopyDataJob
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.jobs_factory import make_ephemeral_transfer_job
+from downloader.jobs.jobs_factory import make_transfer_job
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
@@ -63,7 +63,7 @@ class OnlineImporter:
         jobs: list[Job] = []
         for pkg in db_pkgs:
             # @TODO: Use proper tempfile.mkstemp instead
-            transfer_job = make_ephemeral_transfer_job(pkg.section['db_url'], {}, pkg.db_id)
+            transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
             self._logger.debug('Loading db from: ', pkg.section['db_url'])
             transfer_job.after_job = OpenDbJob(
                 transfer_job=transfer_job,
@@ -102,7 +102,7 @@ class OnlineImporter:
             box.add_failed_db(job.section)
 
         for job in report.get_completed_jobs(ProcessDbMainJob):
-            box.add_installed_db(job.db)
+            box.add_installed_db(job.db, job.db_hash, job.db_size)
             for zip_id in job.ignored_zips:
                 box.add_failed_zip(job.db.db_id, zip_id)
             for zip_id in job.removed_zips:
@@ -496,7 +496,7 @@ class InstallationBox:
                 self._full_partitions[partition.path] = failed_reserve
             else:
                 self._full_partitions[partition.path] += failed_reserve
-    def add_installed_db(self, db: DbEntity):
+    def add_installed_db(self, db: DbEntity, db_hash: str, db_size: int):
         self._installed_dbs.append(db)
     def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
         self._filtered_zip_data[db_id][zip_id] = filtered_data

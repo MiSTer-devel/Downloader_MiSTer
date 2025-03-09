@@ -23,7 +23,7 @@ from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.worker_context import DownloaderWorker
 from downloader.jobs.errors import FileDownloadError
-from typing import Optional, Tuple
+from typing import Optional, Any
 
 
 class FetchDataWorker(DownloaderWorker):
@@ -37,27 +37,30 @@ class FetchDataWorker(DownloaderWorker):
     def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: FetchDataJob) -> WorkerResult:  # type: ignore[override]
-        job.data, error = self._fetch_data(job.source, job.description.get('hash', None), job.description.get('size', None))
+        job.data, error = self._fetch_data(job.source, job.description.get('hash', None), job.description.get('size', None), job.calcs)
         if error is not None:
             return [], error
 
         return [] if job.after_job is None else [job.after_job], None
 
-    def _fetch_data(self, url: str, valid_hash: Optional[str], valid_size: Optional[int],/) -> Tuple[Optional[io.BytesIO], Optional[Exception]]:
+    def _fetch_data(self, url: str, valid_hash: Optional[str], valid_size: Optional[int], calcs: Optional[dict[str, Any]], /) -> tuple[Optional[io.BytesIO], Optional[Exception]]:
         try:
             with self._http_gateway.open(url) as (final_url, in_stream):
                 if in_stream.status != 200:
                     return None, FileDownloadError(f'Bad http status! {final_url}: {in_stream.status}')
 
-                check_md5 = valid_hash is not None
-                buf, calc_hash = self._file_system.write_stream_to_data(in_stream, check_md5, self._timeout)
+                return_calc_hash = valid_hash is not None or calcs is not None
+                buf, calc_hash = self._file_system.write_stream_to_data(in_stream, return_calc_hash, self._timeout)
+                calc_size = buf.getbuffer().nbytes
 
-                if check_md5 and calc_hash != valid_hash:
+                if valid_hash is not None and calc_hash != valid_hash:
                     raise FileDownloadError(f'Bad hash on {final_url} ({valid_hash} != {calc_hash})')
                 if valid_size is not None:
-                    calc_size = buf.getbuffer().nbytes
                     if calc_size != valid_size:
                         raise FileDownloadError(f'Bad size on {final_url} ({valid_size} != {calc_size})')
+                if calcs is not None:
+                    calcs['hash'] = calc_hash
+                    calcs['size'] = calc_size
 
                 return buf, None
 
