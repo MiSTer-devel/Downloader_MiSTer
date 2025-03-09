@@ -22,7 +22,6 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy import stats
 from scipy.stats import iqr
 from pathlib import Path
 
@@ -70,84 +69,63 @@ def plot_data(ax, data, color, label, outliers, y_max, y_min):
 
 
 def main(log_path):
-    improved_arr, baseline_arr = parse_times(log_path)
+    data = {
+        'improved': {'label': 'Downloader 2.0', 'short_label': 'v2.0'},
+        'baseline': {'label': 'Downloader 1.8', 'short_label': 'v1.8'}
+    }
+    times = dict(zip(data, parse_times(log_path)))
+    indices = np.arange(len(times['improved']))
 
-    mean_improved = np.mean(improved_arr)
-    std_improved = np.std(improved_arr, ddof=1)  # 'ddof=1' for sample standard deviation
+    for key, d in data.items():
+        d['arr'] = np.array(times[key])
 
-    print("Mean (improved program):", mean_improved)
-    print("Std Dev (improved program):", std_improved)
-    print()
+        degradation = np.polyval(np.polyfit(indices, d['arr'], 1), indices) - d['arr'].mean()
+        d['arr'] = d['arr'] - degradation
 
-    mean_baseline = np.mean(baseline_arr)
-    std_baseline = np.std(baseline_arr, ddof=1)  # 'ddof=1' for sample standard deviation
-
-    print("Mean (baseline program):", mean_baseline)
-    print("Std Dev (baseline program):", std_baseline)
-    print()
+        d['mean'], std = d['arr'].mean(), d['arr'].std(ddof=1)
+        print(f"Mean ({d['label']}): {d['mean']}\nStd Dev ({d['label']}: {std}\n")
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
-    fig.canvas.manager.set_window_title(Path(log_path).name)
+    fig.canvas.manager.set_window_title(Path(log_path).with_suffix('.png').name)
 
-    ax1.hist(improved_arr, bins=20, alpha=0.5, label='Improved')
-    ax1.hist(baseline_arr, bins=20, alpha=0.5, label='Baseline')
-    ax1.set_xlabel('Execution Time')
+    ax1.hist(data['improved']['arr'], bins=20, alpha=0.5, label=data['improved']['label'], color='blue')
+    ax1.hist(data['baseline']['arr'], bins=20, alpha=0.5, label=data['baseline']['label'], color='red')
+    ax1.set_xlabel('Execution Time (seconds)')
     ax1.set_ylabel('Frequency')
-    ax1.set_title(f'Distribution of Execution Times ({len(improved_arr)} Improved & {len(baseline_arr)} Baseline)')
+    ax1.set_title(f'Distribution of Execution Times ({len(data["improved"]["arr"])} {data["improved"]["label"]} runs & {len(data["baseline"]["arr"])} {data["baseline"]["label"]} runs)')
     ax1.legend()
 
-    raw_avg_improved = improved_arr.mean()
-    raw_avg_baseline = baseline_arr.mean()
+    for d in data.values():
+        d['regression'] = np.polyval(np.polyfit(indices, d['arr'], 1), indices)
+        mask = np.abs(d['arr'] - np.median(d['arr'])) <= 4 * iqr(d['arr'])
+        d['valid'], d['outliers'] = d['arr'][mask], d['arr'][~mask]
+        d['avg_valid'] = d['valid'].mean()
 
-    indices = np.arange(len(improved_arr))
+    improvement = percent_faster(data['improved']['avg_valid'], data['baseline']['avg_valid'])
+    raw_improvement = percent_faster(data['improved']['mean'], data['baseline']['mean'])
 
-    if False:  # Correcting for performance degradation over time
-        degradation_improved = np.polyval(np.polyfit(indices, improved_arr, 1), indices) - raw_avg_improved
-        degradation_baseline = np.polyval(np.polyfit(indices, baseline_arr, 1), indices) - raw_avg_baseline
+    print(f'Improvement: {improvement}%')
+    for d in data.values(): print(f'{d["label"]} Outliers:', d['outliers'])
+    print(f'Improvement with outliers: {raw_improvement}%')
 
-        improved_arr = improved_arr - degradation_improved
-        baseline_arr = baseline_arr - degradation_baseline
+    y_max = max(max(data[k]['valid']) for k in data)
+    y_min = min(min(data[k]['valid']) for k in data)
 
-    regression_improved = np.polyval(np.polyfit(indices, improved_arr, 1), indices)
-    regression_baseline = np.polyval(np.polyfit(indices, baseline_arr, 1), indices)
+    plot_data(ax2, data['improved']['arr'], 'blue', data['improved']['label'], data['improved']['outliers'], y_max, y_min)
+    plot_data(ax2, data['baseline']['arr'], 'red', data['baseline']['label'], data['baseline']['outliers'], y_max, y_min)
 
-    outliers_threshold = 4
-
-    valid_improved = improved_arr[np.abs(improved_arr - np.median(improved_arr)) <= outliers_threshold * iqr(improved_arr)]
-    outliers_improved = improved_arr[np.abs(improved_arr - np.median(improved_arr)) > outliers_threshold * iqr(improved_arr)]
-
-    valid_baseline = baseline_arr[np.abs(baseline_arr - np.median(baseline_arr)) <= outliers_threshold * iqr(baseline_arr)]
-    outliers_baseline = baseline_arr[np.abs(baseline_arr - np.median(baseline_arr)) > outliers_threshold * iqr(baseline_arr)]
-
-    avg_improved = valid_improved.mean()
-    avg_baseline = valid_baseline.mean()
-
-    print(f'Improvement: {percent_faster(avg_improved, avg_baseline)}%')
-    print(f'Improved Outliers:', outliers_improved)
-    print(f'Baseline Outliers:', outliers_baseline)
-    print(f'Improvement with outliers: {percent_faster(raw_avg_improved, raw_avg_baseline)}%')
-
-    y_max, y_min = max(max(valid_improved), max(valid_baseline)), min(min(valid_improved), min(valid_baseline))
-    tick_distance_y = int((y_max - y_min) // 150) * 5 if (y_max - y_min) >= 150 else 5
-    y_max, y_min = y_max + tick_distance_y - y_max % tick_distance_y, y_min - y_min % tick_distance_y
-
-    plot_data(ax2, improved_arr, 'blue', 'Improved', outliers_improved, y_max, y_min)
-    plot_data(ax2, baseline_arr, 'red', 'Baseline', outliers_baseline, y_max, y_min)
-    ax2.plot(indices, regression_improved, color='blue', linestyle='--', label=f'Average Improved: {avg_improved:.3f}')
-    ax2.plot(indices, regression_baseline, color='red', linestyle='--', label=f'Average Baseline: {avg_baseline:.3f}')
-    for i in range(int(y_min), int(y_max), tick_distance_y):
-        ax2.axhline(y=i, color='black', linestyle=':', linewidth=0.5)
+    ax2.plot(indices, data['improved']['regression'], color='blue', linestyle='--', label=f'Average {data["improved"]["short_label"]}: {data["improved"]["avg_valid"]:.3f}s')
+    ax2.plot(indices, data['baseline']['regression'], color='red', linestyle='--', label=f'Average {data["baseline"]["short_label"]}: {data["baseline"]["avg_valid"]:.3f}s')
 
     ax2.set_xlabel('Iteration')
     ax2.set_ylabel('Time (seconds)')
-    ax2.set_title('Improved vs Baseline')
-    ax2.set_ylim(y_min, y_max)
-    ax2.set_yticks(list(range(int(y_min), int(y_max) + 1, tick_distance_y)))
+    ax2.set_title(f'{data["improved"]["label"]} vs {data["baseline"]["label"]}')
+    ax2.yaxis.grid(True, linestyle='--', alpha=0.5)
+    ax2.xaxis.grid(False)
     ax2.legend()
 
     plt.tight_layout()
     plt.show()
-
 
 if __name__ == '__main__':
     chdir_root()
