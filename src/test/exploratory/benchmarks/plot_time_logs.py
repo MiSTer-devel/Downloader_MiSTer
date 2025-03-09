@@ -79,8 +79,8 @@ def main(log_path):
     for key, d in data.items():
         d['arr'] = np.array(times[key])
 
-        degradation = np.polyval(np.polyfit(indices, d['arr'], 1), indices) - d['arr'].mean()
-        d['arr'] = d['arr'] - degradation
+        #degradation = np.polyval(np.polyfit(indices, d['arr'], 1), indices) - d['arr'].mean()
+        #d['arr'] = d['arr'] - degradation
 
         d['mean'], std = d['arr'].mean(), d['arr'].std(ddof=1)
         print(f"Mean ({d['label']}): {d['mean']}\nStd Dev ({d['label']}: {std}\n")

@@ -115,7 +115,7 @@ class OnlineImporter(ProductionOnlineImporter):
 
         jobs = []
         for db, _store, ini_description in self.dbs:
-            jobs.append(ProcessDbMainJob(db=db, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
+            jobs.append(ProcessDbMainJob(db=db, db_hash='', db_size=-1, ini_description=ini_description, store=local_store.store_by_id(db.db_id), full_resync=full_resync))
         return jobs
 
     @staticmethod

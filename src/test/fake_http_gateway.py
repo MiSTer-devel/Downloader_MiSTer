@@ -106,3 +106,5 @@ class FakeBuf:
         self.nbytes = description.get('size', 1)
 
     def getbuffer(self): return self
+    def seek(self, n: int): pass
+    def read(self): return b'0'

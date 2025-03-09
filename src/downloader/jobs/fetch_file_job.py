@@ -16,15 +16,13 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Optional, Union
-import io
+from typing import Optional
 
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.transfer_job import Transferrer
 from downloader.path_package import PathPackage
 
 
-class FetchFileJob(Job, Transferrer):
+class FetchFileJob(Job):
     __slots__ = ('_tags', 'source', 'already_exists', 'pkg', 'db_id', 'after_job')
     type_id: int = JobSystem.get_job_type_id()
     def __init__(self, source: str, already_exists: bool, pkg: Optional[PathPackage], db_id: Optional[str], /):
@@ -35,9 +33,6 @@ class FetchFileJob(Job, Transferrer):
 
         # Next job
         self.after_job: Optional[Job] = None
-
-    def transfer(self) -> Union[str, io.BytesIO]:
-        return self.pkg.full_path
 
     def backup_job(self) -> Optional[Job]:
         return None if self.after_job is None else self.after_job.backup_job()

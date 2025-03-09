@@ -29,6 +29,8 @@ class ProcessDbMainJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
     db: DbEntity
+    db_size: int
+    db_hash: str
     store: StoreWrapper
     ini_description: Dict[str, Any]
     full_resync: bool

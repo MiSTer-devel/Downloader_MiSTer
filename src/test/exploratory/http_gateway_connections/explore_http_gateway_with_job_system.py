@@ -30,7 +30,6 @@ from downloader.file_system import FileSystemFactory
 from downloader.job_system import JobSystem, ProgressReporter, Job
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.fetch_file_worker import FetchFileWorker
-from downloader.jobs.jobs_factory import make_persistent_transfer_job
 from downloader.logger import PrintLogger, Logger
 from downloader.http_gateway import HttpGateway
 from downloader.path_package import PathPackage, PATH_TYPE_FILE, PATH_PACKAGE_KIND_STANDARD
@@ -56,7 +55,7 @@ def main() -> None:
 
         for i in range(20):
             for u in urls:
-                fetch = make_persistent_transfer_job(
+                fetch = FetchFileJob(
                     u,
                     True,
                     PathPackage(

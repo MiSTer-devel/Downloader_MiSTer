@@ -36,7 +36,14 @@ class OpenDbWorker(DownloaderWorkerBase):
             return [], e
 
         ini_description, store, full_resync = job.ini_description, job.store, job.full_resync
-        return [ProcessDbMainJob(db=db, ini_description=ini_description, store=store, full_resync=full_resync)], None
+        return [ProcessDbMainJob(
+            db=db,
+            db_hash=job.transfer_job.calcs['hash'],
+            db_size=job.transfer_job.calcs['size'],
+            ini_description=ini_description,
+            store=store,
+            full_resync=full_resync
+        )], None
 
     def _open_db(self, section: str, source: str, transfer: Any, /) -> DbEntity:
         self._ctx.logger.bench('OpenDbWorker Loading database: ', section)

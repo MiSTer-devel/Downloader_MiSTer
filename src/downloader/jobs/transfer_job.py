@@ -18,7 +18,7 @@
 
 
 import io
-from typing import Protocol, Union, Optional
+from typing import Protocol, Union, Optional, Any
 
 from downloader.job_system import Job
 
@@ -28,6 +28,7 @@ class Transferrer(Protocol):
         ...
 
     source: str
+    calcs: Optional[dict[str, Any]]
     after_job: Optional[Job]
 
 TransferJob = Union[Transferrer, Job]
