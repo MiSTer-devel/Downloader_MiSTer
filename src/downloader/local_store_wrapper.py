@@ -358,13 +358,6 @@ class WriteOnlyStoreAdapter:
         self._store['zips'][zip_id] = description
         self._top_wrapper.mark_force_save()
 
-    def add_imported_offline_database(self, hash_db_file):
-        if hash_db_file in self._store['offline_databases_imported']:
-            return
-
-        self._store['offline_databases_imported'].append(hash_db_file)
-        self._top_wrapper.mark_force_save()
-
     def set_base_path(self, base_path):
         if K_BASE_PATH in self._store and self._store[K_BASE_PATH] == base_path:
             return
@@ -639,9 +632,9 @@ class ReadOnlyStoreAdapter:
 
         for zip_id, summary in self._store.get('filtered_zip_data', {}).items():
             for fp, fd in summary.get('files', {}).items():
-                grouped[zip_id]['files'][fp] = fd
+                grouped[zip_id]['files'][fp if fp[0] != '|' else fp[1:]] = fd
             for dp, dd in summary.get('folders', {}).items():
-                grouped[zip_id]['folders'][dp] = dd
+                grouped[zip_id]['folders'][dp if dp[0] != '|' else dp[1:]] = dd
 
         for zip_id, data in grouped.items():
             zip_data = self._store.get('zips', {}).get(zip_id, {})
@@ -653,13 +646,6 @@ class ReadOnlyStoreAdapter:
             data['folders'] = {'|' + f: d for f, d in data['folders'].items()}
 
         return grouped
-
-    @property
-    def filtered_zip_data(self):
-        if 'filtered_zip_data' not in self._store:
-            return {}
-
-        return self._store['filtered_zip_data']
 
     @property
     def zips(self) -> Dict[str, Dict[str, Any]]:
@@ -706,10 +692,6 @@ class ReadOnlyStoreAdapter:
             return external['folders']
         else:
             return []
-
-    @property
-    def offline_databases_imported(self):
-        return self._store['offline_databases_imported']
 
     @property
     def externals(self):
