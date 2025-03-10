@@ -17,9 +17,8 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.constants import K_BASE_PATH
-from objects import zipped_nes_palettes_id
 from test.objects import zip_desc, file_nes_palette_a, tweak_descr, folder_games_nes, folder_games, \
-    folder_games_nes_palettes, file_nes_palette_a_descr
+    folder_games_nes_palettes, file_nes_palette_a_descr, zipped_nes_palettes_id
 
 
 def cheats_folder_tag_dictionary():
