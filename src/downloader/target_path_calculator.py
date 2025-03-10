@@ -75,10 +75,18 @@ class TargetPathsCalculator:
                 continue
 
             pkg._full_path = None
-            is_system_file = 'path' in description and description['path'] == 'system'
-            can_be_external = path[0] == '|'
-            if can_be_external:
+            if 'path' in description:
+                is_system_file = description['path'] == 'system'
+                is_pext_file = description['path'] == 'pext'
+            else:
+                is_system_file = False
+                is_pext_file = False
+
+            if path[0] == '|':  # @TODO: Remove this block after all paths no longer start with |
                 pkg.rel_path = path[1:]
+                is_pext_file = True
+
+            if is_pext_file:
                 external, error = self._deduce_possible_external_target_path(path=pkg.rel_path, path_type=pkg.ty)
                 if error is not None:
                     pkg.drive = base_path
@@ -90,7 +98,7 @@ class TargetPathsCalculator:
                 pkg.drive, pkg.pext_props = external
                 pkg.kind = PATH_PACKAGE_KIND_PEXT
 
-                if is_system_file:
+                if is_system_file: # @TODO: Remove this block after all paths no longer start with |
                     errors.append(StoragePriorityError(f"System Path '{path}' is incorrect because it starts with '|', please contact the database maintainer."))
                     continue
 

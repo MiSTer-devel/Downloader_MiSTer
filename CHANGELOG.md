@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - The SSL check mechanism in the launcher has been made more flexible by covering more return codes. From just 60 to codes: 60, 77, 35, 51, 58, 59, 82, 83. It also has an improved routine to install new certificates, in case they are missing in the system.
 
 ### Removed
+- Deprecated paths starting with `|`. For potentially external paths (now referred to as "pext paths"), use the path field as instructed in [the updated documentation](docs/custom-databases.md#external-paths). Old `|` paths still work, but support will be fully removed in a future version.
 - The distutils dependency was removed, since it's been deprecated for a while (PEP 632) and removed in Python 3.12.
 - Removed `base_path` in database-scoped options. Files installed in different locations because of this option will be moved to the standard location. As a reminder, general `base_path` usage was deprecated in the version 1.8, as now multi-drive setups are handled with the **Storage Priority** feature introduced in Downloader 1.5.
 - The *offline importer*, a mechanism designed to assist during the migration from the old updater to Downloader, has been removed. Its role was to amend the file duplications that happened with the old updater, but unfortunately it never worked. It required the publication of the original file lists that were renamed, and although some contributors were initially committed to provide them, they could not deliver them in the end. 
