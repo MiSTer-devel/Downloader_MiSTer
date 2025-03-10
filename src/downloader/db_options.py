@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,54 +16,38 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from enum import unique, Enum
-from typing import Dict, Any
+from typing import Set, TypedDict, Dict, Any
 
-from downloader.constants import K_BASE_PATH, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER
 from downloader.other import test_only
 
 
-@unique
-class DbOptionsKind(Enum):
-    DEFAULT_OPTIONS = 1
-    INI_SECTION = 2
+class DbOptionsProps(TypedDict, total=False):
+    downloader_threads_limit: int
+    downloader_timeout: int
+    downloader_retries: int
+    filter: str
 
 
 class DbOptions:
-    def __init__(self, props: Dict[str, Any], kind: DbOptionsKind):
-        present = set()
+    def __init__(self, props: DbOptionsProps):
+        present: Set[str] = set()
 
-        if kind == DbOptionsKind.INI_SECTION:
-            if K_BASE_PATH in props:
-                if not isinstance(props[K_BASE_PATH], str):
-                    raise DbOptionsValidationException([K_BASE_PATH])
-                if len(props[K_BASE_PATH]) <= 1:
-                    raise DbOptionsValidationException([K_BASE_PATH])
-                if props[K_BASE_PATH][-1] == '/':
-                    raise DbOptionsValidationException([K_BASE_PATH])
-
-                present.add(K_BASE_PATH)
-        elif kind == DbOptionsKind.DEFAULT_OPTIONS:
-            pass
-        else:
-            raise ValueError("Invalid props kind: " + str(kind))
-
-        if K_DOWNLOADER_THREADS_LIMIT in props:
-            if not isinstance(props[K_DOWNLOADER_THREADS_LIMIT], int) or props[K_DOWNLOADER_THREADS_LIMIT] < 1:
-                raise DbOptionsValidationException([K_DOWNLOADER_THREADS_LIMIT])
-            present.add(K_DOWNLOADER_THREADS_LIMIT)
-        if K_DOWNLOADER_TIMEOUT in props:
-            if not isinstance(props[K_DOWNLOADER_TIMEOUT], int) or props[K_DOWNLOADER_TIMEOUT] < 1:
-                raise DbOptionsValidationException([K_DOWNLOADER_TIMEOUT])
-            present.add(K_DOWNLOADER_TIMEOUT)
-        if K_DOWNLOADER_RETRIES in props:
-            if not isinstance(props[K_DOWNLOADER_RETRIES], int) or props[K_DOWNLOADER_RETRIES] < 1:
-                raise DbOptionsValidationException([K_DOWNLOADER_RETRIES])
-            present.add(K_DOWNLOADER_RETRIES)
-        if K_FILTER in props:
-            if not isinstance(props[K_FILTER], str):
-                raise DbOptionsValidationException([K_FILTER])
-            present.add(K_FILTER)
+        if 'downloader_threads_limit' in props:
+            if not isinstance(props['downloader_threads_limit'], int) or props['downloader_threads_limit'] < 1:
+                raise DbOptionsValidationException(['downloader_threads_limit'])
+            present.add('downloader_threads_limit')
+        if 'downloader_timeout' in props:
+            if not isinstance(props['downloader_timeout'], int) or props['downloader_timeout'] < 1:
+                raise DbOptionsValidationException(['downloader_timeout'])
+            present.add('downloader_timeout')
+        if 'downloader_retries' in props:
+            if not isinstance(props['downloader_retries'], int) or props['downloader_retries'] < 1:
+                raise DbOptionsValidationException(['downloader_retries'])
+            present.add('downloader_retries')
+        if 'filter' in props:
+            if not isinstance(props['filter'], str):
+                raise DbOptionsValidationException(['filter'])
+            present.add('filter')
 
         if len(present) != len(props):
             raise DbOptionsValidationException([o for o in props if o not in present])
@@ -73,11 +57,8 @@ class DbOptions:
     def items(self):
         return self._props.items()
 
-    def unwrap_props(self):
+    def unwrap_props(self) -> DbOptionsProps:
         return self._props
-
-    def remove_base_path(self):
-        del self._props[K_BASE_PATH]
 
     def apply_to_config(self, config: Dict[str, Any]):
         config.update(self._props)

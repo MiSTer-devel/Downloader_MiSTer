@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ from pathlib import Path
 from downloader.constants import MEDIA_FAT_CIFS, MEDIA_USB0
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from test.fake_importer_implicit_inputs import FileSystemState
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 from test.fake_file_system_factory import FileSystemFactory
 
 

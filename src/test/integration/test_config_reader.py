@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -63,9 +63,6 @@ class TestConfigReader(unittest.TestCase):
             K_OPTIONS: db_options().testable,
             K_SECTION: 'single',
         }})
-
-    def test_databases___with_single_db_ini_with_incorrect_base_path___raises_invalid_config_parameter(self):
-        self.assertRaises(InvalidConfigParameter, lambda: databases("test/integration/fixtures/single_db_with_incorrect_base_path.ini"))
 
     def test_databases___with_single_db_ini_with_incorrect_downloader_timeout___raises_invalid_config_parameter(self):
         self.assertRaises(InvalidConfigParameter, lambda: databases("test/integration/fixtures/single_db_with_incorrect_downloader_timeout.ini"))

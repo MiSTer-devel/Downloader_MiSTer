@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,7 +17,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import sys
-from downloader.logger import Logger
+from typing import Any, List
+from downloader.config import Config
+from downloader.logger import FilelogManager, FilelogSaver, Logger, ConfigLogManager
 
 
 class SpyLoggerDecorator(Logger):
@@ -34,11 +36,40 @@ class SpyLoggerDecorator(Logger):
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
         self.debugCalls.append(args)
 
-    def bench(self, label):
-        self._decorated_logger.bench(label)
+    def bench(self, *args):
+        self._decorated_logger.bench(*args)
 
-    def configure(self, config):
-        self._decorated_logger.configure(config)
 
-    def finalize(self):
-        self._decorated_logger.finalize()
+class NoLogger(Logger, FilelogManager, ConfigLogManager):
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
+    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
+    def bench(self, *args): pass
+    def finalize(self) -> None: pass
+    def set_local_repository(self, local_repository: FilelogSaver) -> None: pass
+    def configure(self, config: Config) -> None: pass
+
+
+def describe_time(t: float) -> str: return time.strftime(f'%Y-%m-%d %H:%M:%S.{t % 1 * 1000:03.0f}', time.localtime(t))
+
+
+class DescribeNowDecorator(Logger):
+    def __init__(self, decorated_logger: Logger):
+        self._re = re.compile(r'^ */[^:]+:\d+.*$')  # Matches paths such as /asd/bef/df:34
+        self._decorated_logger = decorated_logger
+
+    def bench(self, label: str): self._decorated_logger.bench(label)
+
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
+        self._decorated_logger.print(*self._handle_args([*args]), sep=sep, end=end, flush=True)
+
+    def debug(self, *args, sep='', end='\n', flush=True):
+        self._decorated_logger.debug(*self._handle_args([*args]), sep=sep, end=end, flush=True)
+
+    def _handle_args(self, args: List[Any]) -> List[Any]:
+        header = describe_time(time.time())
+        for i in range(len(args)):
+            if isinstance(args[i], str) and not self._re.fullmatch(args[i]):
+                endln, replacement = '\n', f"\n{header}| "
+                args[i] = f"{header}| {args[i].replace(endln, replacement)}"
+
+        return args

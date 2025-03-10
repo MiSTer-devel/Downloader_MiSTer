@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,9 +15,10 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+
 from downloader.constants import K_BASE_PATH
 from test.objects import zip_desc, file_nes_palette_a, tweak_descr, folder_games_nes, folder_games, \
-    folder_games_nes_palettes, file_nes_palette_a_descr
+    folder_games_nes_palettes, file_nes_palette_a_descr, zipped_nes_palettes_id
 
 
 def cheats_folder_tag_dictionary():
@@ -25,26 +26,25 @@ def cheats_folder_tag_dictionary():
 
 
 cheats_folder_id = 'cheats_id'
-zipped_nes_palettes_id = 'zipped_nes_palettes_id'
 cheats_folder_name = 'Cheats'
 
 
-def zipped_nes_palettes_desc(summary_internal_zip_id=None):
+def zipped_nes_palettes_desc(summary_internal_zip_id=None, url: bool = True, tags: bool = False, zipped_files: bool = True, summary: bool = True):
     return zip_desc(
         "Extracting Palettes",
-        folder_games_nes,
+        folder_games_nes + '/',
         summary={
-            "files": {file_nes_palette_a: file_nes_palette_a_descr_zipped()},
+            "files": {file_nes_palette_a: file_nes_palette_a_descr_zipped(url=url, tags=tags)},
             "folders": {
-                folder_games: {"zip_id": zipped_nes_palettes_id},
-                folder_games_nes: {"zip_id": zipped_nes_palettes_id},
-                folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id},
+                folder_games: tweak_descr({"zip_id": zipped_nes_palettes_id, "tags": ["games"]}, tags=tags),
+                folder_games_nes: tweak_descr({"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes"]}, tags=tags),
+                folder_games_nes_palettes: tweak_descr({"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes", "palette"]}, tags=tags),
             }
-        },
+        } if summary else None,
         zipped_files={
-            "files": {file_nes_palette_a[1:]: file_nes_palette_a_descr()},
+            "files": {file_nes_palette_a.removeprefix(folder_games_nes + '/'): file_nes_palette_a_descr()},
             "folders": {}
-        },
+        } if zipped_files else None,
         summary_internal_zip_id=summary_internal_zip_id
     )
 
@@ -54,7 +54,8 @@ def cheats_folder_tags():
 
 
 cheats_folder_nes_folder_name = 'Cheats/NES'
-cheats_folder_nes_file_path = cheats_folder_nes_folder_name + '/10-Yard Fight (USA, Europe) [3D564757].zip'
+cheats_folder_nes_file_zip_path = 'NES/10-Yard Fight (USA, Europe) [3D564757].zip'
+cheats_folder_nes_file_path = 'Cheats/' + cheats_folder_nes_file_zip_path
 cheats_folder_nes_file_url = f'https://{cheats_folder_nes_folder_name}/10-Yard%20Fight%20%28USA%2C%20Europe%29%20%5B3D564757%5D.zip'
 cheats_folder_nes_file_hash = "8c02595fef1096a9dd160e59067f4f4"
 cheats_folder_nes_file_size = 1020
@@ -69,7 +70,8 @@ def cheats_folder_nes_tags():
 
 
 cheats_folder_sms_folder_name = 'Cheats/SMS'
-cheats_folder_sms_file_path = cheats_folder_sms_folder_name + '/Sonic The Hedgehog (World).zip'
+cheats_folder_sms_file_zip_path = 'SMS/Sonic The Hedgehog (World).zip'
+cheats_folder_sms_file_path = 'Cheats/' + cheats_folder_sms_file_zip_path
 cheats_folder_sms_file_url = f'https://{cheats_folder_sms_folder_name}/Sonic%20The%20Hedgehog%20%28World%29.zip'
 cheats_folder_sms_file_hash = "1c111111111096a9dd160e59067f4f4"
 cheats_folder_sms_file_size = 2048
@@ -98,10 +100,10 @@ def cheats_folder_only_nes_folders(zip_id=True, tags=True):
     }
 
 
-def cheats_folder_files(zip_id=True, tags=True, url=True, is_internal_summary=False):
+def cheats_folder_files(zip_id=True, tags=True, url=True, is_internal_summary=False, zip_path=False):
     return {
-        cheats_folder_nes_file_path: cheats_folder_nes_file_descr(zip_id=zip_id, tags=tags, url=url, zip_path=is_internal_summary),
-        cheats_folder_sms_file_path: cheats_folder_sms_file_descr(zip_id=zip_id, tags=tags, url=url, zip_path=is_internal_summary),
+        cheats_folder_nes_file_zip_path if zip_path else cheats_folder_nes_file_path: cheats_folder_nes_file_descr(zip_id=zip_id, tags=tags, url=url, zip_path=is_internal_summary),
+        cheats_folder_sms_file_zip_path if zip_path else cheats_folder_sms_file_path: cheats_folder_sms_file_descr(zip_id=zip_id, tags=tags, url=url, zip_path=is_internal_summary),
     }
 
 
@@ -111,7 +113,6 @@ def cheats_folder_nes_file_descr(zip_id=True, tags=True, url=True, zip_path=Fals
         'size': cheats_folder_nes_file_size,
         'url': cheats_folder_nes_file_url,
         'zip_id': cheats_folder_id,
-        'zip_path': cheats_folder_nes_file_path,
         'tags': cheats_folder_nes_tags()
     }, zip_id=zip_id, tags=tags, url=url, zip_path=zip_path)
 
@@ -122,7 +123,7 @@ def cheats_folder_sms_file_descr(zip_id=True, tags=True, url=True, zip_path=Fals
         'size': cheats_folder_sms_file_size,
         'url': cheats_folder_sms_file_url,
         'zip_id': cheats_folder_id,
-        'zip_path': cheats_folder_sms_file_path,
+        'zip_path': cheats_folder_sms_file_zip_path,
         'tags': cheats_folder_sms_tags()
     }, zip_id=zip_id, tags=tags, url=url, zip_path=zip_path is not None)
 
@@ -147,14 +148,20 @@ def cheats_folder_descr(zip_id=True, tags=True):
         'tags': cheats_folder_tags()
     }, zip_id=zip_id, tags=tags)
 
+def folders_games_nes_palettes(zip_id=True):
+    return {
+        folder_games: tweak_descr({'zip_id': zipped_nes_palettes_id}, zip_id=zip_id),
+        folder_games_nes: tweak_descr({'zip_id': zipped_nes_palettes_id}, zip_id=zip_id),
+        folder_games_nes_palettes: tweak_descr({'zip_id': zipped_nes_palettes_id}, zip_id=zip_id),
+    }
 
-def store_with_unzipped_cheats(url=False, folders=True, files=True, zip_id=True, zips=True, tags=True, online_database_imported=None, summary_hash=None, is_internal_summary=False):
+
+def store_with_unzipped_cheats(url=False, folders=True, files=True, zip_id=True, zips=True, tags=True, summary_hash=None, is_internal_summary=False):
     summary_internal_zip_id = cheats_folder_id if is_internal_summary else None
     o = {
         K_BASE_PATH: "/media/fat",
         "files": {k: v for k, v in cheats_folder_files(url=url, zip_id=zip_id, tags=tags, is_internal_summary=is_internal_summary).items()},
         'folders': {k: v for k, v in cheats_folder_folders(zip_id=zip_id, tags=tags).items()},
-        'offline_databases_imported': online_database_imported if online_database_imported is not None else [],
         "zips": {
             cheats_folder_id: cheats_folder_zip_desc(summary_hash=summary_hash, summary_internal_zip_id=summary_internal_zip_id)
         }
@@ -185,18 +192,18 @@ def summary_json_from_cheats_folder():
 
 def zipped_files_from_cheats_folder():
     return {
-        'files': cheats_folder_files(url=False, zip_id=False, tags=False),
+        'files': cheats_folder_files(url=False, zip_id=False, tags=False, zip_path=True),
         'folders': cheats_folder_folders(),
     }
 
 
+def file_nes_palette_a_descr_zipped(zip_id=True, url=True, tags=False):
+    return file_nes_palette_a_descr(zip_id=zip_id, url=url, tags=tags)
 
-def file_nes_palette_a_descr_zipped():
+
+def files_nes_palettes(zip_id=True, url=True):
     return {
-        "hash": file_nes_palette_a[1:],
-        "size": 2905020,
-        "url": "https://a.pal",
-        "zip_id": zipped_nes_palettes_id
+        file_nes_palette_a: file_nes_palette_a_descr_zipped(zip_id=zip_id, url=url)
     }
 
 
@@ -208,3 +215,9 @@ def with_installed_cheats_folder_on_fs(file_system_state):
         .add_file(base_path=None, file=cheats_folder_sms_file_path,
                    description={"hash": cheats_folder_sms_file_hash, "size": cheats_folder_sms_file_size})
 
+
+def with_installed_nes_palettes_on_fs(file_system_state):
+    file_system_state \
+        .add_folders(folders_games_nes_palettes())\
+        .add_file(base_path=None, file=file_nes_palette_a[1:],
+                   description=file_nes_palette_a_descr(url=False))

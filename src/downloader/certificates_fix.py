@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import subprocess
-from downloader.constants import DEFAULT_CURL_SSL_OPTIONS, K_CURL_SSL
+from downloader.constants import DEFAULT_CURL_SSL_OPTIONS
 
 
 class CertificatesFix:
@@ -38,7 +38,7 @@ class CertificatesFix:
         return result
 
     def _fix_certificates_if_needed_impl(self):
-        curl_ssl = self._config[K_CURL_SSL].strip().lower()
+        curl_ssl = self._config['curl_ssl'].strip().lower()
         if curl_ssl != DEFAULT_CURL_SSL_OPTIONS.strip().lower():
             return True
 
@@ -57,7 +57,7 @@ class CertificatesFix:
     def _check_cacert(self, cacert_path):
         result = self._test_query(cacert_path)
         if result.returncode == 0:
-            self._logger.debug('cacert file at "%s" seems to be fine.' % cacert_path)
+            self._logger.debug('cacert file at "%s" seems to be fine.', cacert_path)
             return True
 
         self._logger.print('WARNING: cacert file at "%s" seems to be wrong!' % cacert_path)
