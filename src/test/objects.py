@@ -658,9 +658,8 @@ def tweak_descr(o, zip_id=True, tags=True, url=True, zip_path=False):
     return o
 
 
-def file_descr(delete=None, hash_code=None, size=None, url=None, reboot=None, path=None, tags=None, unzipped_json=None, json=None):
+def file_descr(hash_code=None, size=None, url=None, reboot=None, path=None, tags=None, unzipped_json=None, json=None):
     result = {
-        "delete": delete if delete is not None else [],
         "hash": hash_code if hash_code is not None else file_a,
         "size": size if size is not None else 2915040,
         "url": url if url is not None else "https://one.rbf",

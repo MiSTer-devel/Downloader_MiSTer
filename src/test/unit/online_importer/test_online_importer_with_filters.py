@@ -50,6 +50,7 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
             ('gb cheats', store_with_all_cheats_and_gb_game),
             ('!gb cheats', store_with_file_nes_cheat),
             ('!gb !nes !cheats', empty_test_store),
+            ('!cheats !console', empty_test_store),
             ('!all', empty_test_store),
             ('!gb !nes', store_with_just_cheats_folder),
             ('all', store_with_cheats_and_console_files),
@@ -206,25 +207,27 @@ file_gb_game = 'gb_game'
 tag_dictionary = {
     'cheats': 0,
     'nes': 1,
-    'gb': 2
+    'gb': 2,
+    'console': 3
 }
 tag_cheats = 0
 tag_nes = 1
 tag_gb = 2
-tag_essential = 3
+tag_console = 3
+tag_essential = 4
 
 def db_with_cheats_and_console_files():
     return db_test_descr(files={
         file_nes_cheat: file_descr(tags=[tag_nes, tag_cheats]),
         file_gb_cheat: file_descr(tags=[tag_gb, tag_cheats]),
-        file_nes_game: file_descr(tags=[tag_nes]),
-        file_gb_game: file_descr(tags=[tag_gb]),
+        file_nes_game: file_descr(tags=[tag_nes, tag_console]),
+        file_gb_game: file_descr(tags=[tag_gb, tag_console]),
     }, tag_dictionary=tag_dictionary, folders={
         'cheats': {'tags': [tag_cheats]},
         'cheats/nes': {'tags': [tag_cheats, tag_nes]},
         'cheats/gb': {'tags': [tag_cheats, tag_gb]},
-        'nes': {'tags': [tag_nes]},
-        'gb': {'tags': [tag_gb]},
+        'nes': {'tags': [tag_nes, tag_console]},
+        'gb': {'tags': [tag_gb, tag_console]},
     })
 
 def store_with_cheats_and_console_files():
