@@ -20,10 +20,9 @@ from downloader.target_path_calculator import StoragePriorityError
 from test.fake_file_system_factory import fs_data
 from test.fake_online_importer import OnlineImporter
 from test.objects import empty_test_store, file_nes_palette_a, file_nes_smb1, db_test, db_entity, file_nes_smb1_descr, files_smb1, folder_games, folder_games_nes, folder_games_nes_palettes\
-    , media_fat, store_descr, zip_desc
+    , media_fat, store_descr, zip_desc, zipped_nes_palettes_id
 from test.unit.online_importer.online_importer_with_priority_storage_test_base import OnlineImporterWithPriorityStorageTestBase
 from test.zip_objects import file_nes_palette_a_descr_zipped
-from objects import zipped_nes_palettes_id
 
 
 class TestOnlineImporterWithPriorityStorage(OnlineImporterWithPriorityStorageTestBase):

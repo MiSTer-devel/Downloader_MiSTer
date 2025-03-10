@@ -21,15 +21,13 @@ from downloader.constants import K_BASE_PATH
 from downloader.jobs.worker_context import DownloaderWorkerFailPolicy
 from test.fake_file_system_factory import fs_data
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
-from test.objects import db_test_descr, empty_zip_summary, folder_games_nes, store_descr, empty_test_store, media_fat, db_entity
-from test.objects import file_a, zipped_file_a_descr, zip_desc
+from test.objects import db_test_descr, empty_zip_summary, folder_games_nes, store_descr, empty_test_store, media_fat, db_entity, file_a, zipped_file_a_descr, zip_desc, zipped_nes_palettes_id
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 from test.zip_objects import files_nes_palettes, folders_games_nes_palettes, with_installed_nes_palettes_on_fs, \
     zipped_nes_palettes_desc, store_with_unzipped_cheats, cheats_folder_zip_desc, \
     cheats_folder_nes_file_path, summary_json_from_cheats_folder, zipped_files_from_cheats_folder, cheats_folder_id, cheats_folder_sms_file_path, cheats_folder_folders, \
     cheats_folder_files, with_installed_cheats_folder_on_fs
-from objects import zipped_nes_palettes_id
 
 
 class TestOnlineImporterWithZips(OnlineImporterTestBase):

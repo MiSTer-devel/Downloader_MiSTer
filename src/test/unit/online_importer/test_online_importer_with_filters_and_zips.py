@@ -30,8 +30,8 @@ from test.zip_objects import cheats_folder_zip_desc, cheats_folder_tag_dictionar
     cheats_folder_files, cheats_folder_folders, cheats_folder_sms_file_descr, cheats_folder_sms_folder_descr, \
     cheats_folder_descr, cheats_folder_nes_file_descr, cheats_folder_nes_folder_descr, cheats_folder_nes_file_hash, \
     cheats_folder_nes_file_size, cheats_folder_sms_file_hash, cheats_folder_sms_file_size, \
-    cheats_folder_nes_file_description, cheats_folder_sms_file_description, file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc
-from objects import zipped_nes_palettes_id, folder_games_nes_palettes
+    cheats_folder_nes_file_description, cheats_folder_sms_file_description, file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc, \
+    zipped_nes_palettes_id, folder_games_nes_palettes
 
 
 def db_with_cheats_zip():
