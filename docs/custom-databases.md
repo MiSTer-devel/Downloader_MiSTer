@@ -76,7 +76,7 @@ The format of the aforementioned JSON file should be as follow:
             /**
             * [Optional] Can this file be considered an "External Path" by Downloader? (string).
             *            Check the External Paths section of this document for more information.
-            *            Default value: not defined
+            *            By default is not defined.
             */
             "path": "pext",
 
@@ -116,7 +116,7 @@ The format of the aforementioned JSON file should be as follow:
             /**
             * [Optional] Can this folder be considered an "External Path" by Downloader? (string).
             *            Check the External Paths section of this document for more information.
-            *            Default value: not defined
+            *            By default is not defined.
             */
             "path": "pext",
         },
