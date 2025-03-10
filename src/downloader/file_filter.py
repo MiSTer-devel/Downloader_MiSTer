@@ -49,15 +49,16 @@ class FilterCalculator(ABC):
         """Returns true if a file must be filtered out according to its description"""
 
 
-class FilterCalculatorImpl(FilterCalculator):
-    def __init__(self, positive, negative):
+class FilterCalculatorFewPartsImpl(FilterCalculator):
+    def __init__(self, positive: list[Union[str, int]], negative: list[Union[str, int]]):
         self._negative = negative
         self._positive = positive
+        self._have_positives = len(self._positive) > 0
 
     def is_filtered(self, description: FileFolderDesc) -> bool:
         tags = description.get('tags', [])
 
-        filtered = len(self._positive) > 0
+        filtered =  self._have_positives
 
         for part in self._positive:
             if part in tags:
@@ -73,13 +74,29 @@ class FilterCalculatorImpl(FilterCalculator):
         return filtered
 
 
+class FilterCalculatorManyPartsImpl(FilterCalculator):
+    def __init__(self, positive: list[Union[str, int]], negative: list[Union[str, int]]):
+        self._negative = negative
+        self._positive = positive
+        self._have_positives = len(self._positive) > 0
+
+    def is_filtered(self, description: FileFolderDesc) -> bool:
+        positive = False
+        for part in description.get('tags', []):
+            if part in self._negative:
+                return True
+            elif part in self._positive:
+                positive = True
+
+        return self._have_positives and not positive
+
+
 class FileFilter:
     def __init__(self, filter_calculator: Optional[FilterCalculator]):
         self._filter_calculator = filter_calculator
 
     def select_filtered_files(self, summary: Index) -> Tuple[Index, ZipData]:
         filtered_zip_data: ZipData = {}
-        #return summary, filtered_zip_data
 
         if self._filter_calculator is None:
             return summary, filtered_zip_data
@@ -139,8 +156,10 @@ class FileFilterFactory:
         if config['filter'] is None or config['filter'] == '':
             self._logger.debug('No filter for db %s.', db.db_id)
             return None
+
         this_filter = config['filter'].strip().lower()  # @TODO: Remove strip after field is validated in other place
         self._logger.debug('Filter for db %s: %s', db.db_id, this_filter)
+
         if this_filter == '':
             raise BadFileFilterPartException(this_filter)
         if this_filter == 'all':
@@ -151,9 +170,10 @@ class FileFilterFactory:
         filter_parts = this_filter.split()
         negative = []
         positive = []
+        indexes = {}
 
         positive_all = False
-        for part in filter_parts:
+        for part_index, part in enumerate(filter_parts):
             this_part: str = part.strip()
 
             if not filter_part_regex.match(this_part):
@@ -196,6 +216,8 @@ class FileFilterFactory:
             else:
                 positive.append(alphanumeric_part)
 
+            indexes[alphanumeric_part] = part_index
+
         essential: Union[str, int]
         if ESSENTIAL_TERM in db.tag_dictionary:
             essential = db.tag_dictionary[ESSENTIAL_TERM]
@@ -204,8 +226,15 @@ class FileFilterFactory:
 
         if len(positive) > 0 and essential not in positive and essential not in negative:
             positive.append(essential)
+            indexes[essential] = -1
 
-        return FilterCalculatorImpl([] if positive_all else positive, negative)
+        count = len(indexes)
+        if count == 0:
+            return NeverFilters()
+        elif count > 4:
+            return FilterCalculatorManyPartsImpl([] if positive_all else positive, negative)
+        else:
+            return FilterCalculatorFewPartsImpl([] if positive_all else positive, negative)
 
 
 def _part_in_db(alphanumeric_part: Union[str, int], index: Index) -> bool:
@@ -229,9 +258,10 @@ def _remove(string: str, remove_list: Iterable[str]) -> str:
 
 
 class AlwaysFilters(FilterCalculator):
-    def is_filtered(self, _) -> bool:
-        return True
+    def is_filtered(self, _) -> bool: return True
 
+class NeverFilters(FilterCalculator):
+    def is_filtered(self, _) -> bool: return False
 
 class BadFileFilterPartException(Exception):
     def __init__(self, part: str):
