@@ -225,11 +225,9 @@ filter = arcade
 ```
 The following options can be defined:
 - filter
-- update_linux
 - downloader_threads_limit
 - downloader_timeout
 - downloader_retries
-- base_path
 
 Using the same list: maintainers can also set new default options [for any users haven't set themselves] that will only apply to their repository; think of these as **database-scoped defaults**.
 
