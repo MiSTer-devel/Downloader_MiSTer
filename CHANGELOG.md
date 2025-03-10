@@ -6,17 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Version 2.0 - 2025-03-X
 
-TODO!!
-Reproduce bug in test: filter out palettes, filter in palettes. It happens too with games/GAMEBOY and games/ATARI "ERROR: /media/fat/|games/Atari2600"
-
-
 ### Added
 - The launcher now uses the latest build of Downloader if it's present in the filesystem. The newer version of Downloader will now be installed from [MiSTer Distribution](https://github.com/MiSTer-devel/Distribution_MiSTer) database just like any other standard MiSTer file. Thanks to this, you may now avoid executing remote code altogether by taking [this additional step](README.md#how-to-avoid-executing-remote-code-altogether) during installation. Otherwise, remote code execution only happens once on your first run of Downloader.
 - Documented **Custom INI file** support in [README.md](README.md#custom-ini-file), in case you want to use a separate launcher and INI file to install different databases in isolation through that launcher.
 
 ### Changed
-- Reboot sequence takes much less time, it went from 30+ seconds to 3.
-- Optimized database filter resolution, so that there is almost no penalty for a filter with a very long list of terms.
+- Reboot sequence takes much less time, it went from 30+ seconds to around 3.
 - Fixed database filtering not working properly in various uncommon scenarios.
 - Improved exit error codes. Previously, we were using only exit code 1 to represent any error, but now values from 10 to 19 represent system errors, and values of 20 or above represent update failures. Check the [constants.py](src/downloader/constants.py) file to see the specific error codes.
 - Improved release script. Now it's also implemented in python.
