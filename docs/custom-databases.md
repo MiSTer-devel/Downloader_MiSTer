@@ -223,13 +223,9 @@ Options for a repository can be defined in `/media/fat/downloader.ini` following
 db_url = 'https://url_to_db.json.zip'
 filter = arcade
 ```
-The following options can be defined:
-- filter
-- downloader_threads_limit
-- downloader_timeout
-- downloader_retries
+For now only the option `filter` can be defined.
 
-Using the same list: maintainers can also set new default options [for any users haven't set themselves] that will only apply to their repository; think of these as **database-scoped defaults**.
+Database maintainers can also set new default options [for any users haven't set themselves] that will only apply to their repository; think of these as **database-scoped defaults**.
 
 Here is an example that sets the **database-scoped default** for the "_filter_" option:
 ```js
