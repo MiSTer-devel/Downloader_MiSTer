@@ -168,7 +168,6 @@ def local_store_files(tuples):
             'base_path': tmp_delme_sandbox[0:-1],
             'folders': {(f if f[0] != '|' else f[1:]): d for f, d in folders.items()},
             'files': fix_relative_files(files),
-            'offline_databases_imported': [],
             'zips': {}
         }
     return store

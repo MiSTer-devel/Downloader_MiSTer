@@ -21,7 +21,8 @@ import unittest
 from downloader.db_entity import DbEntityValidationException, check_zip
 from downloader.db_entity import DbEntity
 from test.objects import raw_db_empty_descr, db_empty
-from test.zip_objects import zipped_nes_palettes_id, zipped_nes_palettes_desc
+from test.zip_objects import zipped_nes_palettes_desc
+from objects import zipped_nes_palettes_id
 
 
 class TestDbEntityZips(unittest.TestCase):

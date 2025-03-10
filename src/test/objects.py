@@ -224,10 +224,7 @@ def zip_desc(description, target_folder_path, zipped_files=None, summary=None, s
             "size": contents_size if contents_size is not None else 7316038,
             "url": "https://contents_file"
         },
-        "files_count": 1858,
-        "folders_count": 0,
         "target_folder_path": target_folder_path,
-        "raw_files_size": 6995290
     }
     if summary_internal_zip_id is not None:
         json['internal_summary'] = {} if summary is None else {
@@ -298,7 +295,7 @@ def db_test_descr(db_id=None, zips=None, folders=None, files=None, db_files=None
     )
 
 
-def store_descr(zips=None, folders=None, files=None, folders_usb0=None, files_usb0=None, folders_usb1=None, files_usb1=None, folders_usb2=None, files_usb2=None, db_files=None, db_id=None, timestamp=None, base_path=None):
+def store_descr(zips=None, folders=None, files=None, folders_usb0=None, files_usb0=None, folders_usb1=None, files_usb1=None, folders_usb2=None, files_usb2=None, db_files=None, db_id=None, timestamp=None, base_path=None, filtered_zip_data=None):
     store = db_to_store(db_entity(
         db_id=db_id,
         db_files=db_files,
@@ -310,6 +307,8 @@ def store_descr(zips=None, folders=None, files=None, folders_usb0=None, files_us
     _add_external_drive_to_store(store, '/media/usb0', folders_usb0, files_usb0)
     _add_external_drive_to_store(store, '/media/usb1', folders_usb1, files_usb1)
     _add_external_drive_to_store(store, '/media/usb2', folders_usb2, files_usb2)
+    if filtered_zip_data is not None:
+        store['filtered_zip_data'] = filtered_zip_data
     return store
 
 
@@ -356,7 +355,6 @@ def db_to_store(db, base_path=None):
         "zips": raw_db["zips"],
         "folders": raw_db["folders"],
         "files": raw_db["files"],
-        "offline_databases_imported": []
     }
     return store
 
@@ -598,12 +596,19 @@ def file_nes_contra_descr():
     }
 
 
-def file_nes_palette_a_descr(url: bool = True):
+def file_nes_palette_a_descr(url: bool = True, zip_id: bool = False, tags: bool = False, zip_path: bool = False):
     return tweak_descr({
         "hash": file_nes_palette_a[1:],
         "size": 2905020,
-        "url": "https://a.pal"
-    }, url=url)
+        "url": "https://a.pal",
+        "zip_id": zipped_nes_palettes_id,
+        "zip_path": file_nes_palette_a.removeprefix(folder_games_nes + '/'),
+        "tags": [
+            "games",
+            "nes",
+            "palette"
+        ]
+    }, url=url, zip_id=zip_id, tags=tags, zip_path=zip_path)
 
 
 def file_neogeo_md_descr():
@@ -642,13 +647,13 @@ def file_save_psx_castlevania_descr(overwrite=None):
 
 
 def tweak_descr(o, zip_id=True, tags=True, url=True, zip_path=False):
-    if not url:
+    if not url and 'url' in o:
         o.pop('url')
-    if not zip_id:
+    if not zip_id and 'zip_id' in o:
         o.pop('zip_id')
-    if not tags:
+    if not tags and 'tags' in o:
         o.pop('tags')
-    if 'zip_path' in o and not zip_path:
+    if not zip_path and 'zip_path' in o:
         o.pop('zip_path')
     return o
 
@@ -801,3 +806,6 @@ def debug_env():
 
 def path_with(path, added_part):
     return '%s/%s' % (path, added_part)
+
+
+zipped_nes_palettes_id = 'zipped_nes_palettes_id'

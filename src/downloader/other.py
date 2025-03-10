@@ -32,7 +32,6 @@ def empty_store_without_base_path():
         'zips': {},
         'folders': {},
         'files': {},
-        'offline_databases_imported': []
     }
 
 

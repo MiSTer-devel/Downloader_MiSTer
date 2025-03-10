@@ -195,7 +195,6 @@ def birdy_store_with_fixed_files_and_folders():
             },
             'files': {},
             'folders': {},
-            'offline_databases_imported': [],
             'zips': {}
         }
     }

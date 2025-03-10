@@ -103,4 +103,4 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         logger.bench('OpenZipContentsWorker launching recovery process index...', job.db.db_id, job.zip_id)
 
-        return create_fetch_jobs(self._ctx, job.db.db_id, invalid_files, [], job.zip_description.get('base_files_url', job.db.base_files_url)), None
+        return create_fetch_jobs(self._ctx, job.db.db_id, invalid_files, [], set(), job.zip_description.get('base_files_url', job.db.base_files_url)), None

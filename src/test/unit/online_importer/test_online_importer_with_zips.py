@@ -25,9 +25,11 @@ from test.objects import db_test_descr, empty_zip_summary, folder_games_nes, sto
 from test.objects import file_a, zipped_file_a_descr, zip_desc
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
-from test.zip_objects import files_nes_palettes, folders_games_nes_palettes, with_installed_nes_palettes_on_fs, zipped_nes_palettes_id, zipped_nes_palettes_desc, store_with_unzipped_cheats, cheats_folder_zip_desc, \
+from test.zip_objects import files_nes_palettes, folders_games_nes_palettes, with_installed_nes_palettes_on_fs, \
+    zipped_nes_palettes_desc, store_with_unzipped_cheats, cheats_folder_zip_desc, \
     cheats_folder_nes_file_path, summary_json_from_cheats_folder, zipped_files_from_cheats_folder, cheats_folder_id, cheats_folder_sms_file_path, cheats_folder_folders, \
     cheats_folder_files, with_installed_cheats_folder_on_fs
+from objects import zipped_nes_palettes_id
 
 
 class TestOnlineImporterWithZips(OnlineImporterTestBase):
@@ -121,7 +123,6 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         self.assertEqual({
             K_BASE_PATH: "/media/fat",
             "files": {file_a: zipped_file_a_descr(different_zip_id)},
-            "offline_databases_imported": [],
             "folders": {different_folder: {"zip_id": different_zip_id}},
             "zips": {different_zip_id: zip_desc(different_folder, "../")}
         }, store)
@@ -271,7 +272,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
 
         self.assertEqual(store_descr(
             zips={
-                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes),
+                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/'),
                 cheats_folder_id: cheats_folder_zip_desc()
             },
             files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},
@@ -391,7 +392,6 @@ def store_with_unibios_from_zip():
                                               'zip_id': 'neogeo_unibios',
                                               'zip_path': 'uni-bios.rom'}},
             'folders': {'games': {}, 'games/NeoGeo': {}},
-            'offline_databases_imported': [],
             'zips': {'neogeo_unibios': {'description': 'Extracting NeoGeo UniBios from http://unibios.free.fr',
                                         'contents_file': {'hash': '1986c39676354d19ae648a914bd914f7',
                                                           'size': 101498,

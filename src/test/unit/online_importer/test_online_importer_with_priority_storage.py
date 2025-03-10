@@ -22,7 +22,8 @@ from test.fake_online_importer import OnlineImporter
 from test.objects import empty_test_store, file_nes_palette_a, file_nes_smb1, db_test, db_entity, file_nes_smb1_descr, files_smb1, folder_games, folder_games_nes, folder_games_nes_palettes\
     , media_fat, store_descr, zip_desc
 from test.unit.online_importer.online_importer_with_priority_storage_test_base import OnlineImporterWithPriorityStorageTestBase
-from test.zip_objects import file_nes_palette_a_descr_zipped,  zipped_nes_palettes_id
+from test.zip_objects import file_nes_palette_a_descr_zipped
+from objects import zipped_nes_palettes_id
 
 
 class TestOnlineImporterWithPriorityStorage(OnlineImporterWithPriorityStorageTestBase):

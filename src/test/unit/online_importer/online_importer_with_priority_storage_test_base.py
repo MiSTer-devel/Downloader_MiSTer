@@ -26,7 +26,8 @@ from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1
     folder_docs_neogeo, folder_docs_s32x, file_foo, file_foo_descr, media_usb0, zip_desc, file_md_sonic_descr, file_md_sonic, folder_games_md
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
-from test.zip_objects import zipped_nes_palettes_id, file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc
+from test.zip_objects import file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc
+from objects import zipped_nes_palettes_id
 
 
 class OnlineImporterWithPriorityStorageTestBase(OnlineImporterTestBase):
@@ -214,7 +215,7 @@ def store_nes_zipped_palettes_on_fat():
     )
 
 
-def _store_zips_nes_zipped_palettes(): return {zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes)}
+def _store_zips_nes_zipped_palettes(): return {zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/')}
 def _store_files_nes_zipped_palettes(): return {file_nes_palette_a[1:]: {"zip_id": zipped_nes_palettes_id, **file_nes_palette_a_descr_zipped()}}
 
 
