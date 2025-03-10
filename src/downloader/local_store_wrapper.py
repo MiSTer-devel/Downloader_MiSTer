@@ -273,12 +273,6 @@ class WriteOnlyStoreAdapter:
     def remove_file_from_zips(self, file_path: str):
         self._remove_entry_from_zips('files', file_path)
 
-    def remove_folder(self, folder_path: str):
-        self._remove_entry('folders', folder_path)
-
-    def remove_folder_from_zips(self, folder_path: str):
-        self._remove_entry_from_zips('folders', folder_path)
-
     def remove_local_folder_from_zips(self, folder_path: str):
         self._remove_local_entry_from_zips('folders', folder_path)
 
@@ -325,7 +319,6 @@ class WriteOnlyStoreAdapter:
         if 'zips' not in self._store:
             return
 
-        #self._clean_external_additions(kind, path)
         for zip_id, zip_description in self._store['zips'].items():
             if kind in zip_description and path in zip_description[kind]:
                 zip_description[kind].pop(path)
@@ -348,15 +341,6 @@ class WriteOnlyStoreAdapter:
             if kind in zip_description and path in zip_description[kind]:
                 zip_description[kind].pop(path)
                 self._top_wrapper.mark_force_save()
-
-    def add_zip(self, zip_id, description, _summary: Dict[str, Any]):
-        if 'zipped_files' in description.get('contents_file', {}): del description['contents_file']['zipped_files']
-        if 'unzipped_json' in description.get('summary_file', {}): del description['summary_file']['unzipped_json']
-        if zip_id in self._store['zips'] and equal_dicts(self._store['zips'][zip_id], description):
-            return
-
-        self._store['zips'][zip_id] = description
-        self._top_wrapper.mark_force_save()
 
     def set_base_path(self, base_path):
         if K_BASE_PATH in self._store and self._store[K_BASE_PATH] == base_path:
@@ -468,20 +452,6 @@ class WriteOnlyStoreAdapter:
                 if 'tags' in description:
                     description.pop('tags')
 
-    def populate_with_summary(self, summaries, db_zips):
-        for zip_id, summary in summaries:
-            self.add_zip(zip_id, db_zips[zip_id], summary)
-
-    def drop_removed_zips_from_store(self, db_zips):
-        removed_zip_ids = []
-        for zip_id in self._store['zips']:
-            if zip_id in db_zips:
-                continue
-
-            removed_zip_ids.append(zip_id)
-
-        self.remove_zip_ids(removed_zip_ids)
-
     def save_filtered_zip_data(self, filtered_zip_data):
         for zip_id in list(filtered_zip_data):
             data = filtered_zip_data[zip_id]
@@ -523,44 +493,10 @@ class WriteOnlyStoreAdapter:
             for folder_path, folder_description in paths['folders'].items():
                 self.add_external_folder(drive, folder_path, folder_description)
 
-        #self._store['zips'][zip_id]['internal_summary'] = {
-        #    'files': index.files,
-        #    'folders': index.folders,
-        #}
-
-    def add_zip_contents(self, zip_id: str, index: Index, description: Dict[str, Any]):
-        for file_path, file_description in index.files.items():
-            self.add_file(file_path, file_description)
-
-        for folder_path, folder_description in index.folders.items():
-            self.add_folder(folder_path, folder_description)
-
-
 class ReadOnlyStoreAdapter:
     def __init__(self, store, db_state_signature):
         self._store = store
         self._db_state_signature = db_state_signature
-
-    def hash_file(self, file_pkg: PathPackage):
-        if file_pkg.is_pext_external():
-            if 'external' not in self._store:
-                return NO_HASH_IN_STORE_CODE
-
-            external = self._store['external']
-            drive = file_pkg.drive
-            if drive not in external:
-                return NO_HASH_IN_STORE_CODE
-
-            summary_files = external[drive]['files']
-            file = file_pkg.rel_path
-            if file not in summary_files:
-                return NO_HASH_IN_STORE_CODE
-
-            return summary_files[file]['hash']
-        else:
-            file = file_pkg.rel_path
-            file_desc = self._store_files_get(file, None)
-            return file_desc['hash'] if file_desc is not None else NO_HASH_IN_STORE_CODE
 
     def invalid_hashes(self, file_pkgs: List[PathPackage]) -> List[bool]:
         '''Returns a list of booleans indicating invalid hashes with the same order as the input.'''
@@ -574,37 +510,6 @@ class ReadOnlyStoreAdapter:
                         else self._store['external'][pkg.drive]['files'][pkg.rel_path]['hash'] != pkg.description['hash'])
             for pkg in file_pkgs
         ]
-
-    def file_drive(self, file: str):
-        if file in self._store['files']:
-            return self.base_path
-        elif file not in self._store['files']:
-            if 'external' in self._store:
-                for drive, summary in self._store['external'].items():
-                    if file in summary['files']:
-                        return drive
-
-        return None
-
-    def folder_drive(self, folder: str):
-        if folder in self._store['folders']:
-            return self.base_path
-        elif folder not in self._store['folders']:
-            if 'external' in self._store:
-                for drive, summary in self._store['external'].items():
-                    if folder in summary['folders']:
-                        return drive
-
-        return None
-
-    def list_missing_files(self, db_files):
-        files = {}
-        files.update(self._store['files'])
-        if 'external' in self._store:
-            for external in self._store['external'].values():
-                if 'files' in external:
-                    files.update(external['files'])
-        return {f: d for f, d in files.items() if f not in db_files}
 
     def zip_summaries(self) -> dict[str, Any]:
         grouped = defaultdict(lambda: {'files': {}, 'folders': {}})
@@ -679,36 +584,12 @@ class ReadOnlyStoreAdapter:
     def external_drives(self) -> List[str]:
         return list(self._store['external'])
 
-    def external_files(self, drive) -> Dict[str, Dict[str, Any]]:
-        external = self._store['external'][drive]
-        if 'files' in external:
-            return external['files']
-        else:
-            return {}
-
-    def external_folders(self, drive) -> List[str]:
-        external = self._store['external'][drive]
-        if 'folders' in external:
-            return external['folders']
-        else:
-            return []
-
-    @property
-    def externals(self):
-        return self._store['external'].items()
-
     @property
     def base_path(self):
         return self._store[K_BASE_PATH]
 
     def has_base_path(self):
         return K_BASE_PATH in self._store
-
-    def zip_description(self, zip_id):
-        return self._store['zips'][zip_id] if zip_id in self._store['zips'] else {}
-
-    def entries_in_zip(self, entry_kind, zip_ids):
-        return {path: fd for path, fd in self._store[entry_kind].items() if 'zip_id' in fd and fd['zip_id'] in zip_ids}
 
     def list_other_drives_for_file(self, file_path: str, drive: Optional[str]) -> List[Tuple[bool, str]]:
         if drive is None: drive = self.base_path
@@ -741,11 +622,6 @@ class ReadOnlyStoreAdapter:
             result.append((False, self.base_path))
 
         return result
-
-    @property
-    def has_no_files(self):
-        return len(self._store['files']) == 0
-
 
 def equal_descriptions(lhs: dict[str, Any], b: dict[str, Any], ty: PathType) -> bool:
     if ty == PathType.FOLDER: return equal_dicts_or_lhs_bigger(lhs, b)
