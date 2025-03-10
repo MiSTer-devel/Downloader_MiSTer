@@ -78,16 +78,12 @@ class FullRunService:
 
         if not self._config['is_pc_launcher'] and self._needs_reboot():
             self._logger.print()
-            self._logger.print("Rebooting in 10 seconds...")
+            self._logger.print("Rebooting...")
             sys.stdout.flush()
-            self._waiter.sleep(2)
             self._filelog_manager.finalize()
             sys.stdout.flush()
-            self._waiter.sleep(4)
             self._os_utils.sync()
-            self._waiter.sleep(4)
-            self._os_utils.sync()
-            self._waiter.sleep(30)
+            self._waiter.sleep(3)
             self._os_utils.reboot()
 
         return result
