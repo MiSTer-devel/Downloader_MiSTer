@@ -29,7 +29,7 @@ filter = snes !cheats
 **downloader** downloads everything by default.  Depending on your needs, it might make sense to simply filter out everything you don't want, or include everything you *do* want.
 
   -  ❗ If your filter has only negative terms, **downloader** will download everything *except your negative filters*.
-  -  ‼️ If you include ***any positive terms*** then **downloader** will only download things you explicity include.
+  -  ‼️ If you include ***any positive terms*** then **downloader** will only download things you explicitly include.
 
 ### Examples
 
@@ -41,7 +41,7 @@ filter = snes !cheats
 👉 The `essential` cores will always be included unless you specifically remove them with `!essential`.  The `essential` cores include the MiSTer menus, etc, and should not be excluded for most purposes.  
 
 #  Core Specificity
-Several of the tags you can exlude are groups: `computer`, `console`, `arcade` etc.   Depending on your requirements it's possible to exclude certain cores within those groups.  You can, for example, disable all console cores `!console` but still download  `SNES NES` cores like so:  `filter = !console snes nes`.
+Several of the tags you can exclude are groups: `computer`, `console`, `arcade` etc.   Depending on your requirements it's possible to exclude certain cores within those groups.  You can, for example, enable only console cores `console` but still avoid downloading  `SNES NES` cores like so:  `filter = console !snes !nes`.
 
   - `filter = !cheats !other !arcade-bankpanic` will download everything *except* `cheats`, `other` (which includes standalone systems like Game n Watch) and the bankpanic arcade core.
   - `filter = arcade !arcade-asteroids !arcade-cave` will only download arcade cores, except the asteroids and Cave cores.
