@@ -22,9 +22,9 @@ from downloader.other import test_only
 
 
 class DbOptionsProps(TypedDict, total=False):
-    downloader_threads_limit: int  # @TODO: Remove this in a future version
-    downloader_timeout: int  # @TODO: Remove this in a future version
-    downloader_retries: int  # @TODO: Remove this in a future version
+    downloader_threads_limit: int  # @TODO (downloader 2.0++): Remove this in a future version
+    downloader_timeout: int  # @TODO (downloader 2.0++): Remove this in a future version
+    downloader_retries: int  # @TODO (downloader 2.0++): Remove this in a future version
     filter: str
 
 
@@ -32,15 +32,15 @@ class DbOptions:
     def __init__(self, props: DbOptionsProps):
         present: Set[str] = set()
 
-        if 'downloader_threads_limit' in props:  # @TODO: Remove this in a future version
+        if 'downloader_threads_limit' in props:  # @TODO (downloader 2.0++): Remove this in a future version
             if not isinstance(props['downloader_threads_limit'], int) or props['downloader_threads_limit'] < 1:
                 raise DbOptionsValidationException(['downloader_threads_limit'])
             present.add('downloader_threads_limit')
-        if 'downloader_timeout' in props:  # @TODO: Remove this in a future version
+        if 'downloader_timeout' in props:  # @TODO (downloader 2.0++): Remove this in a future version
             if not isinstance(props['downloader_timeout'], int) or props['downloader_timeout'] < 1:
                 raise DbOptionsValidationException(['downloader_timeout'])
             present.add('downloader_timeout')
-        if 'downloader_retries' in props:  # @TODO: Remove this in a future version
+        if 'downloader_retries' in props:  # @TODO (downloader 2.0++): Remove this in a future version
             if not isinstance(props['downloader_retries'], int) or props['downloader_retries'] < 1:
                 raise DbOptionsValidationException(['downloader_retries'])
             present.add('downloader_retries')
