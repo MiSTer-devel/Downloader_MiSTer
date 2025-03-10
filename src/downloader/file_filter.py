@@ -58,37 +58,38 @@ class FilterCalculatorFewPartsImpl(FilterCalculator):
     def is_filtered(self, description: FileFolderDesc) -> bool:
         tags = description.get('tags', [])
 
-        filtered =  self._have_positives
+        filtered = self._have_positives
 
         for part in self._positive:
             if part in tags:
                 filtered = False
+                break
 
         if filtered:
             return True
 
         for part in self._negative:
             if part in tags:
-                filtered = True
+                return True
 
-        return filtered
+        return False
 
 
 class FilterCalculatorManyPartsImpl(FilterCalculator):
     def __init__(self, positive: list[Union[str, int]], negative: list[Union[str, int]]):
-        self._negative = negative
-        self._positive = positive
+        self._negative = set(negative)
+        self._positive = set(positive)
         self._have_positives = len(self._positive) > 0
 
     def is_filtered(self, description: FileFolderDesc) -> bool:
-        positive = False
+        found_positive = False
         for part in description.get('tags', []):
             if part in self._negative:
                 return True
             elif part in self._positive:
-                positive = True
+                found_positive = True
 
-        return self._have_positives and not positive
+        return self._have_positives and not found_positive
 
 
 class FileFilter:
@@ -228,13 +229,16 @@ class FileFilterFactory:
             positive.append(essential)
             indexes[essential] = -1
 
+        if positive_all:
+            positive = []
+
         count = len(indexes)
         if count == 0:
             return NeverFilters()
-        elif count > 4:
-            return FilterCalculatorManyPartsImpl([] if positive_all else positive, negative)
+        elif count > 3:
+            return FilterCalculatorManyPartsImpl(positive, negative)
         else:
-            return FilterCalculatorFewPartsImpl([] if positive_all else positive, negative)
+            return FilterCalculatorFewPartsImpl(positive, negative)
 
 
 def _part_in_db(alphanumeric_part: Union[str, int], index: Index) -> bool:
