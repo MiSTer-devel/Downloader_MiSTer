@@ -90,16 +90,9 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
             return [], None
 
         if job.zip_base_files_url == '':
-            files_to_recover = {}
             for file_pkg in invalid_files:
                 if 'url' not in file_pkg.description:
                     job.failed_files.append(file_pkg)
-                else:
-                    files_to_recover[file_pkg.rel_path] = file_pkg.description
-        else:
-            files_to_recover = {file.rel_path: file.description for file in invalid_files}
-
-        #self._ctx.installation_report.unmark_processed_files(job.failed_files, job.db.db_id)
 
         logger.bench('OpenZipContentsWorker launching recovery process index...', job.db.db_id, job.zip_id)
 

@@ -34,7 +34,7 @@ from downloader.jobs.jobs_factory import make_transfer_job
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.reporters import InstallationReport
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerContext
 from downloader.jobs.workers_factory import make_workers
 from downloader.logger import Logger
 from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder

@@ -134,12 +134,6 @@ class PathPackage:
         else:
             return self.rel_path
 
-    def pext_drive(self) -> Optional[str]:
-        if self.kind == PATH_PACKAGE_KIND_PEXT and self.pext_props is not None:
-            return self.pext_props.drive
-        else:
-            return None
-
     def temp_path(self, already_exists: bool) -> Optional[str]:
         if 'tmp' in self.description:
             return (self.drive + '/' + self.description['tmp']) if self.drive is not None else self.description['tmp']
@@ -177,11 +171,5 @@ class PextPathProps:
             self.other_drives,
             self.is_subfolder,
         )
-
-    def parent_pkg(self) -> PathPackage:
-        return PathPackage(self.parent, self.drive, {}, PATH_TYPE_FOLDER, PATH_PACKAGE_KIND_PEXT, PextPathProps(
-            PEXT_KIND_PARENT, self.parent, self.drive, self.other_drives, False
-        ))
-
 
 RemovedCopy = Tuple[bool, str, str]
