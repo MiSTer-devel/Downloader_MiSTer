@@ -57,12 +57,11 @@ class HttpGateway:
 
     def __enter__(self): return self
 
-    def __exit__(self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]) -> bool:
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]) -> None:
         if exc_type is not None and self._logger is not None:
             self._logger.debug(f"An exception of type {exc_type} occurred with value {exc_val}. Traceback: {exc_tb}")
 
         self.cleanup()
-        return False
 
     @contextmanager
     def open(self, url: str, method: Optional[str] = None, body: Any = None, headers: Any = None) -> Generator[Tuple[str, HTTPResponse], None, None]:
