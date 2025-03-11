@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import os
-from typing import Optional, final
+from typing import Optional
 
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
     FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json
