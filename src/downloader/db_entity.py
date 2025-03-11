@@ -29,35 +29,35 @@ from downloader.path_package import PathPackage
 
 
 class DbEntity:
-    def __init__(self, db_raw: Any, section: str) -> None:
-        if not isinstance(db_raw, dict):
+    def __init__(self, db_props: Any, section: str) -> None:
+        if not isinstance(db_props, dict):
             raise DbEntityValidationException(f'ERROR: Database "{section}" has improper format. The database maintainer should fix this.')
 
-        if 'db_id' not in db_raw: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "db_id" field. The database maintainer should fix this.')
-        if 'files' not in db_raw: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "files" field. The database maintainer should fix this.')
-        if 'folders' not in db_raw: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "folders" field. The database maintainer should fix this.')
-        if 'timestamp' not in db_raw: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "timestamp" field. The database maintainer should fix this.')
+        if 'db_id' not in db_props: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "db_id" field. The database maintainer should fix this.')
+        if 'files' not in db_props: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "files" field. The database maintainer should fix this.')
+        if 'folders' not in db_props: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "folders" field. The database maintainer should fix this.')
+        if 'timestamp' not in db_props: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "timestamp" field. The database maintainer should fix this.')
 
-        self.db_id: str = db_raw['db_id'].lower()
+        self.db_id: str = db_props['db_id'].lower()
         if self.db_id != section.lower(): raise DbEntityValidationException(f'ERROR: Section "{section}" does not match database id "{self.db_id}". Fix your INI file.')
-        self.timestamp: int = db_raw['timestamp']
+        self.timestamp: int = db_props['timestamp']
         if not isinstance(self.timestamp, int): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "timestamp" field. The database maintainer should fix this.')
-        self.files: Dict[str, Any] = db_raw['files']
+        self.files: Dict[str, Any] = db_props['files']
         if not isinstance(self.files, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "files" field. The database maintainer should fix this.')
-        self.folders: Dict[str, Any] = db_raw['folders']
+        self.folders: Dict[str, Any] = db_props['folders']
         if not isinstance(self.folders, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "folders" field. The database maintainer should fix this.')
 
-        self.zips: Dict[str, Any] = db_raw.get('zips', {})
+        self.zips: Dict[str, Any] = db_props.get('zips', {})
         if not isinstance(self.zips, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "zips" field. The database maintainer should fix this.')
-        self.base_files_url: str = db_raw.get('base_files_url', '')
+        self.base_files_url: str = db_props.get('base_files_url', '')
         if not isinstance(self.base_files_url, str): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "base_files_url" field. The database maintainer should fix this.')
-        self.tag_dictionary: Dict[str, int] = db_raw.get('tag_dictionary', {})
+        self.tag_dictionary: Dict[str, int] = db_props.get('tag_dictionary', {})
         if not isinstance(self.tag_dictionary, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "tag_dictionary" field. The database maintainer should fix this.')
-        self.linux: Optional[Dict[str, Any]] = db_raw.get('linux', None)
+        self.linux: Optional[Dict[str, Any]] = db_props.get('linux', None)
         if self.linux is not None and not isinstance(self.linux, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "linux" field. The database maintainer should fix this.')
-        self.header: List[str] = db_raw.get('header', [])
+        self.header: List[str] = db_props.get('header', [])
         if not isinstance(self.header, list): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "header" field. The database maintainer should fix this.')
-        self.default_options: DbOptions = DbOptions(db_raw.get('default_options', None) or {})
+        self.default_options: DbOptions = DbOptions(db_props.get('default_options', None) or {})
 
     def extract_props(self) -> dict[str, Any]:  # pragma: no cover
         result = self.__dict__.copy()
