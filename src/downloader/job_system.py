@@ -552,8 +552,8 @@ class CantWaitWhenTimedOut(JobSystemAbortException): pass
 class CycleDetectedException(JobSystemAbortException): pass
 
 class JobSystemLogger(Protocol):
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True) -> None: """Prints a message to the logger."""
-    def debug(self, *args, sep='', end='\n', flush=True) -> None: """Prints a debug message to the logger."""
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush: bool=True) -> None: """Prints a message to the logger."""
+    def debug(self, *args, sep='', end='\n', flush: bool=True) -> None: """Prints a debug message to the logger."""
 
 
 @dataclass(eq=False, order=False)
