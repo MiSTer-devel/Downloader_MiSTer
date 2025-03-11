@@ -1,5 +1,5 @@
 # Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
-
+from downloader.constants import SafeFetchInfo
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -103,11 +103,6 @@ class FileFetcher:
 
         return file_size, file_hash, None
 
-
-class SafeFetchInfo(TypedDict):
-    url: str
-    hash: str
-    size: int
 
 class SafeFetcherConfig(TypedDict):
     downloader_timeout: int

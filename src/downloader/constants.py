@@ -16,7 +16,12 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Final, Any
+from typing import Final, Any, TypedDict
+
+class SafeFetchInfo(TypedDict):
+    url: str
+    hash: str
+    size: int
 
 # Default SSL option
 
@@ -73,7 +78,7 @@ FILE_MiSTer_version: Final[str] = '/MiSTer.version'
 FILE_Linux_uninstalled: Final[str] = '/media/fat/linux.7z'
 FILE_7z_util: Final[str] = '/media/fat/linux/7za'
 FILE_7z_util_uninstalled: Final[str] = '/media/fat/linux/7za.gz'
-def FILE_7z_util_uninstalled_description() -> dict[str, Any]: return {
+def FILE_7z_util_uninstalled_description() -> SafeFetchInfo: return {
     'url': 'https://github.com/MiSTer-devel/SD-Installer-Win64_MiSTer/raw/master/7za.gz',
     'hash': 'ed1ad5185fbede55cd7fd506b3c6c699',
     'size': 465600
