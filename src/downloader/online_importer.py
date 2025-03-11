@@ -64,7 +64,6 @@ class OnlineImporter:
     def _make_jobs(self, db_pkgs: list[DbSectionPackage], local_store: LocalStoreWrapper, full_resync: bool) -> list[Job]:
         jobs: list[Job] = []
         for pkg in db_pkgs:
-            # @TODO: Use proper tempfile.mkstemp instead
             transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
             self._logger.debug('Loading db from: ', pkg.section['db_url'])
             transfer_job.after_job = OpenDbJob(  # type: ignore[union-attr]

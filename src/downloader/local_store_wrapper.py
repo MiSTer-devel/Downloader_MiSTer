@@ -521,7 +521,7 @@ class ReadOnlyStoreAdapter:
     def zip_summaries(self) -> dict[str, Any]:
         grouped: dict[str, StoreFragmentZipSummary] = defaultdict(lambda: {'files': {}, 'folders': {}})
 
-        # @TODO: This if startswith('games') should be removed when we store all the zip information on the store
+        # @TODO: This if startswith('|') should be removed when we store all the zip information on the store
         #        Explicit asking for games is a hack, as this should only be declared in the database information. Remove ASAP
 
         for fp, fd in self._store.get('files', {}).items():

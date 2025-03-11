@@ -231,7 +231,7 @@ def check_repeated_store_presence(ctx: DownloaderWorkerContext, store: ReadOnlyS
 
         for _, drive in store.list_other_drives_for_file(pkg.rel_path, pkg.drive):
             if ctx.file_system.is_file(os.path.join(drive, pkg.rel_path), use_cache=False):
-                result.add(pkg.rel_path)  # @TODO: See if use_cache is needed, and if we should optimzie this fs access
+                result.add(pkg.rel_path)  # @TODO: See if use_cache is needed, and if we should optimize this fs access
     return result
 
 def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter) -> Tuple[
