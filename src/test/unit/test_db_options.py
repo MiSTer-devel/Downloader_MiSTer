@@ -28,7 +28,7 @@ class TestDbOptions(unittest.TestCase):
         self.assertIsNotNone(db_options())
 
     def test_construct_db_options___with_empty_props___returns_empty_options(self):
-        self.assertEqual({}, DbOptions({}).testable)
+        self.assertEqual({}, DbOptions({}).unwrap_props())
 
     def test_construct_db_options___with_not_recognised_option___raises_db_options_validation_exception(self):
         self.assertRaises(DbOptionsValidationException, lambda: DbOptions({'wrong': 'option'}))

@@ -190,7 +190,7 @@ def config_with_filter(filter_value):
 
 
 def file_test_json_zip_descr():
-    return {'hash': file_test_json_zip, 'unzipped_json': db_test_with_file_a().testable}
+    return {'hash': file_test_json_zip, 'unzipped_json': db_test_with_file_a().extract_props()}
 
 
 def file_reboot_descr(custom_hash=None):
@@ -349,7 +349,7 @@ def remove_priority_path(path):
 
 
 def db_to_store(db, base_path=None):
-    raw_db = db.testable
+    raw_db = db.extract_props()
     store = {
         K_BASE_PATH: "/media/fat" if base_path is None else base_path,
         "zips": raw_db["zips"],

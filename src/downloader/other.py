@@ -17,12 +17,9 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import sys
 import urllib
 from typing import Optional
 
-if 'unittest' in sys.modules.keys():
-    import inspect
 from pathlib import Path
 from downloader.constants import FILE_MiSTer
 
@@ -85,74 +82,3 @@ def format_zips_message(zip_list):
     printable = [f'Zip {zip}' for zip in set(zip_list[0:10])]
     message = ', '.join(printable)
     return f'{message} + other zips.' if len(zip_list) > len(printable) else message
-
-
-_calling_test_only = False
-
-
-def test_only(func):
-    def wrapper(*args, **kwargs):
-        if 'unittest' not in sys.modules.keys():
-            raise Exception('Function "%s" can only be used during "unittest" runs.' % func.__name__)
-
-        stack = inspect.stack()
-        frame = stack[1]
-        global _calling_test_only
-        if not _calling_test_only and 'test' not in list(Path(frame.filename).parts):
-            raise Exception('Function "%s" can only be called directly from a test file.' % func.__name__)
-
-        _calling_test_only = True
-        result = func(*args, **kwargs)
-        _calling_test_only = False
-        return result
-
-    return wrapper
-
-
-def cache(func):
-    arguments = func.__code__.co_argcount
-
-    if arguments == 0:
-        return _cached_function(func)
-    elif arguments == 1:
-        return _cached_method(func)
-
-    raise Exception('Could not cache this: %s' % func.__name__)
-
-
-def _cached_function(func):
-    func_cached_value = None
-
-    def wrapper():
-        nonlocal func_cached_value
-        if func_cached_value is None:
-            func_cached_value = func()
-
-        return func_cached_value
-
-    return wrapper
-
-
-def _cached_method(func):
-    attr_name = '%s_cached_value' % func.__name__
-
-    def wrapper(*args):
-        self = args[0]
-        if not isinstance(self, object):
-            raise Exception('cache decorator should only be used with functions and methods with empty arguments')
-
-        if not hasattr(self, attr_name):
-            setattr(self, attr_name, func(*args))
-
-        return getattr(self, attr_name)
-
-    return wrapper
-
-
-class ClosableValue:
-    def __init__(self, value, callback) -> None:
-        self.value = value
-        self._callback = callback
-
-    def close(self) -> None:
-        self._callback()

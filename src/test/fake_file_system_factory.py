@@ -19,12 +19,11 @@ import io
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from downloader.constants import K_BASE_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE, HASH_file_does_not_exist
+from downloader.constants import STORAGE_PATHS_PRIORITY_SEQUENCE, HASH_file_does_not_exist
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, FsError, UnzipError, \
-    absolute_parent_folder, is_windows, FolderCreationError, FsSharedState, FileCopyError
-from downloader.other import ClosableValue
+    absolute_parent_folder, FolderCreationError, FsSharedState, FileCopyError
 from downloader.path_package import PathPackage
 from test.fake_http_gateway import FakeBuf
 from test.fake_importer_implicit_inputs import FileSystemState

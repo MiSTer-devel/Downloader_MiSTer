@@ -60,7 +60,7 @@ class TestConfigReader(unittest.TestCase):
     def test_databases___with_single_db_ini_with_correct_options___returns_single_db_only_with_all_options(self):
         self.assertEqual(databases("test/integration/fixtures/single_db_with_correct_options.ini"), {'single': {
             K_DB_URL: 'https://single.com',
-            K_OPTIONS: db_options().testable,
+            K_OPTIONS: db_options().unwrap_props(),
             K_SECTION: 'single',
         }})
 
@@ -201,6 +201,6 @@ def databases(path, env=None):
 
 def testable(db):
     if K_OPTIONS in db:
-        db[K_OPTIONS] = db[K_OPTIONS].testable
+        db[K_OPTIONS] = db[K_OPTIONS].unwrap_props()
 
     return db

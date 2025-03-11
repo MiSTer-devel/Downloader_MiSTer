@@ -49,7 +49,7 @@ class TestDbEntity(unittest.TestCase):
         raw_db = {'db_id': 'BiG', 'files': {}, 'folders': {}, 'timestamp': 0}
         expected = {'db_id': 'big', 'base_files_url': '', 'db_files': [], 'files': {}, 'folders': {}, 'zips': {}, 'default_options': {}, 'timestamp': 0}
 
-        self.assertEqual(DbEntity(expected, 'big').testable, DbEntity(raw_db, 'bIg').testable)
+        self.assertEqual(DbEntity(expected, 'big').extract_props(), DbEntity(raw_db, 'bIg').extract_props())
 
     def test_construct_db_entity___with_missing_mandatory_field___raises_db_entity_validation_exception(self):
         for field in ['db_id', 'files', 'folders', 'timestamp']:

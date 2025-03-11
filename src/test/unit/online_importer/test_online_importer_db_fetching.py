@@ -35,15 +35,15 @@ db_info = 'db test'
 
 class TestOnlineImporterDbFetching(unittest.TestCase):
     def test_fetch_all___db_with_working_http_uri___returns_expected_db(self):
-        db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
-        self.assertEqual(db_test_descr().testable, fetch_all(http_db_url, network_state=NetworkState(remote_files={http_db_url: db_description})))
+        db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().extract_props()}
+        self.assertEqual(db_test_descr().extract_props(), fetch_all(http_db_url, network_state=NetworkState(remote_files={http_db_url: db_description})))
 
     def test_fetch_all___db_with_fs_path___returns_expected_db(self):
-        db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().testable}
+        db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().extract_props()}
 
         file_system_factory = FileSystemFactory.from_state(files={fs_db_path: db_description})
 
-        self.assertEqual(db_test_descr().testable, fetch_all(fs_db_path, file_system_factory))
+        self.assertEqual(db_test_descr().extract_props(), fetch_all(fs_db_path, file_system_factory))
 
     def test_fetch_all___db_with_wrong_downloaded_file___returns_none(self):
         self.assertEqual(None, fetch_all(http_db_url, fail=DownloaderWorkerFailPolicy.FAULT_TOLERANT))
@@ -66,7 +66,7 @@ def fetch_all(db_url: str, file_system_factory: Optional[FileSystemFactory] = No
     dbs = sut.box().installed_dbs()
     if len(dbs) == 0:
         return None
-    return dbs[0].testable
+    return dbs[0].extract_props()
 
 def test_db(db_uri):
     return {db_test: {K_SECTION: db_test, K_DB_URL: db_uri}}

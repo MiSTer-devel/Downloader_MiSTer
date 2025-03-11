@@ -16,14 +16,11 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from io import BytesIO
 import io
 import os
 import hashlib
 import shutil
 import json
-import sys
-import tempfile
 import threading
 import time
 import zipfile
@@ -34,7 +31,6 @@ from typing import Final, List, Optional, Set, Dict, Any, Tuple, Union
 from downloader.config import AllowDelete, Config
 from downloader.constants import HASH_file_does_not_exist
 from downloader.logger import Logger, OffLogger
-from downloader.other import ClosableValue
 from downloader.path_package import PathPackage
 
 

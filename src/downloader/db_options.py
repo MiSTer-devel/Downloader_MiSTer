@@ -16,9 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Set, TypedDict, Any, cast, Optional
-
-from downloader.other import test_only
+from typing import Set, TypedDict, Any, Optional
 
 
 class DbOptionsProps(TypedDict, total=False):
@@ -58,9 +56,7 @@ class DbOptions:
     def any(self) -> bool:
         return self.filter is not None
 
-    @property
-    @test_only
-    def testable(self):
+    def unwrap_props(self) -> DbOptionsProps:
         return self._props
 
 

@@ -46,16 +46,16 @@ class TestDbUtils(unittest.TestCase):
         self.assert_config(config_with_options, (config_with_options, db, nil))
 
     def test_build_db_config___with_ini_options___returns_ini_options(self):
-        self.assert_config(ini_options.testable, (config_with_options, db, {K_OPTIONS: ini_options}))
+        self.assert_config(ini_options.unwrap_props(), (config_with_options, db, {K_OPTIONS: ini_options}))
 
     def test_build_db_config___with_db_options___returns_db_options(self):
-        self.assert_config(db_with_options.default_options.testable, (default_config(), db_with_options, nil))
+        self.assert_config(db_with_options.default_options.unwrap_props(), (default_config(), db_with_options, nil))
 
     def test_build_db_config___with_config_and_db_options___returns_config_with_options(self):
         self.assert_config(config_with_options, (config_with_options, db_with_options, nil))
 
     def test_build_db_config___with_config_db_and_ini_options___returns_ini_options(self):
-        self.assert_config(ini_options.testable, (config_with_options, db_with_options, {K_OPTIONS: ini_options}))
+        self.assert_config(ini_options.unwrap_props(), (config_with_options, db_with_options, {K_OPTIONS: ini_options}))
 
     def test_sorted_db_sections___after_adding_nothing___returns_empty_array(self):
         self.assertEqual([], sorted_db_sections(config))
