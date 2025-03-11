@@ -38,6 +38,8 @@ class DbOptions:
             present.add('downloader_timeout')
         if 'downloader_retries' in props:  # @TODO (downloader 2.0++): Remove this in a future version
             present.add('downloader_retries')
+        if 'base_path' in props:  # @TODO (downloader 2.0++): Remove this in a future version
+            present.add('base_path')
         if 'filter' in props:
             if not isinstance(props['filter'], str):
                 raise DbOptionsValidationException(['filter'])

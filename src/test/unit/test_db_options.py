@@ -33,6 +33,6 @@ class TestDbOptions(unittest.TestCase):
     def test_construct_db_options___with_not_recognised_option___raises_db_options_validation_exception(self):
         self.assertRaises(DbOptionsValidationException, lambda: DbOptions({'wrong': 'option'}))
 
-    def test_construct_db_options___with_kind_default_options_and_removed_option_base_path___raises_db_options_validation_exception(self):
-        self.assertRaises(DbOptionsValidationException, lambda: DbOptions({'base_path': 'something'}))
+    def test_construct_db_options___with_option_base_path___raises_nothing_by_now(self):
+        self.assertIsNotNone(DbOptions({'base_path': 'something'}))
 

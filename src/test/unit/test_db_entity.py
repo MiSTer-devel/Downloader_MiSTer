@@ -90,7 +90,7 @@ class TestDbEntity(unittest.TestCase):
 
     def test_construct_db_entity___with_wrong_options___raises_db_entity_validation_exception(self):
         raw_db = raw_db_empty_descr()
-        raw_db['default_options'] = {K_BASE_PATH: default_config()[K_BASE_PATH]}
+        raw_db['default_options'] = {'allow_delete': default_config()['allow_delete']}
         self.assertRaises(DbOptionsValidationException, lambda: DbEntity(raw_db, db_empty))
 
     def test_construct_db_entity___with_invalid_files___raises_error(self):
