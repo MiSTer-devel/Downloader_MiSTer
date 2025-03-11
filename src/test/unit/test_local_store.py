@@ -20,7 +20,7 @@ import unittest
 
 from downloader.local_store_wrapper import LocalStoreWrapper
 from downloader.store_migrator import make_new_local_store
-from fake_store_migrator import StoreMigrator
+from test.fake_store_migrator import StoreMigrator
 
 
 class TestLocalStore(unittest.TestCase):
