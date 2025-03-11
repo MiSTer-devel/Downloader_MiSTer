@@ -16,15 +16,17 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from abc import ABC, abstractmethod
+from typing import Protocol, Any
+
+from downloader.logger import Logger
 
 
 class StoreMigrator:
-    def __init__(self, migration_list, logger) -> None:
+    def __init__(self, migration_list: list['MigrationBase'], logger: Logger) -> None:
         self._migrations = migration_list
         self._logger = logger
 
-    def migrate(self, local_store):
+    def migrate(self, local_store: dict[str, Any]) -> None:
         self._logger.bench('Migration start.')
 
         current_version = local_store.get('migration_version', 0)
@@ -43,11 +45,11 @@ class StoreMigrator:
 
         self._logger.bench('Migration done.')
 
-    def latest_migration_version(self):
+    def latest_migration_version(self) -> int:
         return len(self._migrations)
 
 
-def make_new_local_store(store_migrator):
+def make_new_local_store(store_migrator) -> dict[str, Any]:
     return {
         'dbs': {},
         'db_sigs': {},
@@ -60,11 +62,6 @@ class WrongMigrationException(Exception):
     pass
 
 
-class MigrationBase(ABC):
-    @property
-    @abstractmethod
-    def version(self):
-        """Version of the migration object"""
-
-    def migrate(self, local_store) -> None:
-        """Migrate the local store"""
+class MigrationBase(Protocol):
+    version: int
+    def migrate(self, local_store) -> None: ...
