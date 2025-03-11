@@ -127,7 +127,7 @@ class TopLogger(Logger, ConfigLogManager):
         self.file_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
     def debug(self, *args, sep: str='', end: str='\n', flush: bool=False) -> None:
         if self._verbose_mode is False and self._received_exception is False:
-            if _there_is_exception(args):
+            if any(isinstance(a, BaseException) for a in args):
                 self._received_exception = True
             else:
                 return
@@ -182,11 +182,6 @@ def _format_ex(e: BaseException) -> str:
         padding += ' ' * 4
     return exception_msg
 
-def _there_is_exception(args: tuple[Any, ...]) -> bool:
-    for a in args:
-        if isinstance(a, BaseException):
-            return True
-    return False
 
 class DebugOnlyLoggerDecorator(Logger):
     def __init__(self, decorated_logger: Logger) -> None:
