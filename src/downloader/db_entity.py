@@ -62,7 +62,7 @@ class DbEntity:
 
     @property
     @test_only
-    def testable(self):  # pragma: no cover
+    def testable(self) -> dict[str, Any]:  # pragma: no cover
         result = self.__dict__.copy()
         result['default_options'] = result['default_options'].testable
         if result['linux'] is None:
@@ -150,13 +150,13 @@ def is_url_valid(url: str) -> bool:
     except:
         return False
 
-def check_folders(folders, db_id: str) -> None:
+def check_folders(folders: dict[str, Any], db_id: str) -> None:
     if len(folders) == 0: return
 
     for folder_path in folders:
         _validate_and_extract_parts_from_path(db_id, folder_path)
 
-def fix_folders(folders) -> None:
+def fix_folders(folders: dict[str, Any]) -> None:
     if len(folders) == 0: return
 
     rename_folders = []
@@ -168,7 +168,7 @@ def fix_folders(folders) -> None:
         folders[folder_path[:-1]] = folder_description
         folders.pop(folder_path)
 
-def _validate_and_extract_parts_from_path(db_id, path):
+def _validate_and_extract_parts_from_path(db_id: str, path: str) -> list[str]:
     if not isinstance(path, str):
         raise DbEntityValidationException(f'ERROR: Invalid file "{path}" for database: {db_id}. Path should be a string. The database maintainer should fix this.')
 
