@@ -53,13 +53,10 @@ class DbOptions:
         if len(present) != len(props):
             raise DbOptionsValidationException([o for o in props if o not in present])
 
-        self._props = cast(DbOptionsProps, props)
+        self._props = props
 
     def any(self) -> bool:
-        return len(self._props) > 0
-
-    def unwrap_props(self) -> DbOptionsProps:
-        return self._props
+        return self.filter is not None
 
     @property
     @test_only
