@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import os
-from typing import Optional
+from typing import Optional, final
 
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
     FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json
@@ -92,44 +92,44 @@ class LocalRepository(FilelogSaver):
 
     def load_store(self):
         self._logger.bench('Load store start.')
-
-        if self._file_system.is_file(self._storage_load_path):
-            try:
+        try:
+            if self._file_system.is_file(self._storage_load_path):
                 local_store = self._file_system.load_dict_from_file(self._storage_load_path)
-            except Exception as e:
-                self._logger.debug(e)
-                self._logger.print('Could not load store')
+                self._store_migrator.migrate(local_store)
+            else:
                 local_store = make_new_local_store(self._store_migrator)
-        else:
-            local_store = make_new_local_store(self._store_migrator)
 
-        self._store_migrator.migrate(local_store)  # exception must be fixed, users are not modifying this by hand
+            external_drives = self._store_drives()
 
-        external_drives = self._store_drives()
+            for drive in external_drives:
+                external_store_file = os.path.join(drive, FILE_downloader_external_storage)
+                if not self._file_system.is_file(external_store_file):
+                    continue
 
-        for drive in external_drives:
-            external_store_file = os.path.join(drive, FILE_downloader_external_storage)
-            if not self._file_system.is_file(external_store_file):
-                continue
+                try:
+                    self._logger.bench('Open json start.')
+                    external_store = self._file_system.load_dict_from_file(external_store_file)
+                    self._logger.bench('Open json done.')
+                    self._store_migrator.migrate(external_store)  # not very strict with exceptions, because this file is easier to tweak
+                except Exception as e:
+                    self._logger.debug(e)
+                    self._logger.print('Could not load external store for drive "%s"' % drive)
+                    continue
 
-            try:
-                self._logger.bench('Open json start.')
-                external_store = self._file_system.load_dict_from_file(external_store_file)
-                self._logger.bench('Open json done.')
-                self._store_migrator.migrate(external_store)  # not very strict with exceptions, because this file is easier to tweak
-            except Exception as e:
-                self._logger.debug(e)
-                self._logger.print('Could not load external store for drive "%s"' % drive)
-                continue
+                for db_id, external in external_store['dbs'].items():
+                    if db_id not in local_store['dbs'] or len(local_store['dbs'][db_id]) == 0:
+                        local_store['dbs'][db_id] = empty_store_without_base_path()
+                    local_store['dbs'][db_id]['external'] = local_store['dbs'][db_id].get('external', {})
+                    local_store['dbs'][db_id]['external'][drive] = external
 
-            for db_id, external in external_store['dbs'].items():
-                if db_id not in local_store['dbs'] or len(local_store['dbs'][db_id]) == 0:
-                    local_store['dbs'][db_id] = empty_store_without_base_path()
-                local_store['dbs'][db_id]['external'] = local_store['dbs'][db_id].get('external', {})
-                local_store['dbs'][db_id]['external'][drive] = external
+            return LocalStoreWrapper(local_store)
 
-        self._logger.bench('Load store done.')
-        return LocalStoreWrapper(local_store)
+        except Exception as e:
+            self._logger.debug(e)
+            self._logger.print('ERROR: Could not load store')
+            return LocalStoreWrapper(make_new_local_store(self._store_migrator))
+        finally:
+            self._logger.bench('Load store done.')
 
     def has_last_successful_run(self):
         return self._file_system.is_file(self._last_successful_run)

@@ -58,6 +58,8 @@ class LocalStore(TypedDict):
 
 class LocalStoreWrapper:
     def __init__(self, local_store: dict[str, Any]) -> None:
+        if 'dbs' not in local_store or not isinstance(local_store['dbs'], dict): raise LocalStoreValidationException('dbs')
+        if 'db_sigs' not in local_store or not isinstance(local_store['db_sigs'], dict): raise LocalStoreValidationException('db_sigs')
         self._local_store: LocalStore = cast(LocalStore, local_store)
         self._dirty = False
 
@@ -80,6 +82,7 @@ class LocalStoreWrapper:
         return self._dirty
 
 
+class LocalStoreValidationException(Exception): pass
 class ReadOnlyStoreException(Exception): pass
 
 
