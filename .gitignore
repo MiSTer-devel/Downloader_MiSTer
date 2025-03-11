@@ -1,5 +1,6 @@
 .vscode
 .idea
+.venv
 .coverage
 __pycache__
 .DS_Store
@@ -12,10 +13,11 @@ src/downloader.zip
 src/commit.py
 
 # DEBUG FILES:
-delme.py
+delme*.py
 stop
 mister.ip
 dont_download.ini
 downloader.json.zip
-downloader.json
+downloader*.json
 *.log
+*.png
