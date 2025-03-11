@@ -243,7 +243,7 @@ class BadFileFilterPartException(Exception):
     def on_db(self, db_id: str) -> None:
         self.db_id = db_id
 
-    def __str__(self):
+    def __str__(self) -> str:
         base_message = f"Part '{self.part}' is invalid."
         if self.db_id is None:
             return f"Bad filter part: {base_message}"

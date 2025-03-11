@@ -503,7 +503,7 @@ class Job(ABC):
         return getattr(self, '_tags', set())
 
     @property
-    def priority(self): return False
+    def priority(self) -> bool: return False
 
 
 WorkerResult = Tuple[List[Job], Optional[Exception]]
@@ -567,7 +567,7 @@ class _JobPackage:
     parent: Optional['_JobPackage']
 
     # Consider removing __str__ at least in non-debug environments
-    def __str__(self): return f'JobPackage(job_type_id={self.job.type_id}, job_class={self.job.__class__.__name__}, tries={self.tries})'
+    def __str__(self) -> str: return f'JobPackage(job_type_id={self.job.type_id}, job_class={self.job.__class__.__name__}, tries={self.tries})'
 
 class _JobError(Exception):
     def __init__(self, child: Exception) -> None:

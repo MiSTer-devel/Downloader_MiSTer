@@ -60,7 +60,7 @@ class FullRunService:
         self._filelog_manager.set_local_repository(self._local_repository)
         self._logger.debug('config: ' + json.dumps(self._config, default=lambda o: str(o) if isinstance(o, Path) else o.__dict__, indent=4))
 
-    def print_drives(self):
+    def print_drives(self) -> int:
         self._logger.bench('Print Drives start.')
 
         self._local_repository.set_logfile_path('/tmp/print_drives.log')
@@ -145,7 +145,7 @@ class FullRunService:
 
         return 0
 
-    def _check_certificates(self):
+    def _check_certificates(self) -> bool:
         for i in range(3):
             if i != 0:
                 self._logger.debug()

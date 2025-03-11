@@ -26,7 +26,7 @@ class RebootCalculator:
         self._logger = logger
         self._file_system = file_system
 
-    def calc_needs_reboot(self, linux_needs_reboot, importer_needs_reboot):
+    def calc_needs_reboot(self, linux_needs_reboot, importer_needs_reboot) -> bool:
 
         will_reboot = False
         should_reboot = False
