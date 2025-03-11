@@ -26,7 +26,7 @@ class DbOptionsProps(TypedDict, total=False):
 class DbOptions:
     def __init__(self, props: Any) -> None:
         if not isinstance(props, dict):
-            raise DbOptionsValidationException('Database-scoped options has improper format.')
+            raise DbOptionsValidationException(['Database-scoped options has improper format.'])
 
         present: Set[str] = set()
 
@@ -61,8 +61,8 @@ class DbOptions:
 
 
 class DbOptionsValidationException(Exception):
-    def __init__(self, fields) -> None:
+    def __init__(self, fields: list[str]) -> None:
         self.fields = fields
 
-    def fields_to_string(self):
+    def fields_to_string(self) -> str:
         return ', '.join(self.fields)

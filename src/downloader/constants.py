@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Final, Tuple, List
+from typing import Final, Any
 
 # Default SSL option
 
@@ -73,12 +73,12 @@ FILE_MiSTer_version: Final[str] = '/MiSTer.version'
 FILE_Linux_uninstalled: Final[str] = '/media/fat/linux.7z'
 FILE_7z_util: Final[str] = '/media/fat/linux/7za'
 FILE_7z_util_uninstalled: Final[str] = '/media/fat/linux/7za.gz'
-def FILE_7z_util_uninstalled_description(): return {
+def FILE_7z_util_uninstalled_description() -> dict[str, Any]: return {
     'url': 'https://github.com/MiSTer-devel/SD-Installer-Win64_MiSTer/raw/master/7za.gz',
     'hash': 'ed1ad5185fbede55cd7fd506b3c6c699',
     'size': 465600
 }
-FILE_Linux_user_files: Final[List[Tuple[str, str]]] = [
+FILE_Linux_user_files: Final[list[tuple[str, str]]] = [
     # source -> destination
     ('/media/fat/linux/hostname', '/etc/hostname'),
     ('/media/fat/linux/hosts', '/etc/hosts'),
@@ -111,7 +111,7 @@ MEDIA_FAT_CIFS: Final[str] = '/media/fat/cifs'
 MEDIA_FAT: Final[str] = '/media/fat'
 
 # Storage Priority Resolution Sequence
-STORAGE_PATHS_PRIORITY_SEQUENCE: Final[List[str]] = [
+STORAGE_PATHS_PRIORITY_SEQUENCE: Final[list[str]] = [
     MEDIA_USB0,
     MEDIA_USB1,
     MEDIA_USB2,
