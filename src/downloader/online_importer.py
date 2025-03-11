@@ -48,7 +48,7 @@ from downloader.path_package import PathPackage
 
 
 class OnlineImporter:
-    def __init__(self, logger: Logger, job_system: JobSystem, worker_ctx: DownloaderWorkerContext, free_space_reservation: FreeSpaceReservation):
+    def __init__(self, logger: Logger, job_system: JobSystem, worker_ctx: DownloaderWorkerContext, free_space_reservation: FreeSpaceReservation) -> None:
         self._logger = logger
         self._job_system = job_system
         self._worker_ctx = worker_ctx
@@ -346,7 +346,7 @@ class OnlineImporter:
         return self
  
     @staticmethod
-    def _clean_store(store):
+    def _clean_store(store) -> None:
         for file_description in store['files'].values():
             if 'tags' in file_description and 'zip_id' not in file_description: file_description.pop('tags')
         for folder_description in store['folders'].values():
@@ -439,83 +439,83 @@ class InstallationBox:
         self._non_duplicated_files: list[tuple[list[PathPackage], str]] = []
         self._unused_filter_tags: list[str] = []
 
-    def set_unused_filter_tags(self, tags: list[str]):
+    def set_unused_filter_tags(self, tags: list[str]) -> None:
         self._unused_filter_tags = tags
-    def add_downloaded_file(self, path: str):
+    def add_downloaded_file(self, path: str) -> None:
         self._downloaded_files.append(path)
-    def add_downloaded_files(self, files: list[PathPackage]):
+    def add_downloaded_files(self, files: list[PathPackage]) -> None:
         if len(files) == 0: return
         for pkg in files:
             self._downloaded_files.append(pkg.rel_path)
-    def add_validated_file(self, path_pkg: PathPackage, db_id: str):
+    def add_validated_file(self, path_pkg: PathPackage, db_id: str) -> None:
         self._validated_files[db_id].append(path_pkg)
         self._installed_file_pkgs[db_id].append(path_pkg)
         self._installed_file_names.append(path_pkg.rel_path)
-    def add_validated_files(self, files: list[PathPackage], db_id: str):
+    def add_validated_files(self, files: list[PathPackage], db_id: str) -> None:
         if len(files) == 0: return
         self._validated_files[db_id].extend(files)
         self._installed_file_pkgs[db_id].extend(files)
         self._installed_file_names.extend(pkg.rel_path for pkg in files)
-    def add_repeated_store_presence(self, non_external_store_entries: set[str], db_id: str):
+    def add_repeated_store_presence(self, non_external_store_entries: set[str], db_id: str) -> None:
         self._repeated_store_presence[db_id].update(non_external_store_entries)
-    def add_installed_zip_summary(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: dict[str, Any]):
+    def add_installed_zip_summary(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: dict[str, Any]) -> None:
         self._installed_zip_summary.append((db_id, zip_id, fragment, description))
-    def add_present_validated_files(self, paths: list[PathPackage], db_id: str):
+    def add_present_validated_files(self, paths: list[PathPackage], db_id: str) -> None:
         if len(paths) == 0: return
         self._present_validated_files[db_id].extend(paths)
         self._installed_file_pkgs[db_id].extend(paths)
         self._installed_file_names.extend(pkg.rel_path for pkg in paths)
-    def add_present_not_validated_files(self, paths: list[PathPackage]):
+    def add_present_not_validated_files(self, paths: list[PathPackage]) -> None:
         if len(paths) == 0: return
         self._present_not_validated_files.extend([p.rel_path for p in paths])
-    def add_skipped_updated_files(self, paths: list[PathPackage], db_id: str):
+    def add_skipped_updated_files(self, paths: list[PathPackage], db_id: str) -> None:
         if len(paths) == 0: return
         if db_id not in self._skipped_updated_files:
             self._skipped_updated_files[db_id] = []
         self._skipped_updated_files[db_id].extend([p.rel_path for p in paths])
-    def add_file_fetch_started(self, path: str):
+    def add_file_fetch_started(self, path: str) -> None:
         self._fetch_started_files.append(path)
-    def add_failed_file(self, path: str):
+    def add_failed_file(self, path: str) -> None:
         self._failed_files.append(path)
-    def add_failed_db(self, db_id: str):
+    def add_failed_db(self, db_id: str) -> None:
         self._failed_dbs.add(db_id)
-    def add_failed_files(self, file_pkgs: list[PathPackage]):
+    def add_failed_files(self, file_pkgs: list[PathPackage]) -> None:
         if len(file_pkgs) == 0: return
         for pkg in file_pkgs:
             self._failed_files.append(pkg.rel_path)
-    def add_duplicated_files(self, files: list[str], db_id: str):
+    def add_duplicated_files(self, files: list[str], db_id: str) -> None:
         if len(files) == 0: return
         self._duplicated_files.append((files, db_id))
-    def add_non_duplicated_files(self, files: list[PathPackage], db_id: str):
+    def add_non_duplicated_files(self, files: list[PathPackage], db_id: str) -> None:
         if len(files) == 0: return
         self._non_duplicated_files.append((files, db_id))
-    def add_failed_zip(self, db_id: str, zip_id: str):
+    def add_failed_zip(self, db_id: str, zip_id: str) -> None:
         self._failed_zips.append((db_id, zip_id))
-    def add_removed_zip(self, db_id: str, zip_id: str):
+    def add_removed_zip(self, db_id: str, zip_id: str) -> None:
         self._removed_zips.append((db_id, zip_id))
-    def add_failed_folders(self, folders: list[str]):
+    def add_failed_folders(self, folders: list[str]) -> None:
         self._failed_folders.extend(folders)
-    def add_full_partitions(self, full_partitions: list[tuple[Partition, int]]):
+    def add_full_partitions(self, full_partitions: list[tuple[Partition, int]]) -> None:
         if len(full_partitions) == 0: return
         for partition, failed_reserve in full_partitions:
             if partition.path not in self._full_partitions:
                 self._full_partitions[partition.path] = failed_reserve
             else:
                 self._full_partitions[partition.path] += failed_reserve
-    def add_installed_db(self, db: DbEntity, config: Config, db_hash: str, db_size: int):
+    def add_installed_db(self, db: DbEntity, config: Config, db_hash: str, db_size: int) -> None:
         self._installed_dbs.append(db)
         self._installed_db_sigs.append((db, config, db_hash, db_size))
     def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
         self._filtered_zip_data[db_id][zip_id] = filtered_data
-    def add_failed_db_options(self, exception: WrongDatabaseOptions):
+    def add_failed_db_options(self, exception: WrongDatabaseOptions) -> None:
         self._failed_db_options.append(exception)
-    def add_removed_files(self, files: list[tuple[PathPackage, set[str]]]):
+    def add_removed_files(self, files: list[tuple[PathPackage, set[str]]]) -> None:
         if len(files) == 0: return
         self._removed_files.extend(files)
-    def add_removed_folders(self, folders: list[PathPackage], db_id: str):
+    def add_removed_folders(self, folders: list[PathPackage], db_id: str) -> None:
         if len(folders) == 0: return
         self._removed_folders.extend([(db_id, pkg) for pkg  in folders])
-    def add_installed_folders(self, folders: list[PathPackage], db_id: str):
+    def add_installed_folders(self, folders: list[PathPackage], db_id: str) -> None:
         if len(folders) == 0: return
         self._installed_folders.extend([(db_id, pkg) for pkg in folders])
         self._installed_folders_set.update([pkg.rel_path for pkg in folders])

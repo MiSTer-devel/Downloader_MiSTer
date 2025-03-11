@@ -21,7 +21,7 @@ from downloader.constants import FILE_mister_downloader_needs_reboot, K_ALLOW_RE
 
 
 class RebootCalculator:
-    def __init__(self, config, logger, file_system):
+    def __init__(self, config, logger, file_system) -> None:
         self._config = config
         self._logger = logger
         self._file_system = file_system

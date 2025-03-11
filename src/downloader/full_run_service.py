@@ -40,7 +40,7 @@ from downloader.waiter import Waiter
 
 
 class FullRunService:
-    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, local_repository: LocalRepository, online_importer: OnlineImporter, linux_updater: LinuxUpdater, reboot_calculator: RebootCalculator, base_path_relocator: BasePathRelocator, certificates_fix: CertificatesFix, external_drives_repository: ExternalDrivesRepository, os_utils: OsUtils, waiter: Waiter):
+    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, local_repository: LocalRepository, online_importer: OnlineImporter, linux_updater: LinuxUpdater, reboot_calculator: RebootCalculator, base_path_relocator: BasePathRelocator, certificates_fix: CertificatesFix, external_drives_repository: ExternalDrivesRepository, os_utils: OsUtils, waiter: Waiter) -> None:
         self._waiter = waiter
         self._os_utils = os_utils
         self._external_drives_repository = external_drives_repository
@@ -55,7 +55,7 @@ class FullRunService:
         self._printlog_manager = printlog_manager
         self._config = config
 
-    def configure_components(self):
+    def configure_components(self) -> None:
         self._printlog_manager.configure(self._config)
         self._filelog_manager.set_local_repository(self._local_repository)
         self._logger.debug('config: ' + json.dumps(self._config, default=lambda o: str(o) if isinstance(o, Path) else o.__dict__, indent=4))
@@ -158,7 +158,7 @@ class FullRunService:
 
         return False
 
-    def _display_summary(self, box: InstallationBox, start_time):
+    def _display_summary(self, box: InstallationBox, start_time) -> None:
         run_time = str(datetime.timedelta(seconds=time.time() - start_time))[0:-4]
 
         self._logger.print()

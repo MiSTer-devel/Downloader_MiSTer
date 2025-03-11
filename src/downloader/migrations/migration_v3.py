@@ -22,7 +22,7 @@ from downloader.store_migrator import MigrationBase
 class MigrationV3(MigrationBase):
     version = 3
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         """move 'folders' from zips to upper level"""
 
         for db in local_store['dbs'].values():

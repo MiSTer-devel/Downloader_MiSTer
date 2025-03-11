@@ -150,13 +150,13 @@ def is_url_valid(url: str) -> bool:
     except:
         return False
 
-def check_folders(folders, db_id: str):
+def check_folders(folders, db_id: str) -> None:
     if len(folders) == 0: return
 
     for folder_path in folders:
         _validate_and_extract_parts_from_path(db_id, folder_path)
 
-def fix_folders(folders):
+def fix_folders(folders) -> None:
     if len(folders) == 0: return
 
     rename_folders = []

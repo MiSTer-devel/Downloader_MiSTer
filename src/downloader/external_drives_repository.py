@@ -25,7 +25,7 @@ class ExternalDrivesRepositoryFactory:
 
 
 class ExternalDrivesRepository:
-    def __init__(self, file_system, logger):
+    def __init__(self, file_system, logger) -> None:
         self._file_system = file_system
         self._logger = logger
         self._drive_folders_cache = {}

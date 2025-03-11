@@ -22,7 +22,7 @@ from downloader.constants import DEFAULT_CURL_SSL_OPTIONS
 class CertificatesFix:
     cacert_pem_url = 'https://curl.se/ca/cacert.pem'
 
-    def __init__(self, config, file_system, waiter, logger):
+    def __init__(self, config, file_system, waiter, logger) -> None:
         self._config = config
         self._file_system = file_system
         self._waiter = waiter

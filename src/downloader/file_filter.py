@@ -50,7 +50,7 @@ class FilterCalculator(ABC):
 
 
 class FilterCalculatorImpl(FilterCalculator):
-    def __init__(self, positive, negative):
+    def __init__(self, positive, negative) -> None:
         self._negative = negative
         self._positive = positive
 
@@ -74,7 +74,7 @@ class FilterCalculatorImpl(FilterCalculator):
 
 
 class FileFilter:
-    def __init__(self, filter_calculator: Optional[FilterCalculator]):
+    def __init__(self, filter_calculator: Optional[FilterCalculator]) -> None:
         self._filter_calculator = filter_calculator
 
     def select_filtered_files(self, summary: Index) -> Tuple[Index, ZipData]:
@@ -114,17 +114,17 @@ class FileFilter:
             filtered_zip_data[zip_id] = {'files': {}, 'folders': {}}
         return filtered_zip_data[zip_id]
 
-    def _add_filtered_file_in_zip(self, filtered_zip_data: ZipData, file_path: str, zip_id: str, file_desc: FileFolderDesc):
+    def _add_filtered_file_in_zip(self, filtered_zip_data: ZipData, file_path: str, zip_id: str, file_desc: FileFolderDesc) -> None:
         zip_desc = self._filtered_zip_data_by_id(filtered_zip_data, zip_id)
         zip_desc['files'][file_path] = file_desc
 
-    def _add_filtered_folder_in_zip(self, filtered_zip_data: ZipData, folder_path: str, zip_id: str, folder_desc: FileFolderDesc):
+    def _add_filtered_folder_in_zip(self, filtered_zip_data: ZipData, folder_path: str, zip_id: str, folder_desc: FileFolderDesc) -> None:
         zip_desc = self._filtered_zip_data_by_id(filtered_zip_data, zip_id)
         zip_desc['folders'][folder_path] = folder_desc
 
 
 class FileFilterFactory:
-    def __init__(self, logger: Logger):
+    def __init__(self, logger: Logger) -> None:
         self._logger = logger
         self._unused: Set[str] = set()
         self._used: Set[str] = set()
@@ -235,12 +235,12 @@ class AlwaysFilters(FilterCalculator):
 
 
 class BadFileFilterPartException(Exception):
-    def __init__(self, part: str):
+    def __init__(self, part: str) -> None:
         super().__init__(f'Bad filter part: {part}')
         self.part: str = part
         self.db_id: Optional[str] = None
 
-    def on_db(self, db_id: str):
+    def on_db(self, db_id: str) -> None:
         self.db_id = db_id
 
     def __str__(self):

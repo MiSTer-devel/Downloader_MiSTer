@@ -31,7 +31,7 @@ from downloader.path_package import PATH_PACKAGE_KIND_PEXT, PATH_PACKAGE_KIND_ST
 
 
 class TargetPathsCalculatorFactory:
-    def __init__(self, file_system: FileSystem, external_drives_repository: ExternalDrivesRepository):
+    def __init__(self, file_system: FileSystem, external_drives_repository: ExternalDrivesRepository) -> None:
         self._file_system = file_system
         self._external_drives_repository = external_drives_repository
         self._lock = threading.Lock()
@@ -42,7 +42,7 @@ class TargetPathsCalculatorFactory:
 
 
 class TargetPathsCalculator:
-    def __init__(self, file_system: FileSystem, config: Config, drives: List[str], lock: threading.Lock):
+    def __init__(self, file_system: FileSystem, config: Config, drives: List[str], lock: threading.Lock) -> None:
         self._file_system = file_system
         self._config = config
         self._drives = drives
@@ -212,6 +212,6 @@ class TargetPathsCalculator:
 class StoragePriorityError(Exception): pass
 
 class StoragePriorityRegistryEntry:
-    def __init__(self):
+    def __init__(self) -> None:
         self.drives = set()
         self.folders = dict()

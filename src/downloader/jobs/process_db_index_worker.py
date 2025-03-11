@@ -49,7 +49,7 @@ _DeleteFolderPackage = PathPackage
 
 
 class ProcessDbIndexWorker(DownloaderWorkerBase):
-    def __init__(self, ctx: DownloaderWorkerContext):
+    def __init__(self, ctx: DownloaderWorkerContext) -> None:
         super().__init__(ctx)
         self._folders_created: Set[str] = set()
         self._lock = threading.Lock()

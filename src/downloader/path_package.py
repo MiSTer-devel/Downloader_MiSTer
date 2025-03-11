@@ -68,7 +68,7 @@ class PathPackage:
         ty: PathType,
         kind: PathPackageKind,
         pext_props: Optional['PextPathProps']
-    ):
+    ) -> None:
         self.rel_path = rel_path
         self.drive = drive
         self.description = description
@@ -156,7 +156,7 @@ class PextPathProps:
         drive: str,
         other_drives: Tuple[str, ...],
         is_subfolder: bool,/
-    ):
+    ) -> None:
         self.kind = kind
         self.parent = parent
         self.drive = drive

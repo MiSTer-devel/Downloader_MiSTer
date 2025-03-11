@@ -43,7 +43,7 @@ COPY_BUFSIZE: Final = 1024 * 1024 if is_windows else 64 * 1024
 
 
 class FileSystemFactory:
-    def __init__(self, config: Config, path_dictionary: Dict[str, str], logger: Logger):
+    def __init__(self, config: Config, path_dictionary: Dict[str, str], logger: Logger) -> None:
         self._config = config
         self._path_dictionary = path_dictionary
         self._logger = logger
@@ -57,7 +57,7 @@ class FileSystemFactory:
     def create_for_config(self, config) -> 'FileSystem':
         return _FileSystem(config, self._path_dictionary, self._logger, self._unique_temp_filenames, self._shared_state)
 
-    def cancel_ongoing_operations(self):
+    def cancel_ongoing_operations(self) -> None:
         self._shared_state.interrupting_operations = True
 
 
@@ -185,7 +185,7 @@ class FileSystem(ABC):
 
 
 class ReadOnlyFileSystem:
-    def __init__(self, fs: FileSystem):
+    def __init__(self, fs: FileSystem) -> None:
         self._fs = fs
 
     def is_file(self, path):
@@ -243,7 +243,7 @@ class FileWriteError(FsError): pass
 class FsTimeoutError(FsError): pass
 
 class _FileSystem(FileSystem):
-    def __init__(self, config: Config, path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], shared_state: 'FsSharedState'):
+    def __init__(self, config: Config, path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], shared_state: 'FsSharedState') -> None:
         self._config = config
         self._path_dictionary = path_dictionary
         self._logger = logger

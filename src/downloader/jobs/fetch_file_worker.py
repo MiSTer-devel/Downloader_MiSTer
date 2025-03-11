@@ -32,7 +32,7 @@ from downloader.waiter import Waiter
 
 
 class FetchFileWorker(DownloaderWorker):
-    def __init__(self, progress_reporter: ProgressReporter, http_gateway: HttpGateway, file_system: FileSystem, timeout: int):
+    def __init__(self, progress_reporter: ProgressReporter, http_gateway: HttpGateway, file_system: FileSystem, timeout: int) -> None:
         self._progress_reporter = progress_reporter
         self._file_system = file_system
         self._fetcher = FileFetcher(http_gateway=http_gateway, file_system=file_system, timeout=timeout)
@@ -72,7 +72,7 @@ class FetchFileWorker(DownloaderWorker):
 
 
 class FileFetcher:
-    def __init__(self, http_gateway: HttpGateway, file_system: FileSystem, timeout: int):
+    def __init__(self, http_gateway: HttpGateway, file_system: FileSystem, timeout: int) -> None:
         self._http_gateway = http_gateway
         self._file_system = file_system
         self._timeout = timeout
@@ -114,7 +114,7 @@ class SafeFetcherConfig(TypedDict):
     downloader_retries: int
 
 class SafeFileFetcher:
-    def __init__(self, config: SafeFetcherConfig, file_system: FileSystem, logger: Logger, http_gateway: HttpGateway, waiter: Waiter):
+    def __init__(self, config: SafeFetcherConfig, file_system: FileSystem, logger: Logger, http_gateway: HttpGateway, waiter: Waiter) -> None:
         self._retries = config['downloader_retries']
         self._logger = logger
         self._file_system = file_system

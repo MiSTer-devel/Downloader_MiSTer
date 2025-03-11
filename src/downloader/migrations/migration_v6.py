@@ -20,12 +20,12 @@ from downloader.store_migrator import MigrationBase
 
 
 class MigrationV6(MigrationBase):
-    def __init__(self, file_system_factory):
+    def __init__(self, file_system_factory) -> None:
         self._file_system_factory = file_system_factory
 
     version = 6
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         """remove shadow masks folder because it might contain empty folders because of issue #7"""
         """DISABLED: disabled because was considered detrimental. Check git history to see previous code. It's safe to disable."""
         pass

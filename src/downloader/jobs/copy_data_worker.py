@@ -23,7 +23,7 @@ from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerCon
 
 
 class CopyDataWorker(DownloaderWorker):
-    def __init__(self, ctx: DownloaderWorkerContext):
+    def __init__(self, ctx: DownloaderWorkerContext) -> None:
         self._ctx = ctx
 
     def job_type_id(self) -> int: return CopyDataJob.type_id

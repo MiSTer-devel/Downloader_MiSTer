@@ -35,7 +35,7 @@ class FreeSpaceReservation(Protocol):
 
 
 class LinuxFreeSpaceReservation(FreeSpaceReservation):
-    def __init__(self, logger: Logger, config: Config, partitions: Optional[Dict[str, 'Partition']] = None):
+    def __init__(self, logger: Logger, config: Config, partitions: Optional[Dict[str, 'Partition']] = None) -> None:
         self._logger = logger
         self._config = config
         self._partitions: Dict[str, Partition] = partitions or {}
@@ -99,7 +99,7 @@ class UnlimitedFreeSpaceReservation(FreeSpaceReservation):
 
 
 class Partition:
-    def __init__(self, available_space: int, min_space: int, block_size: int, path: str = ""):
+    def __init__(self, available_space: int, min_space: int, block_size: int, path: str = "") -> None:
         self.path = path
         self.available_space = available_space
         self.min_space = min_space * 1024 * 1024

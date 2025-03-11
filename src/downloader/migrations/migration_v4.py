@@ -22,7 +22,7 @@ from downloader.store_migrator import MigrationBase
 class MigrationV4(MigrationBase):
     version = 4
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         """database ids to lowercase"""
 
         wrong_ids = [db_id for db_id, store in local_store['dbs'].items() if db_id.lower() != db_id]

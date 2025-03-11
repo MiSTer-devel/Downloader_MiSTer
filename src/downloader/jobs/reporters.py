@@ -33,7 +33,7 @@ from downloader.logger import Logger
 
 class DownloaderProgressReporter(ProgressReporter):
 
-    def __init__(self, logger: Logger, other_reporters: List[ProgressReporter]):
+    def __init__(self, logger: Logger, other_reporters: List[ProgressReporter]) -> None:
         self._logger = logger
         self._other_reporters = other_reporters
         self._failed_jobs: List[Job] = []
@@ -42,24 +42,24 @@ class DownloaderProgressReporter(ProgressReporter):
     def failed_jobs(self):
         return [*self._failed_jobs]
 
-    def notify_job_started(self, job: Job):
+    def notify_job_started(self, job: Job) -> None:
         pass
 
-    def notify_work_in_progress(self):
+    def notify_work_in_progress(self) -> None:
         for r in self._other_reporters:
             r.notify_work_in_progress()
 
     def notify_jobs_cancelled(self, _jobs: List[Job]) -> None:
         pass
 
-    def notify_job_completed(self, job: Job, next_jobs: List[Job]):
+    def notify_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
         pass
 
-    def notify_job_failed(self, job: Job, exception: BaseException):
+    def notify_job_failed(self, job: Job, exception: BaseException) -> None:
         self._failed_jobs.append(job)
         self._logger.debug(exception)
 
-    def notify_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
+    def notify_job_retried(self, job: Job, retry_job: Job, exception: BaseException) -> None:
         pass
 
 @dataclasses.dataclass
@@ -88,14 +88,14 @@ class JobTagTracking:
         self._initiated: set[int] = set()
         self._ended: set[int] = set()
 
-    def add_job_started(self, job: Job):
+    def add_job_started(self, job: Job) -> None:
         self._add_job_in_progress(job)
 
     def add_jobs_cancelled(self, jobs: List[Job]) -> None:
         for job in jobs:
             self._remove_job_in_progress(job)
 
-    def add_job_completed(self, job: Job, next_jobs: List[Job]):
+    def add_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
         auto_spawn = False
         for c_job in next_jobs:
             if c_job == job:
@@ -107,16 +107,16 @@ class JobTagTracking:
         if not auto_spawn:
             self._remove_job_in_progress(job)
 
-    def add_job_failed(self, job: Job):
+    def add_job_failed(self, job: Job) -> None:
         self._remove_job_in_progress(job)
 
-    def add_job_retried(self, job: Job, retry_job: Job):
+    def add_job_retried(self, job: Job, retry_job: Job) -> None:
         if job != retry_job:
             self._reset_lifecycle(retry_job)
             self._add_job_in_progress(retry_job)
             self._remove_job_in_progress(job)
 
-    def _add_job_in_progress(self, job: Job):
+    def _add_job_in_progress(self, job: Job) -> None:
         job_id = id(job)
         if job_id not in self._initiated:
             self._initiated.add(job_id)
@@ -126,7 +126,7 @@ class JobTagTracking:
         for tag in job.tags:
             self.in_progress[tag].add(job_id)
 
-    def _remove_job_in_progress(self, job: Job):
+    def _remove_job_in_progress(self, job: Job) -> None:
         job_id = id(job)
         if job_id not in self._ended:
             self._ended.add(job_id)
@@ -138,7 +138,7 @@ class JobTagTracking:
                 continue
             self.in_progress[tag].remove(job_id)
 
-    def _reset_lifecycle(self, job: Job):
+    def _reset_lifecycle(self, job: Job) -> None:
         job_id = id(job)
         if job_id in self._initiated: self._initiated.remove(job_id)
         if job_id in self._ended: self._ended.remove(job_id)
@@ -146,7 +146,7 @@ class JobTagTracking:
 T = TypeVar('T')
 class _WithLock(Generic[T]):
     __slots__ = ("data", "lock")
-    def __init__(self, data: T, lock: Optional[threading.Lock] = None):
+    def __init__(self, data: T, lock: Optional[threading.Lock] = None) -> None:
         self.data = data
         self.lock = lock or threading.Lock()
 
@@ -154,7 +154,7 @@ class _WithLock(Generic[T]):
         self.lock.acquire()
         return self.data
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.lock.release()
 
 
@@ -178,7 +178,7 @@ class InstallationReportImpl(InstallationReport):
         self._jobs_tag_completed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
         self._jobs_tag_failed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
 
-    def add_job_started(self, job: Job):
+    def add_job_started(self, job: Job) -> None:
         self._jobs_started[job.type_id].append(job)
         with self._jobs_tag_tracking as tracking: tracking.add_job_started(job)
 
@@ -186,21 +186,21 @@ class InstallationReportImpl(InstallationReport):
         for job in jobs: self._jobs_cancelled[job.type_id].append(job)
         with self._jobs_tag_tracking as tracking: tracking.add_jobs_cancelled(jobs)
 
-    def add_job_completed(self, job: Job, next_jobs: List[Job]):
+    def add_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
         self._jobs_completed[job.type_id].append(job)
         with self._jobs_tag_tracking as tracking:
             tracking.add_job_completed(job, next_jobs)
             for tag in job.tags:
                 self._jobs_tag_completed.data[tag].append(job)
 
-    def add_job_failed(self, job: Job, exception: BaseException):
+    def add_job_failed(self, job: Job, exception: BaseException) -> None:
         self._jobs_failed[job.type_id].append((job, exception))
         with self._jobs_tag_tracking as tracking:
             tracking.add_job_failed(job)
             for tag in job.tags:
                 self._jobs_tag_failed.data[tag].append(job)
 
-    def add_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
+    def add_job_retried(self, job: Job, retry_job: Job, exception: BaseException) -> None:
         self._jobs_retried[job.type_id].append((job, exception))
         with self._jobs_tag_tracking as tracking: tracking.add_job_retried(job, retry_job)
 
@@ -261,19 +261,19 @@ class InstallationReportImpl(InstallationReport):
 
 
 class FileDownloadSessionLogger(Protocol):
-    def print_progress_line(self, line: str):
+    def print_progress_line(self, line: str) -> None:
         """Prints a progress line."""
 
-    def print_pending(self):
+    def print_pending(self) -> None:
         """Prints pending progress."""
 
-    def print_header(self, db: DbEntity):
+    def print_header(self, db: DbEntity) -> None:
         """Prints a header."""
 
 
 class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
 
-    def __init__(self, logger: Logger, waiter: Waiter):
+    def __init__(self, logger: Logger, waiter: Waiter) -> None:
         self._logger = logger
         self._waiter = waiter
         self._check_time: float = 0
@@ -282,16 +282,16 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._need_clear_header: bool = False
         self._symbols: List[str] = []
 
-    def _deactivate(self):
+    def _deactivate(self) -> None:
         self._deactivated = True
 
-    def print_job_started(self, job: Job):
+    def print_job_started(self, job: Job) -> None:
         if isinstance(job, FetchFileJob) and job.db_id is not None:
             self._print_line(job.pkg.rel_path)
 
         self._check_time = time.time() + 2.0
 
-    def print_work_in_progress(self):
+    def print_work_in_progress(self) -> None:
         if self._deactivated:
             return
         now = time.time()
@@ -302,13 +302,13 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
     def print_jobs_cancelled(self, jobs: List[Job]) -> None:
         self._logger.print(f"Cancelled {len(jobs)} jobs.")
 
-    def print_job_completed(self, job: Job, _next_jobs: List[Job]):
+    def print_job_completed(self, job: Job, _next_jobs: List[Job]) -> None:
         if isinstance(job, FetchFileJob) and job.db_id is not None:
             self._symbols.append('.')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
 
-    def _print_symbols(self):
+    def _print_symbols(self) -> None:
         if len(self._symbols) == 0:
             return
 
@@ -321,24 +321,24 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._needs_newline = True
         self._check_time = time.time() + (1.0 if last_is_asterisk else 2.0)
 
-    def _print_line(self, line: str):
+    def _print_line(self, line: str) -> None:
         if self._need_clear_header: line = '\n' + line
         if self._needs_newline: line = '\n' + line
         self._logger.print(line)
         self._needs_newline = False
         self._need_clear_header = False
 
-    def print_progress_line(self, line: str):
+    def print_progress_line(self, line: str) -> None:
         self._print_line(line)
         self._check_time = time.time() + 2.0
 
-    def print_pending(self):
+    def print_pending(self) -> None:
         self._print_symbols()
         if self._needs_newline:
             self._logger.print()
             self._needs_newline = False
 
-    def print_header(self, db: DbEntity):
+    def print_header(self, db: DbEntity) -> None:
         self._print_symbols()
         first_line = '\n' if self._needs_newline else ''
         self._needs_newline = False
@@ -373,13 +373,13 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._need_clear_header = True
         self._check_time = time.time() + 2.0
 
-    def print_job_failed(self, job: Job, exception: BaseException):
+    def print_job_failed(self, job: Job, exception: BaseException) -> None:
         self._print_job_error(job, exception)
 
-    def print_job_retried(self, job: Job, _retry_job: Job, exception: BaseException):
+    def print_job_retried(self, job: Job, _retry_job: Job, exception: BaseException) -> None:
         self._print_job_error(job, exception)
 
-    def _print_job_error(self, job: Job, exception: BaseException):
+    def _print_job_error(self, job: Job, exception: BaseException) -> None:
         if isinstance(job, FetchFileJob) and job.db_id is not None:
             self._logger.debug(exception)
             self._symbols.append('~')
@@ -387,7 +387,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
 
 
 class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
-    def __init__(self, logger: Logger, waiter: Waiter, interrupts: Interruptions, report: InstallationReportImpl):
+    def __init__(self, logger: Logger, waiter: Waiter, interrupts: Interruptions, report: InstallationReportImpl) -> None:
         self._logger = logger
         self._interrupts = interrupts
         self._report = report
@@ -396,22 +396,22 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
     def session_logger(self) -> FileDownloadSessionLogger:
         return self._session_logger
 
-    def notify_job_started(self, job: Job):
+    def notify_job_started(self, job: Job) -> None:
         self._report.add_job_started(job)
         self._session_logger.print_job_started(job)
 
-    def notify_work_in_progress(self):
+    def notify_work_in_progress(self) -> None:
         self._session_logger.print_work_in_progress()
 
-    def notify_job_completed(self, job: Job, next_jobs: List[Job]):
+    def notify_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
         self._report.add_job_completed(job, next_jobs)
         self._session_logger.print_job_completed(job, next_jobs)
 
-    def notify_job_failed(self, job: Job, exception: BaseException):
+    def notify_job_failed(self, job: Job, exception: BaseException) -> None:
         self._report.add_job_failed(job, exception)
         self._session_logger.print_job_failed(job, exception)
 
-    def notify_job_retried(self, job: Job, retry_job: Job, exception: BaseException):
+    def notify_job_retried(self, job: Job, retry_job: Job, exception: BaseException) -> None:
         self._report.add_job_retried(job, retry_job, exception)
         self._session_logger.print_job_retried(job, retry_job, exception)
 
@@ -423,6 +423,6 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         except Exception as e:
             self._logger.debug(e)
 
-    def print_progress_line(self, line: str): self._session_logger.print_progress_line(line)
-    def print_pending(self): self._session_logger.print_pending()
-    def print_header(self, db: DbEntity):  self._session_logger.print_header(db)
+    def print_progress_line(self, line: str) -> None: self._session_logger.print_progress_line(line)
+    def print_pending(self) -> None: self._session_logger.print_pending()
+    def print_header(self, db: DbEntity) -> None:  self._session_logger.print_header(db)
