@@ -22,13 +22,13 @@ from downloader.store_migrator import MigrationBase
 
 
 class MigrationV5(MigrationBase):
-    def __init__(self, config, file_system_factory):
+    def __init__(self, config, file_system_factory) -> None:
         self._config = config
         self._file_system_factory = file_system_factory
 
     version = 5
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         """remove old mister from old location in case it exists"""
         try:
             mister_old = os.path.join(self._config.get('base_system_path', MEDIA_FAT), 'Scripts/.config/downloader/MiSTer.old')

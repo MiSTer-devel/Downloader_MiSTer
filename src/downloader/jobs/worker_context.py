@@ -74,5 +74,5 @@ class DownloaderWorker(Worker):
 
 
 class DownloaderWorkerBase(DownloaderWorker, ABC):
-    def __init__(self, ctx: DownloaderWorkerContext): self._ctx = ctx
+    def __init__(self, ctx: DownloaderWorkerContext) -> None: self._ctx = ctx
 

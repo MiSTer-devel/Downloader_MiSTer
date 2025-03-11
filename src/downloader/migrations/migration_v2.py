@@ -22,7 +22,7 @@ from downloader.store_migrator import MigrationBase
 class MigrationV2(MigrationBase):
     version = 2
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         """convert 'folders' from list to dict"""
 
         for db_id in local_store['dbs']:

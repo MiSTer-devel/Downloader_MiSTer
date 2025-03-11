@@ -20,11 +20,11 @@ from downloader.store_migrator import MigrationBase
 
 
 class MigrationV7(MigrationBase):
-    def __init__(self, config):
+    def __init__(self, config) -> None:
         self._config = config
 
     version = 7
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         for store in local_store['dbs'].values():
             store[K_BASE_PATH] = self._config[K_BASE_PATH]

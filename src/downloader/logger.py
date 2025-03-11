@@ -32,16 +32,16 @@ class Logger(Protocol):
 
 
 class PrintLogger(Logger):
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True) -> None:
         _do_print(*args, sep=sep, end=end, file=file, flush=flush)
 
-    def debug(self, *args, sep='', end='\n', flush=True):
+    def debug(self, *args, sep='', end='\n', flush=True) -> None:
         _do_print("DEBUG| ", *args, sep=sep, end=end, file=sys.stdout, flush=flush)
 
-    def bench(self, *args):
+    def bench(self, *args) -> None:
         _do_print(*args, sep='', end='\n', file=sys.stdout, flush=True)
 
-def _do_print(*args, sep, end, file, flush):
+def _do_print(*args, sep, end, file, flush) -> None:
     try:
         print(*args, sep=sep, end=end, file=file, flush=flush)
     except UnicodeEncodeError:
@@ -54,9 +54,9 @@ def _do_print(*args, sep, end, file, flush):
 
 
 class OffLogger(Logger):
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
-    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False): pass
-    def bench(self, *args): pass
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False) -> None: pass
+    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush=False) -> None: pass
+    def bench(self, *args) -> None: pass
 
 
 class FilelogSaver(Protocol):
@@ -105,7 +105,7 @@ class ConfigLogManager(Protocol):
     def configure(self, config: Config) -> None: pass
 
 class TopLogger(Logger, ConfigLogManager):
-    def __init__(self, print_logger: PrintLogger, file_logger: FileLogger):
+    def __init__(self, print_logger: PrintLogger, file_logger: FileLogger) -> None:
         self.print_logger = print_logger
         self.file_logger = file_logger
         self._verbose_mode = True
@@ -116,16 +116,16 @@ class TopLogger(Logger, ConfigLogManager):
     def for_main():
         return TopLogger(PrintLogger(), FileLogger())
 
-    def configure(self, config: Config):
+    def configure(self, config: Config) -> None:
         if config['verbose']:
             self._start_time = config['start_time']
         else:
             self._verbose_mode = False
 
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False):
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=False) -> None:
         self.print_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
         self.file_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
-    def debug(self, *args, sep='', end='\n', flush=False):
+    def debug(self, *args, sep='', end='\n', flush=False) -> None:
         if self._debug is False:
             return
 
@@ -133,7 +133,7 @@ class TopLogger(Logger, ConfigLogManager):
         if self._verbose_mode:
             self.print_logger.debug(*trans_args, sep=sep, end=end, flush=flush)
         self.file_logger.debug(*trans_args, sep=sep, end=end, flush=flush)
-    def bench(self, *args):
+    def bench(self, *args) -> None:
         if self._start_time is None:
             return
 
@@ -181,17 +181,17 @@ def _format_ex(e: BaseException) -> str:
 
 
 class DebugOnlyLoggerDecorator(Logger):
-    def __init__(self, decorated_logger: Logger):
+    def __init__(self, decorated_logger: Logger) -> None:
         self._decorated_logger = decorated_logger
 
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True) -> None:
         """Calls debug instead of print"""
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
 
-    def debug(self, *args, sep='', end='\n', flush=True):
+    def debug(self, *args, sep='', end='\n', flush=True) -> None:
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
 
-    def bench(self, *args):
+    def bench(self, *args) -> None:
         self._decorated_logger.bench(*args)
 
 def time_str(start_time: float) -> str:

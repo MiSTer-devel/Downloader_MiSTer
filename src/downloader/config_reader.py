@@ -36,7 +36,7 @@ from downloader.logger import Logger, time_str
 
 
 class ConfigReader:
-    def __init__(self, logger: Logger, env: Environment, start_time: float):
+    def __init__(self, logger: Logger, env: Environment, start_time: float) -> None:
         self._logger = logger
         self._env = env
         self._start_time = start_time
@@ -297,7 +297,7 @@ TOptStr = TypeVar('TOptStr', str, Optional[str])
 TOptInt = TypeVar('TOptInt', int, Optional[int])
 
 class IniParser:
-    def __init__(self, ini_args: configparser.SectionProxy):
+    def __init__(self, ini_args: configparser.SectionProxy) -> None:
         self._ini_args = ini_args
 
     def get_string(self, key: str, default: TOptStr) -> Union[str, TOptStr]:

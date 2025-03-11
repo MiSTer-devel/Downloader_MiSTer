@@ -58,8 +58,10 @@ class LocalStore(TypedDict):
 
 class LocalStoreWrapper:
     def __init__(self, local_store: dict[str, Any]):
-        if 'dbs' not in local_store: raise Exception('No dbs field in local store.')
-        if 'db_sigs' not in local_store: raise Exception('No db_sigs field in local store.')
+        if 'dbs' not in local_store:
+            local_store['dbs'] = {}
+        if 'db_sigs' not in local_store:
+            local_store['db_sigs'] = {}
         self._local_store: LocalStore = cast(LocalStore, local_store)
         self._dirty = False
 
@@ -86,7 +88,7 @@ class ReadOnlyStoreException(Exception): pass
 
 
 class StoreWrapper:
-    def __init__(self, store: Dict[str, Any], db_state_signature: DbStateSig, local_store_wrapper: LocalStoreWrapper, readonly: bool = False):
+    def __init__(self, store: Dict[str, Any], db_state_signature: DbStateSig, local_store_wrapper: LocalStoreWrapper, readonly: bool = False) -> None:
         self._external_additions: StoreFragmentPaths = {'files': defaultdict(list), 'folders': defaultdict(list)}
         if 'external' in store:
             for drive, external in store['external'].items():
@@ -171,46 +173,46 @@ class StoreWrapper:
 
 
 class WriteOnlyStoreAdapter:
-    def __init__(self, store, db_state_signature, top_wrapper, external_additions):
+    def __init__(self, store, db_state_signature, top_wrapper, external_additions) -> None:
         self._store = store
         self._db_state_signature = db_state_signature
         self._top_wrapper = top_wrapper
         self._external_additions = external_additions
 
-    def add_file_pkg(self, file_pkg: PathPackage, has_repeated_presence: bool = False):
+    def add_file_pkg(self, file_pkg: PathPackage, has_repeated_presence: bool = False) -> None:
         if file_pkg.pext_props is not None and file_pkg.is_pext_external():
             self.add_external_file(file_pkg.pext_props.drive, file_pkg.rel_path, file_pkg.description, has_repeated_presence)
         else:
             self.add_file(file_pkg.rel_path, file_pkg.description)
 
-    def remove_file_pkg(self, file_pkg: PathPackage):
+    def remove_file_pkg(self, file_pkg: PathPackage) -> None:
         if file_pkg.is_pext_external():
             self.remove_external_file(file_pkg.drive, file_pkg.rel_path)
         else:
             self.remove_local_file(file_pkg.rel_path)
 
-    def add_folder_pkg(self, folder_pkg: PathPackage):
+    def add_folder_pkg(self, folder_pkg: PathPackage) -> None:
         if folder_pkg.pext_props is not None and folder_pkg.is_pext_external():
             self.add_external_folder(folder_pkg.pext_props.drive, folder_pkg.rel_path, folder_pkg.description)
         else:
             self.add_folder(folder_pkg.rel_path, folder_pkg.description)
 
-    def remove_folder_pkg(self, folder_pkg: PathPackage):
+    def remove_folder_pkg(self, folder_pkg: PathPackage) -> None:
         if folder_pkg.is_pext_external():
             self.remove_external_folder(folder_pkg.drive, folder_pkg.rel_path)
         else:
             self.remove_local_folder(folder_pkg.rel_path)
 
-    def add_file(self, file_path, description):
+    def add_file(self, file_path, description) -> None:
         if file_path in self._external_additions['files']:
             for drive in self._external_additions['files'][file_path]:
                 self.remove_external_file(drive, file_path)
         self._add_entry('files', PathType.FILE, file_path, description)
 
-    def add_folder(self, folder, description):
+    def add_folder(self, folder, description) -> None:
         self._add_entry('folders', PathType.FOLDER, folder, description)
 
-    def _add_entry(self, kind: str, ty: PathType, path: str, description: dict[str, Any]):
+    def _add_entry(self, kind: str, ty: PathType, path: str, description: dict[str, Any]) -> None:
         self._clean_external_additions(kind, path)
 
         if 'zip_id' not in description and 'tags' in description:
@@ -222,10 +224,10 @@ class WriteOnlyStoreAdapter:
         self._store[kind][path] = description
         self._top_wrapper.mark_force_save()
 
-    def add_external_folder(self, drive, folder_path, description):
+    def add_external_folder(self, drive, folder_path, description) -> None:
         self._add_external_entry('folders', PathType.FOLDER, drive, folder_path, description)
 
-    def add_external_file(self, drive: str, file_path: str, description: dict[str, Any], has_repeated_presence: bool = False):
+    def add_external_file(self, drive: str, file_path: str, description: dict[str, Any], has_repeated_presence: bool = False) -> None:
         if file_path in self._store['files'] and not has_repeated_presence:
             self.remove_file(file_path)
         if file_path in self._external_additions['files'] and not has_repeated_presence:
@@ -235,7 +237,7 @@ class WriteOnlyStoreAdapter:
                 self.remove_external_file(d, file_path)
         self._add_external_entry('files', PathType.FILE, drive, file_path, description)
 
-    def _add_external_entry(self, kind: str, ty: PathType, drive: str, path: str, description: dict[str, Any]):
+    def _add_external_entry(self, kind: str, ty: PathType, drive: str, path: str, description: dict[str, Any]) -> None:
         external = self._external_by_drive(drive)
 
         if 'zip_id' not in description and 'tags' in description:
@@ -257,38 +259,38 @@ class WriteOnlyStoreAdapter:
 
         return self._store['external'][drive]
 
-    def remove_external_file(self, drive, file_path):
+    def remove_external_file(self, drive, file_path) -> None:
         self._remove_external_entry('files', drive, file_path)
 
-    def remove_local_file(self, file_path):
+    def remove_local_file(self, file_path) -> None:
         self._remove_local_entry('files', file_path)
 
-    def remove_local_folder(self, folder_path):
+    def remove_local_folder(self, folder_path) -> None:
         self._remove_local_entry('folders', folder_path)
 
-    def remove_external_folder(self, drive, folder_path):
+    def remove_external_folder(self, drive, folder_path) -> None:
         self._remove_external_entry('folders', drive, folder_path)
 
-    def _remove_external_entry(self, kind, drive, path):
+    def _remove_external_entry(self, kind, drive, path) -> None:
         if 'external' not in self._store or drive not in self._store['external'] or path not in self._store['external'][drive][kind]:
             return
 
         self._store['external'][drive][kind].pop(path)
         self._top_wrapper.mark_force_save()
 
-    def remove_file(self, file_path: str):
+    def remove_file(self, file_path: str) -> None:
         self._remove_entry('files', file_path)
 
-    def remove_file_from_zips(self, file_path: str):
+    def remove_file_from_zips(self, file_path: str) -> None:
         self._remove_entry_from_zips('files', file_path)
 
-    def remove_local_folder_from_zips(self, folder_path: str):
+    def remove_local_folder_from_zips(self, folder_path: str) -> None:
         self._remove_local_entry_from_zips('folders', folder_path)
 
-    def remove_external_folder_from_zips(self, drive: str, folder_path: str):
+    def remove_external_folder_from_zips(self, drive: str, folder_path: str) -> None:
         self._remove_external_entry_from_zips('folders', drive, folder_path)
 
-    def _clean_external_additions(self, kind, path):
+    def _clean_external_additions(self, kind, path) -> None:
         if path in self._external_additions[kind]:
             self._external_additions[kind].pop(path)
 
@@ -303,18 +305,18 @@ class WriteOnlyStoreAdapter:
 
         if changed: self._top_wrapper.mark_force_save()
 
-    def _remove_entry(self, kind, path):
+    def _remove_entry(self, kind, path) -> None:
         #self._clean_external_additions(kind, path)
         self._remove_local_entry(kind, path)
 
-    def _remove_local_entry(self, kind, path):
+    def _remove_local_entry(self, kind, path) -> None:
         if path not in self._store[kind]:
             return
 
         self._store[kind].pop(path)
         self._top_wrapper.mark_force_save()
 
-    def _remove_entry_from_zips(self, kind: str, path: str):
+    def _remove_entry_from_zips(self, kind: str, path: str) -> None:
         if 'zips' not in self._store:
             return
 
@@ -324,7 +326,7 @@ class WriteOnlyStoreAdapter:
                 zip_description[kind].pop(path)
                 self._top_wrapper.mark_force_save()
 
-    def _remove_local_entry_from_zips(self, kind: str, path: str):
+    def _remove_local_entry_from_zips(self, kind: str, path: str) -> None:
         if 'zips' not in self._store:
             return
 
@@ -333,7 +335,7 @@ class WriteOnlyStoreAdapter:
                 zip_description[kind].pop(path)
                 self._top_wrapper.mark_force_save()
 
-    def _remove_external_entry_from_zips(self, kind: str, drive: str, path: str):
+    def _remove_external_entry_from_zips(self, kind: str, drive: str, path: str) -> None:
         if 'zips' not in self._store:
             return
 
@@ -351,7 +353,7 @@ class WriteOnlyStoreAdapter:
                 zip_description[kind].pop(path)
                 self._top_wrapper.mark_force_save()
 
-    def set_base_path(self, base_path):
+    def set_base_path(self, base_path) -> None:
         if K_BASE_PATH in self._store and self._store[K_BASE_PATH] == base_path:
             return
 
@@ -360,7 +362,7 @@ class WriteOnlyStoreAdapter:
 
         self._store[K_BASE_PATH] = base_path
 
-    def set_db_state_signature(self, transfer_hash: str, transfer_size: int, timestamp: int, filter: str):
+    def set_db_state_signature(self, transfer_hash: str, transfer_size: int, timestamp: int, filter: str) -> None:
         if self._db_state_signature['hash'] != transfer_hash:
             self._db_state_signature['hash'] = transfer_hash
             self._top_wrapper.mark_force_save()
@@ -378,10 +380,10 @@ class WriteOnlyStoreAdapter:
             self._top_wrapper.mark_force_save()
 
 
-    def remove_zip_id(self, zip_id):
+    def remove_zip_id(self, zip_id) -> None:
         self.remove_zip_ids([zip_id])
 
-    def remove_zip_ids(self, removed_zip_ids):
+    def remove_zip_ids(self, removed_zip_ids) -> None:
         if not len(removed_zip_ids):
             return
 
@@ -401,14 +403,14 @@ class WriteOnlyStoreAdapter:
 
         self._top_wrapper.mark_force_save()
 
-    def cleanup_externals(self):
+    def cleanup_externals(self) -> None:
         if 'external' in self._store:
             for drive in list(self._store['external']):
                 self.try_cleanup_drive(drive)
 
             self.try_cleanup_externals()
 
-    def try_cleanup_drive(self, drive):
+    def try_cleanup_drive(self, drive) -> None:
         external = self._external_by_drive(drive)
 
         if 'files' in external and 'folders' not in external:
@@ -428,7 +430,7 @@ class WriteOnlyStoreAdapter:
             del self._store['external'][drive]
             self._top_wrapper.mark_force_save()
 
-    def try_cleanup_externals(self):
+    def try_cleanup_externals(self) -> None:
         for file_path in self._external_additions['files']:
             if file_path in self._store['files']:
                 self._store['files'].pop(file_path)
@@ -454,14 +456,14 @@ class WriteOnlyStoreAdapter:
             self._top_wrapper.mark_force_save()
 
     @staticmethod
-    def _remove_non_zip_fields(descriptions, removed_zip_ids):
+    def _remove_non_zip_fields(descriptions, removed_zip_ids) -> None:
         for description in descriptions:
             if 'zip_id' in description and description['zip_id'] in removed_zip_ids:
                 description.pop('zip_id')
                 if 'tags' in description:
                     description.pop('tags')
 
-    def save_filtered_zip_data(self, filtered_zip_data):
+    def save_filtered_zip_data(self, filtered_zip_data) -> None:
         for zip_id in list(filtered_zip_data):
             data = filtered_zip_data[zip_id]
             empty_files = 'files' not in data or len(data['files']) == 0
@@ -480,7 +482,7 @@ class WriteOnlyStoreAdapter:
 
             self._top_wrapper.mark_force_save()
 
-    def add_zip_summary(self, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]):
+    def add_zip_summary(self, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]) -> None:
         if zip_id in self._store['zips']:
             if not are_zip_descriptions_equal(self._store['zips'][zip_id], description):
                 self._store['zips'][zip_id] = description
@@ -503,7 +505,7 @@ class WriteOnlyStoreAdapter:
                 self.add_external_folder(drive, folder_path, folder_description)
 
 class ReadOnlyStoreAdapter:
-    def __init__(self, store, db_state_signature):
+    def __init__(self, store, db_state_signature) -> None:
         self._store = store
         self._db_state_signature = db_state_signature
 

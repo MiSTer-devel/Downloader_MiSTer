@@ -27,7 +27,7 @@ from typing import Optional, Any
 
 
 class FetchDataWorker(DownloaderWorker):
-    def __init__(self, progress_reporter: ProgressReporter, http_gateway: HttpGateway, file_system: FileSystem, timeout: int):
+    def __init__(self, progress_reporter: ProgressReporter, http_gateway: HttpGateway, file_system: FileSystem, timeout: int) -> None:
         self._progress_reporter = progress_reporter
         self._http_gateway = http_gateway
         self._file_system = file_system

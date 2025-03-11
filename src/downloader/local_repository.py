@@ -79,7 +79,7 @@ class LocalRepository(FilelogSaver):
                 self._logfile_path_value = os.path.join(self._config['base_system_path'], FILE_downloader_log % self._config['config_path'].stem)
         return self._logfile_path_value
 
-    def set_logfile_path(self, value):
+    def set_logfile_path(self, value) -> None:
         self._logfile_path_value = value
 
     def ensure_base_paths(self) -> None:
@@ -190,7 +190,7 @@ class LocalRepository(FilelogSaver):
         finally:
             self._logger.bench('Save store end.')
 
-    def save_log_from_tmp(self, path):
+    def save_log_from_tmp(self, path) -> None:
         self._file_system.turn_off_logs()
         self._file_system.make_dirs_parent(self.logfile_path)
         self._file_system.copy(path, self.logfile_path)

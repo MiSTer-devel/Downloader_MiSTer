@@ -129,7 +129,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             return None, None
         else: raise ValueError(f"Impossible kind '{kind}'")
 
-    def _fill_fragment_with_zip_index(self, fragment: StoreFragmentDrivePaths, job: ProcessZipIndexJob):
+    def _fill_fragment_with_zip_index(self, fragment: StoreFragmentDrivePaths, job: ProcessZipIndexJob) -> None:
         path = None
         if 'target_folder_path' in job.zip_description:
             path = job.zip_description['target_folder_path']

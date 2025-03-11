@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 
 
 class StoreMigrator:
-    def __init__(self, migration_list, logger):
+    def __init__(self, migration_list, logger) -> None:
         self._migrations = migration_list
         self._logger = logger
 
@@ -66,5 +66,5 @@ class MigrationBase(ABC):
     def version(self):
         """Version of the migration object"""
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         """Migrate the local store"""

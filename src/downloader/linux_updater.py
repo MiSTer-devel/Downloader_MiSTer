@@ -31,7 +31,7 @@ from downloader.logger import Logger
 
 
 class LinuxUpdater:
-    def __init__(self, logger: Logger, config: Config, file_system: FileSystem, fetcher: SafeFileFetcher):
+    def __init__(self, logger: Logger, config: Config, file_system: FileSystem, fetcher: SafeFileFetcher) -> None:
         self._config = config
         self._logger = logger
         self._file_system = file_system
@@ -39,7 +39,7 @@ class LinuxUpdater:
         self._linux_descriptions: list[dict[str, Any]] = []
         self._user_files: list[tuple[str, str]] = []
 
-    def update_linux(self, dbs: List[DbEntity]):
+    def update_linux(self, dbs: List[DbEntity]) -> None:
         self._logger.bench('Update Linux start.')
         self._update_linux_impl(dbs)
         self._logger.bench('Update Linux done.')

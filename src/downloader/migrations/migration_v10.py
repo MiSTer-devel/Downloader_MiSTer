@@ -21,5 +21,5 @@ from downloader.store_migrator import MigrationBase
 class MigrationV10(MigrationBase):
     version = 10
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         local_store['db_sigs'] = {}

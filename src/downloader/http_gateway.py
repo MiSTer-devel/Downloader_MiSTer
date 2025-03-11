@@ -36,7 +36,7 @@ class HttpLogger(Protocol):
 
 
 class HttpGateway:
-    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: float, logger: Optional[HttpLogger] = None):
+    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: float, logger: Optional[HttpLogger] = None) -> None:
         now = time.monotonic()
         self._ssl_ctx = ssl_ctx
         self._timeout = timeout
@@ -244,7 +244,7 @@ _default_headers = {'Connection': 'keep-alive', 'Keep-Alive': 'timeout=120'}
 _QueueId = Tuple[str, str]
 
 class _Redirect(Generic[T]):
-    def __init__(self, target: T, timeout: float):
+    def __init__(self, target: T, timeout: float) -> None:
         self.target = target
         self.timeout = timeout
 
@@ -266,7 +266,7 @@ def _redirect(input_arg: T, res_dict: Dict[T, _Redirect[T]], lock: threading.Loc
 
 
 class _Connection:
-    def __init__(self, conn_id: int, http: HTTPConnection, connection_queue: '_ConnectionQueue', logger: Optional[HttpLogger]):
+    def __init__(self, conn_id: int, http: HTTPConnection, connection_queue: '_ConnectionQueue', logger: Optional[HttpLogger]) -> None:
         self.id = conn_id
         self._http = http
         self._connection_queue = connection_queue
@@ -305,7 +305,7 @@ class _Connection:
     def response_headers(self) -> '_ResponseHeaders':
         return self._response_headers
 
-    def finish_response(self):
+    def finish_response(self) -> None:
         if self._close_response() and self._uses < self._max_uses:
             self._connection_queue.push(self)
 
@@ -325,7 +325,7 @@ class _Connection:
             f'{self.response.headers}'
         )
 
-    def _handle_keep_alive(self):
+    def _handle_keep_alive(self) -> None:
         if not self._response_headers.is_keep_alive_connection():
             if self._logger is not None: self._logger.debug(f'Keep-Alive off')
             self._max_uses = 0
@@ -340,7 +340,7 @@ class _FinishedResponse: pass
 
 
 class _ConnectionQueue:
-    def __init__(self, queue_id: _QueueId, timeout: float, ctx: ssl.SSLContext, logger: Optional[HttpLogger]):
+    def __init__(self, queue_id: _QueueId, timeout: float, ctx: ssl.SSLContext, logger: Optional[HttpLogger]) -> None:
         self.id = queue_id
         self._timeout = timeout
         self._ctx = ctx
@@ -395,7 +395,7 @@ def create_http_connection(scheme: str, netloc: str, timeout: float, ctx: ssl.SS
 
 
 class _ResponseHeaders:
-    def __init__(self, logger: Optional[HttpLogger]):
+    def __init__(self, logger: Optional[HttpLogger]) -> None:
         self._logger = logger
         self._headers: Dict[str, str] = {}
         self._version = 11
@@ -463,7 +463,7 @@ _used_headers = {'location', 'cache-control', 'age', 'expires', 'connection', 'k
 
 
 class _ParamsParser:
-    def __init__(self, logger: Optional[HttpLogger]):
+    def __init__(self, logger: Optional[HttpLogger]) -> None:
         self._logger = logger
         self._data: Dict[str, Union[bool, str, None]] = dict()
 

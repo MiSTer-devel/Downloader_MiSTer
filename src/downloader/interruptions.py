@@ -22,10 +22,10 @@ from downloader.http_gateway import HttpGateway
 
 
 class Interruptions:
-    def __init__(self, fs: Optional[FileSystemFactory] = None, gw: Optional[HttpGateway] = None):
+    def __init__(self, fs: Optional[FileSystemFactory] = None, gw: Optional[HttpGateway] = None) -> None:
         self._fs = fs
         self._gw = gw
 
-    def interrupt(self):
+    def interrupt(self) -> None:
         if self._fs: self._fs.cancel_ongoing_operations()
         if self._gw: self._gw.cleanup()

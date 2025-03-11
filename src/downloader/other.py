@@ -150,9 +150,9 @@ def _cached_method(func):
 
 
 class ClosableValue:
-    def __init__(self, value, callback):
+    def __init__(self, value, callback) -> None:
         self.value = value
         self._callback = callback
 
-    def close(self):
+    def close(self) -> None:
         self._callback()

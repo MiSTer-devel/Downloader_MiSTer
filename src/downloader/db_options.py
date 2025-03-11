@@ -63,7 +63,7 @@ class DbOptions:
 
 
 class DbOptionsValidationException(Exception):
-    def __init__(self, fields):
+    def __init__(self, fields) -> None:
         self.fields = fields
 
     def fields_to_string(self):

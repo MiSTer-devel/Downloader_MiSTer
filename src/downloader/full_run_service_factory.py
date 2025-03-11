@@ -48,7 +48,7 @@ import atexit
 
 
 class FullRunServiceFactory:
-    def __init__(self, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, external_drives_repository_factory=None):
+    def __init__(self, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, external_drives_repository_factory=None) -> None:
         self._logger = logger
         self._filelog_manager = filelog_manager
         self._printlog_manager = printlog_manager

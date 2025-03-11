@@ -27,7 +27,7 @@ from downloader.waiter import Waiter
 
 
 class BasePathRelocator:
-    def __init__(self, config: Config, file_system_factory: FileSystemFactory, waiter: Waiter, logger: Logger):
+    def __init__(self, config: Config, file_system_factory: FileSystemFactory, waiter: Waiter, logger: Logger) -> None:
         self._config = config
         self._file_system_factory = file_system_factory
         self._waiter = waiter
@@ -71,7 +71,7 @@ class BasePathRelocator:
 
 
 class BasePathRelocatorPackage:
-    def __init__(self, store: StoreWrapper, config: Config, from_file_system: FileSystem, to_file_system: FileSystem, logger: Logger, waiter: Waiter, db_id: str):
+    def __init__(self, store: StoreWrapper, config: Config, from_file_system: FileSystem, to_file_system: FileSystem, logger: Logger, waiter: Waiter, db_id: str) -> None:
         self._store = store
         self._config = config
         self._from_file_system = from_file_system

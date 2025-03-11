@@ -21,5 +21,5 @@ from downloader.store_migrator import MigrationBase
 class MigrationV9(MigrationBase):
     version = 9
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         local_store['internal'] = True

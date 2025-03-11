@@ -20,16 +20,16 @@ from abc import ABC
 
 
 class OsUtils(ABC):
-    def sync(self):
+    def sync(self) -> None:
         """send sync signal to the OS"""
 
-    def reboot(self):
+    def reboot(self) -> None:
         """send reboot signal to the OS"""
 
 
 class LinuxOsUtils(OsUtils):
-    def sync(self):
+    def sync(self) -> None:
         subprocess.run(['sync'], shell=False, stderr=subprocess.STDOUT)
 
-    def reboot(self):
+    def reboot(self) -> None:
         subprocess.run(['reboot', 'now'], shell=False, stderr=subprocess.STDOUT)

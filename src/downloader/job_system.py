@@ -58,7 +58,7 @@ class JobSystem(JobContext):
         JobSystem._next_job_type_id += 1
         return JobSystem._next_job_type_id
 
-    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', max_threads: int = 6, max_tries: int = 3, wait_time: float = 0.25, max_cycle: int = 3, max_timeout: float = 300, fail_policy: JobFailPolicy = JobFailPolicy.FAULT_TOLERANT):
+    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', max_threads: int = 6, max_tries: int = 3, wait_time: float = 0.25, max_cycle: int = 3, max_timeout: float = 300, fail_policy: JobFailPolicy = JobFailPolicy.FAULT_TOLERANT) -> None:
         self._reporter: ProgressReporter = reporter
         self._logger: JobSystemLogger = logger
         self._max_threads: int = max_threads
@@ -335,7 +335,7 @@ class JobSystem(JobContext):
                 self._add_unhandled_exception(e, package=package, ctx='cancel-futures')
                 self._record_job_failed(package, _wrap_unknown_base_error(e))
 
-    def _handle_raised_exception(self, package: '_JobPackage', e: BaseException):
+    def _handle_raised_exception(self, package: '_JobPackage', e: BaseException) -> None:
         self._add_unhandled_exception(e, package, ctx='handle-raised-exception')
 
         if isinstance(e, JobSystemAbortException):
@@ -552,8 +552,8 @@ class CantWaitWhenTimedOut(JobSystemAbortException): pass
 class CycleDetectedException(JobSystemAbortException): pass
 
 class JobSystemLogger(Protocol):
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True): """Prints a message to the logger."""
-    def debug(self, *args, sep='', end='\n', flush=True): """Prints a debug message to the logger."""
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True) -> None: """Prints a message to the logger."""
+    def debug(self, *args, sep='', end='\n', flush=True) -> None: """Prints a debug message to the logger."""
 
 
 @dataclass(eq=False, order=False)
@@ -570,7 +570,7 @@ class _JobPackage:
     def __str__(self): return f'JobPackage(job_type_id={self.job.type_id}, job_class={self.job.__class__.__name__}, tries={self.tries})'
 
 class _JobError(Exception):
-    def __init__(self, child: Exception):
+    def __init__(self, child: Exception) -> None:
         super().__init__(child)
         self.child = child
         self.__cause__ = child

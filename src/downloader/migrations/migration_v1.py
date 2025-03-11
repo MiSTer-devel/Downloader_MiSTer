@@ -22,7 +22,7 @@ from downloader.store_migrator import MigrationBase
 class MigrationV1(MigrationBase):
     version = 1
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         """create 'dbs' field"""
 
         db_ids = list(local_store.keys())
