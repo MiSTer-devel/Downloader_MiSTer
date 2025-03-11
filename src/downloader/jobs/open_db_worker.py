@@ -54,8 +54,8 @@ class OpenDbWorker(DownloaderWorkerBase):
 
     def _open_db(self, section: str, source: str, transfer: Any, /) -> DbEntity:
         self._ctx.logger.bench('OpenDbWorker Loading database: ', section)
-        db_raw = self._ctx.file_system.load_dict_from_transfer(source, transfer)
+        db_props = self._ctx.file_system.load_dict_from_transfer(source, transfer)
         self._ctx.logger.bench('OpenDbWorker Validating database: ', section)
-        db_entity = DbEntity(db_raw, section)
+        db_entity = DbEntity(db_props, section)
         self._ctx.logger.bench('OpenDbWorker end: ', section)
         return db_entity
