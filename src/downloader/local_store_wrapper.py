@@ -32,6 +32,9 @@ class StoreFragmentPaths(TypedDict):
     files: Dict[str, Any]
     folders: Dict[str, Any]
 
+class StoreFragmentZipSummary(StoreFragmentPaths, total=False):
+    hash: str
+
 def new_store_fragment_paths() -> StoreFragmentPaths: return {"files": dict(), "folders": dict()}
 
 
@@ -49,12 +52,16 @@ class DbStateSig(TypedDict):
 
 def empty_db_state_signature() -> DbStateSig: return {'hash': DB_STATE_SIGNATURE_NO_HASH, 'size': DB_STATE_SIGNATURE_NO_SIZE, 'timestamp': DB_STATE_SIGNATURE_NO_TIMESTAMP, 'filter': DB_STATE_SIGNATURE_NO_FILTER}
 
+class LocalStore(TypedDict):
+    dbs: dict[str, Any]
+    db_sigs: dict[str, Any]
+
 class LocalStoreWrapper:
-    def __init__(self, local_store: Dict[str, Any]):
+    def __init__(self, local_store: LocalStore):
         self._local_store = local_store
         self._dirty = False
 
-    def unwrap_local_store(self) -> Dict[str, Any]:
+    def unwrap_local_store(self) -> LocalStore:
         return self._local_store
 
     def mark_force_save(self) -> None:
@@ -78,7 +85,7 @@ class ReadOnlyStoreException(Exception): pass
 
 class StoreWrapper:
     def __init__(self, store: Dict[str, Any], db_state_signature: DbStateSig, local_store_wrapper: LocalStoreWrapper, readonly: bool = False):
-        self._external_additions = {'files': defaultdict(list), 'folders': defaultdict(list)}
+        self._external_additions: StoreFragmentPaths = {'files': defaultdict(list), 'folders': defaultdict(list)}
         if 'external' in store:
             for drive, external in store['external'].items():
                 if 'files' in external:
@@ -169,7 +176,7 @@ class WriteOnlyStoreAdapter:
         self._external_additions = external_additions
 
     def add_file_pkg(self, file_pkg: PathPackage, has_repeated_presence: bool = False):
-        if file_pkg.is_pext_external():
+        if file_pkg.pext_props is not None and file_pkg.is_pext_external():
             self.add_external_file(file_pkg.pext_props.drive, file_pkg.rel_path, file_pkg.description, has_repeated_presence)
         else:
             self.add_file(file_pkg.rel_path, file_pkg.description)
@@ -181,7 +188,7 @@ class WriteOnlyStoreAdapter:
             self.remove_local_file(file_pkg.rel_path)
 
     def add_folder_pkg(self, folder_pkg: PathPackage):
-        if folder_pkg.is_pext_external():
+        if folder_pkg.pext_props is not None and folder_pkg.is_pext_external():
             self.add_external_folder(folder_pkg.pext_props.drive, folder_pkg.rel_path, folder_pkg.description)
         else:
             self.add_folder(folder_pkg.rel_path, folder_pkg.description)
@@ -216,7 +223,7 @@ class WriteOnlyStoreAdapter:
     def add_external_folder(self, drive, folder_path, description):
         self._add_external_entry('folders', PathType.FOLDER, drive, folder_path, description)
 
-    def add_external_file(self, drive, file_path, description, has_repeated_presence: bool = False):
+    def add_external_file(self, drive: str, file_path: str, description: dict[str, Any], has_repeated_presence: bool = False):
         if file_path in self._store['files'] and not has_repeated_presence:
             self.remove_file(file_path)
         if file_path in self._external_additions['files'] and not has_repeated_presence:
@@ -512,7 +519,7 @@ class ReadOnlyStoreAdapter:
         ]
 
     def zip_summaries(self) -> dict[str, Any]:
-        grouped = defaultdict(lambda: {'files': {}, 'folders': {}})
+        grouped: dict[str, StoreFragmentZipSummary] = defaultdict(lambda: {'files': {}, 'folders': {}})
 
         # @TODO: This if startswith('games') should be removed when we store all the zip information on the store
         #        Explicit asking for games is a hack, as this should only be declared in the database information. Remove ASAP

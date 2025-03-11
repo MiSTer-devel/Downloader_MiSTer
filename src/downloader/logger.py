@@ -109,7 +109,7 @@ class TopLogger(Logger, ConfigLogManager):
         self.file_logger = file_logger
         self._verbose_mode = True
         self._debug = True
-        self._start_time = None
+        self._start_time: Optional[float] = None
 
     @staticmethod
     def for_main():
@@ -169,7 +169,7 @@ def _transform_debug_args(args: List[Any]) -> List[str]:
             rest_args.append(str(a))
     return [*rest_args, *exception_msgs]
 
-def _format_ex(e: Exception) -> str:
+def _format_ex(e: BaseException) -> str:
     exception_msg = ''.join(traceback.TracebackException.from_exception(e).format())
     padding = ' ' * 4
     while e.__cause__ is not None:

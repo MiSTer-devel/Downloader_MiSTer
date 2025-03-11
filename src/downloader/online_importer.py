@@ -33,6 +33,7 @@ from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.jobs_factory import make_transfer_job
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
+from downloader.jobs.reporters import InstallationReport
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 from downloader.jobs.workers_factory import make_workers
 from downloader.logger import Logger
@@ -95,7 +96,7 @@ class OnlineImporter:
         logger.bench('OnlineImporter execute jobs done.')
 
         box = self._box
-        report = self._worker_ctx.file_download_session_logger.report()
+        report: InstallationReport = self._worker_ctx.installation_report
 
         box.set_unused_filter_tags(self._worker_ctx.file_filter_factory.unused_filter_parts())
 

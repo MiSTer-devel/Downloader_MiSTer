@@ -178,7 +178,7 @@ class JobSystem(JobContext):
 
     def _execute_with_threads(self, max_threads: int) -> None:
         with self._temporary_signal_handlers(), ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
-            futures = []
+            futures: list[Tuple['_JobPackage', Future[None]]] = []
             while (self._pending_jobs_amount > 0 or futures) and self._are_jobs_cancelled is False:
                 package = self._job_queue.popleft() if self._job_queue else None
                 if package is not None:
@@ -316,7 +316,7 @@ class JobSystem(JobContext):
         else:
             self._record_job_failed(package, e)
 
-    def _remove_done_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> List[Tuple['_JobPackage', Future[None]]]:
+    def _remove_done_futures(self, futures: list[Tuple['_JobPackage', Future[None]]]) -> list[Tuple['_JobPackage', Future[None]]]:
         still_pending = []
         for package, future in futures:
             if future.done():
@@ -327,7 +327,7 @@ class JobSystem(JobContext):
                 still_pending.append((package, future))
         return still_pending
 
-    def _cancel_futures(self, futures: List[Tuple['_JobPackage', Future[None]]]) -> None:
+    def _cancel_futures(self, futures: list[Tuple['_JobPackage', Future[None]]]) -> None:
         for package, future in futures:
             if future.cancel():
                 self._jobs_cancelled.append(package.job)
@@ -394,7 +394,7 @@ class JobSystem(JobContext):
         self._are_jobs_cancelled = True
         self._logger.print(f'WARNING! Jobs timeout reached after {self._max_timeout} seconds!')
 
-    def _assert_there_are_no_cycles(self, package: '_JobPackage') -> Optional['CycleDetectedException']:
+    def _assert_there_are_no_cycles(self, package: '_JobPackage') -> bool:
         parent_package = package.parent
         if parent_package is None: return True
 

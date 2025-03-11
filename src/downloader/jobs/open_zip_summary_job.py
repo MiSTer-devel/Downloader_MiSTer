@@ -19,7 +19,7 @@
 from dataclasses import field, dataclass
 from typing import Dict, Any, Optional
 
-from downloader.config import Config
+from downloader.config import Config, ConfigDatabaseSection
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
@@ -34,15 +34,15 @@ class OpenZipSummaryJob(Job):
     db: DbEntity
     store: StoreWrapper
     zip_id: str
-    ini_description: Dict[str, Any]
+    ini_description: ConfigDatabaseSection
     zip_description: Dict[str, Any]
     full_resync: bool
     config: Config
     transfer_job: TransferJob # Job & Transferrer  @TODO: Python 3.10
-    backup: ProcessZipIndexJob
+    backup: Optional[ProcessZipIndexJob]
 
     def retry_job(self) -> Optional[Job]:
-        return self.transfer_job
+        return self.transfer_job  # type: ignore[return-value]
 
     def backup_job(self) -> Optional[Job]:
         return self.backup

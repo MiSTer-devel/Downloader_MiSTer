@@ -249,11 +249,11 @@ class InstallationReportImpl(InstallationReport):
 
         return non_already_present
 
-    def get_started_jobs    (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_started   [job_class.type_id]
-    def get_completed_jobs  (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_completed [job_class.type_id]
-    def get_failed_jobs     (self, job_class: Type[TJob]) -> List[Tuple[TJob, BaseException]]:  return self._jobs_failed    [job_class.type_id]
-    def get_retried_jobs    (self, job_class: Type[TJob]) -> List[Tuple[TJob, BaseException]]:  return self._jobs_retried   [job_class.type_id]
-    def get_cancelled_jobs  (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_cancelled [job_class.type_id]
+    def get_started_jobs    (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_started   [job_class.type_id]  # type: ignore[return-value, index]
+    def get_completed_jobs  (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_completed [job_class.type_id]  # type: ignore[return-value, index]
+    def get_failed_jobs     (self, job_class: Type[TJob]) -> List[Tuple[TJob, BaseException]]:  return self._jobs_failed    [job_class.type_id]  # type: ignore[return-value, index]
+    def get_retried_jobs    (self, job_class: Type[TJob]) -> List[Tuple[TJob, BaseException]]:  return self._jobs_retried   [job_class.type_id]  # type: ignore[return-value, index]
+    def get_cancelled_jobs  (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_cancelled [job_class.type_id]  # type: ignore[return-value, index]
 
     # All the rest are Non-thread-safe: Should only be used after threads are out
     def processed_folder(self, path: str) -> Dict[str, PathPackage]: return self._processed_folders.data[path]
@@ -272,9 +272,6 @@ class FileDownloadSessionLogger(Protocol):
 
     def print_header(self, db: DbEntity):
         """Prints a header."""
-
-    def report(self) -> InstallationReport:
-        """Returns the report."""
 
 
 class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
@@ -330,14 +327,14 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._needs_newline = True
         self._check_time = time.time() + (1.0 if last_is_asterisk else 2.0)
 
-    def _print_line(self, line):
+    def _print_line(self, line: str):
         if self._need_clear_header: line = '\n' + line
         if self._needs_newline: line = '\n' + line
         self._logger.print(line)
         self._needs_newline = False
         self._need_clear_header = False
 
-    def print_progress_line(self, line):
+    def print_progress_line(self, line: str):
         self._print_line(line)
         self._check_time = time.time() + 2.0
 
@@ -404,9 +401,6 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
 
     def session_logger(self) -> FileDownloadSessionLogger:
         return self._session_logger
-
-    def report(self) -> InstallationReport:
-        return self._report
 
     def notify_job_started(self, job: Job):
         self._report.add_job_started(job)

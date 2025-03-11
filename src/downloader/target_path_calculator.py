@@ -113,7 +113,7 @@ class TargetPathsCalculator:
 
         return result_pkgs, errors
 
-    def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> Tuple[Optional[Tuple[str, PextPathProps]], Optional['StoragePriorityError']]:
+    def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> Tuple[Tuple[str, PextPathProps], Optional['StoragePriorityError']]:
         path_obj = Path(path)
         parts_len = len(path_obj.parts)
         if path_type == PATH_TYPE_FOLDER and parts_len <= 1:
@@ -125,7 +125,7 @@ class TargetPathsCalculator:
                 False  # is_subfolder
             )), None
         elif path_type == PATH_TYPE_FILE and parts_len <= 2:
-            return None, StoragePriorityError(f"File Path '|{path}' is incorrect, please contact the database maintainer.")
+            return ('', PextPathProps(PEXT_KIND_PARENT, '', '', (), False)), StoragePriorityError(f"File Path '|{path}' is incorrect, please contact the database maintainer.")
         else:
             return self._deduce_external_target_path_from_priority(source_path=path, path_obj=path_obj), None
 
@@ -183,8 +183,8 @@ class TargetPathsCalculator:
             raise StoragePriorityError('%s "%s" not valid!' % (K_STORAGE_PRIORITY, priority))
 
     def _first_drive_with_existing_directory_prefer_sd(self, directory: str) -> Tuple[Optional[str], Tuple[str, ...]]:
-        result = None
-        others = None
+        result: Optional[str] = None
+        others: Optional[list[str]] = None
         for drive in self._drives:
             absolute_directory = os.path.join(drive, directory)
             if self._file_system.is_folder(absolute_directory):

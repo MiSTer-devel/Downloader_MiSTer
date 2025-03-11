@@ -149,13 +149,6 @@ class ConfigReader:
                 self._abort_pc_launcher_wrong_paths('base', 'base_system_path', 'MiSTer')
 
             result['base_system_path'] = str(launcher_path.parent)
-            for section, db in result['databases'].items():
-                if K_OPTIONS in db and K_BASE_PATH in db['options'].unwrap_props():
-                    section_props = db['options'].unwrap_props()
-                    if section_props[K_BASE_PATH] != default_values['base_path']:
-                        self._abort_pc_launcher_wrong_paths('base', 'base_path', section)
-
-                    section_props[K_BASE_PATH] = str(launcher_path.parent)
 
             if result['storage_priority'] != default_values['storage_priority'] and result['storage_priority'] != 'off':
                 self._abort_pc_launcher_wrong_paths('external', 'storage_priority', 'MiSTer')
@@ -224,7 +217,7 @@ class ConfigReader:
         if parser.has(K_DOWNLOADER_RETRIES):
             self._logger.print(f"WARNING! Ignored option for section [{section_id}]: Since Downloader 2.0 '{K_DOWNLOADER_RETRIES} = {parser.get_string(K_DOWNLOADER_RETRIES, '?')}' is no longer a valid option within this block.")
         if parser.has(K_FILTER):
-            options['filter'] = parser.get_string(K_FILTER, None)
+            options['filter'] = parser.get_string(K_FILTER, '')
 
         try:
             return DbOptions(options)

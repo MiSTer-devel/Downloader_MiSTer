@@ -260,19 +260,19 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
             continue
 
         processing_folders.append(pkg)
-        if pkg.kind != PATH_PACKAGE_KIND_PEXT:
+        if pkg.kind != PATH_PACKAGE_KIND_PEXT or pkg.pext_props is None:
             continue
 
         pkg_parent = pkg.pext_props.parent
         if pkg_parent not in parent_pkgs or pkg.drive in parent_drives:
             continue
 
-        parent_drives[pkg_parent].add(pkg.drive)
+        parent_drives[pkg_parent].add(pkg.drive or pkg_parent)
         parent_pkg = parent_pkgs[pkg_parent].clone()
         parent_pkg.drive = pkg.drive
-        parent_pkg.pext_props.kind = pkg.pext_props.kind
-        parent_pkg.pext_props.drive = pkg.pext_props.drive
-        parent_pkg.pext_props.parent = ''
+        parent_pkg.pext_props.kind = pkg.pext_props.kind  # type: ignore[union-attr]
+        parent_pkg.pext_props.drive = pkg.pext_props.drive  # type: ignore[union-attr]
+        parent_pkg.pext_props.parent = ''  # type: ignore[union-attr]
         processing_folders.append(parent_pkg)
 
     for pkg in processing_folders:
@@ -284,8 +284,8 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
             if is_external:
                 removed_pkg = pkg.clone_as_pext()
                 removed_pkg.drive = other_drive
-                removed_pkg.pext_props.drive = other_drive
-                removed_pkg.pext_props.kind = PEXT_KIND_EXTERNAL
+                removed_pkg.pext_props.drive = other_drive  # type: ignore[union-attr]
+                removed_pkg.pext_props.kind = PEXT_KIND_EXTERNAL  # type: ignore[union-attr]
             else:
                 removed_pkg = pkg.clone()
                 removed_pkg.drive = other_drive
@@ -334,7 +334,7 @@ def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_
         return None
 
     parent_folder = pkg.parent
-    if parent_folder:
+    if parent_folder and pkg.drive is not None:
         parent_full_path = pkg.drive + '/' + parent_folder
         if parent_full_path not in created_folders:
             ctx.file_system.make_dirs(parent_full_path)

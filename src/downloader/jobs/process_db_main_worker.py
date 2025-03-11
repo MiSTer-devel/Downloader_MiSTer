@@ -100,7 +100,7 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
         return next_jobs, None
 
 
-def _make_zip_job(index: Optional, z: ZipJobContext) -> Tuple[Job, Optional[Exception]]:
+def _make_zip_job(index: Optional[dict[str, Any]], z: ZipJobContext) -> Tuple[Job, Optional[Exception]]:
     try:
         check_zip(z.zip_description, z.job.db.db_id, z.zip_id)
     except Exception as e:
@@ -109,7 +109,7 @@ def _make_zip_job(index: Optional, z: ZipJobContext) -> Tuple[Job, Optional[Exce
         process_zip_job = None if index is None else _make_process_zip_job_from_ctx(z, zip_summary=index, has_new_zip_summary=False)
 
         # if there is a recent enough index in the store, use it
-        if process_zip_job is not None and index['hash'] == z.zip_description['summary_file']['hash'] and index['hash'] != NO_HASH_IN_STORE_CODE:
+        if process_zip_job is not None and index is not None and index['hash'] == z.zip_description['summary_file']['hash'] and index['hash'] != NO_HASH_IN_STORE_CODE:
             job = process_zip_job
         else:
             job = make_open_zip_summary_job(z, z.zip_description['summary_file'], process_zip_job)

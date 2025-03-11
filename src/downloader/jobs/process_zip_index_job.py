@@ -19,7 +19,7 @@
 from dataclasses import field, dataclass
 from typing import Any, Optional
 
-from downloader.config import Config
+from downloader.config import Config, ConfigDatabaseSection
 from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFoldersHolder
 from downloader.free_space_reservation import Partition
@@ -38,7 +38,7 @@ class ProcessZipIndexJob(Job):
     store: StoreWrapper
     config: Config
     zip_id: str
-    ini_description: dict[str, Any]
+    ini_description: ConfigDatabaseSection
     zip_description: dict[str, Any]
     zip_index: Index
     has_new_zip_summary: bool

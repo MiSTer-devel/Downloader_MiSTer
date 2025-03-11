@@ -20,12 +20,13 @@ from dataclasses import field, dataclass
 from enum import IntEnum, auto, unique
 from typing import Dict, Any, List, Optional
 
+from downloader.config import ConfigDatabaseSection
 from downloader.db_entity import DbEntity
 from downloader.file_filter import FileFoldersHolder, Config
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.transfer_job import TransferJob
 from downloader.path_package import PathPackage
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 
 
 @unique
@@ -39,8 +40,8 @@ class OpenZipContentsJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
     db: DbEntity
-    store: StoreWrapper
-    ini_description: Dict[str, Any]
+    store: ReadOnlyStoreAdapter
+    ini_description: ConfigDatabaseSection
     full_resync: bool
     config: Config
 

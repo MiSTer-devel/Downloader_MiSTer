@@ -20,7 +20,7 @@
 from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 
-from downloader.config import Config
+from downloader.config import Config, ConfigDatabaseSection
 from downloader.db_entity import DbEntity
 
 from downloader.jobs.copy_data_job import CopyDataJob
@@ -35,6 +35,7 @@ from downloader.local_store_wrapper import StoreWrapper, new_store_fragment_driv
 
 
 def make_transfer_job(source: str, description: dict[str, Any], do_calcs: bool, db_id: Optional[str], /) -> TransferJob:
+    job: TransferJob
     if not source.startswith("http"):
         job = CopyDataJob(source, description, {} if do_calcs else None, db_id)
     else:
@@ -51,7 +52,7 @@ class ZipJobContext:
 def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any], process_zip_backup: Optional[ProcessZipIndexJob]) -> TransferJob:
     zip_tag = make_zip_tag(z.job.db, z.zip_id)
     transfer_job = make_transfer_job(file_description['url'], file_description, False, z.job.db.db_id)
-    transfer_job.add_tag(zip_tag)
+    transfer_job.add_tag(zip_tag)  # type: ignore[union-attr]
     open_zip_summary_job = OpenZipSummaryJob(
         zip_id=z.zip_id,
         zip_description=z.zip_description,
@@ -64,13 +65,13 @@ def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any]
         backup=process_zip_backup
     )
     open_zip_summary_job.add_tag(zip_tag)
-    transfer_job.after_job = open_zip_summary_job
+    transfer_job.after_job = open_zip_summary_job   # type: ignore[union-attr]
     if process_zip_backup is not None:
-        process_zip_backup.summary_download_failed = transfer_job.source
+        process_zip_backup.summary_download_failed = transfer_job.source   # type: ignore[union-attr]
     return transfer_job
 
 
-def make_process_zip_index_job(zip_id: str, zip_description: Dict[str, Any], zip_summary: Dict[str, Any], config: Config, db: DbEntity, ini_description: Dict[str, Any], store: StoreWrapper, full_resync: bool, has_new_zip_summary: bool) -> ProcessZipIndexJob:
+def make_process_zip_index_job(zip_id: str, zip_description: Dict[str, Any], zip_summary: Dict[str, Any], config: Config, db: DbEntity, ini_description: ConfigDatabaseSection, store: StoreWrapper, full_resync: bool, has_new_zip_summary: bool) -> ProcessZipIndexJob:
     base_files_url = db.base_files_url
     if 'base_files_url' in zip_description:
         base_files_url = zip_description['base_files_url']

@@ -64,14 +64,6 @@ class FileSystemFactory:
 class FileSystem(ABC):
 
     @abstractmethod
-    def unique_temp_filename(self, register: bool = True) -> ClosableValue:
-        """interface"""
-
-    @abstractmethod
-    def persistent_temp_dir(self) -> str:
-        """interface"""
-
-    @abstractmethod
     def resolve(self, path: str) -> str:
         """interface"""
 
@@ -236,9 +228,6 @@ class ReadOnlyFileSystem:
     def size(self, path):
         return self._fs.size(path)
 
-    def unique_temp_filename(self):
-        return self._fs.unique_temp_filename()
-
     def unlink(self, file_path, verbose=False, exception=None):
         if isinstance(exception, UnlinkTemporaryException):
             self._fs.unlink(file_path)
@@ -266,16 +255,6 @@ class _FileSystem(FileSystem):
         self._shared_state = shared_state
         self._quick_hit = 0
         self._slow_hit = 0
-
-    def unique_temp_filename(self, register: bool = True) -> ClosableValue:
-        name = None
-        while name in self._unique_temp_filenames:
-            name = os.path.join(tempfile._get_default_tempdir(), next(tempfile._get_candidate_names()))
-        self._unique_temp_filenames.add(name)
-        return ClosableValue(name, lambda: self._unique_temp_filenames.remove(name))
-
-    def persistent_temp_dir(self) -> str:
-        return tempfile._get_default_tempdir()
 
     def resolve(self, path: str) -> str:
         return str(Path(path).resolve())
@@ -567,13 +546,13 @@ class _FileSystem(FileSystem):
         else:
             self._logger.debug('Unzipping contents: ', zip_file)
 
-        files_to_unzip = None if isinstance(target_path, str) else target_path
         try:
             with zipfile.ZipFile(zip_file, 'r') as zipf:
-                if files_to_unzip is None:
+                if isinstance(target_path, str):
                     zipf.extractall(target_path)
                     return
 
+                files_to_unzip = target_path
                 for member in zipf.infolist():
                     if member.filename not in files_to_unzip:
                         continue
@@ -666,9 +645,9 @@ def _load_json(file_path: str) -> Dict[str, Any]:
 class FsSharedState:
     def __init__(self) -> None:
         self.interrupting_operations = False
-        self._files: Set[str] = set()
+        self._files: set[str] = set()
         self._files_lock = threading.Lock()
-        self._cached_folders = set()
+        self._cached_folders: set[str] = set()
         self._cached_folders_lock = threading.Lock()
 
     def consult_not_checked_folders(self, folders: List[PathPackage]) -> List[PathPackage]:

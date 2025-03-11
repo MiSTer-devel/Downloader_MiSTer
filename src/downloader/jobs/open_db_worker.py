@@ -32,12 +32,12 @@ class OpenDbWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: OpenDbJob) -> WorkerResult:  # type: ignore[override]
         try:
-            db = self._open_db(job.section, job.transfer_job.source, job.transfer_job.transfer())
+            db = self._open_db(job.section, job.transfer_job.source, job.transfer_job.transfer())  # type: ignore[union-attr]
         except Exception as e:
             self._ctx.swallow_error(e)
             return [], e
 
-        calcs = job.transfer_job.calcs
+        calcs = job.transfer_job.calcs  # type: ignore[union-attr]
         if calcs is None:
             self._ctx.swallow_error(Exception(f'OpenDbWorker [{db.db_id}] must receive a transfer_job with calcs not null.'))
             calcs = {}
