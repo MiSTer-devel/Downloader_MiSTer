@@ -20,8 +20,8 @@ cp __main__.py "${TEMPDIR}/__main__.py"
 if [[ "${SKIP_REMOVALS:-false}" != "true" ]] ; then
   find "${TEMPDIR}" -type f -name '*.py' -exec perl -i -0pe 's/"""(.*?)"""/""/sg; s/^\s*#.*\n//mg; s/^\s*\n//mg' {} +
 fi
-#if which strip-hints 2>&1 > /dev/null ; then
-#  find "${TEMPDIR}" -type f -name '*.py' -exec strip-hints --inplace {} + 2> /dev/null
+#if which strip-hints > /dev/null ; then
+#  find "${TEMPDIR}" -type f -name '*.py' -exec strip-hints --inplace {} \; 2> /dev/null
 #fi
 find "${TEMPDIR}" -type f ! -name '*.py' -exec rm -f {} +
 find "${TEMPDIR}" -type f -iname "*.py" -print0 | while IFS= read -r -d '' file ; do pin_metadata "${file}" ; done
