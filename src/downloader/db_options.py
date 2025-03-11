@@ -56,7 +56,7 @@ class DbOptions:
     def any(self) -> bool:
         return self.filter is not None
 
-    def unwrap_props(self) -> DbOptionsProps:
+    def unwrap_props(self) -> Any:
         return self._props
 
 
