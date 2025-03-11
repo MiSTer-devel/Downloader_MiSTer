@@ -455,11 +455,8 @@ def raw_db_wrong_descr():
     }
 
 
-def db_options(downloader_threads_limit=None, downloader_timeout=None, downloader_retries=None, download_filter=None):
+def db_options(download_filter=None):
     raw_db_options = {
-        K_DOWNLOADER_THREADS_LIMIT: 3 if downloader_threads_limit is None else downloader_threads_limit,
-        K_DOWNLOADER_TIMEOUT: 1 if downloader_timeout is None else downloader_timeout,
-        K_DOWNLOADER_RETRIES: 100 if downloader_retries is None else downloader_retries,
         K_FILTER: 'all' if download_filter is None else download_filter
     }
     return DbOptions(raw_db_options)

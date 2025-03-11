@@ -64,9 +64,6 @@ class TestConfigReader(unittest.TestCase):
             K_SECTION: 'single',
         }})
 
-    def test_databases___with_single_db_ini_with_incorrect_downloader_timeout___raises_invalid_config_parameter(self):
-        self.assertRaises(InvalidConfigParameter, lambda: databases("test/integration/fixtures/single_db_with_incorrect_downloader_timeout.ini"))
-
     def test_databases___with_repeated_db_ini___raises_invalid_config_parameter_exception(self):
         self.assertRaises(InvalidConfigParameter, lambda: databases("test/integration/fixtures/repeated_db.ini"))
 

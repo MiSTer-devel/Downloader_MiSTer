@@ -218,11 +218,11 @@ class ConfigReader:
         if parser.has(K_BASE_PATH):
             self._logger.print(f"WARNING! Ignored option for section [{section_id}]: Since Downloader 2.0 '{K_BASE_PATH} = {parser.get_string(K_BASE_PATH, '?')}' is no longer a valid option within this block.")
         if parser.has(K_DOWNLOADER_THREADS_LIMIT):
-            options['downloader_threads_limit'] = parser.get_int(K_DOWNLOADER_THREADS_LIMIT, None)
+            self._logger.print(f"WARNING! Ignored option for section [{section_id}]: Since Downloader 2.0 '{K_DOWNLOADER_THREADS_LIMIT} = {parser.get_string(K_DOWNLOADER_THREADS_LIMIT, '?')}' is no longer a valid option within this block.")
         if parser.has(K_DOWNLOADER_TIMEOUT):
-            options['downloader_timeout'] = parser.get_int(K_DOWNLOADER_TIMEOUT, None)
+            self._logger.print(f"WARNING! Ignored option for section [{section_id}]: Since Downloader 2.0 '{K_DOWNLOADER_TIMEOUT} = {parser.get_string(K_DOWNLOADER_TIMEOUT, '?')}' is no longer a valid option within this block.")
         if parser.has(K_DOWNLOADER_RETRIES):
-            options['downloader_retries'] = parser.get_int(K_DOWNLOADER_RETRIES, None)
+            self._logger.print(f"WARNING! Ignored option for section [{section_id}]: Since Downloader 2.0 '{K_DOWNLOADER_RETRIES} = {parser.get_string(K_DOWNLOADER_RETRIES, '?')}' is no longer a valid option within this block.")
         if parser.has(K_FILTER):
             options['filter'] = parser.get_string(K_FILTER, None)
 

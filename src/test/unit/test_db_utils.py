@@ -27,10 +27,10 @@ from test.objects import db_entity, config_with
 
 nil = {}
 config = config_with(storage_priority=STORAGE_PRIORITY_PREFER_EXTERNAL)
-config_with_options = config_with(downloader_retries=42)
+config_with_options = config_with(filter_value='all')
 db = db_entity()
-db_with_options = db_entity(default_options={K_DOWNLOADER_RETRIES: 1})
-ini_options = DbOptions({K_DOWNLOADER_RETRIES: 8})
+db_with_options = db_entity(default_options={'filter': 'all'})
+ini_options = DbOptions({'filter': '!essential'})
 
 
 class TestDbUtils(unittest.TestCase):
@@ -39,7 +39,7 @@ class TestDbUtils(unittest.TestCase):
         self.assert_config(config, (config, db, nil))
 
     def test_build_db_config___after_adding_different_options___returns_corresponding_original_config_variants(self):
-        self.assert_config({'downloader_threads_limit': 32, K_STORAGE_PRIORITY: STORAGE_PRIORITY_PREFER_EXTERNAL}, (config, db, {K_OPTIONS: DbOptions({'downloader_threads_limit': 32})}))
+        self.assert_config({'filter': 'console', K_STORAGE_PRIORITY: STORAGE_PRIORITY_PREFER_EXTERNAL}, (config, db, {K_OPTIONS: DbOptions({'filter': 'console'})}))
         self.assert_config({'filter': 'arcade', K_STORAGE_PRIORITY: STORAGE_PRIORITY_PREFER_EXTERNAL}, (config, db, {K_OPTIONS: DbOptions({'filter': 'arcade'})}))
 
     def test_build_db_config___with_config_options___returns_config_with_options(self):
