@@ -20,28 +20,28 @@ import tempfile
 import sys
 import time
 import traceback
-from typing import Any, List, Optional, Protocol
+from typing import Any, Optional, Protocol, TextIO, cast
 
 from downloader.config import Config
 
 
 class Logger(Protocol):
-    def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=True) -> None: """print always"""
-    def debug(self, *args, sep: str='', end: str='\n', flush: bool=True) -> None: """print only to debug target"""
-    def bench(self, *args) -> None: """print only to debug target"""
+    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=True) -> None: """print always"""
+    def debug(self, *args: Any, sep: str='', end: str='\n', flush: bool=True) -> None: """print only to debug target"""
+    def bench(self, *args: Any) -> None: """print only to debug target"""
 
 
 class PrintLogger(Logger):
-    def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=True) -> None:
+    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=True) -> None:
         _do_print(*args, sep=sep, end=end, file=file, flush=flush)
 
-    def debug(self, *args, sep: str='', end: str='\n', flush: bool=True) -> None:
+    def debug(self, *args: Any, sep: str='', end: str='\n', flush: bool=True) -> None:
         _do_print("DEBUG| ", *args, sep=sep, end=end, file=sys.stdout, flush=flush)
 
-    def bench(self, *args) -> None:
+    def bench(self, *args: Any) -> None:
         _do_print(*args, sep='', end='\n', file=sys.stdout, flush=True)
 
-def _do_print(*args, sep, end, file, flush) -> None:
+def _do_print(*args: Any, sep: str, end: str, file: TextIO, flush: bool) -> None:
     try:
         print(*args, sep=sep, end=end, file=file, flush=flush)
     except UnicodeEncodeError:
@@ -54,9 +54,9 @@ def _do_print(*args, sep, end, file, flush) -> None:
 
 
 class OffLogger(Logger):
-    def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=False) -> None: pass
-    def debug(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=False) -> None: pass
-    def bench(self, *args) -> None: pass
+    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=False) -> None: pass
+    def debug(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=False) -> None: pass
+    def bench(self, *args: Any) -> None: pass
 
 
 class FilelogSaver(Protocol):
@@ -68,8 +68,7 @@ class FilelogManager(Protocol):
 
 class FileLogger(Logger, FilelogManager):
     def __init__(self) -> None:
-        from tempfile import _TemporaryFileWrapper
-        self._logfile: Optional[_TemporaryFileWrapper[str]] = tempfile.NamedTemporaryFile('w', delete=False)
+        self._logfile: Optional[TextIO] = cast(TextIO, tempfile.NamedTemporaryFile('w', delete=False))
         self._local_repository: Optional[FilelogSaver] = None
 
     def finalize(self) -> None:
@@ -87,16 +86,16 @@ class FileLogger(Logger, FilelogManager):
     def set_local_repository(self, local_repository: FilelogSaver) -> None:
         self._local_repository = local_repository
 
-    def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=True) -> None:
+    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=True) -> None:
         self._do_print_in_file(*args, sep=sep, end=end, flush=flush)
 
-    def debug(self, *args, sep: str='', end: str='\n', flush: bool=True) -> None:
+    def debug(self, *args: Any, sep: str='', end: str='\n', flush: bool=True) -> None:
         self._do_print_in_file("DEBUG| ", *_transform_debug_args(args), sep=sep, end=end, flush=flush)
 
-    def bench(self, *args) -> None:
+    def bench(self, *args: Any) -> None:
         self._do_print_in_file(*args, sep='', end='\n', flush=False)
 
-    def _do_print_in_file(self, *args, sep, end, flush) -> None:
+    def _do_print_in_file(self, *args: Any, sep: str, end: str, flush: bool) -> None:
         if self._logfile is not None:
             _do_print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
 
@@ -113,7 +112,7 @@ class TopLogger(Logger, ConfigLogManager):
         self._start_time: Optional[float] = None
 
     @staticmethod
-    def for_main():
+    def for_main() -> 'TopLogger':
         return TopLogger(PrintLogger(), FileLogger())
 
     def configure(self, config: Config) -> None:
@@ -122,10 +121,10 @@ class TopLogger(Logger, ConfigLogManager):
         else:
             self._verbose_mode = False
 
-    def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=False) -> None:
+    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=False) -> None:
         self.print_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
         self.file_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
-    def debug(self, *args, sep: str='', end: str='\n', flush: bool=False) -> None:
+    def debug(self, *args: Any, sep: str='', end: str='\n', flush: bool=False) -> None:
         if self._verbose_mode is False and self._received_exception is False:
             if any(isinstance(a, BaseException) for a in args):
                 self._received_exception = True
@@ -136,7 +135,7 @@ class TopLogger(Logger, ConfigLogManager):
         if self._verbose_mode:
             self.print_logger.debug(*trans_args, sep=sep, end=end, flush=flush)
         self.file_logger.debug(*trans_args, sep=sep, end=end, flush=flush)
-    def bench(self, *args) -> None:
+    def bench(self, *args: Any) -> None:
         if self._start_time is None:
             return
 
@@ -144,7 +143,7 @@ class TopLogger(Logger, ConfigLogManager):
         self.print_logger.bench(bench_header, *args)
         self.file_logger.bench(bench_header, *args)
 
-def _transform_debug_args(args: tuple[Any, ...]) -> List[str]:
+def _transform_debug_args(args: tuple[Any, ...]) -> list[str]:
     exception_msgs: list[str] = []
     rest_args: list[str] = []
     interp_count = 0
@@ -187,14 +186,14 @@ class DebugOnlyLoggerDecorator(Logger):
     def __init__(self, decorated_logger: Logger) -> None:
         self._decorated_logger = decorated_logger
 
-    def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=True) -> None:
+    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=True) -> None:
         """Calls debug instead of print"""
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
 
-    def debug(self, *args, sep: str='', end: str='\n', flush: bool=True) -> None:
+    def debug(self, *args: Any, sep: str='', end: str='\n', flush: bool=True) -> None:
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
 
-    def bench(self, *args) -> None:
+    def bench(self, *args: Any) -> None:
         self._decorated_logger.bench(*args)
 
 def time_str(start_time: float) -> str:
