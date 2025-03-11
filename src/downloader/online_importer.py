@@ -408,7 +408,7 @@ def is_system_path(description: dict[str, str]) -> bool:
 
 
 class InstallationBox:
-    def __init__(self):
+    def __init__(self) -> None:
         self._downloaded_files: list[str] = []
         self._validated_files: dict[str, list[PathPackage]] = defaultdict(list)  # @TODO: Remove this?
         self._present_validated_files: dict[str, list[PathPackage]] = defaultdict(list)

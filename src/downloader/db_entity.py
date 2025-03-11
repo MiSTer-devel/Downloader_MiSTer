@@ -16,7 +16,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import ipaddress
-from typing import Dict, Any, Final, List, Optional
+from typing import Dict, Any, Final, List, Optional, TypedDict
 from urllib.parse import urlparse
 
 from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FILE_MiSTer_alt_ini, \
@@ -24,13 +24,13 @@ from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FI
     FILE_MiSTer_new, FOLDER_linux, FOLDER_saves, FOLDER_savestates, FOLDER_screenshots, FILE_PDFViewer, FILE_lesskey, \
     FILE_glow, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, DISTRIBUTION_MISTER_DB_ID, FILE_gamecontrollerdb_user, \
     FILE_yc_txt
-from downloader.db_options import DbOptions
+from downloader.db_options import DbOptions, DbOptionsProps
 from downloader.other import test_only
 from downloader.path_package import PathPackage
 
 
 class DbEntity:
-    def __init__(self, db_raw, section):
+    def __init__(self, db_raw: Any, section: str):
         if not isinstance(db_raw, dict):
             raise DbEntityValidationException(f'ERROR: Database "{section}" has improper format. The database maintainer should fix this.')
 
@@ -54,7 +54,7 @@ class DbEntity:
         if not isinstance(self.base_files_url, str): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "base_files_url" field. The database maintainer should fix this.')
         self.tag_dictionary: Dict[str, int] = db_raw.get('tag_dictionary', {})
         if not isinstance(self.tag_dictionary, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "tag_dictionary" field. The database maintainer should fix this.')
-        self.linux: Dict[str, Any] = db_raw.get('linux', None)
+        self.linux: Optional[Dict[str, Any]] = db_raw.get('linux', None)
         if self.linux is not None and not isinstance(self.linux, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "linux" field. The database maintainer should fix this.')
         self.header: List[str] = db_raw.get('header', [])
         if not isinstance(self.header, list): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "header" field. The database maintainer should fix this.')

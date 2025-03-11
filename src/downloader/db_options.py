@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Set, TypedDict
+from typing import Set, TypedDict, Any, cast
 
 from downloader.other import test_only
 
@@ -26,7 +26,10 @@ class DbOptionsProps(TypedDict, total=False):
 
 
 class DbOptions:
-    def __init__(self, props: DbOptionsProps):
+    def __init__(self, props: Any):
+        if not isinstance(props, dict):
+            raise DbOptionsValidationException('Database-scoped options has improper format.')
+
         present: Set[str] = set()
 
         if 'downloader_threads_limit' in props:  # @TODO (downloader 2.0++): Remove this in a future version
@@ -43,7 +46,7 @@ class DbOptions:
         if len(present) != len(props):
             raise DbOptionsValidationException([o for o in props if o not in present])
 
-        self._props = props
+        self._props = cast(DbOptionsProps, props)
 
     def items(self):
         return self._props.items()
