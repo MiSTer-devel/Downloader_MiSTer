@@ -599,7 +599,7 @@ class ReadOnlyStoreAdapter:
     def base_path(self):
         return self._store[K_BASE_PATH]
 
-    def has_base_path(self):
+    def has_base_path(self) -> bool:
         return K_BASE_PATH in self._store
 
     def list_other_drives_for_file(self, file_path: str, drive: Optional[str]) -> List[Tuple[bool, str]]:
@@ -652,7 +652,7 @@ def equal_dicts_or_lhs_bigger(lhs: dict[str, Any], b: dict[str, Any]) -> bool:
     return True
 
 
-def equal_dicts(a, b):
+def equal_dicts(a, b) -> bool:
     if len(a) != len(b):
         return False
 
@@ -666,7 +666,7 @@ def equal_dicts(a, b):
     return True
 
 
-def equal_lists(a, b):
+def equal_lists(a, b) -> bool:
     if len(a) != len(b):
         return False
 

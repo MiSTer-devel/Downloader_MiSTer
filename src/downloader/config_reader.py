@@ -313,7 +313,7 @@ class IniParser:
         if result is None: return default
         return to_int(result, default)
 
-    def has(self, key: str):
+    def has(self, key: str) -> bool:
         return self._ini_args.get(key) is not None
 
 

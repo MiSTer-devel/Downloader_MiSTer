@@ -56,7 +56,7 @@ class HttpGateway:
 
     def __enter__(self): return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
         if exc_type is not None and self._logger is not None:
             self._logger.debug(f"An exception of type {exc_type} occurred with value {exc_val}. Traceback: {exc_tb}")
 
