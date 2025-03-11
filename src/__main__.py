@@ -36,7 +36,7 @@ except (ImportError, SyntaxError) as e:
 try:
     from commit import default_commit
 except ImportError as e:
-    default_commit = None
+    default_commit = None  # type: ignore[assignment]
 
 if __name__ == '__main__':
     exit_code = main(read_env(default_commit), start_time)

@@ -25,7 +25,7 @@ from downloader.config import Config
 from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
-from downloader.job_system import Job
+from downloader.job_system import Job, Worker
 from downloader.jobs.copy_data_job import CopyDataJob
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_data_job import FetchDataJob
@@ -58,7 +58,7 @@ class OnlineImporter:
         self._needs_reboot = False
         self._needs_save = False
 
-    def _make_workers(self) -> dict[int, DownloaderWorker]:
+    def _make_workers(self) -> dict[int, Worker]:
         return {w.job_type_id(): w for w in make_workers(self._worker_ctx)}
 
     def _make_jobs(self, db_pkgs: list[DbSectionPackage], local_store: LocalStoreWrapper, full_resync: bool) -> list[Job]:
@@ -67,14 +67,14 @@ class OnlineImporter:
             # @TODO: Use proper tempfile.mkstemp instead
             transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
             self._logger.debug('Loading db from: ', pkg.section['db_url'])
-            transfer_job.after_job = OpenDbJob(
+            transfer_job.after_job = OpenDbJob(  # type: ignore[union-attr]
                 transfer_job=transfer_job,
                 section=pkg.db_id,
                 ini_description=pkg.section,
                 store=local_store.store_by_id(pkg.db_id),
                 full_resync=full_resync,
             )
-            jobs.append(transfer_job)
+            jobs.append(transfer_job)  # type: ignore[arg-type]
         return jobs
 
     def set_local_store(self, local_store: LocalStoreWrapper) -> None:
@@ -100,100 +100,100 @@ class OnlineImporter:
 
         box.set_unused_filter_tags(self._worker_ctx.file_filter_factory.unused_filter_parts())
 
-        for job, _e in report.get_failed_jobs(OpenDbJob):
-            box.add_failed_db(job.section)
+        for open_db_job, _e in report.get_failed_jobs(OpenDbJob):
+            box.add_failed_db(open_db_job.section)
 
-        for job in report.get_completed_jobs(ProcessDbMainJob):
-            box.add_installed_db(job.db, job.config, job.db_hash, job.db_size)
-            for zip_id in job.ignored_zips:
-                box.add_failed_zip(job.db.db_id, zip_id)
-            for zip_id in job.removed_zips:
-                box.add_removed_zip(job.db.db_id, zip_id)
+        for db_job in report.get_completed_jobs(ProcessDbMainJob):
+            box.add_installed_db(db_job.db, db_job.config, db_job.db_hash, db_job.db_size)
+            for zip_id in db_job.ignored_zips:
+                box.add_failed_zip(db_job.db.db_id, zip_id)
+            for zip_id in db_job.removed_zips:
+                box.add_removed_zip(db_job.db.db_id, zip_id)
 
-        for job, _e in report.get_failed_jobs(ProcessDbMainJob):
-            box.add_failed_db(job.db.db_id)
+        for db_job, _e in report.get_failed_jobs(ProcessDbMainJob):
+            box.add_failed_db(db_job.db.db_id)
 
-        for job in report.get_completed_jobs(ProcessDbIndexJob):
-            box.add_present_not_validated_files(job.present_not_validated_files)
-            box.add_duplicated_files(job.duplicated_files, job.db.db_id)
-            box.add_non_duplicated_files(job.non_duplicated_files, job.db.db_id)
-            box.add_present_validated_files(job.present_validated_files, job.db.db_id)
-            box.add_skipped_updated_files(job.skipped_updated_files, job.db.db_id)
-            box.add_repeated_store_presence(job.repeated_store_presence, job.db.db_id)
-            box.add_removed_folders(job.removed_folders, job.db.db_id)
-            box.add_installed_folders(job.installed_folders, job.db.db_id)
-            box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
-            box.queue_file_removal(job.files_to_remove, job.db.db_id)
+        for index_job in report.get_completed_jobs(ProcessDbIndexJob):
+            box.add_present_not_validated_files(index_job.present_not_validated_files)
+            box.add_duplicated_files(index_job.duplicated_files, index_job.db.db_id)
+            box.add_non_duplicated_files(index_job.non_duplicated_files, index_job.db.db_id)
+            box.add_present_validated_files(index_job.present_validated_files, index_job.db.db_id)
+            box.add_skipped_updated_files(index_job.skipped_updated_files, index_job.db.db_id)
+            box.add_repeated_store_presence(index_job.repeated_store_presence, index_job.db.db_id)
+            box.add_removed_folders(index_job.removed_folders, index_job.db.db_id)
+            box.add_installed_folders(index_job.installed_folders, index_job.db.db_id)
+            box.queue_directory_removal(index_job.directories_to_remove, index_job.db.db_id)
+            box.queue_file_removal(index_job.files_to_remove, index_job.db.db_id)
 
-        for job, e in report.get_failed_jobs(ProcessDbIndexJob):
-            box.add_failed_db(job.db.db_id)
-            box.add_full_partitions(job.full_partitions)
-            box.add_failed_files(job.failed_files_no_space)
-            box.add_failed_folders(job.failed_folders)
+        for index_job, e in report.get_failed_jobs(ProcessDbIndexJob):
+            box.add_failed_db(index_job.db.db_id)
+            box.add_full_partitions(index_job.full_partitions)
+            box.add_failed_files(index_job.failed_files_no_space)
+            box.add_failed_folders(index_job.failed_folders)
             if not isinstance(e, BadFileFilterPartException): continue
-            box.add_failed_db_options(WrongDatabaseOptions(f"Wrong custom download filter on database {job.db.db_id}. Part '{str(e)}' is invalid."))
+            box.add_failed_db_options(WrongDatabaseOptions(f"Wrong custom download filter on database {index_job.db.db_id}. Part '{str(e)}' is invalid."))
 
-        for job in report.get_completed_jobs(ProcessZipIndexJob):
-            box.add_present_not_validated_files(job.present_not_validated_files)
-            box.add_duplicated_files(job.duplicated_files, job.db.db_id)
-            box.add_non_duplicated_files(job.non_duplicated_files, job.db.db_id)
-            box.add_present_validated_files(job.present_validated_files, job.db.db_id)
-            box.add_skipped_updated_files(job.skipped_updated_files, job.db.db_id)
-            box.add_repeated_store_presence(job.repeated_store_presence, job.db.db_id)
-            box.add_removed_folders(job.removed_folders, job.db.db_id)
-            box.add_installed_folders(job.installed_folders, job.db.db_id)
-            box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
-            box.queue_file_removal(job.files_to_remove, job.db.db_id)
-            if job.summary_download_failed is not None:
-                box.add_failed_file(job.summary_download_failed)
-            if job.filtered_data:
-                box.add_filtered_zip_data(job.db.db_id, job.zip_id, job.filtered_data)
-            if job.has_new_zip_summary:
-                box.add_installed_zip_summary(job.db.db_id, job.zip_id, job.result_zip_index, job.zip_description)
+        for zindex_job in report.get_completed_jobs(ProcessZipIndexJob):
+            box.add_present_not_validated_files(zindex_job.present_not_validated_files)
+            box.add_duplicated_files(zindex_job.duplicated_files, zindex_job.db.db_id)
+            box.add_non_duplicated_files(zindex_job.non_duplicated_files, zindex_job.db.db_id)
+            box.add_present_validated_files(zindex_job.present_validated_files, zindex_job.db.db_id)
+            box.add_skipped_updated_files(zindex_job.skipped_updated_files, zindex_job.db.db_id)
+            box.add_repeated_store_presence(zindex_job.repeated_store_presence, zindex_job.db.db_id)
+            box.add_removed_folders(zindex_job.removed_folders, zindex_job.db.db_id)
+            box.add_installed_folders(zindex_job.installed_folders, zindex_job.db.db_id)
+            box.queue_directory_removal(zindex_job.directories_to_remove, zindex_job.db.db_id)
+            box.queue_file_removal(zindex_job.files_to_remove, zindex_job.db.db_id)
+            if zindex_job.summary_download_failed is not None:
+                box.add_failed_file(zindex_job.summary_download_failed)
+            if zindex_job.filtered_data:
+                box.add_filtered_zip_data(zindex_job.db.db_id, zindex_job.zip_id, zindex_job.filtered_data)
+            if zindex_job.has_new_zip_summary:
+                box.add_installed_zip_summary(zindex_job.db.db_id, zindex_job.zip_id, zindex_job.result_zip_index, zindex_job.zip_description)
 
-        for job, _e in report.get_failed_jobs(ProcessZipIndexJob):
-            box.add_failed_db(job.db.db_id)
-            if job.summary_download_failed is not None:
-                box.add_failed_file(job.summary_download_failed)
-            box.add_failed_files(job.failed_files_no_space)
-            box.add_full_partitions(job.full_partitions)
-            box.add_failed_folders(job.failed_folders)
+        for zindex_job, _e in report.get_failed_jobs(ProcessZipIndexJob):
+            box.add_failed_db(zindex_job.db.db_id)
+            if zindex_job.summary_download_failed is not None:
+                box.add_failed_file(zindex_job.summary_download_failed)
+            box.add_failed_files(zindex_job.failed_files_no_space)
+            box.add_full_partitions(zindex_job.full_partitions)
+            box.add_failed_folders(zindex_job.failed_folders)
 
-        for job in report.get_completed_jobs(OpenZipContentsJob):
-            box.add_downloaded_files(job.downloaded_files)
-            box.add_validated_files(job.validated_files, job.db.db_id)
+        for open_zip_job in report.get_completed_jobs(OpenZipContentsJob):
+            box.add_downloaded_files(open_zip_job.downloaded_files)
+            box.add_validated_files(open_zip_job.validated_files, open_zip_job.db.db_id)
             # We should be able to comment previous line and the test still pass
-            box.add_failed_files(job.failed_files)
-            box.queue_directory_removal(job.directories_to_remove, job.db.db_id)
-            box.queue_file_removal(job.files_to_remove, job.db.db_id)
+            box.add_failed_files(open_zip_job.failed_files)
+            box.queue_directory_removal(open_zip_job.directories_to_remove, open_zip_job.db.db_id)
+            box.queue_file_removal(open_zip_job.files_to_remove, open_zip_job.db.db_id)
 
-        for job, _e in report.get_failed_jobs(OpenZipContentsJob):
-            box.add_failed_files(job.files_to_unzip)
+        for open_zip_job, _e in report.get_failed_jobs(OpenZipContentsJob):
+            box.add_failed_files(open_zip_job.files_to_unzip)
 
-        for job in report.get_started_jobs(FetchFileJob):
-            box.add_file_fetch_started(job.pkg.rel_path)
+        for fetch_file_job in report.get_started_jobs(FetchFileJob):
+            box.add_file_fetch_started(fetch_file_job.pkg.rel_path)
 
-        for job in report.get_completed_jobs(FetchFileJob):
-            if job.db_id is None or job.pkg is None: continue
-            box.add_downloaded_file(job.pkg.rel_path)
-            box.add_validated_file(job.pkg, job.db_id)
+        for fetch_file_job in report.get_completed_jobs(FetchFileJob):
+            if fetch_file_job.db_id is None or fetch_file_job.pkg is None: continue
+            box.add_downloaded_file(fetch_file_job.pkg.rel_path)
+            box.add_validated_file(fetch_file_job.pkg, fetch_file_job.db_id)
 
-        for job, e in report.get_failed_jobs(FetchFileJob):
-            box.add_failed_file(job.pkg.rel_path)
-            if job.pkg.rel_path != FILE_MiSTer:
+        for fetch_file_job, e in report.get_failed_jobs(FetchFileJob):
+            box.add_failed_file(fetch_file_job.pkg.rel_path)
+            if fetch_file_job.pkg.rel_path != FILE_MiSTer:
                 continue
 
             self._logger.debug(e)
             fs = self._worker_ctx.file_system
-            full_path = job.pkg.full_path
+            full_path = fetch_file_job.pkg.full_path
             if fs.is_file(full_path, use_cache=False):
                 continue
 
-            backup_path = job.pkg.backup_path()
-            temp_path = job.pkg.temp_path(job.already_exists)
+            backup_path = fetch_file_job.pkg.backup_path()
+            temp_path = fetch_file_job.pkg.temp_path(fetch_file_job.already_exists)
             if backup_path is not None and fs.is_file(backup_path, use_cache=False):
                 fs.move(backup_path, full_path)
-            elif temp_path is not None and fs.is_file(temp_path, use_cache=False) and fs.hash(temp_path) == job.pkg.description['hash']:
+            elif temp_path is not None and fs.is_file(temp_path, use_cache=False) and fs.hash(temp_path) == fetch_file_job.pkg.description['hash']:
                 fs.move(temp_path, full_path)
 
             if fs.is_file(full_path, use_cache=False):
@@ -206,10 +206,10 @@ class OnlineImporter:
             self._logger.print('Your system won\'nt be able to boot until you do so!')
             sys.exit(EXIT_ERROR_BAD_NEW_BINARY)
 
-        for job, _e in report.get_failed_jobs(FetchDataJob) + report.get_failed_jobs(CopyDataJob):
-            if job.db_id is not None:
-                box.add_failed_db(job.db_id)
-            box.add_failed_file(job.source)  # @TODO: This should not count as a file, but as a "source".
+        for transfer_job, _e in report.get_failed_jobs(FetchDataJob) + report.get_failed_jobs(CopyDataJob):
+            if transfer_job.db_id is not None:
+                box.add_failed_db(transfer_job.db_id)
+            box.add_failed_file(transfer_job.source)  # @TODO: This should not count as a file, but as a "source".
 
         logger.bench('OnlineImporter applying changes on stores...')
 
@@ -222,8 +222,8 @@ class OnlineImporter:
             read_stores[db.db_id] = store.read_only()
             stores.append(store)
 
-        for db, config, db_hash, db_size in box.installed_db_sigs():
-            write_stores[db.db_id].set_db_state_signature(db_hash, db_size, db.timestamp, config['filter'])
+        for db_entity, config, db_hash, db_size in box.installed_db_sigs():
+            write_stores[db_entity.db_id].set_db_state_signature(db_hash, db_size, db_entity.timestamp, config['filter'])
 
         for db_id, zip_id in box.removed_zips():
             write_stores[db_id].remove_zip_id(zip_id)
@@ -302,7 +302,7 @@ class OnlineImporter:
 
                 self._worker_ctx.file_system.remove_folder(pkg.full_path)
 
-                if pkg.is_pext_external():
+                if pkg.is_pext_external() and pkg.drive is not None:
                     write_stores[db_id].remove_external_folder(pkg.drive, pkg.rel_path)
                     write_stores[db_id].remove_external_folder_from_zips(pkg.drive, pkg.rel_path)
                 else:
@@ -331,16 +331,16 @@ class OnlineImporter:
         for db_id, filtered_zip_data in box.filtered_zip_data().items():
             write_stores[db_id].save_filtered_zip_data(filtered_zip_data)
 
-        for store in write_stores.values():
-            store.cleanup_externals()
+        for w_store in write_stores.values():
+            w_store.cleanup_externals()
 
         self._needs_save = local_store.needs_save()
 
         for store in stores:
             self._clean_store(store.unwrap_store())
 
-        for e in box.wrong_db_options():
-            self._worker_ctx.swallow_error(e)
+        for wrong_db_opts_err in box.wrong_db_options():
+            self._worker_ctx.swallow_error(wrong_db_opts_err)
 
         logger.bench('OnlineImporter done.')
         return self
@@ -425,7 +425,7 @@ class InstallationBox:
         self._removed_folders: list[tuple[str, PathPackage]] = []
         self._removed_zips: list[tuple[str, str]] = []
         self._skipped_updated_files: dict[str, list[str]] = dict()
-        self._filtered_zip_data: dict[str, dict[str, dict[str, dict[str, Any]]]] = defaultdict(dict)
+        self._filtered_zip_data: dict[str, dict[str, FileFoldersHolder]] = defaultdict(dict)
         self._installed_zip_summary: list[tuple[str, str, StoreFragmentDrivePaths, dict[str, Any]]] = []
         self._installed_folders: list[tuple[str, PathPackage]] = []
         self._installed_folders_set: set[str] = set()
