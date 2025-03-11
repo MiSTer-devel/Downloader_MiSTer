@@ -261,9 +261,6 @@ class InstallationReportImpl(InstallationReport):
 
 
 class FileDownloadSessionLogger(Protocol):
-    def start_session(self):
-        """Starts a new session."""
-
     def print_progress_line(self, line: str):
         """Prints a progress line."""
 
@@ -284,9 +281,6 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._needs_newline: bool = False
         self._need_clear_header: bool = False
         self._symbols: List[str] = []
-
-    def start_session(self):
-        self.__init__(self._logger, self._waiter)
 
     def _deactivate(self):
         self._deactivated = True
@@ -429,7 +423,6 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         except Exception as e:
             self._logger.debug(e)
 
-    def start_session(self): self._session_logger.start_session()
     def print_progress_line(self, line: str): self._session_logger.print_progress_line(line)
     def print_pending(self): self._session_logger.print_pending()
     def print_header(self, db: DbEntity):  self._session_logger.print_header(db)

@@ -274,7 +274,7 @@ class _Connection:
         self._timeout: float = http.timeout if http.timeout is not None else 120.0
         self._last_use_time: float = 0.0
         self._uses: int = 0
-        self._max_uses: int = sys.maxsize
+        self._max_uses: float = sys.float_info.max
         self._response: Optional[Union[HTTPResponse, '_FinishedResponse']] = None
         self._response_headers = _ResponseHeaders(logger)
 

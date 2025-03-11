@@ -20,6 +20,7 @@ from typing import Optional
 
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
     FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json
+from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem, FsError
 from downloader.local_store_wrapper import LocalStoreWrapper
 from downloader.logger import FilelogSaver, Logger
@@ -29,17 +30,17 @@ from downloader.config import Config
 
 
 class LocalRepository(FilelogSaver):
-    def __init__(self, config: Config, logger: Logger, file_system: FileSystem, store_migrator: StoreMigrator, external_drives_repository):
+    def __init__(self, config: Config, logger: Logger, file_system: FileSystem, store_migrator: StoreMigrator, external_drives_repository: ExternalDrivesRepository) -> None:
         self._config = config
         self._logger = logger
         self._file_system = file_system
         self._store_migrator = store_migrator
         self._external_drives_repository = external_drives_repository
-        self._storage_path_save_value = None
-        self._storage_path_old_value = None
-        self._storage_path_load_value = None
-        self._last_successful_run_value = None
-        self._logfile_path_value = None
+        self._storage_path_save_value: Optional[str] = None
+        self._storage_path_old_value: Optional[str] = None
+        self._storage_path_load_value: Optional[str] = None
+        self._last_successful_run_value: Optional[str] = None
+        self._logfile_path_value: Optional[str] = None
 
     @property
     def _storage_save_path(self):

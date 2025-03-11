@@ -20,7 +20,7 @@ from downloader.constants import K_BASE_PATH, DB_STATE_SIGNATURE_NO_HASH, DB_STA
     DB_STATE_SIGNATURE_NO_TIMESTAMP, DB_STATE_SIGNATURE_NO_FILTER
 from downloader.jobs.index import Index
 from downloader.other import empty_store_without_base_path
-from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict
+from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict, cast
 from collections import defaultdict, ChainMap
 
 from downloader.path_package import PathPackage, PathType
@@ -57,8 +57,10 @@ class LocalStore(TypedDict):
     db_sigs: dict[str, Any]
 
 class LocalStoreWrapper:
-    def __init__(self, local_store: LocalStore):
-        self._local_store = local_store
+    def __init__(self, local_store: dict[str, Any]):
+        if 'dbs' not in local_store: raise Exception('No dbs field in local store.')
+        if 'db_sigs' not in local_store: raise Exception('No db_sigs field in local store.')
+        self._local_store: LocalStore = cast(LocalStore, local_store)
         self._dirty = False
 
     def unwrap_local_store(self) -> LocalStore:
