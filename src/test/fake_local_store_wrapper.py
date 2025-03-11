@@ -1,5 +1,4 @@
 # Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
-from typing import Any
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,6 +15,7 @@ from typing import Any
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+from typing import Any
 from downloader.local_store_wrapper import LocalStoreWrapper as ProductionLocalStoreWrapper, \
     StoreWrapper as ProductionStoreWrapper, empty_db_state_signature
 
@@ -35,7 +35,7 @@ class LocalStoreWrapper(ProductionLocalStoreWrapper):
 
 class StoreWrapper(ProductionStoreWrapper):
     def __init__(self, store, top_wrapper=None, crate=None):
-        self._top_wrapper = top_wrapper or LocalStoreWrapper({}, crate)
+        self._top_wrapper = top_wrapper or LocalStoreWrapper({'dbs': {}, 'db_sigs': {}}, crate)
         super().__init__(store, empty_db_state_signature(), self._top_wrapper)
 
 

@@ -124,6 +124,12 @@ class TestLocalRepository(unittest.TestCase):
         store = load_store(fs(files={usb0_db_json_file: birdy_cifs_json_db()}))
         self.assertEqual(birdy_store_with_fixed_files_and_folders(), store)
 
+    def test_load_store___when_there_is_an_error___returns_a_new_store(self):
+        files_system = fs(files=db_files_internal_empty())
+        files_system[0].set_read_error()
+        store = load_store(files_system)
+        self.assertEqual({}, store)
+
 
 def save_store(fs_objects, input_local_store):
     file_system, fs_state = fs_objects

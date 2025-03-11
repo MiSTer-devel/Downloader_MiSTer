@@ -22,8 +22,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from downloader.constants import STORAGE_PATHS_PRIORITY_SEQUENCE, HASH_file_does_not_exist
-from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, FsError, UnzipError, \
-    absolute_parent_folder, FolderCreationError, FsSharedState, FileCopyError
+from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
+    FsError, UnzipError, \
+    absolute_parent_folder, FolderCreationError, FsSharedState, FileCopyError, FileReadError
 from downloader.path_package import PathPackage
 from test.fake_http_gateway import FakeBuf
 from test.fake_importer_implicit_inputs import FileSystemState
@@ -182,6 +183,9 @@ class FakeFileSystem(ProductionFileSystem):
     def set_copy_buggy(self):
         self._fake_failures['copy_buggy'] = True
 
+    def set_read_error(self):
+        self._fake_failures['read_error'] = True
+
     def move(self, source, target):
         source_file = self._path(source)
         target_file = self._path(target)
@@ -307,6 +311,9 @@ class FakeFileSystem(ProductionFileSystem):
         else: return self._load_dict_from_data(source, transfer)
 
     def load_dict_from_file(self, path):
+        if 'read_error' in self._fake_failures:
+            raise FileReadError(path)
+
         full_path = self._path(path)
         file_description = self.state.files[full_path]
         return self._load_json_from_description(path, file_description)
