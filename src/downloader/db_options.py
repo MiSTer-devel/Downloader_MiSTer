@@ -26,7 +26,7 @@ class DbOptionsProps(TypedDict, total=False):
 
 
 class DbOptions:
-    def __init__(self, props: Any):
+    def __init__(self, props: Any) -> None:
         if not isinstance(props, dict):
             raise DbOptionsValidationException('Database-scoped options has improper format.')
 

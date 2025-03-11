@@ -29,6 +29,7 @@ from downloader.path_package import PathPackage
 from downloader.waiter import Waiter
 from downloader.job_system import ProgressReporter, Job
 from downloader.logger import Logger
+from types import TracebackType
 
 
 class DownloaderProgressReporter(ProgressReporter):
@@ -154,7 +155,7 @@ class _WithLock(Generic[T]):
         self.lock.acquire()
         return self.data
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]) -> None:
         self.lock.release()
 
 
