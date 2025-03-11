@@ -5,14 +5,13 @@
 __pycache__
 .DS_Store
 
-# TEST FILES:
-delme
-
 # BUILD FILES:
 src/downloader.zip
 src/commit.py
+downloader_bin
 
 # DEBUG FILES:
+delme
 delme*.py
 stop
 mister.ip
