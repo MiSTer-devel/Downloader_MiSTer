@@ -224,7 +224,7 @@ class ReadOnlyFileSystem:
     def size(self, path):
         return self._fs.size(path)
 
-    def unlink(self, file_path, verbose=False, exception=None):
+    def unlink(self, file_path, verbose: bool=False, exception=None):
         if isinstance(exception, UnlinkTemporaryException):
             self._fs.unlink(file_path)
             return
