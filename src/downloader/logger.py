@@ -68,10 +68,11 @@ class FilelogManager(Protocol):
 
 class FileLogger(Logger, FilelogManager):
     def __init__(self) -> None:
-        self._logfile = tempfile.NamedTemporaryFile('w', delete=False)
+        from tempfile import _TemporaryFileWrapper
+        self._logfile: Optional[_TemporaryFileWrapper[str]] = tempfile.NamedTemporaryFile('w', delete=False)
         self._local_repository: Optional[FilelogSaver] = None
 
-    def finalize(self):
+    def finalize(self) -> None:
         if self._logfile is None:
             return
 
@@ -83,19 +84,19 @@ class FileLogger(Logger, FilelogManager):
             self._local_repository.save_log_from_tmp(self._logfile.name)
         self._logfile = None
 
-    def set_local_repository(self, local_repository: FilelogSaver):
+    def set_local_repository(self, local_repository: FilelogSaver) -> None:
         self._local_repository = local_repository
 
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True):
+    def print(self, *args, sep='', end='\n', file=sys.stdout, flush=True) -> None:
         self._do_print_in_file(*args, sep=sep, end=end, flush=flush)
 
-    def debug(self, *args, sep='', end='\n', flush=True):
+    def debug(self, *args, sep='', end='\n', flush=True) -> None:
         self._do_print_in_file("DEBUG| ", *_transform_debug_args(args), sep=sep, end=end, flush=flush)
 
-    def bench(self, *args):
+    def bench(self, *args) -> None:
         self._do_print_in_file(*args, sep='', end='\n', flush=False)
 
-    def _do_print_in_file(self, *args, sep, end, flush):
+    def _do_print_in_file(self, *args, sep, end, flush) -> None:
         if self._logfile is not None:
             _do_print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
 
@@ -128,10 +129,10 @@ class TopLogger(Logger, ConfigLogManager):
         if self._debug is False:
             return
 
-        args = _transform_debug_args(args)
+        trans_args = _transform_debug_args(args)
         if self._verbose_mode:
-            self.print_logger.debug(*args, sep=sep, end=end, flush=flush)
-        self.file_logger.debug(*args, sep=sep, end=end, flush=flush)
+            self.print_logger.debug(*trans_args, sep=sep, end=end, flush=flush)
+        self.file_logger.debug(*trans_args, sep=sep, end=end, flush=flush)
     def bench(self, *args):
         if self._start_time is None:
             return
@@ -140,7 +141,7 @@ class TopLogger(Logger, ConfigLogManager):
         self.print_logger.bench(bench_header, *args)
         self.file_logger.bench(bench_header, *args)
 
-def _transform_debug_args(args: List[Any]) -> List[str]:
+def _transform_debug_args(args: tuple[Any, ...]) -> List[str]:
     exception_msgs = []
     rest_args = []
     interp_count = 0

@@ -92,6 +92,7 @@ class OnlineImporter:
 
         logger.bench('OnlineImporter execute jobs start.')
         self._job_system.execute_jobs()
+        self._worker_ctx.file_download_session_logger.print_pending()
         logger.bench('OnlineImporter execute jobs done.')
 
         box = self._box
