@@ -142,11 +142,11 @@ class TopLogger(Logger, ConfigLogManager):
         self.file_logger.bench(bench_header, *args)
 
 def _transform_debug_args(args: tuple[Any, ...]) -> List[str]:
-    exception_msgs = []
-    rest_args = []
+    exception_msgs: list[str] = []
+    rest_args: list[str] = []
     interp_count = 0
     interp_main = ''
-    interp_subs = []
+    interp_subs: list[str] = []
     for a in args:
         if isinstance(a, Exception):
             exception_msgs.append(_format_ex(a))
@@ -154,7 +154,7 @@ def _transform_debug_args(args: tuple[Any, ...]) -> List[str]:
 
         if interp_count > 1:
             interp_subs.append(str(a))
-            interp_count =- 1
+            interp_count -= 1
         elif interp_count == 1:
             try:
                 rest_args.append(interp_main % (*interp_subs, str(a)))
