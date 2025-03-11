@@ -26,16 +26,16 @@ from downloader.config import Config
 
 
 class Logger(Protocol):
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush: bool=True) -> None: """print always"""
-    def debug(self, *args, sep='', end='\n', flush: bool=True) -> None: """print only to debug target"""
+    def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=True) -> None: """print always"""
+    def debug(self, *args, sep: str='', end: str='\n', flush: bool=True) -> None: """print only to debug target"""
     def bench(self, *args) -> None: """print only to debug target"""
 
 
 class PrintLogger(Logger):
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush: bool=True) -> None:
+    def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=True) -> None:
         _do_print(*args, sep=sep, end=end, file=file, flush=flush)
 
-    def debug(self, *args, sep='', end='\n', flush: bool=True) -> None:
+    def debug(self, *args, sep: str='', end: str='\n', flush: bool=True) -> None:
         _do_print("DEBUG| ", *args, sep=sep, end=end, file=sys.stdout, flush=flush)
 
     def bench(self, *args) -> None:
@@ -54,8 +54,8 @@ def _do_print(*args, sep, end, file, flush) -> None:
 
 
 class OffLogger(Logger):
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush: bool=False) -> None: pass
-    def debug(self, *args, sep='', end='\n', file=sys.stdout, flush: bool=False) -> None: pass
+    def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=False) -> None: pass
+    def debug(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=False) -> None: pass
     def bench(self, *args) -> None: pass
 
 
@@ -87,10 +87,10 @@ class FileLogger(Logger, FilelogManager):
     def set_local_repository(self, local_repository: FilelogSaver) -> None:
         self._local_repository = local_repository
 
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush: bool=True) -> None:
+    def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=True) -> None:
         self._do_print_in_file(*args, sep=sep, end=end, flush=flush)
 
-    def debug(self, *args, sep='', end='\n', flush: bool=True) -> None:
+    def debug(self, *args, sep: str='', end: str='\n', flush: bool=True) -> None:
         self._do_print_in_file("DEBUG| ", *_transform_debug_args(args), sep=sep, end=end, flush=flush)
 
     def bench(self, *args) -> None:
@@ -122,10 +122,10 @@ class TopLogger(Logger, ConfigLogManager):
         else:
             self._verbose_mode = False
 
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush: bool=False) -> None:
+    def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=False) -> None:
         self.print_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
         self.file_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
-    def debug(self, *args, sep='', end='\n', flush: bool=False) -> None:
+    def debug(self, *args, sep: str='', end: str='\n', flush: bool=False) -> None:
         if self._debug is False:
             return
 
@@ -184,11 +184,11 @@ class DebugOnlyLoggerDecorator(Logger):
     def __init__(self, decorated_logger: Logger) -> None:
         self._decorated_logger = decorated_logger
 
-    def print(self, *args, sep='', end='\n', file=sys.stdout, flush: bool=True) -> None:
+    def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=True) -> None:
         """Calls debug instead of print"""
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
 
-    def debug(self, *args, sep='', end='\n', flush: bool=True) -> None:
+    def debug(self, *args, sep: str='', end: str='\n', flush: bool=True) -> None:
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
 
     def bench(self, *args) -> None:
