@@ -20,7 +20,7 @@ from typing import Any, Optional
 import unittest
 
 from downloader.config import default_config
-from downloader.constants import K_BASE_PATH, FILE_MiSTer, FOLDER_gamecontrollerdb, FOLDER_linux, FILE_gamecontrollerdb, \
+from downloader.constants import FILE_MiSTer, FOLDER_gamecontrollerdb, FOLDER_linux, FILE_gamecontrollerdb, \
     FILE_gamecontrollerdb_user, DISTRIBUTION_MISTER_DB_ID
 from downloader.db_entity import DbEntityValidationException, check_file, check_folders, invalid_paths, \
     no_distribution_mister_invalid_paths, invalid_root_folders, distribution_mister_exceptional_paths
