@@ -16,24 +16,23 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import os
+from downloader.config import Config
 from downloader.constants import MEDIA_FAT
 from downloader.store_migrator import MigrationBase
 
 
 class MigrationV5(MigrationBase):
-    def __init__(self, config, file_system_factory) -> None:
+    def __init__(self, config: Config) -> None:
         self._config = config
-        self._file_system_factory = file_system_factory
 
     version = 5
 
     def migrate(self, local_store) -> None:
         """remove old mister from old location in case it exists"""
         try:
-            mister_old = os.path.join(self._config.get('base_system_path', MEDIA_FAT), 'Scripts/.config/downloader/MiSTer.old')
-            fs = self._file_system_factory.create_for_system_scope()
-            if fs.is_file(mister_old):
-                fs.unlink(mister_old)
+            from pathlib import Path
+            mister_old = Path(self._config.get('base_system_path', MEDIA_FAT)) / 'Scripts/.config/downloader/MiSTer.old'
+            if mister_old.is_file():
+                mister_old.unlink(missing_ok=True)
         except Exception as e:
             print(e)

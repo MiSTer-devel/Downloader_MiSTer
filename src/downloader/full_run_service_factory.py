@@ -65,7 +65,7 @@ class FullRunServiceFactory:
         file_system_factory = FileSystemFactory(config, path_dictionary, self._logger)
         system_file_system = file_system_factory.create_for_system_scope()
         external_drives_repository = self._external_drives_repository_factory.create(system_file_system, self._logger)
-        store_migrator = StoreMigrator(migrations(config, file_system_factory), self._logger)
+        store_migrator = StoreMigrator(migrations(config), self._logger)
         local_repository = LocalRepository(config, self._logger, system_file_system, store_migrator, external_drives_repository)
 
         http_connection_timeout = config['downloader_timeout'] / 4 if config['downloader_timeout'] > 60 else 15

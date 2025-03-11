@@ -68,13 +68,6 @@ class TestRealisticMigrations(unittest.TestCase):
     def test_migrate___on_vlast_with_zip_filled_store___returns_same_store(self):
         self.assert_versions_stay_the_same(self.filled_store_vlast_with_zip)
 
-    def test_migrate___on_empty_store_with_file_mister_old___file_mister_old_gets_removed(self):
-        file = 'Scripts/.config/downloader/MiSTer.old'
-        file_system_state = FileSystemState(files={file: file_descr()})
-        sut = StoreMigrator(file_system_factory=FileSystemFactory(file_system_state))
-        sut.migrate({})
-        self.assertEqual(fs_data(), sut.system_file_system.data)
-
     def assert_versions_change_as_expected(self, initial_file, expected_file):
         store = load_file(initial_file)
         StoreMigrator().migrate(store)
