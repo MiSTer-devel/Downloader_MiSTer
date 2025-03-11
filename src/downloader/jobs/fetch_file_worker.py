@@ -47,7 +47,7 @@ class FetchFileWorker(DownloaderWorker):
         target_path = job.pkg.full_path
         desc = job.pkg.description
 
-        if temp_path is None and backup_path is not None and self._file_system.is_file(target_path, use_cache=False):
+        if temp_path is None and backup_path is not None and self._file_system.is_file(target_path, use_cache=False):  # @TODO: See if use_cache is needed
             self._file_system.copy(target_path, backup_path)
 
         file_path = temp_path or target_path
@@ -61,7 +61,7 @@ class FetchFileWorker(DownloaderWorker):
                 return [], FileDownloadError(f"Bad hash on {job.pkg.rel_path} ({desc['hash']} != {file_hash})")
 
             if file_path != target_path:
-                if backup_path is not None and self._file_system.is_file(target_path, use_cache=False):
+                if backup_path is not None and self._file_system.is_file(target_path, use_cache=False):  # @TODO: See if use_cache is needed
                     self._file_system.move(target_path, backup_path)
                 self._file_system.move(file_path, target_path)
 
