@@ -22,7 +22,7 @@ import unittest
 from downloader.config import default_config
 from downloader.constants import FILE_MiSTer, FOLDER_gamecontrollerdb, FOLDER_linux, FILE_gamecontrollerdb, \
     FILE_gamecontrollerdb_user, DISTRIBUTION_MISTER_DB_ID
-from downloader.db_entity import DbEntityValidationException, check_file, check_folders, invalid_paths, \
+from downloader.db_entity import DbEntityValidationException, check_file_pkg, check_folder_paths, invalid_paths, \
     no_distribution_mister_invalid_paths, invalid_root_folders, distribution_mister_exceptional_paths
 from downloader.db_options import DbOptionsValidationException
 from downloader.path_package import PathPackage, PathPackageKind, PathType
@@ -71,13 +71,13 @@ class TestDbEntity(unittest.TestCase):
         ]
         for i, (fp, fd) in enumerate(wrong_files):
             with self.subTest(i):
-                self.assertRaises(DbEntityValidationException, lambda: check_file(pkg(fp, fd), db_test, None))
+                self.assertRaises(DbEntityValidationException, lambda: check_file_pkg(pkg(fp, fd), db_test, None))
 
     def test_construct_db_entity___with_saves_files_that_allow_overwrite___raises_db_entity_validation_exception(self):
-        self.assertRaises(DbEntityValidationException, lambda: check_file(pkg(file_save_psx_castlevania, file_save_psx_castlevania_descr(overwrite=True)), db_test, None))
+        self.assertRaises(DbEntityValidationException, lambda: check_file_pkg(pkg(file_save_psx_castlevania, file_save_psx_castlevania_descr(overwrite=True)), db_test, None))
 
     def test_construct_db_entity___with_saves_files_without_overwrite_property___raises_db_entity_validation_exception(self):
-        self.assertRaises(DbEntityValidationException, lambda: check_file(pkg(file_save_psx_castlevania, file_save_psx_castlevania_descr()), db_test, None))
+        self.assertRaises(DbEntityValidationException, lambda: check_file_pkg(pkg(file_save_psx_castlevania, file_save_psx_castlevania_descr()), db_test, None))
 
     def test_construct_db_entity___with_saves_files_that_doesnt_allow_overwrite___returns_db(self):
         self.assertIsNotNone(db_entity(files={file_save_psx_castlevania: file_save_psx_castlevania_descr(overwrite=False)}))
@@ -101,16 +101,16 @@ class TestDbEntity(unittest.TestCase):
 
         for wrong_path in invalids:
             with self.subTest(wrong_path):
-                self.assertRaises(DbEntityValidationException, lambda: check_file(pkg(wrong_path, file_a_descr()), db_test, None))
+                self.assertRaises(DbEntityValidationException, lambda: check_file_pkg(pkg(wrong_path, file_a_descr()), db_test, None))
 
     def test_construct_db_entity___with_invalid_root_folders___raises_error(self):
         invalids = ('linux/f', 'linux/something/something/', '../', 'this/is/ok/../or/', '/user/', '.config/') + tuple('%s/folder' % f for f in invalid_root_folders) + distribution_mister_exceptional_paths
         for wrong_path in invalids:
             with self.subTest(wrong_path):
-                self.assertRaises(DbEntityValidationException, lambda: check_folders([pkg(wrong_path, {})], 'wrong_db'))
+                self.assertRaises(DbEntityValidationException, lambda: check_folder_paths([pkg(wrong_path, {})], 'wrong_db'))
 
     def test_construct_db_entity___with_mister_file___raises_invalid_downloader_path_exception(self):
-        self.assertRaises(DbEntityValidationException, lambda: check_file(pkg(FILE_MiSTer, file_mister_descr()), db_test, None))
+        self.assertRaises(DbEntityValidationException, lambda: check_file_pkg(pkg(FILE_MiSTer, file_mister_descr()), db_test, None))
 
     def test_construct_db_entity___valid_folders___does_not_raise_an_error(self):
         invalids = (FOLDER_linux, FOLDER_gamecontrollerdb)

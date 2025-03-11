@@ -21,12 +21,12 @@ import configparser
 import re
 import time
 from pathlib import Path
-from typing import Optional, List, TypeVar, Union, SupportsInt
+from typing import Optional, TypeVar, Union, SupportsInt
 
 
 from downloader.config import Environment, Config, default_config, InvalidConfigParameter, AllowReboot, \
     ConfigDatabaseSection, ConfigMisterSection, AllowDelete
-from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, K_DEFAULT_DB_ID, K_OPTIONS, K_BASE_PATH, \
+from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, K_DEFAULT_DB_ID, K_BASE_PATH, \
     K_DB_URL, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER, K_BASE_SYSTEM_PATH, \
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, \
@@ -201,7 +201,7 @@ class ConfigReader:
         }
 
         options = self._parse_database_options(parser, section_id)
-        if len(options.items()) > 0:
+        if options.any():
             description['options'] = options
 
         return description
@@ -236,7 +236,7 @@ class ConfigReader:
             'downloader_threads_limit': parser.get_int(K_DOWNLOADER_THREADS_LIMIT, result['downloader_threads_limit']),
             'downloader_timeout': parser.get_int(K_DOWNLOADER_TIMEOUT, result['downloader_timeout']),
             'downloader_retries': parser.get_int(K_DOWNLOADER_RETRIES, result['downloader_retries']),
-            'filter': parser.get_string(K_FILTER, result['filter']),
+            'filter': parser.get_string(K_FILTER, result['filter']).strip().lower(),
             'minimum_system_free_space_mb': parser.get_int(K_MINIMUM_SYSTEM_FREE_SPACE_MB, result['minimum_system_free_space_mb']),
             'minimum_external_free_space_mb': parser.get_int(K_MINIMUM_EXTERNAL_FREE_SPACE_MB, result['minimum_external_free_space_mb']),
             'user_defined_options': []
