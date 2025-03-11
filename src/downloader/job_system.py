@@ -78,13 +78,13 @@ class JobSystem(JobContext):
         self._is_executing_jobs: bool = False
         self._timeout_clock: float = 0
         self._timed_out: bool = False
-        self._signals = [signal.SIGINT]
+        self._signals: List[signal.Signals] = [signal.SIGINT]
 
     def timed_out(self) -> bool: return self._timed_out
     def get_unhandled_exceptions(self) -> Iterable[BaseException]: return self._unhandled_errors
     def pending_jobs_amount(self) -> int: return self._pending_jobs_amount
 
-    def set_interfering_signals(self, signals: List[signal.Signals]):
+    def set_interfering_signals(self, signals: List[signal.Signals]) -> None:
         with self._lock:
             if self._is_executing_jobs: raise CantSetSignalsException('Can not set interfering signals while executing jobs')
 
