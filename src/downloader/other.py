@@ -18,13 +18,13 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import urllib
-from typing import Optional
+from typing import Optional, Any
 
 from pathlib import Path
 from downloader.constants import FILE_MiSTer
 
 
-def empty_store_without_base_path():
+def empty_store_without_base_path() -> dict[str, Any]:
     return {
         'zips': {},
         'folders': {},
@@ -32,7 +32,7 @@ def empty_store_without_base_path():
     }
 
 
-def calculate_url(base_files_url, path) -> Optional[str]:
+def calculate_url(base_files_url: str, path: str) -> Optional[str]:
     if base_files_url is None or base_files_url.strip() == '':
         return None
 
@@ -40,7 +40,7 @@ def calculate_url(base_files_url, path) -> Optional[str]:
     return url
 
 
-def format_files_message(file_list):
+def format_files_message(file_list: list[str]) -> str:
     any_mra_files = [file for file in file_list if file[-4:].lower() == '.mra']
 
     rbfs = [file for file in file_list if file[-4:].lower() == '.rbf' or file == FILE_MiSTer]
@@ -72,13 +72,13 @@ def format_files_message(file_list):
     return 'none.' if message == '' else message
 
 
-def format_folders_message(folder_list):
+def format_folders_message(folder_list: list[str]) -> str:
     printable = [f'Folder {folder}' for folder in set(folder_list[0:10])]
     message = ', '.join(printable)
     return f'{message} + other folders.' if len(folder_list) > len(printable) else message
 
 
-def format_zips_message(zip_list):
+def format_zips_message(zip_list: list[str]) -> str:
     printable = [f'Zip {zip}' for zip in set(zip_list[0:10])]
     message = ', '.join(printable)
     return f'{message} + other zips.' if len(zip_list) > len(printable) else message

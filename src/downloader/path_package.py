@@ -135,13 +135,13 @@ class PathPackage:
             return self.rel_path
 
     def temp_path(self, already_exists: bool) -> Optional[str]:
-        if 'tmp' in self.description:
+        if 'tmp' in self.description and isinstance(self.description['tmp'], str):
             return (self.drive + '/' + self.description['tmp']) if self.drive is not None else self.description['tmp']
         else:
             return self.full_path + SUFFIX_file_in_progress if already_exists else None
 
     def backup_path(self) -> Optional[str]:
-        if 'backup' in self.description:
+        if 'backup' in self.description and isinstance(self.description['backup'], str):
             return (self.drive + '/' + self.description['backup']) if self.drive is not None else self.description['backup']
         else:
             return None
