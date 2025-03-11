@@ -116,15 +116,6 @@ class FakeFileSystem(ProductionFileSystem):
     def _fix_paths(self, paths):
         return [p.replace(self._base_path(p) + '/', '') for p in paths]
 
-    def unique_temp_filename(self, register: bool = True):
-        name = '/tmp/unique_temp_filename_%d' % self.unique_temp_filename_index
-        self.unique_temp_filename_index += 1
-        if register: self._write_records.append(_Record('unique_temp_filename', name))
-        return ClosableValue(name, lambda: None)
-
-    def persistent_temp_dir(self) -> str:
-        return '/tmp'
-
     def hash(self, path):
         file_path = self._path(path)
         if file_path not in self.state.files:

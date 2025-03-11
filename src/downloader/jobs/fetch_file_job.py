@@ -25,7 +25,7 @@ from downloader.path_package import PathPackage
 class FetchFileJob(Job):
     __slots__ = ('_tags', 'source', 'already_exists', 'pkg', 'db_id', 'after_job')
     type_id: int = JobSystem.get_job_type_id()
-    def __init__(self, source: str, already_exists: bool, pkg: Optional[PathPackage], db_id: Optional[str], /):
+    def __init__(self, source: str, already_exists: bool, pkg: PathPackage, db_id: Optional[str], /):
         self.source = source
         self.already_exists = already_exists
         self.pkg = pkg

@@ -37,13 +37,13 @@ class BasePathRelocator:
         result = []
         for pkg in db_pkgs:
             if not pkg.store.read_only().has_base_path():
-                pkg.store.write_only().set_base_path(self._config[K_BASE_PATH])
+                pkg.store.write_only().set_base_path(self._config['base_path'])
 
             from_base_path = pkg.store.read_only().base_path
-            to_base_path = self._config[K_BASE_PATH]
+            to_base_path = self._config['base_path']
 
             if to_base_path == from_base_path:
-                self._logger.debug('%s still uses base_path: %s', pkg.db_id, self._config[K_BASE_PATH])
+                self._logger.debug('%s still uses base_path: %s', pkg.db_id, self._config['base_path'])
                 continue
 
             from_file_system = self._file_system_factory.create_for_config(config_with_base_path(self._config, from_base_path))
@@ -84,7 +84,7 @@ class BasePathRelocatorPackage:
     def db_id(self): return self._db_id
 
     def relocate_non_system_files(self) -> None:
-        files_to_relocate: Tuple[str, Dict[str, Any]] = []
+        files_to_relocate: list[tuple[str, Dict[str, Any]]] = []
         for file, description in self._store.read_only().files.items():
             if 'path' in description and description['path'] == 'system':
                 continue
@@ -168,7 +168,7 @@ class BasePathRelocatorPackage:
 
     @property
     def _to_base_path(self) -> str:
-        return self._config[K_BASE_PATH]
+        return self._config['base_path']
 
 
 class RelocatorError(Exception):

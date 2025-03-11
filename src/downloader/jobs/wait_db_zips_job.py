@@ -19,7 +19,7 @@
 from dataclasses import field, dataclass
 from typing import Any, Dict, List
 
-from downloader.config import Config
+from downloader.config import Config, ConfigDatabaseSection
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
 from downloader.local_store_wrapper import StoreWrapper
@@ -31,7 +31,7 @@ class WaitDbZipsJob(Job):
 
     db: DbEntity
     store: StoreWrapper
-    ini_description: Dict[str, Any]
+    ini_description: ConfigDatabaseSection
     full_resync: bool
     config: Config
     zip_job_tags: List[str]

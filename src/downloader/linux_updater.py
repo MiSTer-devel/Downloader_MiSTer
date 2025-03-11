@@ -21,7 +21,7 @@ import json
 import sys
 import tempfile
 import os.path
-from typing import Dict, List
+from typing import Dict, List, Any
 from downloader.config import Config
 from downloader.constants import FILE_7z_util_uninstalled, FILE_7z_util_uninstalled_description, FILE_Linux_uninstalled, FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version, FILE_7z_util, FILE_Linux_user_files
 from downloader.db_entity import DbEntity
@@ -36,8 +36,8 @@ class LinuxUpdater:
         self._logger = logger
         self._file_system = file_system
         self._fetcher = fetcher
-        self._linux_descriptions = []
-        self._user_files = []
+        self._linux_descriptions: list[dict[str, Any]] = []
+        self._user_files: list[tuple[str, str]] = []
 
     def update_linux(self, dbs: List[DbEntity]):
         self._logger.bench('Update Linux start.')

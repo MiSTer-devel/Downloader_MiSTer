@@ -75,7 +75,7 @@ class PathPackage:
         self.ty = ty
         self.kind = kind
         self.pext_props = pext_props
-        self._full_path = None
+        self._full_path: Optional[str] = None
 
     @property
     def full_path(self) -> str:
@@ -122,7 +122,7 @@ class PathPackage:
             PextPathProps(
                 PEXT_KIND_STANDARD,
                 '',  # parent
-                self.drive,
+                self.drive or '',
                 (),  # other drives
                 False  # is subfolder
             ) if self.pext_props is None else self.pext_props.clone(),

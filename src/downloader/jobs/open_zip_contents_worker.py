@@ -17,13 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import os
+from typing import Optional, Union
 
 from downloader.job_system import WorkerResult
-from downloader.jobs.index import Index
-from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.process_db_index_worker import create_fetch_jobs
 from downloader.path_package import PATH_PACKAGE_KIND_STANDARD, PATH_TYPE_FILE, PATH_TYPE_FOLDER, PathPackage
-from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
 from downloader.file_system import UnzipError
 
@@ -36,23 +35,24 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         logger = self._ctx.logger
         logger.bench('OpenZipContentsWorker start: ', job.db.db_id, job.zip_id)
 
+        zip_paths: Optional[dict[str, str]]
         if job.zip_kind == ZipKind.EXTRACT_ALL_CONTENTS:
             should_extract_all = len(job.files_to_unzip) > (0.7 * job.total_amount_of_files_in_zip)
             if should_extract_all:
                 zip_paths = None
             else:
-                root_zip_path = os.path.join(job.target_folder.rel_path, '')
+                root_zip_path = os.path.join(job.target_folder.rel_path, '')  # type: ignore[union-attr]
                 zip_paths = {pkg.description.get('zip_path', None) or pkg.rel_path.removeprefix(root_zip_path): pkg.full_path for pkg in job.files_to_unzip}
         elif job.zip_kind == ZipKind.EXTRACT_SINGLE_FILES:
             should_extract_all = False
             zip_paths = {pkg.description['zip_path']: pkg.full_path for pkg in job.files_to_unzip}
         else: raise ValueError(f"Impossible kind '{job.zip_kind}' for zip '{job.zip_id}' in db '{job.db.db_id}'")
 
-        target_path = job.target_folder.full_path if should_extract_all else zip_paths
+        target_path: Union[str, dict[str, str]] = job.target_folder.full_path if should_extract_all else (zip_paths or {})  # type: ignore[union-attr]
         self._ctx.file_download_session_logger.print_progress_line(job.action_text)
         logger.bench('OpenZipContentsWorker unzipping...', job.db.db_id, job.zip_id)
         try:
-            self._ctx.file_system.unzip_contents(job.transfer_job.transfer(), target_path, (job.target_folder, job.files_to_unzip, job.filtered_data['files']))
+            self._ctx.file_system.unzip_contents(job.transfer_job.transfer(), target_path, (job.target_folder, job.files_to_unzip, job.filtered_data['files']))  # type: ignore[union-attr]
         except UnzipError as e:
             self._ctx.swallow_error(e)
             return [], e

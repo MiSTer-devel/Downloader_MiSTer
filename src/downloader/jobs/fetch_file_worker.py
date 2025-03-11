@@ -96,7 +96,7 @@ class FileFetcher:
         except OSError as e:
             return 0, '', FileDownloadError(f'OS Error! {url}: {e.errno} {str(e)}', e)
         except BaseException as e:
-            return 0, '', FileDownloadError(f'Exception during download! {url}: {str(e)}', e)
+            return 0, '', FileDownloadError(f'Exception during download! {url}: {str(e)}')
 
         if not self._file_system.is_file(download_path, use_cache=False):
             return 0, '', FileDownloadError(f'File from {url} could not be stored.')

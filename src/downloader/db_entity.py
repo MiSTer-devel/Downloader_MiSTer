@@ -195,11 +195,11 @@ def _validate_and_extract_parts_from_path(db_id, path):
 
     return parts
 
-no_distribution_mister_invalid_paths: Final[tuple[str]] = tuple(item.lower() for item in [FILE_MiSTer, FILE_menu_rbf])
-invalid_paths: Final[tuple[str]] = tuple(item.lower() for item in [FILE_MiSTer_ini, FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, FILE_downloader_launcher_script, FILE_MiSTer_new])
-invalid_root_folders: Final[tuple[str]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_screenshots, FOLDER_savestates])
-folders_with_non_overridable_files: Final[tuple[str]] = tuple(item.lower() for item in [FOLDER_saves])
-exceptional_paths: Final[tuple[str]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, FILE_gamecontrollerdb_user, FILE_yc_txt])
-distribution_mister_exceptional_paths: Final[tuple[str]] = tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow])
+no_distribution_mister_invalid_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FILE_MiSTer, FILE_menu_rbf])
+invalid_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FILE_MiSTer_ini, FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, FILE_downloader_launcher_script, FILE_MiSTer_new])
+invalid_root_folders: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_screenshots, FOLDER_savestates])
+folders_with_non_overridable_files: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_saves])
+exceptional_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, FILE_gamecontrollerdb_user, FILE_yc_txt])
+distribution_mister_exceptional_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow])
 
 class DbEntityValidationException(Exception): pass

@@ -113,10 +113,10 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             transfer_job=data_job,
             action_text=job.zip_description['description'],
             zip_base_files_url=job.zip_description.get('base_files_url', '').strip(),
-            filtered_data=job.filtered_data,
+            filtered_data=job.filtered_data or {'files': {}, 'folders': {}}
         )
-        data_job.after_job = open_zip_contents_job
-        return [data_job], None
+        data_job.after_job = open_zip_contents_job  # type: ignore[union-attr]
+        return [data_job], None  # type: ignore[list-item]
 
     @staticmethod
     def _create_target_package(calculator: TargetPathsCalculator, kind: ZipKind, description: Dict[str, Any]) -> Tuple[Optional[PathPackage], Optional[Exception]]:

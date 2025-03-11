@@ -163,7 +163,7 @@ class OnlineImporter(ProductionOnlineImporter):
         return store
 
     def report(self) -> InstallationReport:
-        return self._worker_ctx.file_download_session_logger.report()
+        return self._worker_ctx.installation_report
     
     def box(self) -> InstallationBox:
         return self._box

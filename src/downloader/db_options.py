@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Set, TypedDict, Dict, Any
+from typing import Set, TypedDict
 
 from downloader.other import test_only
 
@@ -50,9 +50,6 @@ class DbOptions:
 
     def unwrap_props(self) -> DbOptionsProps:
         return self._props
-
-    def apply_to_config(self, config: Dict[str, Any]):
-        config.update(self._props)
 
     @property
     @test_only

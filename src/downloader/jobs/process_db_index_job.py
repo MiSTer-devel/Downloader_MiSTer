@@ -19,7 +19,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from downloader.config import Config
+from downloader.config import Config, ConfigDatabaseSection
 from downloader.db_entity import DbEntity
 from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, JobSystem
@@ -35,7 +35,7 @@ class ProcessDbIndexJob(Job):
     # Inputs
     db: DbEntity
     store: StoreWrapper
-    ini_description: dict[str, Any]
+    ini_description: ConfigDatabaseSection
     index: Index
     full_resync: bool
     config: Config

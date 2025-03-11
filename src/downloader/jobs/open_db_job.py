@@ -17,8 +17,8 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import Any
 
+from downloader.config import ConfigDatabaseSection
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.transfer_job import TransferJob
 from downloader.local_store_wrapper import StoreWrapper
@@ -29,7 +29,7 @@ class OpenDbJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
     transfer_job: TransferJob # Job & Transferrer @TODO: Python 3.10
     section: str
-    ini_description: dict[str, Any]
+    ini_description: ConfigDatabaseSection
     store: StoreWrapper
     full_resync: bool
 

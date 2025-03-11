@@ -28,7 +28,7 @@ class OpenZipSummaryWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: OpenZipSummaryJob) -> WorkerResult:  # type: ignore[override]
         try:
-            summary = self._ctx.file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())
+            summary = self._ctx.file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())  # type: ignore[union-attr]
             check_zip_summary(summary, job.db.db_id, job.zip_id)
             return [make_process_zip_index_job(
                 zip_id=job.zip_id,

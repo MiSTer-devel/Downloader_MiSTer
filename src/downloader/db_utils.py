@@ -52,10 +52,10 @@ def build_db_config(input_config: Config, db: DbEntity, ini_description: ConfigD
 
     for key, option in db.default_options.items():
         if key not in input_config['user_defined_options'] or (key == 'filter' and '[mister]' in option.lower()):
-            result[key] = option
+            result[key] = option  # type: ignore[literal-required]
 
     if 'options' in ini_description:
-        ini_description['options'].apply_to_config(result)
+        result.update(ini_description['options'].unwrap_props())
 
     if result['filter'] is not None:
         result['filter'] = result['filter'].lower()
