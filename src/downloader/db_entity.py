@@ -30,7 +30,7 @@ from downloader.path_package import PathPackage
 
 
 class DbEntity:
-    def __init__(self, db_raw: Any, section: str):
+    def __init__(self, db_raw: Any, section: str) -> None:
         if not isinstance(db_raw, dict):
             raise DbEntityValidationException(f'ERROR: Database "{section}" has improper format. The database maintainer should fix this.')
 

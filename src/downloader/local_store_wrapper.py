@@ -57,7 +57,7 @@ class LocalStore(TypedDict):
     db_sigs: dict[str, Any]
 
 class LocalStoreWrapper:
-    def __init__(self, local_store: dict[str, Any]):
+    def __init__(self, local_store: dict[str, Any]) -> None:
         if 'dbs' not in local_store:
             local_store['dbs'] = {}
         if 'db_sigs' not in local_store:

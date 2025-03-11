@@ -22,9 +22,10 @@ import threading
 import time
 from contextlib import contextmanager
 from email.utils import parsedate_to_datetime
-from typing import Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar, Generic
+from typing import Type, Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar, Generic
 from urllib.parse import urlparse, ParseResult, urlunparse
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
+from types import TracebackType
 
 
 T = TypeVar('T')
@@ -56,7 +57,7 @@ class HttpGateway:
 
     def __enter__(self): return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]) -> bool:
         if exc_type is not None and self._logger is not None:
             self._logger.debug(f"An exception of type {exc_type} occurred with value {exc_val}. Traceback: {exc_tb}")
 
