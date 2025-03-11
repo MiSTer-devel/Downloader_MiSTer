@@ -81,13 +81,13 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
         self.assertEqual(fs_data(), self.sut.fs_data)
 
     def test_download_zipped_cheats_folder___with_empty_store_and_filter_none___installs_zips_and_files(self):
-        actual_store = self.download_zipped_cheats_folder(empty_test_store(), None)
+        actual_store = self.download_zipped_cheats_folder(empty_test_store(), '')
 
         self.assertEqual(store_with_installed_cheats_files_and_zips_but_no_filtered_data(), actual_store)
         self.assertAllCheatsFilesAreInstalled()
 
     def test_download_zipped_cheats_folder___with_filtered_nes_zip_data_in_store_but_empty_filter___installs_files_and_removes_filtered_zip_data(self):
-        actual_store = self.download_zipped_cheats_folder(store_with_filtered_cheats_nes_zip_data(), None)
+        actual_store = self.download_zipped_cheats_folder(store_with_filtered_cheats_nes_zip_data(), '')
 
         self.assertEqual(store_with_installed_cheats_files_and_zips_but_no_filtered_data(), actual_store)
         self.assertAllCheatsFilesAreInstalled()
@@ -148,10 +148,10 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
         self.assertEqual(store_with_installed_cheats_files_without_zips_and_no_filtered_data(), actual_store)
         self.assertAllCheatsFilesAreInstalled()
 
-    def download_zipped_cheats_folder(self, store, filter_value, summary=None, summary_hash=None, implicit_inputs=None):
+    def download_zipped_cheats_folder(self, store, filter_value: str, summary=None, summary_hash=None, implicit_inputs=None):
         implicit_inputs = implicit_inputs if implicit_inputs is not None else ImporterImplicitInputs()
-        implicit_inputs.config[K_FILTER] = filter_value
-        implicit_inputs.config[K_ZIP_FILE_COUNT_THRESHOLD] = 0 # This will cause to unzip the contents
+        implicit_inputs.config['filter'] = filter_value
+        implicit_inputs.config['zip_file_count_threshold'] = 0 # This will cause to unzip the contents
 
         self.sut = OnlineImporter.from_implicit_inputs(implicit_inputs)
 
