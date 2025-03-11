@@ -313,20 +313,6 @@ class IniParser:
         if result is None: return default
         return to_int(result, default)
 
-    def get_str_list(self, key: str, default: List[str]) -> List[str]:
-        result = [s for s in [s.strip('"\' ') for s in self.get_string(key, '')] if s != '']
-        if len(result) > 0:
-            return result
-        else:
-            return default
-
-    def get_int_list(self, key: str, default: List[int]):
-        result = [s for s in [to_int(s, None) for s in self.get_str_list(key, [])] if s is not None]
-        if len(result) > 0:
-            return result
-        else:
-            return default
-
     def has(self, key: str):
         return self._ini_args.get(key) is not None
 

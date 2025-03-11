@@ -144,10 +144,6 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def remove_non_empty_folder(self, path: str) -> None:
-        """interface"""
-
-    @abstractmethod
     def download_target_path(self, path: str) -> str:
         """interface"""
 
@@ -420,17 +416,6 @@ class _FileSystem(FileSystem):
     def _ignore_error(self, e: Exception) -> None:
         self._logger.debug(e)
         self._logger.debug('Ignoring error.')
-
-    def remove_non_empty_folder(self, path: str) -> None:
-        if self._config['allow_delete'] != AllowDelete.ALL:
-            return
-
-        full_path = self._path(path)
-        self._debug_log('Deleting non-empty folder', (path, full_path))
-        try:
-            shutil.rmtree(full_path)
-        except Exception as e:
-            self._ignore_error(e)
 
     def download_target_path(self, path: str) -> str:
         return self._path(path)

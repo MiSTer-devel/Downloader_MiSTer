@@ -16,7 +16,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import ipaddress
-from typing import Dict, Any, Final, List, Optional, TypedDict
+from typing import Dict, Any, Final, List, Optional
 from urllib.parse import urlparse
 
 from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FILE_MiSTer_alt_ini, \
@@ -24,7 +24,7 @@ from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FI
     FILE_MiSTer_new, FOLDER_linux, FOLDER_saves, FOLDER_savestates, FOLDER_screenshots, FILE_PDFViewer, FILE_lesskey, \
     FILE_glow, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, DISTRIBUTION_MISTER_DB_ID, FILE_gamecontrollerdb_user, \
     FILE_yc_txt
-from downloader.db_options import DbOptions, DbOptionsProps
+from downloader.db_options import DbOptions
 from downloader.other import test_only
 from downloader.path_package import PathPackage
 
