@@ -16,6 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import STORAGE_PATHS_PRIORITY_SEQUENCE, MEDIA_FAT, K_BASE_SYSTEM_PATH, K_BASE_PATH
+from downloader.file_system import FileSystem
+from downloader.logger import Logger
 from downloader.other import cache
 
 
@@ -25,10 +27,9 @@ class ExternalDrivesRepositoryFactory:
 
 
 class ExternalDrivesRepository:
-    def __init__(self, file_system, logger) -> None:
+    def __init__(self, file_system: FileSystem, logger: Logger) -> None:
         self._file_system = file_system
         self._logger = logger
-        self._drive_folders_cache = {}
 
     @cache
     def connected_drives(self):

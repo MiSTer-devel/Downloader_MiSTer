@@ -213,5 +213,5 @@ class StoragePriorityError(Exception): pass
 
 class StoragePriorityRegistryEntry:
     def __init__(self) -> None:
-        self.drives = set()
-        self.folders = dict()
+        self.drives: set[str] = set()
+        self.folders: dict[str, Any] = dict()
