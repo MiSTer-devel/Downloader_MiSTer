@@ -46,6 +46,12 @@ update_linux = true
 ;   2 -> Allow this tool to reboot the system only after Linux has been updated.
 allow_reboot = 1
 
+; allow_delete options:
+;   0 -> Don't allow this tool to delete anything at all.
+;   1 -> Allow this tool to delete any old file from previous updates.
+;   2 -> Allow this tool to delete only old cores that receive a new version.
+allow_delete = 1
+
 ; minimum_system_free_space_mb: Fee space needed to install files with Downloader
 ;   This minimum applies solely to the system partition (SD card).
 ;   Reducing this value is not advised.
