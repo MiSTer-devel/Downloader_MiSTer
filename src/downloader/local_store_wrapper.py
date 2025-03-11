@@ -58,10 +58,6 @@ class LocalStore(TypedDict):
 
 class LocalStoreWrapper:
     def __init__(self, local_store: dict[str, Any]) -> None:
-        if 'dbs' not in local_store:
-            local_store['dbs'] = {}
-        if 'db_sigs' not in local_store:
-            local_store['db_sigs'] = {}
         self._local_store: LocalStore = cast(LocalStore, local_store)
         self._dirty = False
 
