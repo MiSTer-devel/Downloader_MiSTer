@@ -116,7 +116,7 @@ def check_no_url_files(files: list[PathPackage], db_id: str) -> None:
         if 'hash' not in file_description or not isinstance(file_description['hash'], str): raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. File needs a valid hash. The database maintainer should fix this.')
         if 'size' not in file_description or not isinstance(file_description['size'], int): raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. File needs a valid size. The database maintainer should fix this.')
 
-def check_file(file_pkg: PathPackage, db_id: str, url: Optional[str], /) -> None:
+def check_file_pkg(file_pkg: PathPackage, db_id: str, url: Optional[str], /) -> None:
     file_path, file_description = file_pkg.rel_path, file_pkg.description
     if not is_url_valid(url or file_description.get('url', None)):
         raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. Invalid url "{url}". The database maintainer should fix this.')
@@ -150,7 +150,7 @@ def is_url_valid(url: str) -> bool:
     except:
         return False
 
-def check_folders(folders: dict[str, Any], db_id: str) -> None:
+def check_folder_paths(folders: list[str], db_id: str) -> None:
     if len(folders) == 0: return
 
     for folder_path in folders:

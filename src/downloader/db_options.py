@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Set, TypedDict, Any, cast
+from typing import Set, TypedDict, Any, cast, Optional
 
 from downloader.other import test_only
 
@@ -40,18 +40,23 @@ class DbOptions:
             present.add('downloader_retries')
         if 'base_path' in props:  # @TODO (downloader 2.0++): Remove this in a future version
             present.add('base_path')
+
+        self.filter: Optional[str]
         if 'filter' in props:
             if not isinstance(props['filter'], str):
                 raise DbOptionsValidationException(['filter'])
             present.add('filter')
+            self.filter = props['filter'].strip().lower()
+        else:
+            self.filter = None
 
         if len(present) != len(props):
             raise DbOptionsValidationException([o for o in props if o not in present])
 
         self._props = cast(DbOptionsProps, props)
 
-    def items(self):
-        return self._props.items()
+    def any(self) -> bool:
+        return len(self._props) > 0
 
     def unwrap_props(self) -> DbOptionsProps:
         return self._props

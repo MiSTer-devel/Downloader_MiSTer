@@ -22,7 +22,7 @@ import threading
 import os
 from collections import defaultdict
 
-from downloader.db_entity import check_file, check_folders
+from downloader.db_entity import check_file_pkg, check_folder_paths
 from downloader.file_filter import BadFileFilterPartException, Config, ZipData
 from downloader.file_system import FileWriteError, FolderCreationError, FsError, ReadOnlyFileSystem
 from downloader.free_space_reservation import Partition
@@ -244,7 +244,7 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
         return [], [], set(), []
 
     try:
-        check_folders([pkg.rel_path for pkg in create_folder_pkgs], db_id)
+        check_folder_paths([pkg.rel_path for pkg in create_folder_pkgs], db_id)
     except Exception as e:
         ctx.swallow_error(e)
 
@@ -328,7 +328,7 @@ def create_fetch_jobs(ctx: DownloaderWorkerContext, db_id: str, non_existing_pkg
 def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_id: str, created_folders: set[str], base_files_url: str, /) -> Optional[FetchFileJob]:
     source = _url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url)
     try:
-        check_file(pkg, db_id, source)
+        check_file_pkg(pkg, db_id, source)
     except Exception as e:
         ctx.swallow_error(e)
         return None

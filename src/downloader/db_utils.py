@@ -50,12 +50,12 @@ def sorted_db_sections(config: Config) -> List[Tuple[str, ConfigDatabaseSection]
 def build_db_config(input_config: Config, db: DbEntity, ini_description: ConfigDatabaseSection) -> Config:
     result = input_config.copy()
 
-    for key, option in db.default_options.items():
-        if key not in input_config['user_defined_options'] or (key == 'filter' and '[mister]' in option.lower()):
-            result[key] = option  # type: ignore[literal-required]
+    if db.default_options.filter is not None:
+        if 'filter' not in input_config['user_defined_options'] or '[mister]' in db.default_options.filter:
+            result['filter'] = db.default_options.filter
 
-    if 'options' in ini_description:
-        result.update(ini_description['options'].unwrap_props())
+    if 'options' in ini_description and ini_description['options'].filter is not None:
+        result['filter'] = ini_description['options'].filter
 
     if result['filter'] is not None:
         result['filter'] = result['filter'].lower()
