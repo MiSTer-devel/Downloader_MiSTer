@@ -16,9 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 from downloader.config import Config, config_with_base_path
-from downloader.constants import K_BASE_PATH
 from downloader.db_utils import DbSectionPackage
 from downloader.file_system import FileSystem, FileSystemFactory
 from downloader.local_store_wrapper import StoreWrapper
@@ -147,7 +146,7 @@ class BasePathRelocatorPackage:
         for folder in folders_to_clean:
             self._from_file_system.remove_folder(folder)
 
-    def _rollback_changes(self, old_files) -> None:
+    def _rollback_changes(self, old_files: list[str]) -> None:
         self._logger.print()
         self._logger.print()
         self._logger.print('ERROR: Relocation could not be completed!')
