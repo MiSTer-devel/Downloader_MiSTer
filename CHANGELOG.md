@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Documented **Custom INI file** support in [README.md](README.md#custom-ini-file), in case you want to use a separate launcher and INI file to install different databases in isolation through that launcher.
 
 ### Changed
+- The log file `downloader.log` no longer stores debug information by default unless errors occur during the process. To log debug information, set `verbose` to `true` in the INI file, as described in the [README.md](README.md#custom-ini-file).
 - Reboot sequence takes much less time, it went from 30+ seconds to around 3.
 - Fixed database filtering not working properly in various uncommon scenarios.
 - Improved exit error codes. Previously, we were using only exit code 1 to represent any error, but now values from 10 to 19 represent system errors, and values of 20 or above represent update failures. Check the [constants.py](src/downloader/constants.py) file to see the specific error codes.

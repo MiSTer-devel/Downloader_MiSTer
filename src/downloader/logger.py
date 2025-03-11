@@ -109,7 +109,7 @@ class TopLogger(Logger, ConfigLogManager):
         self.print_logger = print_logger
         self.file_logger = file_logger
         self._verbose_mode = True
-        self._debug = True
+        self._received_exception = False
         self._start_time: Optional[float] = None
 
     @staticmethod
@@ -126,8 +126,11 @@ class TopLogger(Logger, ConfigLogManager):
         self.print_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
         self.file_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
     def debug(self, *args, sep: str='', end: str='\n', flush: bool=False) -> None:
-        if self._debug is False:
-            return
+        if self._verbose_mode is False and self._received_exception is False:
+            if _there_is_exception(args):
+                self._received_exception = True
+            else:
+                return
 
         trans_args = _transform_debug_args(args)
         if self._verbose_mode:
@@ -179,6 +182,11 @@ def _format_ex(e: BaseException) -> str:
         padding += ' ' * 4
     return exception_msg
 
+def _there_is_exception(args: tuple[Any, ...]) -> bool:
+    for a in args:
+        if isinstance(a, BaseException):
+            return True
+    return False
 
 class DebugOnlyLoggerDecorator(Logger):
     def __init__(self, decorated_logger: Logger) -> None:
