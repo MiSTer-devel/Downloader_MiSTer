@@ -25,7 +25,6 @@ from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FI
     FILE_glow, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, DISTRIBUTION_MISTER_DB_ID, FILE_gamecontrollerdb_user, \
     FILE_yc_txt
 from downloader.db_options import DbOptions
-from downloader.other import test_only
 from downloader.path_package import PathPackage
 
 
@@ -60,11 +59,9 @@ class DbEntity:
         if not isinstance(self.header, list): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "header" field. The database maintainer should fix this.')
         self.default_options: DbOptions = DbOptions(db_raw.get('default_options', None) or {})
 
-    @property
-    @test_only
-    def testable(self) -> dict[str, Any]:  # pragma: no cover
+    def extract_props(self) -> dict[str, Any]:  # pragma: no cover
         result = self.__dict__.copy()
-        result['default_options'] = result['default_options'].testable
+        result['default_options'] = result['default_options'].unwrap_props()
         if result['linux'] is None:
             result.pop('linux')
         if result['header'] is None:
