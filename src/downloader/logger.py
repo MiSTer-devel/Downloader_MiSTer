@@ -67,7 +67,7 @@ class FilelogManager(Protocol):
     def set_local_repository(self, local_repository: FilelogSaver) -> None: pass
 
 class FileLogger(Logger, FilelogManager):
-    def __init__(self):
+    def __init__(self) -> None:
         self._logfile = tempfile.NamedTemporaryFile('w', delete=False)
         self._local_repository: Optional[FilelogSaver] = None
 

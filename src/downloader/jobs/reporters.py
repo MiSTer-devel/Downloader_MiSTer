@@ -83,10 +83,10 @@ class InstallationReport(Protocol):
 class JobTagTracking:
     # To avoid errors, the jobs passed here need to be kept alive in memory, since we are using their address as key,
     # and a new job with the same address of an old one would cause very hard to debug problems.
-    def __init__(self):
-        self.in_progress: Dict[Union[str, int], Set[int]] = defaultdict(set)
-        self._initiated: Set[int] = set()
-        self._ended: Set[int] = set()
+    def __init__(self) -> None:
+        self.in_progress: dict[Union[str, int], set[int]] = defaultdict(set)
+        self._initiated: set[int] = set()
+        self._ended: set[int] = set()
 
     def add_job_started(self, job: Job):
         self._add_job_in_progress(job)
@@ -159,7 +159,7 @@ class _WithLock(Generic[T]):
 
 
 class InstallationReportImpl(InstallationReport):
-    def __init__(self):
+    def __init__(self) -> None:
         # These are only accessed in the main thread
         self._jobs_started: Dict[int, List[Job]] = defaultdict(list)
         self._jobs_completed: Dict[int, List[Job]] = defaultdict(list)
