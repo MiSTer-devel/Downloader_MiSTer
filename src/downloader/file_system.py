@@ -108,10 +108,6 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def copy_fast(self, source: str, target: str) -> None:
-        """interface"""
-
-    @abstractmethod
     def hash(self, path: str) -> str:
         """interface"""
 
@@ -327,24 +323,19 @@ class _FileSystem(FileSystem):
         self._shared_state.add_file(full_target)
 
     def copy(self, source: str, target: str) -> None:
+        """Copy a file from source to target with optimized buffer size for embedded systems."""
         full_source = self._path(source)
         full_target = self._path(target)
         self._debug_log('Copying', (source, full_source), (target, full_target))
         try:
-            shutil.copyfile(full_source, full_target, follow_symlinks=True)
+            # Use manual file handling with a larger buffer for better performance on embedded systems
+            with open(full_source, 'rb') as fsource:
+                with open(full_target, 'wb') as ftarget:
+                    shutil.copyfileobj(fsource, ftarget, length=1024 * 1024 * 4)
+            self._shared_state.add_file(full_target)
         except Exception as e:
             self._logger.debug(e)
             raise FileCopyError(f"Cannot copy '{source}' to '{target}'") from e
-        self._shared_state.add_file(full_target)
-
-    def copy_fast(self, source: str, target: str) -> None:
-        full_source = self._path(source)
-        full_target = self._path(target)
-        self._debug_log('Copying', (source, full_source), (target, full_target))
-        with open(full_source, 'rb') as fsource:
-            with open(full_target, 'wb') as ftarget:
-                shutil.copyfileobj(fsource, ftarget, length=1024 * 1024 * 4)
-        self._shared_state.add_file(full_target)
 
     def hash(self, path: str) -> str:
         try:
