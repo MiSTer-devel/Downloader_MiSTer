@@ -112,7 +112,7 @@ class BasePathRelocatorPackage:
             self._logger.print('Relocated: %s ' % file, end='', flush=True)
 
             self._to_file_system.make_dirs_parent(file)
-            self._to_file_system.copy_fast(source_path, file)
+            self._to_file_system.copy(source_path, file)
             old_files.append(file)
 
             target_hash = self._to_file_system.hash(file)

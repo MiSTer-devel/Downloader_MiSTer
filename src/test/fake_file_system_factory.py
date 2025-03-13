@@ -210,9 +210,6 @@ class FakeFileSystem(ProductionFileSystem):
         self._write_records.append(_Record('copy', (source_file, target_file)))
         self._fs_cache.add_file(target_file)
 
-    def copy_fast(self, source, target):
-        self.copy(source, target)
-
     def make_dirs(self, path):
         folder = self._path(path)
         path_parents = list(Path(folder).parents)
