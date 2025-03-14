@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -124,6 +124,18 @@ class TestLocalRepository(unittest.TestCase):
         store = load_store(fs(files={usb0_db_json_file: birdy_cifs_json_db()}))
         self.assertEqual(birdy_store_with_fixed_files_and_folders(), store)
 
+    def test_load_store___when_there_is_an_error_on_internal_store___returns_an_empty_store(self):
+        files_system = fs(files=db_files_internal_empty())
+        files_system[0].set_read_error()
+        store = load_store(files_system)
+        self.assertEqual({}, store)
+
+    def test_load_store___when_there_is_no_internal_store_and_an_error_on_external_store___ignores_the_external_store_and_returns_an_empty_store(self):
+        files_system = fs(files={usb0_db_json_file: birdy_cifs_json_db()})
+        files_system[0].set_read_error()
+        store = load_store(files_system)
+        self.assertEqual({}, store)
+
 
 def save_store(fs_objects, input_local_store):
     file_system, fs_state = fs_objects
@@ -195,7 +207,6 @@ def birdy_store_with_fixed_files_and_folders():
             },
             'files': {},
             'folders': {},
-            'offline_databases_imported': [],
             'zips': {}
         }
     }

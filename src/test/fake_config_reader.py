@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,11 +16,11 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.config import ConfigReader as ProductionConfigReader
-from downloader.logger import NoLogger
+from downloader.config_reader import ConfigReader as ProductionConfigReader
+from test.fake_logger import NoLogger
 from test.objects import default_env
 
 
 class ConfigReader(ProductionConfigReader):
     def __init__(self, env=None):
-        super().__init__(NoLogger(), env or default_env())
+        super().__init__(NoLogger(), env or default_env(), 0)

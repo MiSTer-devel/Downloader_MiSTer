@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,4 +17,13 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 
-class FileDownloadException(Exception): pass
+from typing import Optional
+
+
+class GetFileError(Exception):
+    def __init__(self, message: str, cause: Optional[Exception] = None) -> None:
+        super().__init__(message)
+        self.__cause__ = cause
+class FileDownloadError(GetFileError): pass
+class FileCopyError(GetFileError): pass
+class WrongDatabaseOptions(Exception): pass

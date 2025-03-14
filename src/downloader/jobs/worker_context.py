@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,33 +16,63 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from dataclasses import dataclass
+from enum import Enum, auto
+from typing import Optional
 
+from downloader.config import Config
+from downloader.external_drives_repository import ExternalDrivesRepository
+from downloader.file_filter import FileFilterFactory
 from downloader.file_system import FileSystem
+from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
-from downloader.job_system import JobSystem, Worker
-from downloader.jobs.reporters import FileDownloadProgressReporter
+from downloader.job_system import Job, Worker, ProgressReporter, JobContext
+from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
 from downloader.logger import Logger
-from downloader.target_path_repository import TargetPathRepository
+from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.waiter import Waiter
+
+
+class DownloaderWorkerFailPolicy(Enum):
+    FAIL_FAST = auto()
+    FAULT_TOLERANT = auto()
+
+
+class NilJob(Job): type_id = -1
 
 
 @dataclass
 class DownloaderWorkerContext:
-    job_system: JobSystem
+    job_ctx: JobContext
     http_gateway: HttpGateway
     logger: Logger
-    target_path_repository: TargetPathRepository
     file_system: FileSystem
     waiter: Waiter
-    file_download_reporter: FileDownloadProgressReporter
+    file_download_session_logger: FileDownloadSessionLogger
+    progress_reporter: ProgressReporter
+    installation_report: InstallationReportImpl
+    free_space_reservation: FreeSpaceReservation
+    external_drives_repository: ExternalDrivesRepository
+    file_filter_factory: FileFilterFactory
+    target_paths_calculator_factory: TargetPathsCalculatorFactory
+    config: Config
+    fail_policy: DownloaderWorkerFailPolicy = DownloaderWorkerFailPolicy.FAULT_TOLERANT
+
+    def swallow_error(self, e: Optional[Exception], print: bool = True):
+        if e is None: return
+        if self.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
+            raise e
+        self.logger.debug(e)
+        if print: self.logger.print(f"ERROR: {e}")
 
 
 class DownloaderWorker(Worker):
-    def __init__(self, ctx: DownloaderWorkerContext):
-        self._ctx = ctx
-
     @abstractmethod
-    def initialize(self):
-        """Initialize the worker"""
+    def job_type_id(self) -> int:
+        """Returns the type id of the job this worker operates on."""
+
+
+class DownloaderWorkerBase(DownloaderWorker, ABC):
+    def __init__(self, ctx: DownloaderWorkerContext) -> None: self._ctx = ctx
+

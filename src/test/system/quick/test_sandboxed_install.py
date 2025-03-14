@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,7 +20,8 @@ import shutil
 from pathlib import Path
 from downloader.constants import K_BASE_PATH, FILE_mister_downloader_needs_reboot
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
-from downloader.logger import PrintLogger
+from downloader.logger import PrintLogger, TopLogger
+from test.fake_logger import NoLogger
 from test.system.quick.sandbox_test_base import SandboxTestBase, tmp_delme_sandbox, local_store_files, load_json, hashes, cleanup
 from test.fake_store_migrator import StoreMigrator
 from downloader.file_system import hash_file
@@ -136,37 +137,6 @@ class TestSandboxedInstall(SandboxTestBase):
 
         self.assertEqual(baz_exists_before, baz_exists_after)
 
-    def test_sandbox_db___deletes_extra_file_from_offline_db(self):
-        sandbox_db_with_extra_json_file = 'test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox_db_with_extra_file.json'
-
-        shutil.copy2(self.foo_file, self.tmp_delme)
-        shutil.copy2(self.bar_file, self.tmp_delme)
-        shutil.copy2(self.baz_file, self.tmp_delme)
-        shutil.copy2(sandbox_db_with_extra_json_file, self.tmp_delme)
-
-        tmp_offline_db_file = self.tmp_delme + '/' + Path(sandbox_db_with_extra_json_file).name
-        tmp_baz_file = self.tmp_delme + '/' + Path(self.baz_file).name
-
-        offline_db_exists_before = Path(tmp_offline_db_file).is_file()
-        baz_exists_before = Path(tmp_baz_file).is_file()
-
-        db = load_json('test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox_db.json')
-        expected_local_store = local_store_files([('sandbox', db['files'])])
-        expected_local_store['dbs']['sandbox']['offline_databases_imported'] = ['5fce72d14b3b32291f60ee5eea925f35']
-
-        self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/offline_db_with_extra_file/sandbox.ini', {
-            'local_store': expected_local_store,
-            'files': hashes(self.tmp_delme, db['files']),
-            'files_count': 2
-        })
-
-        offline_db_exists_after = Path(tmp_offline_db_file).is_file()
-        baz_exists_after = Path(tmp_baz_file).is_file()
-
-        self.assertNotEqual(offline_db_exists_before, offline_db_exists_after)
-        self.assertNotEqual(baz_exists_before, baz_exists_after)
-        self.assertFalse(offline_db_exists_after or baz_exists_after)
-
     installed_folders = {'bar': {}, 'bar/sub_bar': {}, 'bar/sub_bar/sub_sub_bar': {}, 'baz': {}, 'foo': {},
                          'foo/sub_foo': {}}
     installed_system_folders = {'Scripts': {}, 'Scripts/.config': {}, 'Scripts/.config/downloader': {}}
@@ -220,6 +190,7 @@ class TestSandboxedInstall(SandboxTestBase):
 
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/relocated_db/sandbox.ini', {
             'local_store': {
+                'db_sigs': {},
                 'dbs': {
                     'sandbox': {
                         K_BASE_PATH: '/tmp/delme_relocated',
@@ -227,7 +198,6 @@ class TestSandboxedInstall(SandboxTestBase):
                             'bar.txt': {'delete': [], 'hash': '942b89ab661f86228ea9ad3e980763a7', 'size': 4, 'url': 'https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/bar.txt'},
                             'foo.txt': {'delete': [], 'hash': '133af32b4894d9c5527cc5c91269ee28', 'size': 20, 'url': 'https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/foo.txt'}},
                         'folders': {},
-                        'offline_databases_imported': [],
                         'zips': {}
                     }
                 },
@@ -244,7 +214,8 @@ class TestSandboxedInstall(SandboxTestBase):
         self.assertFalse(os.path.isfile(FILE_mister_downloader_needs_reboot))
 
     def test_print_drives(self):
-        exit_code = self.run_execute_full_run(self.sandbox_ini, ExternalDrivesRepositoryFactory(), PrintLogger(), ['', '--print-drives'])
+        logger = TopLogger(PrintLogger(), NoLogger())
+        exit_code = self.run_execute_full_run(self.sandbox_ini, ExternalDrivesRepositoryFactory(), logger, logger, ['', '--print-drives'])
         self.assertEqual(0, exit_code)
 
     def test_sandbox_db___installs_file_after_applying_expanded_filter(self):

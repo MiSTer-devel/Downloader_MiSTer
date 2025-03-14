@@ -22,7 +22,7 @@ from downloader.store_migrator import MigrationBase
 class MigrationV8(MigrationBase):
     version = 8
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         for store in local_store['dbs'].values():
             if len(store[K_BASE_PATH]) <= 1 or store[K_BASE_PATH][-1] != '/':
                 continue

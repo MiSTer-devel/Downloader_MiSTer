@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,16 +16,23 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
+from typing import Optional
 
 from downloader.job_system import Job, JobSystem
+from downloader.path_package import PathPackage
 
 
-@dataclass
 class FetchFileJob(Job):
-    type_id: int = field(init=False, default=JobSystem.get_job_type_id())
-    path: str
-    description: Dict[str, Any]
-    hash_check: bool
-    after_validation: Optional[Job] = None
+    __slots__ = ('_tags', 'source', 'already_exists', 'pkg', 'db_id', 'after_job')
+    type_id: int = JobSystem.get_job_type_id()
+    def __init__(self, source: str, already_exists: bool, pkg: PathPackage, db_id: Optional[str], /) -> None:
+        self.source = source
+        self.already_exists = already_exists
+        self.pkg = pkg
+        self.db_id = db_id
+
+        # Next job
+        self.after_job: Optional[Job] = None
+
+    def backup_job(self) -> Optional[Job]:
+        return None if self.after_job is None else self.after_job.backup_job()

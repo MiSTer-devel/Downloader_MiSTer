@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,12 +19,13 @@
 import unittest
 from unittest.mock import Mock
 
+from downloader.constants import EXIT_ERROR_FAILED_DBS, EXIT_ERROR_STORE_NOT_SAVED, EXIT_ERROR_NO_CERTS
 from test.fake_external_drives_repository import ExternalDrivesRepositoryStub
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_os_utils import SpyOsUtils
 from test.fake_full_run_service import FullRunService
-from test.objects import raw_db_empty_descr, raw_db_empty_with_linux_descr, raw_db_wrong_descr, db_empty, db_test_with_file_a, db_test, db_with_folders, raw_db_descr
+from test.objects import raw_db_empty_descr, raw_db_empty_with_linux_descr, raw_db_wrong_descr, db_empty, db_test, raw_db_descr
 
 
 class TestFullRunService(unittest.TestCase):
@@ -36,13 +37,13 @@ class TestFullRunService(unittest.TestCase):
         exit_code = FullRunService.with_single_db(db_empty, raw_db_empty_descr()).full_run()
         self.assertEqual(exit_code, 0)
 
-    def test_full_run___database_with_wrong_id___returns_1(self):
+    def test_full_run___database_with_wrong_id___returns_exit_code_error_failed_dbs(self):
         exit_code = FullRunService.with_single_db(db_empty, raw_db_wrong_descr()).full_run()
-        self.assertEqual(exit_code, 1)
+        self.assertEqual(exit_code, EXIT_ERROR_FAILED_DBS)
 
-    def test_full_run___database_not_fetched___returns_1(self):
+    def test_full_run___database_not_fetched___returns_exit_code_error_failed_dbs(self):
         exit_code = FullRunService.with_single_empty_db().full_run()
-        self.assertEqual(exit_code, 1)
+        self.assertEqual(exit_code, EXIT_ERROR_FAILED_DBS)
 
     def test_full_run___database_with_old_linux___calls_update_linux_and_returns_0(self):
         os_utils = SpyOsUtils()
@@ -62,7 +63,7 @@ class TestFullRunService(unittest.TestCase):
 
         self.assertEqual(1, os_utils.calls_to_reboot)
 
-    def test_full_run___when_certificates_check_fails___returns_exit_code_1(self):
+    def test_full_run___when_certificates_check_fails___returns_exit_code_error_no_certs(self):
         certificates_fix = Mock()
         certificates_fix.fix_certificates_if_needed.return_value = False
 
@@ -70,13 +71,13 @@ class TestFullRunService(unittest.TestCase):
             .with_single_db(db_empty, raw_db_empty_with_linux_descr(), certificates_fix=certificates_fix)\
             .full_run()
 
-        self.assertEqual(1, exit_code)
+        self.assertEqual(EXIT_ERROR_NO_CERTS, exit_code)
 
-    def test_full_run___test_database_but_failing_folders_on_fs___returns_exit_code_1(self):
+    def test_full_run___test_database_but_failing_folders_on_fs___returns_exit_code_error_store_not_saved(self):
         db_id, db_descr, file_system_factory = test_database_setup()
         file_system_factory.set_create_folders_will_error()
         exit_code = FullRunService.with_single_db(db_id, db_descr, file_system_factory=file_system_factory).full_run()
-        self.assertEqual(1, exit_code)
+        self.assertEqual(EXIT_ERROR_STORE_NOT_SAVED, exit_code)
 
     def test_full_run___test_database_with_no_fs_problems___returns_exit_code_0(self):
         db_id, db_descr, file_system_factory = test_database_setup()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,15 +17,13 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import os
+import time
+start_time = time.time()
+
 from sys import exit
 
 try:
-    from downloader.main import main
-    from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, DEFAULT_CURL_SSL_OPTIONS, \
-    KENV_DOWNLOADER_INI_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, KENV_CURL_SSL, KENV_COMMIT, KENV_ALLOW_REBOOT, \
-    KENV_UPDATE_LINUX, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_DEBUG, \
-    KENV_FAIL_ON_FILE_ERROR, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, KENV_FORCED_BASE_PATH
+    from downloader.main import main, read_env
 except (ImportError, SyntaxError) as e:
     print(e)
     print('\n')
@@ -33,29 +31,13 @@ except (ImportError, SyntaxError) as e:
     print('Please upgrade your OS before running Downloader')
     print('More info at https://github.com/MiSTer-devel/mr-fusion')
     print()
-    exit(1)
+    exit(10)  # Same exit value as: downloader.constants.EXIT_ERROR_WRONG_SETUP
 
 try:
-    from commit import default_commit
+    from commit import default_commit  # type: ignore[import-not-found]
 except ImportError as e:
-    default_commit = 'unknown'
+    default_commit = None  # type: ignore[assignment]
 
 if __name__ == '__main__':
-    exit_code = main({
-        KENV_DOWNLOADER_LAUNCHER_PATH: os.getenv(KENV_DOWNLOADER_LAUNCHER_PATH, None),
-        KENV_DOWNLOADER_INI_PATH: os.getenv(KENV_DOWNLOADER_INI_PATH, None),
-        KENV_LOGFILE: os.getenv(KENV_LOGFILE, None),
-        KENV_CURL_SSL: os.getenv(KENV_CURL_SSL, DEFAULT_CURL_SSL_OPTIONS),
-        KENV_COMMIT: os.getenv(KENV_COMMIT, default_commit),
-        KENV_ALLOW_REBOOT: os.getenv(KENV_ALLOW_REBOOT, None),
-        KENV_UPDATE_LINUX: os.getenv(KENV_UPDATE_LINUX, DEFAULT_UPDATE_LINUX_ENV).lower(),
-        KENV_DEFAULT_DB_URL: os.getenv(KENV_DEFAULT_DB_URL, DISTRIBUTION_MISTER_DB_URL),
-        KENV_DEFAULT_DB_ID: os.getenv(KENV_DEFAULT_DB_ID, DISTRIBUTION_MISTER_DB_ID),
-        KENV_DEFAULT_BASE_PATH: os.getenv(KENV_DEFAULT_BASE_PATH, None),
-        KENV_FORCED_BASE_PATH: os.getenv(KENV_FORCED_BASE_PATH, None),
-        KENV_PC_LAUNCHER: os.getenv(KENV_PC_LAUNCHER, None),
-        KENV_DEBUG: os.getenv(KENV_DEBUG, 'false').lower(),
-        KENV_FAIL_ON_FILE_ERROR: os.getenv(KENV_FAIL_ON_FILE_ERROR, 'false')
-    })
-
+    exit_code = main(read_env(default_commit), start_time)
     exit(exit_code)

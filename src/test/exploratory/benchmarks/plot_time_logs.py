@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,9 +21,12 @@ import re
 import sys
 
 import matplotlib.pyplot as plt
+import numpy as np
+from scipy.stats import iqr
+from pathlib import Path
 
 from src.debug import chdir_root
-from src.test.exploratory.benchmarks.time_multiple_runs import average, percent_faster
+from src.test.exploratory.benchmarks.time_multiple_runs import percent_faster
 
 
 def parse_times(log_path):
@@ -45,55 +48,84 @@ def parse_times(log_path):
             elif type_ == 'launcher':
                 launcher_seconds.append(seconds)
 
-    print("Run seconds:", len(run_seconds))
-    print("Launcher seconds:", len(launcher_seconds))
-    return run_seconds, launcher_seconds
+    print("Run iterations:", len(run_seconds))
+    print("Launcher iterations:", len(launcher_seconds))
+    print()
+    return np.array(run_seconds), np.array(launcher_seconds)
 
 
-def plot_data(data, color, label, outliers, y_max, y_min):
+def plot_data(ax, data, color, label, outliers, y_max, y_min):
     non_outliers = [x for x in data if x not in outliers]
     indices = [i for i, x in enumerate(data) if x not in outliers]
 
-    plt.scatter(indices, non_outliers, label=f'{label}', color=color)
-    plt.plot(indices, non_outliers, color=color)
+    ax.scatter(indices, non_outliers, label=f'{label}', color=color)
+    ax.plot(indices, non_outliers, color=color)
 
     for i, val in enumerate(data):
         if val in outliers:
-            plt.scatter(i, y_max if val > y_max else y_min, color=color, marker='|', s=100, linewidths=2)
+            ax.scatter(i, y_max if val > y_max else y_min, color=color, marker='|', s=100, linewidths=2)
 
     return non_outliers
 
 
 def main(log_path):
-    improved, baseline = parse_times(log_path)
+    data = {
+        'improved': {'label': 'Downloader 2.0', 'short_label': 'v2.0'},
+        'baseline': {'label': 'Downloader 1.8', 'short_label': 'v1.8'}
+    }
+    times = dict(zip(data, parse_times(log_path)))
+    indices = np.arange(len(times['improved']))
 
-    avg_improved, raw_avg_improved, outliers_improved = average(improved)
-    avg_baseline, raw_avg_baseline, outliers_baseline = average(baseline)
+    for key, d in data.items():
+        d['arr'] = np.array(times[key])
 
-    print(f'Improvement: {percent_faster(avg_improved, avg_baseline)}%')
+        #degradation = np.polyval(np.polyfit(indices, d['arr'], 1), indices) - d['arr'].mean()
+        #d['arr'] = d['arr'] - degradation
 
-    valid_improved = list(set(improved) - set(outliers_improved))
-    valid_baseline = list(set(baseline) - set(outliers_baseline))
-    y_max, y_min = max(max(valid_improved), max(valid_baseline)), min(min(valid_improved), min(valid_baseline))
-    tick_distance_y = int((y_max - y_min) // 150) * 5 if (y_max - y_min) >= 150 else 5
-    y_max, y_min = y_max + tick_distance_y - y_max % tick_distance_y, y_min - y_min % tick_distance_y
+        d['mean'], std = d['arr'].mean(), d['arr'].std(ddof=1)
+        print(f"Mean ({d['label']}): {d['mean']}\nStd Dev ({d['label']}: {std}\n")
 
-    plot_data(improved, 'blue', 'Improved', outliers_improved, y_max, y_min)
-    plot_data(baseline, 'red', 'Baseline', outliers_baseline, y_max, y_min)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
+    fig.canvas.manager.set_window_title(Path(log_path).with_suffix('.png').name)
 
-    plt.axhline(y=avg_improved, color='blue', linestyle='--', label=f'Average Improved: {avg_improved:.3f}')
-    plt.axhline(y=avg_baseline, color='red', linestyle='--', label=f'Average Baseline: {avg_baseline:.3f}')
-    for i in range(int(y_min), int(y_max), tick_distance_y):
-        plt.axhline(y=i, color='black', linestyle=':', linewidth=0.5)
+    ax1.hist(data['improved']['arr'], bins=20, alpha=0.5, label=data['improved']['label'], color='blue')
+    ax1.hist(data['baseline']['arr'], bins=20, alpha=0.5, label=data['baseline']['label'], color='red')
+    ax1.set_xlabel('Execution Time (seconds)')
+    ax1.set_ylabel('Frequency')
+    ax1.set_title(f'Distribution of Execution Times ({len(data["improved"]["arr"])} {data["improved"]["label"]} runs & {len(data["baseline"]["arr"])} {data["baseline"]["label"]} runs)')
+    ax1.legend()
 
-    plt.xlabel('Iteration')
-    plt.ylabel('Time (seconds)')
-    plt.title('Improved vs Baseline')
-    plt.ylim(y_min, y_max)
-    plt.yticks(list(range(int(y_min), int(y_max) + 1, tick_distance_y)))
-    plt.legend()
+    for d in data.values():
+        d['regression'] = np.polyval(np.polyfit(indices, d['arr'], 1), indices)
+        mask = np.abs(d['arr'] - np.median(d['arr'])) <= 4 * iqr(d['arr'])
+        d['valid'], d['outliers'] = d['arr'][mask], d['arr'][~mask]
+        d['avg_valid'] = d['valid'].mean()
+
+    improvement = percent_faster(data['improved']['avg_valid'], data['baseline']['avg_valid'])
+    raw_improvement = percent_faster(data['improved']['mean'], data['baseline']['mean'])
+
+    print(f'Improvement: {improvement}%')
+    for d in data.values(): print(f'{d["label"]} Outliers:', d['outliers'])
+    print(f'Improvement with outliers: {raw_improvement}%')
+
+    y_max = max(max(data[k]['valid']) for k in data)
+    y_min = min(min(data[k]['valid']) for k in data)
+
+    plot_data(ax2, data['improved']['arr'], 'blue', data['improved']['label'], data['improved']['outliers'], y_max, y_min)
+    plot_data(ax2, data['baseline']['arr'], 'red', data['baseline']['label'], data['baseline']['outliers'], y_max, y_min)
+
+    ax2.plot(indices, data['improved']['regression'], color='blue', linestyle='--', label=f'Average {data["improved"]["short_label"]}: {data["improved"]["avg_valid"]:.3f}s')
+    ax2.plot(indices, data['baseline']['regression'], color='red', linestyle='--', label=f'Average {data["baseline"]["short_label"]}: {data["baseline"]["avg_valid"]:.3f}s')
+
+    ax2.set_xlabel('Iteration')
+    ax2.set_ylabel('Time (seconds)')
+    ax2.set_title(f'{data["improved"]["label"]} vs {data["baseline"]["label"]}')
+    ax2.yaxis.grid(True, linestyle='--', alpha=0.5)
+    ax2.xaxis.grid(False)
+    ax2.legend()
+
+    plt.tight_layout()
     plt.show()
-
 
 if __name__ == '__main__':
     chdir_root()

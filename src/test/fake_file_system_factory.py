@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,17 +15,20 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+import io
 import json
+import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from downloader.constants import K_BASE_PATH, STORAGE_PATHS_PRIORITY_SEQUENCE
-from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.constants import STORAGE_PATHS_PRIORITY_SEQUENCE, HASH_file_does_not_exist
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
-    absolute_parent_folder, is_windows, FolderCreationError, FsCache, FileCopyError
-from downloader.other import ClosableValue, UnreachableException
+    FsError, UnzipError, \
+    absolute_parent_folder, FolderCreationError, FsSharedState, FileCopyError, FileReadError
+from downloader.path_package import PathPackage
+from test.fake_http_gateway import FakeBuf
 from test.fake_importer_implicit_inputs import FileSystemState
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 
 first_fake_temp_file = '/tmp/unique_temp_filename_0'
 
@@ -47,13 +50,16 @@ class FileSystemFactory:
         self._state = state if state is not None else FileSystemState(config=config)
         self._fake_failures = {}
         self._write_records = write_records if write_records is not None else []
-        self._fs_cache = FsCache()
+        self._fs_cache = FsSharedState()
 
     def set_create_folders_will_error(self):
         self._fake_failures['create_folders_error'] = True
 
     def set_copy_will_error(self):
         self._fake_failures['copy_error'] = True
+
+    def set_unzip_will_error(self):
+        self._fake_failures['unzip_error'] = True
 
     def create_for_config(self, config):
         return FakeFileSystem(self._state, config, self._fake_failures, self._write_records, self._fs_cache)
@@ -63,24 +69,35 @@ class FileSystemFactory:
 
     @property
     def data(self):
-        data = self._state.__dict__.copy()
-        del data['config']
-        del data['path_dictionary']
-        return data
+        return fs_state_to_data(self._state)
+
+    @property
+    def private_state(self): return self._state
 
     @property
     def records(self):
-        return [record.__dict__.copy() for record in self._write_records]
+        return [record.__dict__.copy() for record in self._write_records if record.not_ignored()]
 
     @staticmethod
     def from_state(files=None, folders=None, config=None, base_path=None, path_dictionary=None):
         return FileSystemFactory(state=FileSystemState(files=files, folders=folders, config=config, base_path=base_path, path_dictionary=path_dictionary))
 
 
+def fs_state_to_data(state: FileSystemState):
+    def change_files(files): return {
+        k: {
+            'hash': v['hash'] if 'hash' in v else 'NO_HASH', 'size': v['size'] if 'size' in v else 1
+        } for k, v in files.items()
+    }
+    def change_folders(folders): return {k: {} for k in folders}
+
+    return {'files': change_files(state.files), 'folders': change_folders(state.folders)}
+
+
 class FakeFileSystem(ProductionFileSystem):
     unique_temp_filename_index = 0
 
-    def __init__(self, state, config, fake_failures, write_records, fs_cache: FsCache):
+    def __init__(self, state, config, fake_failures, write_records, fs_cache: FsSharedState):
         self.state = state
         self._config = config
         self._fake_failures = fake_failures
@@ -94,22 +111,19 @@ class FakeFileSystem(ProductionFileSystem):
 
     @property
     def data(self):
-        data = self.state.__dict__.copy()
-        del data['config']
-        del data['path_dictionary']
-        return data
+        return fs_state_to_data(self.state)
 
     def _fix_paths(self, paths):
         return [p.replace(self._base_path(p) + '/', '') for p in paths]
 
-    def unique_temp_filename(self):
-        name = '/tmp/unique_temp_filename_%d' % self.unique_temp_filename_index
-        self.unique_temp_filename_index += 1
-        self._write_records.append(_Record('unique_temp_filename', name))
-        return ClosableValue(name, lambda: None)
-
     def hash(self, path):
-        return self.state.files[self._path(path)]['hash']
+        file_path = self._path(path)
+        if file_path not in self.state.files:
+            return HASH_file_does_not_exist
+        return self.state.files[file_path]['hash']
+
+    def size(self, path):
+        return self.state.files[self._path(path)]['size']
 
     def resolve(self, path):
         return self._path(path)
@@ -124,6 +138,14 @@ class FakeFileSystem(ProductionFileSystem):
             return True
 
         return False
+
+    def are_files(self, file_pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
+        are = []
+        nope = []
+        for p in file_pkgs:
+            if self.is_file(p.full_path): are.append(p)
+            else: nope.append(p)
+        return are, nope
 
     def print_debug(self):
         pass
@@ -140,7 +162,10 @@ class FakeFileSystem(ProductionFileSystem):
     def read_file_contents(self, path):
         return self.state.files[self._path(path)]['content']
 
-    def precache_is_file_with_folders(self, folders: list[str]):
+    def read_file_bytes(self, path: str) -> io.BytesIO:
+        return FakeBuf(self.state.files[self._path(path)])
+
+    def precache_is_file_with_folders(self, _folders: list[str], recheck: bool = False):
         pass
 
     def write_file_contents(self, path, content):
@@ -157,6 +182,9 @@ class FakeFileSystem(ProductionFileSystem):
 
     def set_copy_buggy(self):
         self._fake_failures['copy_buggy'] = True
+
+    def set_read_error(self):
+        self._fake_failures['read_error'] = True
 
     def move(self, source, target):
         source_file = self._path(source)
@@ -182,11 +210,13 @@ class FakeFileSystem(ProductionFileSystem):
         self._write_records.append(_Record('copy', (source_file, target_file)))
         self._fs_cache.add_file(target_file)
 
-    def copy_fast(self, source, target):
-        self.copy(source, target)
-
     def make_dirs(self, path):
         folder = self._path(path)
+        path_parents = list(Path(folder).parents)
+        for p in path_parents[:-3]:
+            parent = str(p)
+            if parent not in self.state.folders:
+                self.state.folders[parent] = {}
         self.state.folders[folder] = {}
         self._write_records.append(_Record('make_dirs', folder))
         if 'create_folders_error' in self._fake_failures:
@@ -223,6 +253,10 @@ class FakeFileSystem(ProductionFileSystem):
     def remove_folder(self, path):
         folder = self._path(path)
         if folder in self.state.folders:
+            for other_folder in self.state.folders:
+                if other_folder.startswith(folder) and other_folder != folder:
+                    raise Exception(f'Cannot remove non-empty folder {folder} because {other_folder} exists!')
+
             self.state.folders.pop(folder)
         self._write_records.append(_Record('make_dirs', folder))
 
@@ -239,13 +273,21 @@ class FakeFileSystem(ProductionFileSystem):
     def download_target_path(self, path):
         return self._path(path)
 
-    def write_incoming_stream(self, in_stream: Any, target_path: str):
+    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /) -> tuple[int, str]:
+        if in_stream.storing_problems:
+            return 0, ''
+
+        lower_path = target_path.lower()
+        self._write_records.append(_Record('write_incoming_stream', lower_path))
+        self.state.files[lower_path] = in_stream.description
+        self._fs_cache.add_file(lower_path)
+        return self.size(lower_path), self.hash(lower_path)
+
+    def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> Tuple[io.BytesIO, str]:
         if in_stream.storing_problems:
             return
 
-        self._write_records.append(_Record('write_incoming_stream', target_path))
-        self.state.files[target_path] = in_stream.description
-        self._fs_cache.add_file(target_path)
+        return in_stream.buf, in_stream.description['hash'] if calc_md5 else ''
 
     def unlink(self, path, verbose=True):
         full_path = self._path(path)
@@ -257,14 +299,33 @@ class FakeFileSystem(ProductionFileSystem):
         else:
             return False
 
-    def load_dict_from_file(self, path, suffix=None):
-        file_description = self.state.files[self._path(path)]
-        if 'unzipped_json' in file_description:
-            return file_description['unzipped_json']
-        elif 'json' in file_description:
-            return file_description['json']
+    def load_dict_from_transfer(self, source: str, transfer: Union[str, io.BytesIO]):
+        if isinstance(transfer, str):
+            path = self._path(transfer)
+            result = self.load_dict_from_file(path)
+            self.state.files.pop(path)
+            return result
+        else: return self._load_dict_from_data(source, transfer)
+
+    def load_dict_from_file(self, path):
+        if 'read_error' in self._fake_failures:
+            raise FileReadError(path)
+
+        full_path = self._path(path)
+        file_description = self.state.files[full_path]
+        return self._load_json_from_description(path, file_description)
+
+    def _load_dict_from_data(self, source: str, data: io.BytesIO) -> Dict[str, Any]:
+        if not isinstance(data, FakeBuf): raise FsError('This should have been a FakeBuf.')
+        return self._load_json_from_description(source, data.description)
+
+    def _load_json_from_description(self, info: str, description: Dict[str, Any]) -> Any:
+        if 'unzipped_json' in description:
+            return description['unzipped_json']
+        elif 'json' in description:
+            return description['json']
         else:
-            raise UnreachableException('Should not reach this!')
+            raise FsError(f'Transfer {info} does not have a json content.')
 
     def save_json_on_zip(self, db, path):
         if self._path(path) not in self.state.files:
@@ -280,12 +341,45 @@ class FakeFileSystem(ProductionFileSystem):
         self.state.files[file]['json'] = db
         self._write_records.append(_Record('save_json', file))
 
-    def unzip_contents(self, file_path, zip_target_path, contained_files):
-        contents = self.state.files[self._path(file_path)]['zipped_files']
+    def unzip_contents(self, transfer: Union[str, io.BytesIO], target_path: Union[str, Dict[str, str]], test_info: Tuple[Optional[PathPackage], List[PathPackage], Dict[str, Dict[str, Any]]]):
+        if isinstance(transfer, str):
+            contents = self.state.files[self._path(transfer)]['zipped_files']
+            self.unlink(transfer)
+        else:
+            contents = transfer.description['zipped_files']
+
+        if 'unzip_error' in self._fake_failures:
+            raise UnzipError(transfer)
+
+        target_path_by_relpath = None if isinstance(target_path, str) else target_path
+
+        extracting = {}
+        target_pkg, files_to_unzip, filtered_files = test_info
+        if target_path_by_relpath is not None:
+            # Should NOT extract all case
+            extracting.update(target_path_by_relpath)
+            if target_pkg is None:
+                zip_path, full_path = next(iter(target_path_by_relpath.items()))
+                abs_zip_root_path = full_path.removesuffix(zip_path)
+                for f_desc in filtered_files.values():
+                    f = f_desc['zip_path']
+                    extracting[f] = os.path.join(abs_zip_root_path, f)
+        else:
+            # Should extract all case
+            zip_root_path = os.path.join(target_pkg.rel_path, '')
+            abs_zip_root_path = target_pkg.full_path
+            for f_path in list(filtered_files) + ([pkg.rel_path for pkg in files_to_unzip] if target_path_by_relpath is None else []):
+                f = f_path.lstrip('|').removeprefix(zip_root_path)
+                extracting[f] = os.path.join(abs_zip_root_path, f)
+
         for file, description in contents['files'].items():
-            self.state.files[self._path(file)] = {'hash': description['hash'], 'size': description['size']}
+            full_path = extracting.get(file, None)
+            if full_path is None:
+                continue
+            self.state.files[full_path.lower()] = {'hash': description['hash'], 'size': description['size']}
+
         for folder in contents['folders']:
-            if not self._is_folder_unziped(contained_files, folder):
+            if not self._is_folder_unziped(extracting, folder):
                 continue
 
             self.state.folders[self._path(folder)] = {}
@@ -293,31 +387,18 @@ class FakeFileSystem(ProductionFileSystem):
     def turn_off_logs(self) -> None:
         pass
 
-    def _is_folder_unziped(self, contained_files, folder):
-        for file in contained_files:
-            if folder in file:
+    def _is_folder_unziped(self, extracting: Dict[str, str], folder: str):
+        for file in extracting:
+            if file.lower().startswith(folder):
                 return True
 
         return False
 
-    def _path(self, path):
-        if is_windows:
-            path = path.replace('\\', '/')
-            if len(path) > 2 and path[0].lower() == 'c' and path[1] == ':' and path[2] == '/':
-                path = path[2:]
+    def _path(self, path: str) -> str:
+        if path[0] == '/' or os.path.isabs(path):
+            return path.lower()
 
-        path = path.lower()
-
-        if path[0] == '/':
-            return path
-
-        if path in self.state.path_dictionary:
-            return '%s/%s' % (self.state.path_dictionary[path], path)
-
-        return ('%s/%s' % (self._base_path(path), path))
-
-    def _base_path(self, path):
-        return self._config[K_BASE_PATH]
+        return os.path.join(self._config['base_path'], path).lower()
 
 
 class _Record:
@@ -325,10 +406,6 @@ class _Record:
         self.scope = scope
         self.data = [d for d in data] if isinstance(data, tuple) else data
 
-
-class _FakeTempFile:
-    def __init__(self, name):
-        self.name = name
-
-    def close(self):
-        pass
+    def not_ignored(self):
+        if not isinstance(self.data, str): return True
+        return not self.data.endswith('.test_downloader')

@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import FILE_PDFViewer, MEDIA_FAT
+from downloader.constants import FILE_PDFViewer, MEDIA_FAT, K_BASE_PATH
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data
 from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1, folder_games, \
@@ -41,8 +41,10 @@ from test.unit.online_importer.online_importer_with_priority_storage_test_base i
     fs_folders_nes_on_delme, hidden_drive, store_pdfviewer_on_base_system_path_hidden, fs_folders_pdfviewers_on_hidden, \
     fs_files_pdfviewers_on_hidden, _store_files_foo, _store_files_s32x_md, _store_files_smb1, _store_folders_nes, \
     _store_folders_docs_s32x, _store_folders_docs_neogeo, _store_files_neogeo_md, _store_files_contra, \
-    OnlineImporterWithPriorityStorageTestBase, store_nes_folder, store_just_nes_palettes_on_usb1, fs_files_nes_palettes_on_usb1, store_smb1_and_contra_on_fat, \
-    store_smb1_on_fat, fs_files_sonic_on_usb1, store_sonic_on_usb1
+    OnlineImporterWithPriorityStorageTestBase, store_nes_folder, store_just_nes_palettes_on_usb1, \
+    fs_files_nes_palettes_on_usb1, \
+    store_smb1_on_fat, fs_files_sonic_on_usb1, store_sonic_on_usb1, \
+    store_games_folder_on_usb1, store_nes_folder_on_usb1_and_usb2
 
 
 class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPriorityStorageTestBase):
@@ -62,14 +64,14 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         self.assertEqual(store_smb1_on_usb1(), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_usb1(), folders=fs_folders_nes_on_usb1_and_usb2()), sut.fs_data)
-        self.assertReports(sut, [])
+        self.assertReports(sut, [], save=False)
 
     def test_download_empty_db___after_previous_run___removes_files_from_usb1_but_keeps_usb1_and_usb2_folders(self):
         store = store_smb1_on_usb1()
 
         sut = self.download_empty_db(store, fs(files=fs_files_smb1_on_usb1(), folders=fs_folders_nes_on_usb1_and_usb2()))
 
-        self.assertEqual(empty_test_store(), store)
+        self.assertEqual(store_nes_folder_on_usb1(), store)
         self.assertEqual(fs_data(folders=fs_folders_nes_on_usb1_and_usb2()), sut.fs_data)
         self.assertReports(sut, [])
 
@@ -82,21 +84,21 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
         self.assertEqual(fs_data(files=fs_files_smb1_on_usb2(), folders=fs_folders_nes_on_usb2()), sut.fs_data)
         self.assertReports(sut, [file_nes_smb1])
 
-    def test_download_smb1_db___after_copying_files_to_usb1___updates_the_store_with_usb1_and_usb2(self):
+    def test_download_smb1_db___after_copying_files_to_usb1___updates_the_store_with_validated_usb1_and_keeps_usb2(self):
         store = store_smb1_on_usb2()
 
         sut = self.download_smb1_db(store, fs(files=fs_files_smb1_on_usb1_and_usb2(), folders=fs_folders_nes_on_usb1_and_usb2()))
 
         self.assertEqual(store_smb1_on_usb1_and_usb2(), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_usb1_and_usb2(), folders=fs_folders_nes_on_usb1_and_usb2()), sut.fs_data)
-        self.assertReports(sut, [])
+        self.assertReports(sut, downloaded=[], validated=[file_nes_smb1])
 
     def test_download_empty_db___after_removing_nes_folders_on_external_drives_with_store_referencing_missing_files___lets_the_store_with_just_games_folders(self):
         store = store_smb1_on_usb1_and_usb2()
 
         sut = self.download_empty_db(store, fs(folders=fs_folders_games_on_usb1_and_usb2()))
 
-        self.assertEqual(empty_test_store(), store)
+        self.assertEqual(store_nes_folder_on_usb1_and_usb2(), store)
         self.assertEqual(fs_data(folders=fs_folders_games_on_usb1_and_usb2()), sut.fs_data)
         self.assertReports(sut, [])
 
@@ -105,16 +107,16 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_empty_db(store, fs(folders=fs_folders_nes_on_usb1()))
 
-        self.assertEqual(empty_test_store(), store)
+        self.assertEqual(store_nes_folder_on_usb1(), store)
         self.assertEqual(fs_data(folders=fs_folders_nes_on_usb1()), sut.fs_data)
-        self.assertReports(sut, [])
+        self.assertReports(sut, [], save=False)
 
     def test_download_empty_db___with_smb1_on_usb1_and_usb2___removes_smb1_but_keeps_nes_folders(self):
         store = store_smb1_on_usb1_and_usb2()
 
         sut = self.download_empty_db(store, fs(files=fs_files_smb1_on_usb1_and_usb2(), folders=fs_folders_nes_on_usb1_and_usb2()))
 
-        self.assertEqual(empty_test_store(), store)
+        self.assertEqual(store_nes_folder_on_usb1_and_usb2(), store)
         self.assertEqual(fs_data(folders=fs_folders_nes_on_usb1_and_usb2()), sut.fs_data)
         self.assertReports(sut, [])
 
@@ -145,39 +147,48 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
         self.assertEqual(fs_data(files=fs_files_smb1_on_fat(), folders=fs_folders_nes_on_fat()), sut.fs_data)
         self.assertReports(sut, [], save=False)
 
-    def test_download_smb1_db___after_copying_smb1_to_usb1___just_updates_store(self):
+    def test_download_smb1_db___after_copying_smb1_to_usb1___just_updates_store_and_validates_smb1_on_usb1(self):
         store = store_smb1()
 
         sut = self.download_smb1_db(store, fs(files=fs_files_smb1_on_fat_and_usb1(), folders=fs_folders_nes_on_fat_and_usb1()))
 
         self.assertEqual(store_smb1_on_fat_and_usb1(), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_fat_and_usb1(), folders=fs_folders_nes_on_fat_and_usb1()), sut.fs_data)
-        self.assertReports(sut, [])
+        self.assertReports(sut, downloaded=[], validated=[file_nes_smb1])
 
     def test_download_empty_db___after_copied_smb1_to_usb1___removes_everything_except_games_and_nes_folder_on_usb1(self):
+        store = store_smb1_on_fat_and_usb1()
+
+        sut = self.download_empty_db(store, fs(files=fs_files_smb1_on_fat_and_usb1(), folders=fs_folders_nes_on_fat_and_usb1()))
+
+        self.assertEqual(store_nes_folder_on_usb1(), store)
+        self.assertEqual(fs_data(folders=fs_folders_nes_on_usb1()), sut.fs_data)
+        self.assertReports(sut, [])
+
+    def test_download_empty_db___with_usb1_store_after_copying_all_to_fat___removes_whole_store_except_games_in_case_user_removes_subfolder_but_removes_usb1_file_and_keeps_the_rest_of_fs(self):
         store = store_smb1_on_usb1()
 
         sut = self.download_empty_db(store, fs(files=fs_files_smb1_on_fat_and_usb1(), folders=fs_folders_nes_on_fat_and_usb1()))
 
-        self.assertEqual(empty_test_store(), store)
+        self.assertEqual(store_nes_folder_on_usb1(), store)
         self.assertEqual(fs_data(folders=fs_folders_nes_on_usb1()), sut.fs_data)
         self.assertReports(sut, [])
 
-    def test_download_smb1_db___after_moving_smb1_to_usb1___just_updates_store(self):
+    def test_download_smb1_db___after_moving_smb1_to_usb1___updates_store_and_validates_smb_on_usb1(self):
         store = store_smb1()
 
         sut = self.download_smb1_db(store, fs(files=fs_files_smb1_on_usb1(), folders=fs_folders_nes_on_usb1()))
 
         self.assertEqual(store_smb1_on_usb1(), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_usb1(), folders=fs_folders_nes_on_usb1()), sut.fs_data)
-        self.assertReports(sut, [])
+        self.assertReports(sut, downloaded=[], validated=[file_nes_smb1])
 
     def test_download_empty_db___after_moved_smb1_to_usb1___just_keeps_nes_folder_on_usb1(self):
         store = store_smb1_on_usb1()
 
         sut = self.download_empty_db(store, fs(files=fs_files_smb1_on_usb1(), folders=fs_folders_nes_on_usb1()))
 
-        self.assertEqual(empty_test_store(), store)
+        self.assertEqual(store_nes_folder_on_usb1(), store)
         self.assertEqual(fs_data(folders=fs_folders_nes_on_usb1()), sut.fs_data)
         self.assertReports(sut, [])
 
@@ -219,6 +230,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
     def test_download_empty_db___with_nes_folder_installed_on_delme_and_fat_and_config_with_base_path_delme___removes_nes_folder_only_on_delme(self):
         store = store_nes_folder()
+        del store[K_BASE_PATH]
 
         sut = self.download_empty_db(store, fs(base_path=delme_drive, folders=[*fs_folders_nes_on_delme(), *fs_folders_nes_on_fat()]))
 
@@ -262,39 +274,39 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
         self.assertEqual(fs_data(files=fs_files_smb1_and_contra_on_fat(), folders=fs_folders_nes_on_fat()), sut.fs_data)
         self.assertReports(sut, [], save=False)
 
-    def test_download_smb1_and_contra___after_copying_contra_to_usb1___downloads_smb_to_usb1(self):
+    def test_download_smb1_and_contra___after_copying_contra_to_usb1___downloads_smb_to_usb1_and_validates_contra_on_usb1(self):
         store = store_smb1_and_contra()
 
         sut = self.download_smb1_and_contra(store, fs(files=fs_files_smb1_and_contra_on_fat_contra_on_usb1_too(), folders=fs_folders_nes_on_fat_and_usb1()))
 
         self.assertEqual(store_smb1_and_contra_on_fat_and_usb1(), store)
         self.assertEqual(fs_data(files=fs_files_smb1_and_contra_on_fat_and_usb1(), folders=fs_folders_nes_on_fat_and_usb1()), sut.fs_data)
-        self.assertReports(sut, [file_nes_smb1])
+        self.assertReports(sut, downloaded=[file_nes_smb1], validated=[file_nes_contra])
 
     def test_download_empty_db___after_copied_contra_to_usb1___removes_everything_except_nes_folder_on_usb1(self):
         store = store_smb1_and_contra_on_fat_and_usb1()
 
         sut = self.download_empty_db(store, fs(files=fs_files_smb1_and_contra_on_fat_and_usb1(), folders=fs_folders_nes_on_fat_and_usb1()))
 
-        self.assertEqual(empty_test_store(), store)
+        self.assertEqual(store_nes_folder_on_usb1(), store)
         self.assertEqual(fs_data(folders=fs_folders_nes_on_usb1()), sut.fs_data)
         self.assertReports(sut, [])
 
-    def test_download_smb1_and_contra___after_moving_contra_to_usb1___downloads_smb_to_usb1(self):
+    def test_download_smb1_and_contra___after_moving_contra_to_usb1___downloads_smb_to_usb1_and_validates_contra_on_usb1(self):
         store = store_smb1_and_contra()
 
         sut = self.download_smb1_and_contra(store, fs(files=fs_files_smb1_on_fat_contra_on_usb1(), folders=fs_folders_nes_on_fat_and_usb1()))
 
         self.assertEqual(store_smb1_on_fat_and_smb1_and_contra_on_usb1(), store)
         self.assertEqual(fs_data(files=fs_files_smb1_and_contra_on_usb1_smb1_on_fat_too(), folders=fs_folders_nes_on_fat_and_usb1()), sut.fs_data)
-        self.assertReports(sut, [file_nes_smb1])
+        self.assertReports(sut, downloaded=[file_nes_smb1], validated=[file_nes_contra])
 
     def test_download_empty_db___after_moved_contra_to_usb1___removes_everything_except_games_and_nes_folder_on_usb1(self):
         store = store_smb1_on_fat_and_smb1_and_contra_on_usb1()
 
         sut = self.download_empty_db(store, fs(files=fs_files_smb1_and_contra_on_usb1_smb1_on_fat_too(), folders=fs_folders_nes_on_fat_and_usb1()))
 
-        self.assertEqual(empty_test_store(), store)
+        self.assertEqual(store_nes_folder_on_usb1(), store)
         self.assertEqual(fs_data(folders=fs_folders_nes_on_usb1()), sut.fs_data)
         self.assertReports(sut, [])
 
@@ -330,7 +342,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_empty_db(store, fs(files=fs_files_smb1_and_nes_palettes_on_usb1(), folders=fs_folders_nes_palettes_on_usb1()))
 
-        self.assertEqual(empty_test_store(), store)
+        self.assertEqual(store_nes_folder_on_usb1(), store)
         self.assertEqual(fs_data(folders=fs_folders_nes_on_usb1()), sut.fs_data)
         self.assertReports(sut, [])
 

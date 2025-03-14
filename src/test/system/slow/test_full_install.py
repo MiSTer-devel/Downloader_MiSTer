@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,12 +19,13 @@
 import unittest
 import shutil
 import os
+import time
 import os.path
 from pathlib import Path
-from downloader.config import ConfigReader
-from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, KENV_CURL_SSL, KENV_DEBUG
+from downloader.config_reader import ConfigReader
+from downloader.constants import KENV_CURL_SSL, KENV_DEBUG, KENV_LOGLEVEL
 from test.objects import debug_env
-from downloader.logger import NoLogger
+from test.fake_logger import NoLogger
 from downloader.file_system import hash_file
 import subprocess
 
@@ -69,10 +70,10 @@ class TestFullInstall(unittest.TestCase):
         self.assertNotEqual(correct_hash, corrupt_hash)
 
     def assertRunOk(self, ini_path):
-        config = ConfigReader(NoLogger(), debug_env()).read_config(ini_path)
-        shutil.rmtree(config[K_BASE_PATH], ignore_errors=True)
-        shutil.rmtree(config[K_BASE_SYSTEM_PATH], ignore_errors=True)
-        mister_path = Path('%s/MiSTer' % config[K_BASE_SYSTEM_PATH])
+        config = ConfigReader(NoLogger(), debug_env(), time.time()).read_config(ini_path)
+        shutil.rmtree(config['base_path'], ignore_errors=True)
+        shutil.rmtree(config['base_system_path'], ignore_errors=True)
+        mister_path = Path('%s/MiSTer' % config['base_system_path'])
         os.makedirs(str(mister_path.parent), exist_ok=True)
         mister_path.touch()
         tool = str(Path(ini_path).with_suffix('.sh'))
@@ -81,7 +82,8 @@ class TestFullInstall(unittest.TestCase):
         test_env = os.environ.copy()
         test_env[KENV_CURL_SSL] = ''
         test_env[KENV_DEBUG] = 'true'
+        test_env[KENV_LOGLEVEL] = 'info'
         result = subprocess.run([tool], stderr=subprocess.STDOUT, env=test_env)
         self.assertEqual(result.returncode, 0)
-        self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json" % config[K_BASE_SYSTEM_PATH]))
+        self.assertTrue(os.path.isfile("%s/Scripts/.config/downloader/downloader.json" % config['base_system_path']))
         os.unlink(tool)

@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ from downloader.store_migrator import MigrationBase
 class MigrationV3(MigrationBase):
     version = 3
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         """move 'folders' from zips to upper level"""
 
         for db in local_store['dbs'].values():

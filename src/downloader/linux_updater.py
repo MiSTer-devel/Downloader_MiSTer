@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,25 +21,31 @@ import json
 import sys
 import tempfile
 import os.path
-from downloader.constants import FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version, FILE_Linux_7z, FILE_Linux_user_files
+from typing import Dict, List, Any
+from downloader.config import Config
+from downloader.constants import FILE_7z_util_uninstalled, FILE_7z_util_uninstalled_description, FILE_Linux_uninstalled, FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version, FILE_7z_util, FILE_Linux_user_files
+from downloader.db_entity import DbEntity
+from downloader.file_system import FileSystem
+from downloader.jobs.fetch_file_worker import SafeFileFetcher
+from downloader.logger import Logger
 
 
 class LinuxUpdater:
-    def __init__(self, config, file_system, file_downloader_factory, logger):
+    def __init__(self, logger: Logger, config: Config, file_system: FileSystem, fetcher: SafeFileFetcher) -> None:
         self._config = config
-        self._file_downloader_factory = file_downloader_factory
         self._logger = logger
         self._file_system = file_system
-        self._linux_descriptions = []
-        self._user_files = []
+        self._fetcher = fetcher
+        self._linux_descriptions: list[dict[str, Any]] = []
+        self._user_files: list[tuple[str, str]] = []
 
-    def update_linux(self, importer_command):
+    def update_linux(self, dbs: List[DbEntity]) -> None:
         self._logger.bench('Update Linux start.')
-        self._update_linux_impl(importer_command)
+        self._update_linux_impl(dbs)
         self._logger.bench('Update Linux done.')
 
-    def _update_linux_impl(self, importer_command):
-        for db, _, _ in importer_command.read_dbs():
+    def _update_linux_impl(self, dbs: List[DbEntity]) -> None:
+        for db in dbs:
             if db.linux is not None:
                 self._linux_descriptions.append({
                     'id': db.db_id,
@@ -62,8 +68,6 @@ class LinuxUpdater:
         description = self._linux_descriptions[0]
 
         linux = description['args']
-        linux_path = 'linux.7z'
-
         self._logger.debug('linux: ' + json.dumps(linux, indent=4))
 
         current_linux_version = self.get_current_linux_version()
@@ -81,45 +85,38 @@ class LinuxUpdater:
         self._logger.print('Latest linux version -> %s' % linux['version'][-6:])
         self._logger.print()
 
-        file_downloader = self._file_downloader_factory.create(self._config, parallel_update=False)
-
-        file_downloader.queue_file(linux, linux_path)
-        if not self._file_system.is_file(FILE_Linux_7z):
-            file_downloader.queue_file({
-                'delete': [],
-                'url': 'https://github.com/MiSTer-devel/SD-Installer-Win64_MiSTer/raw/master/7za.gz',
-                'hash': 'ed1ad5185fbede55cd7fd506b3c6c699',
-                'size': 465600
-            }, '/media/fat/linux/7za.gz')
-
-        file_downloader.download_files(False)
-        self._logger.print()
-
-        if len(file_downloader.errors()) > 0:
-            self._logger.print('Some error happened during the Linux download:')
-            for error in file_downloader.errors():
-                self._logger.print(error)
-
-            self._logger.print()
+        self._logger.print('Fetching the new Linux image...')
+        error = self._fetcher.fetch_file(linux, FILE_Linux_uninstalled)
+        if error is not None:
+            self._logger.print('ERROR! Could not fetch the Linux image.')
+            self._logger.print(error)
             return
 
-        self._run_subprocesses(linux, linux_path)
+        if not self._file_system.is_file(FILE_7z_util):
+            self._logger.print('Fetching 7za.gz file...')
+            error = self._fetcher.fetch_file(FILE_7z_util_uninstalled_description(), FILE_7z_util_uninstalled)
+            if error is not None:
+                self._logger.print('ERROR! Could not fetch the 7za.gz file.')
+                self._logger.print(error)
+                return
+
+        self._run_subprocesses(linux)
 
     def get_current_linux_version(self):
         return self._file_system.read_file_contents(FILE_MiSTer_version) if self._file_system.is_file(FILE_MiSTer_version) else 'unknown'
 
-    def _run_subprocesses(self, linux, linux_path):
-        if self._file_system.is_file('/media/fat/linux/7za.gz'):
+    def _run_subprocesses(self, linux: Dict[str, str]) -> None:
+        if self._file_system.is_file(FILE_7z_util_uninstalled):
             sys.stdout.flush()
-            result = subprocess.run('gunzip "/media/fat/linux/7za.gz"', shell=True, stderr=subprocess.STDOUT)
-            self._file_system.unlink('/media/fat/linux/7za.gz')
+            result = subprocess.run(f'gunzip "{FILE_7z_util_uninstalled}"', shell=True, stderr=subprocess.STDOUT)
+            self._file_system.unlink(FILE_7z_util_uninstalled)
             if result.returncode != 0:
                 self._logger.print('ERROR! Could not install 7z.')
                 self._logger.print('Error code: %d' % result.returncode)
                 self._logger.print()
                 return
 
-        if not self._file_system.is_file(FILE_Linux_7z):
+        if not self._file_system.is_file(FILE_7z_util):
             self._logger.print('ERROR! 7z is not present in the system.')
             self._logger.print('Aborting Linux update.')
             self._logger.print()
@@ -148,7 +145,7 @@ class LinuxUpdater:
                 fi
                 rm "{1}" > /dev/null 2>&1
                 exit $RET_CODE
-        '''.format(FILE_Linux_7z, self._file_system.download_target_path(linux_path)), shell=True, stderr=subprocess.STDOUT)
+        '''.format(FILE_7z_util, FILE_Linux_uninstalled), shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
             self._logger.print('ERROR! Could not uncompress the linux installer.')

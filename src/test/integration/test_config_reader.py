@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -60,15 +60,9 @@ class TestConfigReader(unittest.TestCase):
     def test_databases___with_single_db_ini_with_correct_options___returns_single_db_only_with_all_options(self):
         self.assertEqual(databases("test/integration/fixtures/single_db_with_correct_options.ini"), {'single': {
             K_DB_URL: 'https://single.com',
-            K_OPTIONS: db_options().testable,
+            K_OPTIONS: db_options().unwrap_props(),
             K_SECTION: 'single',
         }})
-
-    def test_databases___with_single_db_ini_with_incorrect_base_path___raises_invalid_config_parameter(self):
-        self.assertRaises(InvalidConfigParameter, lambda: databases("test/integration/fixtures/single_db_with_incorrect_base_path.ini"))
-
-    def test_databases___with_single_db_ini_with_incorrect_downloader_timeout___raises_invalid_config_parameter(self):
-        self.assertRaises(InvalidConfigParameter, lambda: databases("test/integration/fixtures/single_db_with_incorrect_downloader_timeout.ini"))
 
     def test_databases___with_repeated_db_ini___raises_invalid_config_parameter_exception(self):
         self.assertRaises(InvalidConfigParameter, lambda: databases("test/integration/fixtures/repeated_db.ini"))
@@ -207,6 +201,6 @@ def databases(path, env=None):
 
 def testable(db):
     if K_OPTIONS in db:
-        db[K_OPTIONS] = db[K_OPTIONS].testable
+        db[K_OPTIONS] = db[K_OPTIONS].unwrap_props()
 
     return db

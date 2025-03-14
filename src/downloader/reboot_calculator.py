@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,12 +21,12 @@ from downloader.constants import FILE_mister_downloader_needs_reboot, K_ALLOW_RE
 
 
 class RebootCalculator:
-    def __init__(self, config, logger, file_system):
+    def __init__(self, config, logger, file_system) -> None:
         self._config = config
         self._logger = logger
         self._file_system = file_system
 
-    def calc_needs_reboot(self, linux_needs_reboot, importer_needs_reboot):
+    def calc_needs_reboot(self, linux_needs_reboot, importer_needs_reboot) -> bool:
 
         will_reboot = False
         should_reboot = False

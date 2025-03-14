@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,11 +22,11 @@ from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1
     file_pdfviewer_descr, file_nes_contra, file_nes_contra_descr, file_nes_palette_a, file_nes_palette_a_descr, \
     folder_games_nes_palettes, db_test, file_nes_manual, file_nes_manual_descr, folder_docs, folder_docs_nes, db_demo, \
     db_id_external_drives_1, db_id_external_drives_2, file_neogeo_md, file_neogeo_md_descr, file_s32x_md, \
-    file_s32x_md_descr, \
+    file_s32x_md_descr, zipped_nes_palettes_id, \
     folder_docs_neogeo, folder_docs_s32x, file_foo, file_foo_descr, media_usb0, zip_desc, file_md_sonic_descr, file_md_sonic, folder_games_md
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
-from test.zip_objects import zipped_nes_palettes_id, file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc
+from test.zip_objects import file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc
 
 
 class OnlineImporterWithPriorityStorageTestBase(OnlineImporterTestBase):
@@ -60,8 +60,8 @@ class OnlineImporterWithPriorityStorageTestBase(OnlineImporterTestBase):
             .add_db(db_demo_with_nes_manual(), local_store_dbs[db_demo]) \
             .download(False), local_store_dbs
 
-    def download_external_drives_1_and_2(self, inputs):
-        local_store_dbs = {
+    def download_external_drives_1_and_2(self, inputs, store=None):
+        local_store_dbs = store if store is not None else {
             db_id_external_drives_1: empty_test_store(),
             db_id_external_drives_2: empty_test_store(),
         }
@@ -136,14 +136,14 @@ def store_sonic_on_usb1_but_just_folders(): return store_descr(files_usb1={}, fo
 def store_smb1_on_fat_and_usb1(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes(), files_usb1=_store_files_smb1(), folders_usb1=_store_folders_nes())
 def store_smb1_on_delme(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes(), base_path=delme_drive)
 def store_smb1(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes())
+def store_smb1_on_fat(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes())
 def store_smb1_and_nes_palettes(): return store_descr(files=_store_files_smb1_and_nes_palettes(), folders=_store_folders_nes_palettes())
 def store_smb1_and_nes_palettes_on_usb1(): return store_descr(files_usb1=_store_files_smb1_and_nes_palettes(), folders_usb1=_store_folders_nes_palettes())
-def store_just_nes_palettes_on_usb1(): return store_descr(files_usb1=_store_files_nes_palettes(), folders_usb1={})
+def store_just_nes_palettes_on_usb1(): return store_descr(files_usb1=_store_files_nes_palettes(), folders_usb1=_store_folders_nes_palettes())
 def store_smb1_on_usb2(): return store_descr(files_usb2=_store_files_smb1(), folders_usb2=_store_folders_nes())
 def store_smb1_on_usb1_and_usb2(): return store_descr(files_usb1=_store_files_smb1(), folders_usb1=_store_folders_nes(), files_usb2=_store_files_smb1(), folders_usb2=_store_folders_nes())
 def store_games_on_usb1_and_usb2(): return store_descr(folders_usb1=_store_folders_games(), folders_usb2=_store_folders_games())
 def store_smb1_and_contra_on_fat(): return store_descr(files=_store_files_smb1_and_contra(), folders=_store_folders_nes())
-def store_smb1_on_fat(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes())
 def store_smb1_and_contra_on_usb1(): return store_descr(files_usb1=_store_files_smb1_and_contra(), folders_usb1=_store_folders_nes())
 def store_smb1_and_contra_on_fat_and_usb1(): return store_descr(files=_store_files_smb1_and_contra(), folders=_store_folders_nes(), files_usb1=_store_files_smb1_and_contra(), folders_usb1=_store_folders_nes())
 def store_smb1_and_contra_on_fat_and_usb0(): return store_descr(files=_store_files_smb1_and_contra(), folders=_store_folders_nes(), files_usb0=_store_files_smb1_and_contra(), folders_usb0=_store_folders_nes())
@@ -154,8 +154,9 @@ def store_nes_folder_on_usb1_and_usb2(): return store_descr(folders_usb1=_store_
 def store_nes_folder_on_usb1(): return store_descr(folders_usb1=_store_folders_nes())
 def store_nes_folder_on_usb2(): return store_descr(folders_usb2=_store_folders_nes())
 def store_nes_folder(): return store_descr(folders=_store_folders_nes())
-def store_games_folder_on_usb1_too(): return store_descr(folders=_store_folders_games(), files_usb1={}, folders_usb1=_store_folders_games())
-def store_smb1_and_games_folder_on_usb1_too(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes(), folders_usb1=_store_folders_games())
+def store_games_folder_on_usb1(): return store_descr(files_usb1={}, folders_usb1=_store_folders_games())
+def store_games_folder_on_usb1_and_fat(): return store_descr(folders=_store_folders_games(), files_usb1={}, folders_usb1=_store_folders_games())
+def store_smb1_and_games_folder_on_usb1_and_fat(): return store_descr(files=_store_files_smb1(), folders=_store_folders_nes(), folders_usb1=_store_folders_games())
 def store_pdfviewer_on_base_system_path_hidden(): return store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files=_store_files_pdfviewer(), folders=_store_folders_linux())
 def store_smb1_and_contra(): return store_descr(files=_store_files_smb1_and_contra(), folders=_store_folders_nes())
 def store_nes_manual_on_usb2(): return store_descr(files_usb2=_store_files_nes_manual(), folders_usb2=_store_folders_docs_nes())
@@ -192,7 +193,7 @@ def db_external_drives_2(): return db_entity(db_id=db_id_external_drives_2, file
 
 
 def db_with_zipped_nes_palettes(): return db_entity(
-    folders=_store_folders_nes(),
+    folders={**_store_folders_nes(), folder_games_nes_palettes: {}},
     zips={zipped_nes_palettes_id: zipped_nes_palettes_desc()}
 )
 
@@ -213,7 +214,7 @@ def store_nes_zipped_palettes_on_fat():
     )
 
 
-def _store_zips_nes_zipped_palettes(): return {zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes)}
+def _store_zips_nes_zipped_palettes(): return {zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/')}
 def _store_files_nes_zipped_palettes(): return {file_nes_palette_a[1:]: {"zip_id": zipped_nes_palettes_id, **file_nes_palette_a_descr_zipped()}}
 
 

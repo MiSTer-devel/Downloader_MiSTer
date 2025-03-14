@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,31 +17,31 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import default_config
-from downloader.constants import FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version
-from test.fake_importer_command import ImporterCommand
+from downloader.constants import FILE_MiSTer_version, FILE_downloader_needs_reboot_after_linux_update
+from downloader.db_entity import DbEntity
 from downloader.linux_updater import LinuxUpdater as ProductionLinuxUpdater
+from test.fake_logger import NoLogger
+from test.fake_file_fetcher import SafeFileFetcher
 from test.fake_file_system_factory import FileSystemFactory
-from test.fake_file_downloader_factory import FileDownloaderFactory
-from downloader.logger import NoLogger
 
 
 class LinuxUpdater(ProductionLinuxUpdater):
-    def __init__(self, file_downloader_factory=None, file_system=None, file_system_factory=None, config=None):
+    def __init__(self, file_system=None, fetcher=None, file_system_factory=None, config=None, network_state=None):
         self._file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
-        file_downloader_factory = FileDownloaderFactory(file_system_factory=self._file_system_factory) if file_downloader_factory is None else file_downloader_factory
         self.file_system = self._file_system_factory.create_for_system_scope() if file_system is None else file_system
         config = config or default_config()
-        self._importer_command = ImporterCommand(config)
-        super().__init__(config, self.file_system, file_downloader_factory, NoLogger())
+        fetcher = fetcher or SafeFileFetcher(config, self.file_system, network_state)
+        self._dbs = []
+        super().__init__(NoLogger(), config, self.file_system, fetcher)
 
-    def add_db(self, db):
-        self._importer_command.add_db(db, {}, {})
+    def add_db(self, db: DbEntity) -> 'LinuxUpdater':
+        self._dbs.append(db)
         return self
 
-    def update(self):
-        self.update_linux(self._importer_command)
+    def update(self) -> 'LinuxUpdater':
+        self.update_linux(self._dbs)
         return self
 
-    def _run_subprocesses(self, linux, linux_path):
+    def _run_subprocesses(self, linux):
         self.file_system.write_file_contents(FILE_MiSTer_version, linux['version'])
         self.file_system.touch(FILE_downloader_needs_reboot_after_linux_update)

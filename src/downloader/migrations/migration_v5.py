@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,42 +15,24 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.constants import DISTRIBUTION_MISTER_DB_ID, K_DATABASES, K_OPTIONS
+
+from downloader.config import Config
+from downloader.constants import MEDIA_FAT
 from downloader.store_migrator import MigrationBase
 
 
 class MigrationV5(MigrationBase):
-    def __init__(self, file_system_factory, path_resolver_factory, config):
-        self._file_system_factory = file_system_factory
-        self._path_resolver_factory = path_resolver_factory
+    def __init__(self, config: Config) -> None:
         self._config = config
 
     version = 5
 
-    def migrate(self, local_store):
+    def migrate(self, local_store) -> None:
         """remove old mister from old location in case it exists"""
-
-        config = self._config.copy()
         try:
-            ini_description = self._config[K_DATABASES][DISTRIBUTION_MISTER_DB_ID]
-        except KeyError as _:
-            return
-
-        if K_OPTIONS in ini_description:
-            ini_description[K_OPTIONS].apply_to_config(config)
-
-        file_system = self._file_system_factory.create_for_config(config)
-
-        storage_priority_top_folders = {}
-
-        migrate_file_mister_old(file_system, self._path_resolver_factory.create(config, storage_priority_top_folders))
-
-
-def migrate_file_mister_old(file_system, path_resolver):
-    file_MiSTer_old = 'Scripts/.config/downloader/MiSTer.old'
-
-    path_resolver.add_system_path(file_MiSTer_old)
-    path_resolver.resolve_file_path(file_MiSTer_old)
-
-    if file_system.is_file(file_MiSTer_old):
-        file_system.unlink(file_MiSTer_old)
+            from pathlib import Path
+            mister_old = Path(self._config.get('base_system_path', MEDIA_FAT)) / 'Scripts/.config/downloader/MiSTer.old'
+            if mister_old.is_file():
+                mister_old.unlink(missing_ok=True)
+        except Exception as e:
+            print(e)

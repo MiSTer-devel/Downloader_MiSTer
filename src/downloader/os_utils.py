@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,16 +20,16 @@ from abc import ABC
 
 
 class OsUtils(ABC):
-    def sync(self):
+    def sync(self) -> None:
         """send sync signal to the OS"""
 
-    def reboot(self):
+    def reboot(self) -> None:
         """send reboot signal to the OS"""
 
 
 class LinuxOsUtils(OsUtils):
-    def sync(self):
+    def sync(self) -> None:
         subprocess.run(['sync'], shell=False, stderr=subprocess.STDOUT)
 
-    def reboot(self):
+    def reboot(self) -> None:
         subprocess.run(['reboot', 'now'], shell=False, stderr=subprocess.STDOUT)

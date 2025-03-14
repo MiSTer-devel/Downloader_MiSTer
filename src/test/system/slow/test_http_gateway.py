@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -17,7 +17,6 @@
 import unittest
 import ssl
 import tempfile
-import time
 import random
 import shutil
 import os
@@ -42,8 +41,7 @@ class TestHttpGateway(unittest.TestCase):
         shutil.rmtree(self.dir_path)
 
     def test_http_gateway_with_distribution_mister_urls___gets_500_files(self):
-        logger = PrintLogger.make_configured({'verbose': True, 'start_time': time.time()})
-        with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gateway:
+        with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=PrintLogger()) as gateway:
             with tempfile.NamedTemporaryFile() as temp_file, gateway.open(DISTRIBUTION_MISTER_DB_URL) as (url, res):
                 shutil.copyfileobj(res, temp_file)
                 db = load_json_from_zip(temp_file.name)
