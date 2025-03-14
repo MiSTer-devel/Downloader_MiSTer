@@ -22,7 +22,7 @@ from collections import defaultdict
 import os
 
 from downloader.config import Config
-from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY
+from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY, MEDIA_FAT
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.job_system import Job, Worker
@@ -89,6 +89,8 @@ class OnlineImporter:
 
         self._job_system.register_workers(self._make_workers())
         self._job_system.push_jobs(self._make_jobs(db_pkgs, local_store, full_resync))
+
+        file_mister_present = self._worker_ctx.file_system.is_file(os.path.join(MEDIA_FAT, FILE_MiSTer), use_cache=False)
 
         logger.bench('OnlineImporter execute jobs start.')
         self._job_system.execute_jobs()
@@ -180,7 +182,7 @@ class OnlineImporter:
 
         for fetch_file_job, e in report.get_failed_jobs(FetchFileJob):
             box.add_failed_file(fetch_file_job.pkg.rel_path)
-            if fetch_file_job.pkg.rel_path != FILE_MiSTer:
+            if fetch_file_job.pkg.rel_path != FILE_MiSTer or not file_mister_present:
                 continue
 
             self._logger.debug(e)
