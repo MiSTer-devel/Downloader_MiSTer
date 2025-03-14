@@ -154,7 +154,7 @@ class OnlineImporter:
                 box.add_installed_zip_summary(zindex_job.db.db_id, zindex_job.zip_id, zindex_job.result_zip_index, zindex_job.zip_description)
 
         for zindex_job, _e in report.get_failed_jobs(ProcessZipIndexJob):
-            box.add_failed_db(zindex_job.db.db_id)
+            #box.add_failed_db(zindex_job.db.db_id)
             if zindex_job.summary_download_failed is not None:
                 box.add_failed_file(zindex_job.summary_download_failed)
             box.add_failed_files(zindex_job.failed_files_no_space)
@@ -210,7 +210,11 @@ class OnlineImporter:
 
         for transfer_job, _e in report.get_failed_jobs(FetchDataJob) + report.get_failed_jobs(CopyDataJob):
             if transfer_job.db_id is not None:
-                box.add_failed_db(transfer_job.db_id)
+                if len(transfer_job.tags) == 0:
+                    pass  # @TODO: Cover this better in a test, since it affects distribution_mister test database check.
+                else:
+                    box.add_failed_db(transfer_job.db_id)
+
             box.add_failed_file(transfer_job.source)  # @TODO: This should not count as a file, but as a "source".
 
         logger.bench('OnlineImporter applying changes on stores...')
