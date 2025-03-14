@@ -130,7 +130,7 @@ If not done manually, the launcher will automatically install that build on its 
 
 ### Supporters+ shout-out!
 
-Thomas Williams and Wayne Booker
+Luca Fiandri, Thomas Williams and Wayne Booker
 
 Thank you so much for supporting this project! If you would like to show up here, join us as **Supporter+** on Patreon:
 
