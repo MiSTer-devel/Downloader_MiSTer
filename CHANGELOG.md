@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## Version 2.0 - 2025-03-X
+## Version 2.0 - 2025-03-14
 
 ### Added
 - Rewrote Downloader's core routines with a worker-based concurrency model, maximizing parallelism in this environment while improving efficiency, scalability, and extensibility for future optimizations.
