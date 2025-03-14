@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,18 +17,32 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
+from typing import Dict, Any, Optional
 
+from downloader.config import Config, ConfigDatabaseSection
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.worker_context import DownloaderWorker
+from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
+from downloader.jobs.transfer_job import TransferJob
+from downloader.local_store_wrapper import StoreWrapper
 
 
-@dataclass
-class DbHeaderJob(Job):
+@dataclass(eq=False, order=False)
+class OpenZipSummaryJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
+
     db: DbEntity
+    store: StoreWrapper
+    zip_id: str
+    ini_description: ConfigDatabaseSection
+    zip_description: Dict[str, Any]
+    full_resync: bool
+    config: Config
+    transfer_job: TransferJob # Job & Transferrer  @TODO: Python 3.10
+    backup: Optional[ProcessZipIndexJob]
 
+    def retry_job(self) -> Optional[Job]:
+        return self.transfer_job  # type: ignore[return-value]
 
-class DbHeaderWorker(DownloaderWorker):
-    def initialize(self): self._ctx.job_system.register_worker(DbHeaderJob.type_id, self)
-    def operate_on(self, job: DbHeaderJob): self._ctx.file_download_reporter.print_header(job.db)
+    def backup_job(self) -> Optional[Job]:
+        return self.backup

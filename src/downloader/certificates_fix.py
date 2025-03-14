@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,19 +16,24 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import subprocess
-from downloader.constants import DEFAULT_CURL_SSL_OPTIONS, K_CURL_SSL
+
+from downloader.config import Config
+from downloader.constants import DEFAULT_CURL_SSL_OPTIONS
+from downloader.file_system import FileSystem
+from downloader.logger import Logger
+from downloader.waiter import Waiter
 
 
 class CertificatesFix:
     cacert_pem_url = 'https://curl.se/ca/cacert.pem'
 
-    def __init__(self, config, file_system, waiter, logger):
+    def __init__(self, config: Config, file_system: FileSystem, waiter: Waiter, logger: Logger) -> None:
         self._config = config
         self._file_system = file_system
         self._waiter = waiter
         self._logger = logger
 
-    def fix_certificates_if_needed(self):
+    def fix_certificates_if_needed(self) -> bool:
         self._logger.bench('Fix certificates start.')
 
         result = self._fix_certificates_if_needed_impl()
@@ -37,8 +42,8 @@ class CertificatesFix:
 
         return result
 
-    def _fix_certificates_if_needed_impl(self):
-        curl_ssl = self._config[K_CURL_SSL].strip().lower()
+    def _fix_certificates_if_needed_impl(self) -> bool:
+        curl_ssl = self._config['curl_ssl'].strip().lower()
         if curl_ssl != DEFAULT_CURL_SSL_OPTIONS.strip().lower():
             return True
 
@@ -54,10 +59,10 @@ class CertificatesFix:
         self._get_new_cacert(cacert_path)
         return True
 
-    def _check_cacert(self, cacert_path):
+    def _check_cacert(self, cacert_path) -> bool:
         result = self._test_query(cacert_path)
         if result.returncode == 0:
-            self._logger.debug('cacert file at "%s" seems to be fine.' % cacert_path)
+            self._logger.debug('cacert file at "%s" seems to be fine.', cacert_path)
             return True
 
         self._logger.print('WARNING: cacert file at "%s" seems to be wrong!' % cacert_path)
@@ -67,7 +72,7 @@ class CertificatesFix:
 
         return self._get_new_cacert(cacert_path)
 
-    def _unlink(self, path):
+    def _unlink(self, path) -> bool:
         try:
             self._file_system.unlink(path)
             return True
@@ -79,7 +84,7 @@ class CertificatesFix:
             self._logger.debug("ERROR: Could not remove certs file.")
             return False
 
-    def _get_new_cacert(self, cacert_path):
+    def _get_new_cacert(self, cacert_path) -> bool:
         try:
             self._file_system.touch(cacert_path)
         except OSError as _:

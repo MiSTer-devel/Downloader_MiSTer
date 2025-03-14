@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,28 +15,11 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-import os
+from downloader.store_migrator import MigrationBase
 
 
-class TempFilesPool:
-    def __init__(self, file_system):
-        self._file_system = file_system
-        self._temp_files = []
+class MigrationV10(MigrationBase):
+    version = 10
 
-    def make_temp_file(self):
-        temp_file = self._file_system.unique_temp_filename()
-        self._temp_files.append(temp_file)
-        return temp_file.value
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exception_type, exception_value, traceback):
-        self.cleanup()
-
-    def cleanup(self):
-        for temp_file in self._temp_files:
-            if os.path.exists(temp_file.value):
-                os.unlink(temp_file.value)
-            temp_file.close()
-        self._temp_files = []
+    def migrate(self, local_store) -> None:
+        local_store['db_sigs'] = {}

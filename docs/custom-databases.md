@@ -72,8 +72,14 @@ The format of the aforementioned JSON file should be as follow:
             *            Default value: true
             */
             "overwrite": true,
-          
-          
+
+            /**
+            * [Optional] Can this file be considered an "External Path" by Downloader? (string).
+            *            Check the External Paths section of this document for more information.
+            *            By default is not defined.
+            */
+            "path": "pext",
+
             /**
             * [Optional] Should reboot after installing this file? (boolean).
             *            Default value: false
@@ -106,6 +112,13 @@ The format of the aforementioned JSON file should be as follow:
              *            Default value: empty list.
              */
             "tags": [],
+
+            /**
+            * [Optional] Can this folder be considered an "External Path" by Downloader? (string).
+            *            Check the External Paths section of this document for more information.
+            *            By default is not defined.
+            */
+            "path": "pext",
         },
       
       
@@ -184,11 +197,21 @@ Once a database has been published it's very important that it's ID is **NEVER**
 
 ### External Paths
 
-Files and folders paths can be defined as *potentially external* paths. That way, thanks to the **Storage Priority Resolution** feature, files can be installed on external storage, thus saving space on the main SD card.
+File and folder paths can be defined as *potentially external* paths, or *pext paths* for short. This way, thanks to the **Storage Priority Resolution** feature, files can be installed on external storage, helping save space on the main SD card.
 
-For a path to be considered as potentially external, it must be prepended with the symbol `|`.
+For a path to be considered as potentially external, it must be described with the field `path` set to `pext`.
 
-Example paths: `|games/PSX/tomb_raider.chd`, `|docs/AO486/Manual.pdf`
+Example:
+```js
+"games/PSX/tomb_raider.chd": {
+    "path": "pext",
+    ... other fields ...
+},
+"docs/AO486/Manual.pdf": {
+    "path": "pext",
+    ... other fields ...
+}
+```
 
 In practice, downloader will install both files at `games/PSX/tomb_raider.chd` and `docs/AO486/Manual.pdf`, but these relative paths can be located on external storages if the circumstances specified on the `storage_priority` [documentation](../README.md#options) occur.
 
@@ -200,15 +223,9 @@ Options for a repository can be defined in `/media/fat/downloader.ini` following
 db_url = 'https://url_to_db.json.zip'
 filter = arcade
 ```
-The following options can be defined:
-- filter
-- update_linux
-- downloader_threads_limit
-- downloader_timeout
-- downloader_retries
-- base_path
+For now only the option `filter` can be defined.
 
-Using the same list: maintainers can also set new default options [for any users haven't set themselves] that will only apply to their repository; think of these as **database-scoped defaults**.
+Database maintainers can also set new default options [for any users haven't set themselves] that will only apply to their repository; think of these as **database-scoped defaults**.
 
 Here is an example that sets the **database-scoped default** for the "_filter_" option:
 ```js

@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Version 2.0 - 2025-03-14
+
+### Added
+- Rewrote Downloader's core routines with a worker-based concurrency model, maximizing parallelism in this environment while improving efficiency, scalability, and extensibility for future optimizations.
+- The launcher now uses the latest build of Downloader if it's present in the filesystem. The newer version of Downloader will now be installed from [MiSTer Distribution](https://github.com/MiSTer-devel/Distribution_MiSTer) database just like any other standard MiSTer file. Thanks to this, you may now avoid executing remote code altogether by taking [this additional step](README.md#how-to-avoid-executing-remote-code-altogether) during installation. Otherwise, remote code execution only happens once on your first run of Downloader.
+- Documented **Custom INI file** support in [README.md](README.md#custom-ini-file), in case you want to use a separate launcher and INI file to install different databases in isolation through that launcher.
+- Added a docs [plot script](docs/jobs_flow_diagram.py), which helps document the internal worker architecture by generating [flow diagrams](docs/jobs_diagram.png).
+- Added a [debug](src/debug.py) CLI that assists in various development and testing processes.
+
+### Changed
+- Improvements and fixes in the HTTP client, which is now working more efficiently in highly concurrent scenarios and now takes care of most caching features from the HTTP/1.1 spec. Previously, in very rare cases, connections could stall, and this no longer happens.
+- Fixed timeouts not being triggered in some very rare scenarios, which, together with the previous connection-stalling bug in the HTTP client, would make the Downloader hang with a continuous array of asterisks for much longer than intended.
+- Fixed a bug where **Storage Priority**, set to *external*, would not detect an existing folder with content in setups with many drives connected at the same time.
+- Downloader is now more resilient when encountering databases with incorrect formats. It will still log these errors.
+- The log file `downloader.log` no longer stores debug information by default unless errors occur during the process. To log debug information, set `verbose` to `true` in the INI file, as described in the [README.md](README.md#custom-ini-file).
+- Reboot sequence takes much less time, it went from 30+ seconds to around 3.
+- Fixed database filtering not working properly in various uncommon scenarios.
+- Improved exit error codes. Previously, we were using only exit code 1 to represent any error, but now values from 10 to 19 represent system errors, and values of 20 or above represent update failures. Check the [constants.py](src/downloader/constants.py) file to see the specific error codes.
+- Improved release script. Now it's also implemented in python.
+- Fixed bug in error handling when restoring user system files during a Linux update by [daph](https://github.com/MiSTer-devel/Downloader_MiSTer/commits?author=daph).
+- Better **custom download filters** documentation by [NFGman](https://github.com/MiSTer-devel/Downloader_MiSTer/commits?author=NFGman). Check it [here](docs/download-filters.md).
+- Expanded filesystem precaching to speed up the check of already installed files.
+- The SSL check mechanism in the launcher has been made more flexible by covering more return codes. From just 60 to codes: 60, 77, 35, 51, 58, 59, 82, 83. It also has an improved routine to install new certificates, in case they are missing in the system.
+- Made the program react much sooner to interrupt signals (Ctrl+C) when invoked in a terminal.
+- Improved the benchmark script with more visualization outputs.
+- Custom database headers take up a bit less space in the output.
+- A large amount of minor bug fixes and improvements. Check this [PR (warning: +300 commits)](https://github.com/MiSTer-devel/Downloader_MiSTer/pull/51) for more details.
+
+### Removed
+- Deprecated paths starting with `|`. For potentially external paths (now referred to as "pext paths"), use the path field as instructed in [the updated documentation](docs/custom-databases.md#external-paths). Old `|` paths still work, but support will be fully removed in a future version.
+- The distutils python dependency was removed, since it's been deprecated for a while (PEP 632) and removed in Python 3.12.
+- The sharutils package is no longer required on linux for the standard launcher to run, so there is no need to install any dependencies on Ubuntu to run Downloader.
+- Removed `base_path` in database-scoped options. Files installed in different locations because of this option will be moved to the standard location. As a reminder, general `base_path` usage was deprecated in the version 1.8, as now multi-drive setups are handled with the **Storage Priority** feature introduced in Downloader 1.5.
+- Removed `downloader_threads_limit`, `downloader_timeout`, `downloader_retries` and `update_linux` from the database-scoped options. Instead, global values (defined under [mister] heading) are being used for these parameters, as they were being ignored anyway.
+- The *offline importer*, a mechanism designed to assist during the migration from the old updater to Downloader, has been removed. Its role was to amend the file duplications that happened with the old updater, but unfortunately it never worked. It required the publication of the original file lists that were renamed, and although some contributors were initially committed to provide them, they could not deliver them in the end. 
+
 ## Version 1.8 - 2023-09-21
 
 ### Added

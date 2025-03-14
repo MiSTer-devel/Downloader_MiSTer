@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,996 +16,558 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Set
-
-from downloader.config import download_sensitive_configs
-from downloader.constants import K_BASE_PATH, K_ZIP_FILE_COUNT_THRESHOLD,\
-    K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_new, FILE_MiSTer, FILE_MiSTer_old, K_BASE_SYSTEM_PATH
-from downloader.file_filter import BadFileFilterPartException
-from downloader.file_system import FolderCreationError, ReadOnlyFileSystem, UnlinkTemporaryException, FileCopyError
-from downloader.free_space_reservation import FreeSpaceReservation
-from downloader.other import UnreachableException, calculate_url
+import sys
+from typing import Optional, Any
+from collections import defaultdict
 import os
 
-
-class _Session:
-    def __init__(self):
-        self.files_that_failed = []
-        self.files_that_failed_from_zip = []
-        self.folders_that_failed = []
-        self.zips_that_failed = []
-        self.correctly_installed_files = []
-        self.new_files_not_overwritten = {}
-        self.processed_files = {}
-        self.needs_reboot = False
-        self.file_system = None
-
-    def add_new_file_not_overwritten(self, db_id, file):
-        if db_id not in self.new_files_not_overwritten:
-            self.new_files_not_overwritten[db_id] = []
-        self.new_files_not_overwritten[db_id].append(file)
+from downloader.config import Config
+from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY
+from downloader.db_entity import DbEntity
+from downloader.db_utils import DbSectionPackage
+from downloader.job_system import Job, Worker
+from downloader.jobs.copy_data_job import CopyDataJob
+from downloader.jobs.errors import WrongDatabaseOptions
+from downloader.jobs.fetch_data_job import FetchDataJob
+from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.jobs_factory import make_transfer_job
+from downloader.jobs.open_db_job import OpenDbJob
+from downloader.jobs.process_db_main_job import ProcessDbMainJob
+from downloader.jobs.reporters import InstallationReport
+from downloader.jobs.worker_context import DownloaderWorkerContext
+from downloader.jobs.workers_factory import make_workers
+from downloader.logger import Logger
+from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
+from downloader.free_space_reservation import FreeSpaceReservation, Partition
+from downloader.job_system import JobSystem
+from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
+from downloader.jobs.process_db_index_job import ProcessDbIndexJob
+from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
+from downloader.local_store_wrapper import LocalStoreWrapper, StoreFragmentDrivePaths
+from downloader.path_package import PathPackage
 
 
 class OnlineImporter:
-    def __init__(self, file_filter_factory, file_system_factory, file_downloader_factory, path_resolver_factory,
-                 local_repository, external_drives_repository, free_space_reservation: FreeSpaceReservation, waiter, logger):
-        self._file_filter_factory = file_filter_factory
-        self._file_system_factory = file_system_factory
-        self._file_downloader_factory = file_downloader_factory
-        self._path_resolver_factory = path_resolver_factory
-        self._local_repository = local_repository
-        self._external_drives_repository = external_drives_repository
-        self._free_space_reservation = free_space_reservation
-        self._waiter = waiter
+    def __init__(self, logger: Logger, job_system: JobSystem, worker_ctx: DownloaderWorkerContext, free_space_reservation: FreeSpaceReservation) -> None:
         self._logger = logger
-        self._unused_filter_tags = []
-        self._full_partitions = []
-        self._base_session = _Session()
+        self._job_system = job_system
+        self._worker_ctx = worker_ctx
+        self._free_space_reservation = free_space_reservation
+        self._local_store: Optional[LocalStoreWrapper] = None
+        self._box = InstallationBox()
+        self._needs_reboot = False
+        self._needs_save = False
 
-    def download_dbs_contents(self, importer_command, full_resync):
-        # TODO: Move the filter validation to earlier (before downloading dbs).
-        self._logger.bench('Online Importer start.')
+    def _make_workers(self) -> dict[int, Worker]:
+        return {w.job_type_id(): w for w in make_workers(self._worker_ctx)}
 
-        packages = self._unpack_dbs_data(importer_command, full_resync)
-        self._process_already_present_files(packages)
-        not_fitting_files = self._filter_not_fitting_files()
-        self._create_folders(packages)
-        config_map = self._build_config_map(packages)
-        self._process_config_map(config_map, not_fitting_files)
-        self._remove_files(packages)
-        self._finish_stores(packages)
-        self._remove_folders(importer_command)
-        self._unused_filter_tags = self._file_filter_factory.unused_filter_parts()
-        self._clean_stores(importer_command)
+    def _make_jobs(self, db_pkgs: list[DbSectionPackage], local_store: LocalStoreWrapper, full_resync: bool) -> list[Job]:
+        jobs: list[Job] = []
+        for pkg in db_pkgs:
+            transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
+            self._logger.debug('Loading db from: ', pkg.section['db_url'])
+            transfer_job.after_job = OpenDbJob(  # type: ignore[union-attr]
+                transfer_job=transfer_job,
+                section=pkg.db_id,
+                ini_description=pkg.section,
+                store=local_store.store_by_id(pkg.db_id),
+                full_resync=full_resync,
+            )
+            jobs.append(transfer_job)  # type: ignore[arg-type]
+        return jobs
 
-        self._logger.bench('Online Importer done.')
+    def set_local_store(self, local_store: LocalStoreWrapper) -> None:
+        self._local_store = local_store
 
-    def _unpack_dbs_data(self, importer_command, full_resync):
-        packages = []
+    def download_dbs_contents(self, db_pkgs: list[DbSectionPackage], full_resync: bool):
+        if self._local_store is None: raise Exception("Local store is not set")
 
-        self._logger.print("Preparing databases ...")
+        logger = self._logger
+        logger.bench('OnlineImporter start.')
+        
+        local_store: LocalStoreWrapper = self._local_store
 
-        for db, store, config in importer_command.read_dbs():
-            read_only_store = store.read_only()
+        self._job_system.register_workers(self._make_workers())
+        self._job_system.push_jobs(self._make_jobs(db_pkgs, local_store, full_resync))
 
-            self._logger.debug(f"Preparing db '{db.db_id}'...")
-            file_system = ReadOnlyFileSystem(self._file_system_factory.create_for_config(config))
+        logger.bench('OnlineImporter execute jobs start.')
+        self._job_system.execute_jobs()
+        self._worker_ctx.file_download_session_logger.print_pending()
+        logger.bench('OnlineImporter execute jobs done.')
 
-            self._logger.bench('Restoring filtered ZIP data...')
-            restored_db = _OnlineFilteredZipData(db, read_only_store).restore_filtered_zip_data()
+        box = self._box
+        report: InstallationReport = self._worker_ctx.installation_report
 
-            self._logger.bench('Expanding summaries...')
-            zip_summaries_expander = _OnlineZipSummaries(restored_db, read_only_store, full_resync, config, file_system, self._file_downloader_factory, self._logger, self._base_session)
-            expanded_db, zip_summaries = zip_summaries_expander.expand_summaries()
+        box.set_unused_filter_tags(self._worker_ctx.file_filter_factory.unused_filter_parts())
 
-            self._logger.bench('Filtering Database...')
-            file_filter = self._create_file_filter(expanded_db, config)
-            filtered_db, filtered_zip_data = file_filter.select_filtered_files(expanded_db)
+        for open_db_job, _e in report.get_failed_jobs(OpenDbJob):
+            box.add_failed_db(open_db_job.section)
 
-            externals = {'priority_files': {}, 'priority_sub_folders': {}, 'priority_top_folders': {}}
+        for db_job in report.get_completed_jobs(ProcessDbMainJob):
+            box.add_installed_db(db_job.db, db_job.config, db_job.db_hash, db_job.db_size)
+            for zip_id in db_job.ignored_zips:
+                box.add_failed_zip(db_job.db.db_id, zip_id)
+            for zip_id in db_job.removed_zips:
+                box.add_removed_zip(db_job.db.db_id, zip_id)
 
-            self._logger.bench('Translating paths...')
-            path_resolver = self._path_resolver_factory.create(config, externals['priority_top_folders'])
-            resolver = _Resolver(filtered_db, read_only_store, config, path_resolver, self._local_repository, self._logger, self._base_session, externals)
-            resolved_db = resolver.translate_paths()
+        for db_job, _e in report.get_failed_jobs(ProcessDbMainJob):
+            box.add_failed_db(db_job.db.db_id)
 
-            db_file_selector = _DatabaseFileSelector(resolved_db, read_only_store, full_resync, file_system, self._logger, self._base_session, self._free_space_reservation)
+        for index_job in report.get_completed_jobs(ProcessDbIndexJob):
+            box.add_present_not_validated_files(index_job.present_not_validated_files)
+            box.add_duplicated_files(index_job.duplicated_files, index_job.db.db_id)
+            box.add_non_duplicated_files(index_job.non_duplicated_files, index_job.db.db_id)
+            box.add_present_validated_files(index_job.present_validated_files, index_job.db.db_id)
+            box.add_skipped_updated_files(index_job.skipped_updated_files, index_job.db.db_id)
+            box.add_repeated_store_presence(index_job.repeated_store_presence, index_job.db.db_id)
+            box.add_removed_folders(index_job.removed_folders, index_job.db.db_id)
+            box.add_installed_folders(index_job.installed_folders, index_job.db.db_id)
+            box.queue_directory_removal(index_job.directories_to_remove, index_job.db.db_id)
+            box.queue_file_removal(index_job.files_to_remove, index_job.db.db_id)
 
-            self._logger.bench('Precaching files...')
-            file_system.precache_is_file_with_folders(resolved_db.folders.keys())
+        for index_job, e in report.get_failed_jobs(ProcessDbIndexJob):
+            box.add_failed_db(index_job.db.db_id)
+            box.add_full_partitions(index_job.full_partitions)
+            box.add_failed_files(index_job.failed_files_no_space)
+            box.add_failed_folders(index_job.failed_folders)
+            if not isinstance(e, BadFileFilterPartException): continue
+            box.add_failed_db_options(WrongDatabaseOptions(f"Wrong custom download filter on database {index_job.db.db_id}. Part '{str(e)}' is invalid."))
 
-            self._logger.bench('Selecting changed files...')
-            changed_files, already_present_files, needed_zips = db_file_selector.select_changed_files()
+        for zindex_job in report.get_completed_jobs(ProcessZipIndexJob):
+            box.add_present_not_validated_files(zindex_job.present_not_validated_files)
+            box.add_duplicated_files(zindex_job.duplicated_files, zindex_job.db.db_id)
+            box.add_non_duplicated_files(zindex_job.non_duplicated_files, zindex_job.db.db_id)
+            box.add_present_validated_files(zindex_job.present_validated_files, zindex_job.db.db_id)
+            box.add_skipped_updated_files(zindex_job.skipped_updated_files, zindex_job.db.db_id)
+            box.add_repeated_store_presence(zindex_job.repeated_store_presence, zindex_job.db.db_id)
+            box.add_removed_folders(zindex_job.removed_folders, zindex_job.db.db_id)
+            box.add_installed_folders(zindex_job.installed_folders, zindex_job.db.db_id)
+            box.queue_directory_removal(zindex_job.directories_to_remove, zindex_job.db.db_id)
+            box.queue_file_removal(zindex_job.files_to_remove, zindex_job.db.db_id)
+            if zindex_job.summary_download_failed is not None:
+                box.add_failed_file(zindex_job.summary_download_failed)
+            if zindex_job.filtered_data:
+                box.add_filtered_zip_data(zindex_job.db.db_id, zindex_job.zip_id, zindex_job.filtered_data)
+            if zindex_job.has_new_zip_summary:
+                box.add_installed_zip_summary(zindex_job.db.db_id, zindex_job.zip_id, zindex_job.result_zip_index, zindex_job.zip_description)
 
-            packages.append((resolved_db, config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries))
+        for zindex_job, _e in report.get_failed_jobs(ProcessZipIndexJob):
+            box.add_failed_db(zindex_job.db.db_id)
+            if zindex_job.summary_download_failed is not None:
+                box.add_failed_file(zindex_job.summary_download_failed)
+            box.add_failed_files(zindex_job.failed_files_no_space)
+            box.add_full_partitions(zindex_job.full_partitions)
+            box.add_failed_folders(zindex_job.failed_folders)
 
-        return packages
+        for open_zip_job in report.get_completed_jobs(OpenZipContentsJob):
+            box.add_downloaded_files(open_zip_job.downloaded_files)
+            box.add_validated_files(open_zip_job.validated_files, open_zip_job.db.db_id)
+            # We should be able to comment previous line and the test still pass
+            box.add_failed_files(open_zip_job.failed_files)
+            box.queue_directory_removal(open_zip_job.directories_to_remove, open_zip_job.db.db_id)
+            box.queue_file_removal(open_zip_job.files_to_remove, open_zip_job.db.db_id)
 
-    def _process_already_present_files(self, packages):
-        for db, config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries in packages:
-            self._logger.bench(f'Process {db.db_id} already present files...')
+        for open_zip_job, _e in report.get_failed_jobs(OpenZipContentsJob):
+            box.add_failed_files(open_zip_job.files_to_unzip)
 
-            read_only_store = store.read_only()
-            write_only_store = store.write_only()
+        for fetch_file_job in report.get_started_jobs(FetchFileJob):
+            box.add_file_fetch_started(fetch_file_job.pkg.rel_path)
 
-            file_system = self._file_system_factory.create_for_config(config)
-            db_importer = _OnlineDatabaseImporter(db, write_only_store, read_only_store, externals, config, file_system, self._file_downloader_factory, self._logger, self._base_session, self._external_drives_repository)
+        for fetch_file_job in report.get_completed_jobs(FetchFileJob):
+            if fetch_file_job.db_id is None or fetch_file_job.pkg is None: continue
+            box.add_downloaded_file(fetch_file_job.pkg.rel_path)
+            box.add_validated_file(fetch_file_job.pkg, fetch_file_job.db_id)
 
-            db_importer.process_already_present_files(already_present_files)
-
-    def _filter_not_fitting_files(self) -> Set[str]:
-        self._logger.debug(f"Free space: {self._free_space_reservation.free_space()}")
-
-        full_partitions = self._free_space_reservation.get_full_partitions()
-        if len(full_partitions) == 0:
-            return set()
-
-        self._logger.bench(f'Filtering out not fitting files...')
-
-        not_fitting_files = set()
-        for partition in full_partitions:
-            self._logger.print(f"Partition {partition.partition_path} is full!")
-            self._full_partitions.append(partition.partition_path)
-            not_fitting_files.update(partition.files)
-
-        return not_fitting_files
-
-    def _create_folders(self, packages):
-        for db, config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries in packages:
-            self._logger.bench(f'Creating db {db.db_id} folders...')
-
-            read_only_store = store.read_only()
-            write_only_store = store.write_only()
-
-            file_system = self._file_system_factory.create_for_config(config)
-            db_importer = _OnlineDatabaseImporter(db, write_only_store, read_only_store, externals, config, file_system, self._file_downloader_factory, self._logger, self._base_session, self._external_drives_repository)
-            db_importer.create_folders()
-
-    def _build_config_map(self, packages):
-        self._logger.debug(f"Building config map...")
-        config_map = {}
-        for db, config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries in packages:
-            config_key = ''
-            for key in download_sensitive_configs():
-                config_key += f'{key}:{str(config[key])};'
-
-            if config_key not in config_map:
-                config_map[config_key] = []
-            config_map[config_key].append((db, config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries))
-
-        return config_map
-
-    def _process_config_map(self, config_map, not_fitting_files: Set[str]):
-        for config_json, subpackages in config_map.items():
-            self._logger.debug(f"Processing config '{config_json}'...")
-            config = None if len(subpackages) == 0 else subpackages[0][1]
-            file_system = self._file_system_factory.create_for_config(config)
-            file_downloader = self._file_downloader_factory.create(config, parallel_update=True)
-
-            files_to_download = []
-            store_by_file = {}
-            is_first_run = False
-
-            for db, _config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries in subpackages:
-                self._logger.bench(f'Process db {db.db_id} changed files...')
-
-                read_only_store = store.read_only()
-                write_only_store = store.write_only()
-
-                if len(changed_files) > 0:
-                    files_to_download.append((f'[{db.db_id}]', {'db': db}))
-                else:
-                    self._print_db_header(db)
-                    self._logger.print("Nothing new to download from given sources.")
-
-                db_importer = _OnlineDatabaseImporter(db, write_only_store, read_only_store, externals, config, file_system, self._file_downloader_factory, self._logger, self._base_session,
-                                                      self._external_drives_repository)
-
-                for file_path, file_description in changed_files.items():
-                    download_description = {'hash': file_description['hash'], 'size': file_description['size']}
-                    if 'url' in file_description:
-                        download_description['url'] = file_description['url']
-
-                    base_files_url = db.base_files_url
-                    if 'zip_id' in file_description and file_description['zip_id'] in db.zips:
-                        zip_id = file_description['zip_id']
-                        download_description['zip_id'] = zip_id
-                        if 'zip_path' in file_description:
-                            download_description['zip_path'] = file_description['zip_path']
-                        zip_base_files_url = db.zips[zip_id].get('base_files_url', None)
-                        if zip_base_files_url is not None and len(zip_base_files_url) > 0:
-                            base_files_url = zip_base_files_url
-
-                    if 'url' not in download_description:
-                        maybe_url = calculate_url(base_files_url, file_path)
-                        if maybe_url is not None:
-                            download_description['url'] = maybe_url
-
-                    files_to_download.append((file_path, download_description))
-                    store_by_file[file_path] = [write_only_store, db_importer, file_description]
-
-                is_first_run = is_first_run or db_importer._is_first_run()
-                if len(needed_zips) > 0:
-                    db_importer._import_zip_contents(needed_zips, filtered_zip_data, file_downloader, not_fitting_files)
-
-            if len(files_to_download) == 0:
+        for fetch_file_job, e in report.get_failed_jobs(FetchFileJob):
+            box.add_failed_file(fetch_file_job.pkg.rel_path)
+            if fetch_file_job.pkg.rel_path != FILE_MiSTer:
                 continue
 
-            not_downloaded_files = []
-            for file_path, download_description in files_to_download:
-                if 'size' in download_description and file_system.download_target_path(file_path) in not_fitting_files:
-                    not_downloaded_files.append(file_path)
-                    continue
-                file_downloader.queue_file(download_description, file_path)
-
-            self._logger.print("\nDownloading %d files:" % len(files_to_download))
-            file_downloader.download_files(is_first_run)
-
-            self._base_session.files_that_failed.extend(file_downloader.errors() + not_downloaded_files)
-            self._base_session.folders_that_failed.extend(file_downloader.failed_folders())
-            self._base_session.correctly_installed_files.extend(file_downloader.correctly_downloaded_files())
-
-            for file_path in file_downloader.errors():
-                write_only_store, db_importer, file_description = store_by_file[file_path]
-                write_only_store.remove_file(file_path)
-
-            for file_path in file_downloader.correctly_downloaded_files():
-                write_only_store, db_importer, file_description = store_by_file[file_path]
-                if file_description.get('reboot', False):
-                    self._base_session.needs_reboot = True
-                db_importer._add_file_to_store(file_path, file_description)
-
-            for file_path in set(self._base_session.files_that_failed_from_zip) - set(file_downloader.correctly_downloaded_files()):
-                if file_path not in store_by_file:
-                    continue
-                write_only_store, db_importer, file_description = store_by_file[file_path]
-                db_importer._add_file_to_store(file_path, file_description)
-
-    def _remove_files(self, packages):
-        for db, config, store, externals, changed_files, already_present_files, needed_zips, filtered_zip_data, zip_summaries in packages:
-            self._logger.bench(f'Remove db {db.db_id} deleted files...')
-
-            read_only_store = store.read_only()
-            write_only_store = store.write_only()
-
-            file_system = self._file_system_factory.create_for_config(config)
-            db_importer = _OnlineDatabaseImporter(db, write_only_store, read_only_store, externals, config, file_system, self._file_downloader_factory, self._logger, self._base_session, self._external_drives_repository)
-
-            db_importer.remove_deleted_files()
-            file_system.print_debug()
-
-    def _finish_stores(self, packages):
-        for db, config, store, _externals, _changed_files, _already_present_files, _needed_zips, filtered_zip_data, zip_summaries in packages:
-            self._logger.bench(f'Finishing db {db.db_id} store...')
-
-            write_only_store = store.write_only()
-            write_only_store.populate_with_summary(zip_summaries, db.zips)
-            write_only_store.drop_removed_zips_from_store(db.zips)
-            write_only_store.save_filtered_zip_data(filtered_zip_data)
-            write_only_store.set_base_path(config[K_BASE_PATH])
-
-    def _clean_stores(self, importer_command):
-        self._logger.bench('Cleaning stores...')
-
-        for _, store, config in importer_command.read_dbs():
-            write_store = store.write_only()
-            read_store = store.read_only()
-
-            file_system = self._file_system_factory.create_for_config(config)
-            if read_store.has_externals:
-                for drive in read_store.external_drives:
-                    write_store.try_cleanup_drive(drive)
-
-                write_store.try_cleanup_externals()
-
-            delete_files = []
-            for file_path, file_description in read_store.files.items():
-                if 'zip_id' in file_description and file_path in self._base_session.files_that_failed_from_zip:
-                    continue
-
-                if is_system_path(file_description):
-                    present_file_path = f'{config[K_BASE_SYSTEM_PATH]}/{file_path}'
-                else:
-                    present_file_path = f'{config[K_BASE_PATH]}/{file_path}'
-
-                if file_system.is_file(present_file_path):
-                    continue
-
-                delete_files.append(file_path)
-            for file_path in delete_files:
-                write_store.remove_file(file_path)
-
-            delete_folders = []
-            for folder_path in sorted(read_store.folders, key=len, reverse=True):
-
-                folder_description = read_store.folders[folder_path]
-                if is_system_path(folder_description) and \
-                        file_system.is_folder(os.path.join(config[K_BASE_SYSTEM_PATH], folder_path)):
-                    continue
-                elif file_system.is_folder(os.path.join(config[K_BASE_PATH], folder_path)):
-                    continue
-
-                delete_folders.append(folder_path)
-            for folder_path in delete_folders:
-                write_store.remove_folder(folder_path)
-
-    def _remove_folders(self, importer_command):
-        self._logger.bench('Removing folders...')
-
-        store_by_id = {}
-        db_folders = {}
-        internal_store_folders = {}
-        external_stored_folders = {}
-
-        # fill up trans-db folder registries
-
-        for db, store, config in importer_command.read_dbs():
-            read_only_store = store.read_only()
-
-            store_by_id[db.db_id] = store
-
-            for folder_path in db.folders:
-                if folder_path not in db_folders:
-                    db_folders[folder_path] = set()
-
-                db_folders[folder_path].add(db.db_id)
-
-            for folder_path, folder_description in read_only_store.folders.items():
-                base_path = config[K_BASE_PATH]
-                if is_system_path(folder_description):
-                    base_path = config[K_BASE_SYSTEM_PATH]
-
-                if base_path not in internal_store_folders:
-                    internal_store_folders[base_path] = {}
-
-                if folder_path not in internal_store_folders[base_path]:
-                    internal_store_folders[base_path][folder_path] = set()
-
-                internal_store_folders[base_path][folder_path].add(db.db_id)
-
-            if not read_only_store.has_externals:
+            self._logger.debug(e)
+            fs = self._worker_ctx.file_system
+            full_path = fetch_file_job.pkg.full_path
+            if fs.is_file(full_path, use_cache=False):
                 continue
 
-            for drive, external in read_only_store.externals:
-                for folder_path in external['folders']:
-                    if drive not in external_stored_folders:
-                        external_stored_folders[drive] = {}
+            backup_path = fetch_file_job.pkg.backup_path()
+            temp_path = fetch_file_job.pkg.temp_path(fetch_file_job.already_exists)
+            if backup_path is not None and fs.is_file(backup_path, use_cache=False):
+                fs.move(backup_path, full_path)
+            elif temp_path is not None and fs.is_file(temp_path, use_cache=False) and fs.hash(temp_path) == fetch_file_job.pkg.description['hash']:
+                fs.move(temp_path, full_path)
 
-                    if folder_path not in external_stored_folders[drive]:
-                        external_stored_folders[drive][folder_path] = set()
-
-                    external_stored_folders[drive][folder_path].add(db.db_id)
-
-        # remove folders from fs
-        system_file_system = self._file_system_factory.create_for_system_scope()
-
-        for drive, folders in internal_store_folders.items():
-            for folder_path in sorted(folders, key=len, reverse=True):
-                if folder_path in db_folders:
-                    continue
-
-                full_folder_path = os.path.join(drive, folder_path)
-                if system_file_system.folder_has_items(full_folder_path):
-                    continue
-
-                system_file_system.remove_folder(full_folder_path)
-                for db_id in folders[folder_path]:
-                    store_by_id[db_id].write_only().remove_folder(folder_path)
-
-        for drive, folders in external_stored_folders.items():
-            for folder_path in sorted(folders, key=len, reverse=True):
-                if folder_path in db_folders:
-                    continue
-
-                if len(folder_path.split('/')) <= 2:  # when storage_priority is prefer_sd
-                    continue
-
-                full_folder_path = os.path.join(drive, folder_path)
-                if system_file_system.folder_has_items(full_folder_path):
-                    continue
-
-                system_file_system.remove_folder(full_folder_path)
-                for db_id in folders[folder_path]:
-                    store_by_id[db_id].write_only().remove_external_folder(drive, folder_path)
-
-        # remove folders from store
-        for db, store, config in importer_command.read_dbs():
-            read_store = store.read_only()
-            write_store = store.write_only()
-
-            for folder_path in sorted(list(read_store.folders), key=len, reverse=True):
-                if folder_path in db.folders:
-                    continue
-
-                folder_description = read_store.folders[folder_path]
-                if is_system_path(folder_description) and \
-                        system_file_system.folder_has_items(f'{config[K_BASE_SYSTEM_PATH]}/{folder_path}'):
-                    continue
-                elif system_file_system.folder_has_items(f'{config[K_BASE_PATH]}/{folder_path}'):
-                    continue
-
-                write_store.remove_folder(folder_path)
-
-            if not read_store.has_externals:
+            if fs.is_file(full_path, use_cache=False):
                 continue
 
-            for drive in read_store.external_drives:
-                delete_folders = []
-                external_folders = read_store.external_folders(drive)
-                for folder_path in sorted(external_folders, key=len, reverse=True):
-                    if folder_path in db_folders:
+            # This error message should never happen.
+            # If it happens it would be an unexpected case where file_system is not moving files correctly
+            self._logger.print('CRITICAL ERROR!!! Could not restore the MiSTer binary!')
+            self._logger.print('Please manually rename the file MiSTer.new as MiSTer')
+            self._logger.print('Your system won\'nt be able to boot until you do so!')
+            sys.exit(EXIT_ERROR_BAD_NEW_BINARY)
+
+        for transfer_job, _e in report.get_failed_jobs(FetchDataJob) + report.get_failed_jobs(CopyDataJob):
+            if transfer_job.db_id is not None:
+                box.add_failed_db(transfer_job.db_id)
+            box.add_failed_file(transfer_job.source)  # @TODO: This should not count as a file, but as a "source".
+
+        logger.bench('OnlineImporter applying changes on stores...')
+
+        write_stores = {}
+        read_stores = {}
+        stores = []
+        for db in db_pkgs:
+            store = local_store.store_by_id(db.db_id)
+            write_stores[db.db_id] = store.write_only()
+            read_stores[db.db_id] = store.read_only()
+            stores.append(store)
+
+        for db_entity, config, db_hash, db_size in box.installed_db_sigs():
+            write_stores[db_entity.db_id].set_db_state_signature(db_hash, db_size, db_entity.timestamp, config['filter'])
+
+        for db_id, zip_id in box.removed_zips():
+            write_stores[db_id].remove_zip_id(zip_id)
+
+        if len(files_to_consume := box.consume_files()) > 0:
+            logger.bench('OnlineImporter files_to_consume start.')
+            processed_file_names: set[str] = {file_pkg.rel_path for file_pkgs, db_id in box.non_duplicated_files() for file_pkg in file_pkgs}
+            processed_files: dict[str, list[PathPackage]] = defaultdict(list)
+            removed_files: list[tuple[PathPackage, set[str]]] = []
+
+            for pkg, dbs in files_to_consume:
+                for db_id in dbs:
+                    write_stores[db_id].remove_file(pkg.rel_path)
+                    write_stores[db_id].remove_file_from_zips(pkg.rel_path)
+
+                if pkg.rel_path in processed_file_names: continue
+
+                for db_id in dbs:
+                    if not read_stores[db_id].has_externals:
                         continue
 
-                    # Note on following folder_has_items call:
-                    #
-                    # A folder_description coming from store.external_folders() can never be a system path,
-                    # so we only check K_BASE_PATH and ignore K_BASE_SYSTEM_PATH
-                    #
-                    # If it's a system path, it's a bug but will be ignored. Note that we are filtering this cases out
-                    # currently during the translation step. So it's very unlikely to happen,
-                    # and there is no real damage if it occurs.
+                    for drive in read_stores[db_id].external_drives:
+                        file_path = os.path.join(drive, pkg.rel_path)
+                        if self._worker_ctx.file_system.is_file(file_path):
+                            self._worker_ctx.file_system.unlink(file_path)
 
-                    if system_file_system.folder_has_items(f'{config[K_BASE_PATH]}/{folder_path}'):
-                        continue
+                self._worker_ctx.file_system.unlink(pkg.full_path)
+                processed_files[list(dbs)[0]].append(pkg)
+                processed_file_names.add(pkg.rel_path)
+                removed_files.append((pkg, dbs))
 
-                    delete_folders.append(folder_path)
-
-                for folder_path in delete_folders:
-                    write_store.remove_external_folder(drive, folder_path)
-
-    def _print_db_header(self, db):
-        self._logger.print()
-        if len(db.header) > 0:
-            self._logger.print('################################################################################')
-            for line in db.header:
-                if isinstance(line, float):
-                    self._waiter.sleep(line)
-                else:
-                    self._logger.print(line, end='')
+            box.add_removed_files(removed_files)
+            logger.bench('OnlineImporter files_to_consume done.')
         else:
-            self._logger.print('################################################################################')
-            self._logger.print('SECTION: %s' % db.db_id)
-            self._logger.print()
+            processed_files = {}
 
-    def _create_file_filter(self, db, config):
-        try:
-            return self._file_filter_factory.create(db, config)
-        except BadFileFilterPartException as e:
-            raise WrongDatabaseOptions(
-                "Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e)))
+        if len(duplicated_files := box.duplicated_files()) > 0:
+            logger.bench('OnlineImporter calculating db_id_by_rel_path start.')
+            db_id_by_rel_path = {file_pkg.rel_path: db_id for file_pkgs, db_id in box.non_duplicated_files() for file_pkg in file_pkgs} | \
+                                {file_pkg.rel_path: db_id for db_id, file_pkgs in processed_files.items() for file_pkg in file_pkgs}
+            logger.bench('OnlineImporter calculating db_id_by_rel_path done.')
+
+            for duplicates, db_id in duplicated_files:
+                self._logger.print(f'Warning! {len(duplicates)} duplicates found in [{db_id}]:')
+                for file in duplicates:
+                    self._logger.print(f'DUPLICATED: {file} [using {db_id_by_rel_path[file]} instead]')
+
+        for pkg, dbs in sorted(box.consume_directories(), key=lambda x: len(x[0].full_path), reverse=True):
+            if box.is_folder_installed(pkg.rel_path):
+                # If a folder got installed by any db...
+                # assert len(dbs) >=1
+                # The for-loop is for when two+ dbs used to have the same folder but one of them has removed it, it should be kept because
+                # one db still uses it. But it should be removed from the store in the other dbs.
+                for db_id in dbs:
+                    write_stores[db_id].remove_local_folder(pkg.rel_path)
+                    write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
+                continue
+
+            if self._worker_ctx.file_system.folder_has_items(pkg.full_path):
+                continue
+
+            for db_id in dbs:
+                for is_external, drive in read_stores[db_id].list_other_drives_for_folder(pkg):
+                    if is_external:
+                        # @TODO: This count part blow is for checking if previously it was previously stored as "is_pext_external_subfolder", but since this information is lost, we need to do this. When we store "path" = "pext" we will have this information again, so we can do this much cleaner.
+                        if pkg.rel_path.count('/') >= 2 and pkg.rel_path.count('/') >= 2 \
+                                and not self._worker_ctx.file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
+                            write_stores[db_id].remove_external_folder(drive, pkg.rel_path)
+                            write_stores[db_id].remove_external_folder_from_zips(drive, pkg.rel_path)
+                            self._worker_ctx.file_system.remove_folder(full_ext_path)
+                    else:
+                        if not self._worker_ctx.file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
+                            self._worker_ctx.file_system.remove_folder(full_ext_path)
+                            write_stores[db_id].remove_local_folder(pkg.rel_path)
+                            write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
+
+                self._worker_ctx.file_system.remove_folder(pkg.full_path)
+
+                if pkg.is_pext_external() and pkg.drive is not None:
+                    write_stores[db_id].remove_external_folder(pkg.drive, pkg.rel_path)
+                    write_stores[db_id].remove_external_folder_from_zips(pkg.drive, pkg.rel_path)
+                else:
+                    write_stores[db_id].remove_local_folder(pkg.rel_path)
+                    write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
+
+        for db_id, file_pkgs in box.installed_file_pkgs().items():
+            for file_pkg in file_pkgs:
+                if 'reboot' in file_pkg.description and file_pkg.description['reboot'] == True:
+                    self._needs_reboot = True
+                write_stores[db_id].add_file_pkg(file_pkg, file_pkg.rel_path in box.repeated_store_presence()[db_id])
+
+        for db_id, folder_pkg in box.installed_folders():
+            write_stores[db_id].add_folder_pkg(folder_pkg)
+
+        for file_pkg, dbs in box.removed_files():
+            for db_id in dbs:
+                write_stores[db_id].remove_file_pkg(file_pkg)
+
+        for db_id, folder_pkg in box.removed_folders():
+            write_stores[db_id].remove_folder_pkg(folder_pkg)
+
+        for db_id, zip_id, zip_summary, zip_description in box.installed_zip_summary():
+            write_stores[db_id].add_zip_summary(zip_id, zip_summary, zip_description)
+
+        for db_id, filtered_zip_data in box.filtered_zip_data().items():
+            write_stores[db_id].save_filtered_zip_data(filtered_zip_data)
+
+        for w_store in write_stores.values():
+            w_store.cleanup_externals()
+
+        self._needs_save = local_store.needs_save()
+
+        for store in stores:
+            self._clean_store(store.unwrap_store())
+
+        for wrong_db_opts_err in box.wrong_db_options():
+            self._worker_ctx.swallow_error(wrong_db_opts_err)
+
+        logger.bench('OnlineImporter done.')
+        return self
+ 
+    @staticmethod
+    def _clean_store(store) -> None:
+        for file_description in store['files'].values():
+            if 'tags' in file_description and 'zip_id' not in file_description: file_description.pop('tags')
+        for folder_description in store['folders'].values():
+            if 'tags' in folder_description and 'zip_id' not in folder_description: folder_description.pop('tags')
+        for zip_description in store['zips'].values():
+            if 'zipped_files' in zip_description['contents_file']:
+                zip_description['contents_file'].pop('zipped_files')
+            if 'summary_file' in zip_description and 'unzipped_json' in zip_description['summary_file']:
+                zip_description['summary_file'].pop('unzipped_json')
+            if 'internal_summary' in zip_description:
+                zip_description.pop('internal_summary')
+
+    def folders_that_failed(self) -> list[str]:
+        return self._box.failed_folders()
+
+    def zips_that_failed(self) -> list[str]:
+        return [f'{db_id}:{zip_id}' for db_id, zip_id in self._box.failed_zips()]
 
     def files_that_failed(self):
-        return self._base_session.files_that_failed
+        return self._box.failed_files()
 
-    def folders_that_failed(self):
-        return self._base_session.folders_that_failed
+    def box(self) -> 'InstallationBox':
+        return self._box
 
-    def zips_that_failed(self):
-        return self._base_session.zips_that_failed
-
-    def unused_filter_tags(self):
-        return self._unused_filter_tags
-
-    def correctly_installed_files(self):
-        return self._base_session.correctly_installed_files
-
-    def needs_reboot(self):
-        return self._base_session.needs_reboot
-
-    def full_partitions(self):
-        return self._full_partitions
+    def dbs_that_failed(self):
+        return self._box.failed_dbs()
 
     def new_files_not_overwritten(self):
-        return self._base_session.new_files_not_overwritten
+        return self._box.skipped_updated_files()
 
+    def needs_reboot(self):
+        return self._needs_reboot
 
-class _Resolver:
-    def __init__(self, db, read_only_store, config, path_resolver, local_repository, logger, session, externals):
-        self._db = db
-        self._read_only_store = read_only_store
-        self._config = config
-        self._path_resolver = path_resolver
-        self._local_repository = local_repository
-        self._logger = logger
-        self._session = session
-        self._externals = externals
+    def full_partitions(self):
+        return [p for p, s in self._box.full_partitions().items()]
 
-    def _is_external_zip(self, path, description):
-        if path[0] == '|' or 'zip_id' not in description:
-            return False
+    def free_space(self):
+        actual_remaining_space = dict(self._free_space_reservation.free_space())
+        for p, reservation in self._box.full_partitions().items():
+            actual_remaining_space[p] -= reservation
+        return actual_remaining_space
 
-        zip_id = description['zip_id']
-        zip_descr = self._db.zips[zip_id]
-        if 'target_folder_path' not in zip_descr or len(zip_descr['target_folder_path']) == 0:
-            return False
+    def correctly_downloaded_dbs(self) -> list[DbEntity]:
+        return self._box.installed_dbs()
 
-        return zip_descr['target_folder_path'][0] == '|'
+    def correctly_installed_files(self):
+        return self._box.installed_file_names()
 
-    def translate_paths(self):
-        priority_files = self._externals['priority_files']
-        priority_sub_folders = self._externals['priority_sub_folders']
+    def run_files(self):
+        return self._box.fetch_started_files()
 
-        input_folders = self._db.folders
-        self._db.folders = {}
-        for target_folder_path, description in input_folders.items():
-            self._translate_input_folder_path(description, priority_sub_folders, target_folder_path)
+    @property
+    def needs_save(self) -> bool:
+        return self._needs_save
 
-        input_files = self._db.files
-        self._db.files = {}
-        for file_path, description in input_files.items():
-            self._translate_input_file_path(description, file_path, priority_files)
 
-        input_zips = self._db.zips
-        self._db.zips = {}
-        for zip_id, zip_description in input_zips.items():
-            self._translate_input_zip_paths(priority_sub_folders, zip_id, zip_description)
-
-        return self._db
-
-    def _translate_input_zip_paths(self, priority_sub_folders, zip_id, zip_description):
-        kind = zip_description['kind']
-        if kind == 'extract_all_contents':
-            if is_system_path(zip_description):
-                self._logger.print('ERROR: Zip %s is marked as system path, contact the db maintainer. Skipping...' % zip_id)
-                self._logger.debug(zip_description)
-                self._session.zips_that_failed.append(zip_id)
-                return
-
-            target_zip_folder_path = zip_description['target_folder_path']
-            target_zip_folder_base_path = self._path_resolver.resolve_folder_path(target_zip_folder_path)
-            if target_zip_folder_path[0] == '|':
-                target_zip_folder_path = target_zip_folder_path[1:]
-            if target_zip_folder_base_path is not None and self._read_only_store.base_path != target_zip_folder_base_path:
-                priority_sub_folders[target_zip_folder_path] = target_zip_folder_base_path
-
-        self._db.zips[zip_id] = zip_description
-
-    def _translate_input_file_path(self, description, file_path, priority_files):
-        target_is_system_path = is_system_path(description)
-        if self._is_external_zip(file_path, description):
-            file_path = '|' + file_path
-
-        if file_path[0] == '|':
-            if target_is_system_path:
-                self._logger.print('ERROR: External file %s is marked as system path, contact the db maintainer. Skipping...' % file_path)
-                self._logger.debug(description)
-                self._session.files_that_failed.append(file_path[1:])
-                return
-            base_path = self._path_resolver.resolve_file_path(file_path)
-            file_path = file_path[1:]
-        else:
-            if target_is_system_path:
-                self._path_resolver.add_system_path(file_path)
-                if file_path == FILE_MiSTer:
-                    self._path_resolver.add_system_path(FILE_MiSTer_new)
-                    self._path_resolver.add_system_path(FILE_MiSTer_old)
-
-                    self._path_resolver.resolve_file_path(FILE_MiSTer_new)
-                    self._path_resolver.resolve_file_path(FILE_MiSTer_old)
-            base_path = self._path_resolver.resolve_file_path(file_path)
-
-        if base_path is not None and self._read_only_store.base_path != base_path and not target_is_system_path:
-            priority_files[file_path] = base_path
-        self._db.files[file_path] = description
-
-    def _translate_input_folder_path(self, description, priority_sub_folders, target_folder_path):
-        is_external_zip = self._is_external_zip(target_folder_path, description)
-        target_is_system_path = is_system_path(description)
-        if is_external_zip:
-            target_folder_path = '|' + target_folder_path
-
-        if target_folder_path[0] == '|':
-            if target_is_system_path:
-                self._logger.print('ERROR: External folder %s is marked as system path, contact the db maintainer. Skipping...' % target_folder_path)
-                self._logger.debug(description)
-                self._session.folders_that_failed.append(target_folder_path[1:])
-                return
-
-            base_path = self._path_resolver.resolve_folder_path(target_folder_path)
-            target_folder_path = target_folder_path[1:]
-        else:
-            if target_is_system_path:
-                self._path_resolver.add_system_path(target_folder_path)
-            base_path = self._path_resolver.resolve_folder_path(target_folder_path)
-
-        if base_path is not None and self._read_only_store.base_path != base_path and not target_is_system_path:
-            priority_sub_folders[target_folder_path] = base_path
-        self._db.folders[target_folder_path] = description
-
-
-class _OnlineFilteredZipData:
-    def __init__(self, db, read_only_store):
-        self._db = db
-        self._read_only_store = read_only_store
-
-    def restore_filtered_zip_data(self):
-        for zip_id, zip_data in self._read_only_store.filtered_zip_data.items():
-            if zip_id not in self._db.zips:
-                continue
-
-            self._db.files.update(zip_data['files'])
-            self._db.folders.update(zip_data['folders'])
-
-        return self._db
-
-
-class _OnlineZipSummaries:
-    def __init__(self, db, read_only_store, full_resync, config, file_system, file_downloader_factory, logger, session):
-        self._db = db
-        self._read_only_store = read_only_store
-        self._full_resync = full_resync
-        self._config = config
-        self._file_system = file_system
-        self._file_downloader_factory = file_downloader_factory
-        self._logger = logger
-        self._session = session
-
-    def expand_summaries(self):
-        zip_ids_from_store = []
-        zip_ids_to_download = []
-        zip_ids_from_internal_summary = []
-
-        for zip_id, db_zip_desc in self._db.zips.items():
-            if is_system_path(db_zip_desc):
-                continue
-
-            if 'summary_file' in db_zip_desc:
-                db_summary_file_hash = db_zip_desc['summary_file']['hash']
-                store_summary_file_hash = self._store_summary_file_hash_by_zip_id(zip_id)
-                if store_summary_file_hash is not None and store_summary_file_hash == db_summary_file_hash:
-                    zip_ids_from_store.append(zip_id)
-                else:
-                    zip_ids_to_download.append(zip_id)
-            elif 'internal_summary' in db_zip_desc:
-                zip_ids_from_internal_summary.append(zip_id)
-            else:
-                raise UnreachableException(
-                    'Unreachable code path for: %s.%s' % (self._db.db_id, zip_id))  # pragma: no cover
-
-        summaries = []
-        if len(zip_ids_from_internal_summary) > 0:
-            summaries.extend(self._import_zip_ids_from_internal_summaries(zip_ids_from_internal_summary))
-
-        if len(zip_ids_from_store) > 0:
-            self._import_zip_ids_from_store(zip_ids_from_store)
-
-        if len(zip_ids_to_download) > 0:
-            summaries.extend(self._import_zip_ids_from_network(zip_ids_to_download))
-
-        return self._db, summaries
-
-    def _store_summary_file_hash_by_zip_id(self, zip_id):
-        store_zip_desc = self._read_only_store.zip_description(zip_id)
-        store_summary_file = store_zip_desc['summary_file'] if 'summary_file' in store_zip_desc else {}
-        return store_summary_file['hash'] if 'hash' in store_summary_file else None
-
-    def _import_zip_ids_from_internal_summaries(self, zip_ids_from_internal_summaries):
-        summaries = []
-        for zip_id in zip_ids_from_internal_summaries:
-            summary = self._db.zips[zip_id]['internal_summary']
-            self._populate_with_summary(zip_id, summary)
-            self._db.zips[zip_id].pop('internal_summary')
-            summaries.append((zip_id, summary))
-
-        return summaries
-
-    def _import_zip_ids_from_network(self, zip_ids_to_download):
-        summary_downloader = self._file_downloader_factory.create(self._config, parallel_update=True, silent=True)
-        zip_ids_by_temp_zip = dict()
-
-        temp_filename = self._file_system.unique_temp_filename()
-        for zip_id in zip_ids_to_download:
-            temp_zip = '%s_%s_summary.json.zip' % (temp_filename.value, zip_id)
-            zip_ids_by_temp_zip[temp_zip] = zip_id
-
-            summary_downloader.queue_file(self._db.zips[zip_id]['summary_file'], temp_zip)
-
-        temp_filename.close()
-
-        summary_downloader.download_files(self._is_first_run())
-        downloaded_summaries = [(zip_ids_by_temp_zip[temp_zip], temp_zip) for temp_zip in
-                                summary_downloader.correctly_downloaded_files()]
-        failed_zip_ids = [zip_ids_by_temp_zip[temp_zip] for temp_zip in summary_downloader.errors()]
-
-        summaries = []
-        for zip_id, temp_zip in downloaded_summaries:
-            summary = self._file_system.load_dict_from_file(temp_zip)
-            self._populate_with_summary(zip_id, summary)
-            self._file_system.unlink(temp_zip, exception=UnlinkTemporaryException())
-            summaries.append((zip_id, summary))
-
-        zip_ids_falling_back_to_store = [zip_id for zip_id in failed_zip_ids if zip_id in self._read_only_store.zips]
-        if len(zip_ids_falling_back_to_store) > 0:
-            self._import_zip_ids_from_store(zip_ids_falling_back_to_store)
-
-        self._session.files_that_failed.extend(summary_downloader.errors())
-        self._session.folders_that_failed.extend(summary_downloader.failed_folders())
-
-        return summaries
-
-    def _populate_with_summary(self, zip_id, summary):
-        self._db.files.update(summary['files'])
-        self._db.folders.update(summary['folders'])
-
-    def _import_zip_ids_from_store(self, zip_ids):
-        self._db.files.update(self._read_only_store.entries_in_zip('files', zip_ids))
-        self._db.folders.update(self._read_only_store.entries_in_zip('folders', zip_ids))
-
-    def _is_first_run(self):
-        return self._read_only_store.has_no_files
-
-
-class _DatabaseFileSelector:
-    def __init__(self, db, read_only_store, full_resync, file_system, logger, session, free_space_reservation: FreeSpaceReservation):
-        self._db = db
-        self._read_only_store = read_only_store
-        self._full_resync = full_resync
-        self._file_system = file_system
-        self._logger = logger
-        self._session = session
-        self._free_space_reservation = free_space_reservation
-
-    def select_changed_files(self):
-        changed_files = {}
-        already_present_files = {}
-        needed_zips = {}
-
-        for file_path, file_description in self._db.files.items():
-            if file_path in self._session.processed_files:
-                self._logger.print('DUPLICATED: %s' % file_path)
-                self._logger.print('Already been processed by database: %s' % self._session.processed_files[file_path])
-                continue
-
-            if self._file_system.is_file(file_path):
-                store_hash = self._read_only_store.hash_file(file_path)
-
-                if not self._full_resync and store_hash == file_description['hash']:
-                    already_present_files[file_path] = [file_description, True]
-                    continue
-
-                if store_hash == 'file_does_not_exist_so_cant_get_hash' and self._file_system.hash(file_path) == file_description['hash']:
-                    already_present_files[file_path] = [file_description, False]
-                    continue
-
-                if 'overwrite' in file_description and not file_description['overwrite']:
-                    if self._file_system.hash(file_path) != file_description['hash']:
-                        self._session.add_new_file_not_overwritten(self._db.db_id, file_path)
-                    continue
-
-            changed_files[file_path] = file_description
-            self._session.processed_files[file_path] = self._db.db_id
-            self._free_space_reservation.reserve_space_for_file(self._file_system.download_target_path(file_path), file_description)
-
-            if 'zip_id' not in file_description:
-                continue
-
-            zip_id = file_description['zip_id']
-            if zip_id not in needed_zips:
-                needed_zips[zip_id] = {'files': {}, 'total_size': 0}
-            needed_zips[zip_id]['files'][file_path] = file_description
-            needed_zips[zip_id]['total_size'] += file_description['size']
-
-        return changed_files, already_present_files, needed_zips
-
-
-class _OnlineDatabaseImporter:
-    def __init__(self, db, write_only_store, read_only_store, externals, config, file_system,
-                 file_downloader_factory, logger, session, external_drives_repository):
-        self._db = db
-        self._write_only_store = write_only_store
-        self._read_only_store = read_only_store
-        self._externals = externals
-        self._config = config
-        self._file_system = file_system
-        self._file_downloader_factory = file_downloader_factory
-        self._logger = logger
-        self._session = session
-        self._external_drives_repository = external_drives_repository
-
-    def process_already_present_files(self, already_existing_files):
-        for file_path, [file_description, has_matching_hash] in already_existing_files.items():
-            self._add_file_to_store(file_path, file_description)
-            if has_matching_hash:
-                continue
-
-            self._logger.print('No changes: %s' % file_path)
-            self._session.correctly_installed_files.append(file_path)
-            self._session.processed_files[file_path] = self._db.db_id
-
-    def process_changed_files(self, changed_files, needed_zips, filtered_zip_data):
-        file_downloader = self._file_downloader_factory.create(self._config, parallel_update=True)
-        file_downloader.set_base_files_url(self._db.base_files_url)
-
-        for file_path, file_description in changed_files.items():
-            file_downloader.queue_file(file_description, file_path)
-
-        if len(needed_zips) > 0:
-            self._import_zip_contents(needed_zips, filtered_zip_data, file_downloader)
-
-        file_downloader.download_files(self._is_first_run())
-
-        self._session.files_that_failed.extend(file_downloader.errors())
-        self._session.folders_that_failed.extend(file_downloader.failed_folders())
-        self._session.correctly_installed_files.extend(file_downloader.correctly_downloaded_files())
-
-        for file_path in file_downloader.errors():
-            self._write_only_store.remove_file(file_path)
-
-        for file_path in file_downloader.correctly_downloaded_files():
-            if changed_files[file_path].get('reboot', False):
-                self._session.needs_reboot = True
-            self._add_file_to_store(file_path, changed_files[file_path])
-
-    def _add_file_to_store(self, file_path, file_description):
-        if 'tags' in file_description and 'zip_id' not in file_description:
-            file_description.pop('tags')
-
-        if file_path in self._externals['priority_files']:
-            self._write_only_store.add_external_file(self._externals['priority_files'][file_path], file_path, file_description)
-        else:
-            self._write_only_store.add_file(file_path, file_description)
-
-    def _is_first_run(self):
-        return self._read_only_store.has_no_files
-
-    def _import_zip_contents(self, needed_zips, filtered_zip_data, file_downloader, not_fitting_files):
-        zip_downloader = self._file_downloader_factory.create(self._config, parallel_update=True)
-        zip_ids_by_temp_zip = dict()
-
-        temp_filename = self._file_system.unique_temp_filename()
-
-        for zip_id in needed_zips:
-            zipped_files = needed_zips[zip_id]
-
-            needs_extracting_single_files = 'kind' in self._db.zips[zip_id] and self._db.zips[zip_id]['kind'] == 'extract_single_files'
-            less_file_count = len(zipped_files['files']) < self._config[K_ZIP_FILE_COUNT_THRESHOLD]
-            less_accumulated_mbs = zipped_files['total_size'] < (1000 * 1000 * self._config[K_ZIP_ACCUMULATED_MB_THRESHOLD])
-
-            if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
-                continue
-
-            if len(not_fitting_files):
-                any_not_fitting = False
-                for file_path in zipped_files['files']:
-                    if self._file_system.download_target_path(file_path) in not_fitting_files:
-                        self._session.files_that_failed_from_zip.append(file_path)
-                        any_not_fitting = True
-
-                if any_not_fitting:
-                    continue
-
-            temp_zip = '%s_%s_contents.zip' % (temp_filename.value, zip_id)
-            zip_ids_by_temp_zip[temp_zip] = zip_id
-            zip_downloader.queue_file(self._db.zips[zip_id]['contents_file'], temp_zip)
-
-        temp_filename.close()
-
-        if len(zip_ids_by_temp_zip) == 0:
-            return
-
-        zip_downloader.download_files(self._is_first_run())
-        for temp_zip in sorted(zip_downloader.correctly_downloaded_files()):
-            zip_id = zip_ids_by_temp_zip[temp_zip]
-            zipped_files = needed_zips[zip_id]
-            zip_description = self._db.zips[zip_id]
-
-            self._import_zip_contents_from_temp_zip(temp_zip, zip_id, zipped_files, zip_description, filtered_zip_data, file_downloader)
-
-        self._session.files_that_failed.extend(zip_downloader.errors())
-
-    def _import_zip_contents_from_temp_zip(self, temp_zip, zip_id, zipped_files, zip_description, filtered_zip_data, file_downloader):
-        kind = zip_description['kind']
-        if kind == 'extract_all_contents':
-            target_folder_path = zip_description['target_folder_path']
-            if target_folder_path[0] == '|':
-                target_folder_path = target_folder_path[1:]
-
-            self._logger.print(zip_description['description'])
-            self._file_system.unzip_contents(temp_zip, target_folder_path, list(zipped_files['files']))
-            self._file_system.unlink(temp_zip)
-            file_downloader.mark_unpacked_zip(zip_id, zip_description['base_files_url'])
-
-            filtered_files = filtered_zip_data[zip_id]['files'] if zip_id in filtered_zip_data else []
-            for file_path in filtered_files:
-                self._file_system.unlink(file_path)
-
-            # TODO: Add this back when adding official support fort zips
-            # for folder_path in sorted(filtered_zip_data[zip_id]['folders'].keys(), key=len, reverse=True):
-            #     if not self._file_system.is_folder(folder_path):
-            #         continue
-            #     if self._file_system.folder_has_items(folder_path):
-            #         continue
-            #
-            #     self._file_system.remove_folder(folder_path)
-
-        elif kind == 'extract_single_files':
-            self._logger.print(zip_description['description'])
-            temp_filename = self._file_system.unique_temp_filename()
-            tmp_path = '%s_%s/' % (temp_filename.value, zip_id)
-            self._file_system.unzip_contents(temp_zip, tmp_path, list(zipped_files['files']))
-            for file_path, file_description in zipped_files['files'].items():
-                try:
-                    self._file_system.copy('%s%s' % (tmp_path, file_description['zip_path']), file_path)
-                except FileCopyError as _e:
-                    self._session.files_that_failed_from_zip.append(file_path)
-                    self._logger.print('ERROR: File "%s" could not be copied, skipping.' % file_path)
-
-            self._file_system.unlink(temp_zip)
-            self._file_system.remove_non_empty_folder(tmp_path)
-            temp_filename.close()
-            file_downloader.mark_unpacked_zip(zip_id, 'whatever')
-        else:
-            raise UnreachableException('ERROR: ZIP %s has wrong field kind "%s", contact the db maintainer.' % (zip_id, kind))  # pragma: no cover
-
-    def create_folders(self):
-        for folder_path in sorted(self._db.folders):
-            folder_description = self._db.folders[folder_path]
-
-            try:
-                self._create_folder_in_folders(folder_path, folder_description)
-            except FolderCreationError as _e:
-                self._logger.print('ERROR: Folder "%s" could not be created, skipping.' % folder_path)
-                self._session.folders_that_failed.append(folder_path)
-
-    def _create_folder_in_folders(self, folder_path, folder_description):
-        priority_top_folders = self._externals['priority_top_folders']
-        priority_sub_folders = self._externals['priority_sub_folders']
-
-        if 'tags' in folder_description and 'zip_id' not in folder_description:
-            folder_description.pop('tags')
-
-        if folder_path in priority_top_folders:
-            for drive in priority_top_folders[folder_path].drives:
-                self._write_folder(drive, folder_path, folder_description)
-        elif folder_path in priority_sub_folders:
-            drive = priority_sub_folders[folder_path]
-            self._write_folder(drive, folder_path, folder_description)
-        else:
-            self._file_system.make_dirs(folder_path)
-            self._write_only_store.add_folder(folder_path, folder_description)
-
-    def _write_folder(self, drive, folder_path, folder_description):
-        full_folder_path = os.path.join(drive, folder_path)
-        self._file_system.make_dirs(full_folder_path)
-        if drive == self._config[K_BASE_PATH]:
-            self._write_only_store.add_folder(folder_path, folder_description)
-            return
-
-        self._write_only_store.add_external_folder(drive, folder_path, folder_description)
-        if folder_path in self._read_only_store.folders and not self._file_system.is_folder(folder_path):
-            self._write_only_store.remove_folder(folder_path)
-
-    def remove_deleted_files(self):
-        files_to_delete = self._read_only_store.list_missing_files(self._db.files)
-
-        for file_path, description in files_to_delete.items():
-            self._write_only_store.remove_file(file_path)
-
-            drives = {drive: True for drive in self._external_drives_repository.connected_drives()}
-            if is_system_path(description):
-                drives[self._config[K_BASE_SYSTEM_PATH]] = False
-            else:
-                drives[self._config[K_BASE_PATH]] = False
-
-            for drive, is_external in drives.items():
-                if is_external:
-                    self._write_only_store.remove_external_file(drive, file_path)
-                else:
-                    self._write_only_store.remove_file(file_path)
-
-                full_file_path = os.path.join(drive, file_path)
-                if not self._file_system.is_file(full_file_path):
-                    continue
-                self._file_system.unlink(full_file_path)
-
-        if len(files_to_delete) > 0:
-            self._logger.print()
-
-
-def is_system_path(description: Dict[str, str]) -> bool:
+def is_system_path(description: dict[str, str]) -> bool:
     return 'path' in description and description['path'] == 'system'
 
 
-class WrongDatabaseOptions(Exception):
-    pass
+class InstallationBox:
+    def __init__(self) -> None:
+        self._downloaded_files: list[str] = []
+        self._validated_files: dict[str, list[PathPackage]] = defaultdict(list)  # @TODO: Remove this?
+        self._present_validated_files: dict[str, list[PathPackage]] = defaultdict(list)
+        self._installed_file_pkgs: dict[str, list[PathPackage]] = defaultdict(list)
+        self._installed_file_names: list[str] = []
+        self._present_not_validated_files: list[str] = []
+        self._fetch_started_files: list[str] = []
+        self._failed_files: list[str] = []
+        self._failed_folders: list[str] = []
+        self._failed_zips: list[tuple[str, str]] = []
+        self._full_partitions: dict[str, int] = dict()
+        self._failed_db_options: list[WrongDatabaseOptions] = []
+        self._removed_files: list[tuple[PathPackage, set[str]]] = []
+        self._removed_folders: list[tuple[str, PathPackage]] = []
+        self._removed_zips: list[tuple[str, str]] = []
+        self._skipped_updated_files: dict[str, list[str]] = dict()
+        self._filtered_zip_data: dict[str, dict[str, FileFoldersHolder]] = defaultdict(dict)
+        self._installed_zip_summary: list[tuple[str, str, StoreFragmentDrivePaths, dict[str, Any]]] = []
+        self._installed_folders: list[tuple[str, PathPackage]] = []
+        self._installed_folders_set: set[str] = set()
+        self._repeated_store_presence: dict[str, set[str]] = defaultdict(set)
+        self._directory_removals: dict[str, tuple[PathPackage, set[str]]] = dict()
+        self._file_removals: dict[str, tuple[PathPackage, set[str]]] = dict()
+        self._installed_dbs: list[DbEntity] = []
+        self._installed_db_sigs: list[tuple[DbEntity, Config, str, int]] = []
+        self._failed_dbs: set[str] = set()
+        self._duplicated_files: list[tuple[list[str], str]] = []
+        self._non_duplicated_files: list[tuple[list[PathPackage], str]] = []
+        self._unused_filter_tags: list[str] = []
 
+    def set_unused_filter_tags(self, tags: list[str]) -> None:
+        self._unused_filter_tags = tags
+    def add_downloaded_file(self, path: str) -> None:
+        self._downloaded_files.append(path)
+    def add_downloaded_files(self, files: list[PathPackage]) -> None:
+        if len(files) == 0: return
+        for pkg in files:
+            self._downloaded_files.append(pkg.rel_path)
+    def add_validated_file(self, path_pkg: PathPackage, db_id: str) -> None:
+        self._validated_files[db_id].append(path_pkg)
+        self._installed_file_pkgs[db_id].append(path_pkg)
+        self._installed_file_names.append(path_pkg.rel_path)
+    def add_validated_files(self, files: list[PathPackage], db_id: str) -> None:
+        if len(files) == 0: return
+        self._validated_files[db_id].extend(files)
+        self._installed_file_pkgs[db_id].extend(files)
+        self._installed_file_names.extend(pkg.rel_path for pkg in files)
+    def add_repeated_store_presence(self, non_external_store_entries: set[str], db_id: str) -> None:
+        self._repeated_store_presence[db_id].update(non_external_store_entries)
+    def add_installed_zip_summary(self, db_id: str, zip_id: str, fragment: StoreFragmentDrivePaths, description: dict[str, Any]) -> None:
+        self._installed_zip_summary.append((db_id, zip_id, fragment, description))
+    def add_present_validated_files(self, paths: list[PathPackage], db_id: str) -> None:
+        if len(paths) == 0: return
+        self._present_validated_files[db_id].extend(paths)
+        self._installed_file_pkgs[db_id].extend(paths)
+        self._installed_file_names.extend(pkg.rel_path for pkg in paths)
+    def add_present_not_validated_files(self, paths: list[PathPackage]) -> None:
+        if len(paths) == 0: return
+        self._present_not_validated_files.extend([p.rel_path for p in paths])
+    def add_skipped_updated_files(self, paths: list[PathPackage], db_id: str) -> None:
+        if len(paths) == 0: return
+        if db_id not in self._skipped_updated_files:
+            self._skipped_updated_files[db_id] = []
+        self._skipped_updated_files[db_id].extend([p.rel_path for p in paths])
+    def add_file_fetch_started(self, path: str) -> None:
+        self._fetch_started_files.append(path)
+    def add_failed_file(self, path: str) -> None:
+        self._failed_files.append(path)
+    def add_failed_db(self, db_id: str) -> None:
+        self._failed_dbs.add(db_id)
+    def add_failed_files(self, file_pkgs: list[PathPackage]) -> None:
+        if len(file_pkgs) == 0: return
+        for pkg in file_pkgs:
+            self._failed_files.append(pkg.rel_path)
+    def add_duplicated_files(self, files: list[str], db_id: str) -> None:
+        if len(files) == 0: return
+        self._duplicated_files.append((files, db_id))
+    def add_non_duplicated_files(self, files: list[PathPackage], db_id: str) -> None:
+        if len(files) == 0: return
+        self._non_duplicated_files.append((files, db_id))
+    def add_failed_zip(self, db_id: str, zip_id: str) -> None:
+        self._failed_zips.append((db_id, zip_id))
+    def add_removed_zip(self, db_id: str, zip_id: str) -> None:
+        self._removed_zips.append((db_id, zip_id))
+    def add_failed_folders(self, folders: list[str]) -> None:
+        self._failed_folders.extend(folders)
+    def add_full_partitions(self, full_partitions: list[tuple[Partition, int]]) -> None:
+        if len(full_partitions) == 0: return
+        for partition, failed_reserve in full_partitions:
+            if partition.path not in self._full_partitions:
+                self._full_partitions[partition.path] = failed_reserve
+            else:
+                self._full_partitions[partition.path] += failed_reserve
+    def add_installed_db(self, db: DbEntity, config: Config, db_hash: str, db_size: int) -> None:
+        self._installed_dbs.append(db)
+        self._installed_db_sigs.append((db, config, db_hash, db_size))
+    def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
+        self._filtered_zip_data[db_id][zip_id] = filtered_data
+    def add_failed_db_options(self, exception: WrongDatabaseOptions) -> None:
+        self._failed_db_options.append(exception)
+    def add_removed_files(self, files: list[tuple[PathPackage, set[str]]]) -> None:
+        if len(files) == 0: return
+        self._removed_files.extend(files)
+    def add_removed_folders(self, folders: list[PathPackage], db_id: str) -> None:
+        if len(folders) == 0: return
+        self._removed_folders.extend([(db_id, pkg) for pkg  in folders])
+    def add_installed_folders(self, folders: list[PathPackage], db_id: str) -> None:
+        if len(folders) == 0: return
+        self._installed_folders.extend([(db_id, pkg) for pkg in folders])
+        self._installed_folders_set.update([pkg.rel_path for pkg in folders])
+
+    def is_folder_installed(self, path: str) -> bool:  return path in self._installed_folders_set
+    def downloaded_files(self): return self._downloaded_files
+    def present_validated_files(self) -> list[str]: return [pkg.rel_path for path_pkgs in self._present_validated_files.values() for pkg in path_pkgs]
+    def present_not_validated_files(self): return self._present_not_validated_files
+    def fetch_started_files(self): return self._fetch_started_files
+    def failed_files(self): return self._failed_files
+    def duplicated_files(self): return self._duplicated_files
+    def non_duplicated_files(self): return self._non_duplicated_files
+    def failed_folders(self): return self._failed_folders
+    def failed_zips(self): return self._failed_zips
+    def removed_files(self): return self._removed_files
+    def removed_folders(self): return self._removed_folders
+    def removed_zips(self): return self._removed_zips
+    def installed_file_pkgs(self): return self._installed_file_pkgs
+    def installed_file_names(self): return self._installed_file_names
+    def installed_folders(self): return self._installed_folders
+    def wrong_db_options(self): return self._failed_db_options
+    def repeated_store_presence(self): return self._repeated_store_presence
+    def installed_zip_summary(self): return self._installed_zip_summary
+    def skipped_updated_files(self): return self._skipped_updated_files
+    def filtered_zip_data(self): return self._filtered_zip_data
+    def full_partitions(self) -> dict[str, int]: return self._full_partitions
+    def installed_db_sigs(self): return self._installed_db_sigs
+    def installed_dbs(self) -> list[DbEntity]: return self._installed_dbs
+    def updated_dbs(self) -> list[str]: return list(self._validated_files)
+    def failed_dbs(self) -> list[str]: return list(self._failed_dbs)
+    def unused_filter_tags(self): return self._unused_filter_tags
+
+    def queue_directory_removal(self, dirs: list[PathPackage], db_id: str) -> None:
+        if len(dirs) == 0: return
+        for pkg in dirs:
+            if pkg.rel_path not in self._directory_removals:
+                self._directory_removals[pkg.rel_path] = (pkg, set())
+            self._directory_removals[pkg.rel_path][1].add(db_id)
+    def queue_file_removal(self, files: list[PathPackage], db_id: str) -> None:
+        if len(files) == 0: return
+        for pkg in files:
+            if pkg.rel_path not in self._file_removals:
+                self._file_removals[pkg.rel_path] = (pkg, set())
+            self._file_removals[pkg.rel_path][1].add(db_id)
+
+    def consume_files(self) -> list[tuple[PathPackage, set[str]]]:
+        result = sorted([(x[0], x[1]) for x in self._file_removals.values()], key=lambda x: x[0].rel_path)
+        self._file_removals.clear()
+        return result
+
+    def consume_directories(self) -> list[tuple[PathPackage, set[str]]]:
+        result = sorted([(x[0], x[1]) for x in self._directory_removals.values()], key=lambda x: len(x[0].rel_path))
+        self._directory_removals.clear()
+        return result
+    

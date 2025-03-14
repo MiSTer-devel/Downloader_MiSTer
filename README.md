@@ -35,11 +35,10 @@ Here you can see the default parameters and the options that you may change:
 ;   'off' -> Disables this feature. Affected files will always be installed in your SD.
 storage_priority = 'prefer_sd'
 
-; allow_delete options:
-;   0 -> Don't allow this tool to delete anything at all.
-;   1 -> Allow this tool to delete any old file from previous updates.
-;   2 -> Allow this tool to delete only old cores that receive a new version.
-allow_delete = 1
+; update_linux options:
+;   true -> Updates Linux when there is a new update (very recommended).
+;   false -> Doesn't update Linux.
+update_linux = true
 
 ; allow_reboot options:
 ;   0 -> Don't allow this tool to ever reboot automatically.
@@ -47,10 +46,11 @@ allow_delete = 1
 ;   2 -> Allow this tool to reboot the system only after Linux has been updated.
 allow_reboot = 1
 
-; update_linux options:
-;   true -> Updates Linux when there is a new update (very recommended).
-;   false -> Doesn't update Linux.
-update_linux = true
+; allow_delete options:
+;   0 -> Don't allow this tool to delete anything at all.
+;   1 -> Allow this tool to delete any old file from previous updates.
+;   2 -> Allow this tool to delete only old cores that receive a new version.
+allow_delete = 1
 
 ; minimum_system_free_space_mb: Fee space needed to install files with Downloader
 ;   This minimum applies solely to the system partition (SD card).
@@ -75,16 +75,19 @@ downloader_retries = 3
 verbose = false
 ```
 
-### Roadmap
+### Feature Roadmap
 
 - [x] Initial Release
 - [x] [Cheats](https://gamehacking.org/mister/) fetching
 - [x] First-run optimisations
 - [x] Configurable custom download filters
-- [x] Storage Priority Resolution for auto-detecting connected drives
-- [x] Free space check
+- [x] Storage Priority Resolution for automatically detecting connected drives
+- [x] Free space checks
+- [ ] Opt-in parameter to bypass strict file checks
+- [ ] Fast check for update availability (without triggering an actual update)
+- [ ] HTTP cookie support
 - [ ] Uninstall database feature
-- [ ] Integration with *MiSTer* binary
+- [ ] Firmware integration
 
 Check the [CHANGELOG](CHANGELOG.md) for more information about past releases.
 
@@ -127,10 +130,13 @@ If not done manually, the launcher will automatically install that build on its 
 
 ### Supporters+ shout-out!
 
-Daniel Tarsky, James D Eberhart, Koala Koa, MiSTerFPGA.co.uk, Tony Escobar, turbochop3300 and Wayne Booker
+Thomas Williams and Wayne Booker
 
 Thank you so much for supporting this project! If you would like to show up here, join us as **Supporter+** on Patreon:
 
 <p align="center">
 <a href="https://www.patreon.com/bePatron?u=37499475"><img src="https://slrowland.com/wp-content/uploads/2018/02/patreonsupport.png"></img></a>
 </p>
+
+### Powered by
+[![PyCharm logo](https://resources.jetbrains.com/storage/products/company/brand/logos/PyCharm.svg)](https://jb.gg/OpenSourceSupport)

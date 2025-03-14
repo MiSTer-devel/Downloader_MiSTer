@@ -1,4 +1,5 @@
-# Copyright (c) 2021-2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
+from typing import Optional
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +17,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import STORAGE_PATHS_PRIORITY_SEQUENCE, MEDIA_FAT, K_BASE_SYSTEM_PATH, K_BASE_PATH
-from downloader.other import cache
+from downloader.file_system import FileSystem
+from downloader.logger import Logger
 
 
 class ExternalDrivesRepositoryFactory:
@@ -25,21 +27,21 @@ class ExternalDrivesRepositoryFactory:
 
 
 class ExternalDrivesRepository:
-    def __init__(self, file_system, logger):
+    def __init__(self, file_system: FileSystem, logger: Logger) -> None:
         self._file_system = file_system
         self._logger = logger
-        self._drive_folders_cache = {}
+        self._connected_drives: Optional[tuple[str, ...]] = None
 
-    @cache
-    def connected_drives(self):
-        result = self._retrieve_connected_drives_list()
-        if len(result) > 0:
-            self._logger.debug()
-            self._logger.debug('Detected following connected drives:')
-            for directory in result:
-                self._logger.debug(directory)
-            self._logger.debug()
-        return result
+    def connected_drives(self) -> tuple[str, ...]:
+        if self._connected_drives is None:
+            self._connected_drives = self._retrieve_connected_drives_list()
+            if len(self._connected_drives) > 0:
+                self._logger.debug()
+                self._logger.debug('Detected following connected drives:')
+                for directory in self._connected_drives:
+                    self._logger.debug(directory)
+                self._logger.debug()
+        return self._connected_drives
 
     def connected_drives_except_base_path_drives(self, config):
         blocklist = set()

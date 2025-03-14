@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-# Copyright (c) 2021-2023 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 import os
+import sys
 import tempfile
 import subprocess
 import time
@@ -19,15 +20,16 @@ def scp_path(p): return f'root@{mister_ip()}:{p}' if p.startswith('/media') else
 def exports(env=None): return " ".join(f"export {key}={value};" for key, value in (env or {}).items())
 def scp_file(src, dest, **kwargs): _ssh_pass('scp', [scp_path(src), scp_path(dest)], **kwargs)
 def exec_ssh(cmd, env=None, **kwargs): return _ssh_pass('ssh', [f'root@{mister_ip()}', f'{exports(env)}{cmd}'], **kwargs)
-def run_build(**kwargs): send_build(**kwargs), exec_ssh(f'/media/fat/downloader.sh', **kwargs)
+def run_build(**kwargs): send_build(env={"SKIP_REMOVALS": "true"}), exec_ssh(f'/media/fat/downloader.sh', **kwargs)
 def run_launcher(**kwargs): send_build(**kwargs), exec_ssh(f'/media/fat/Scripts/downloader.sh', **kwargs)
+def run_compile(**kwargs): send_compile(**kwargs), exec_ssh(f'/media/fat/downloader_bin', **kwargs)
 def store_push(**kwargs): scp_file('downloader.json', '/media/fat/Scripts/.config/downloader/downloader.json', **kwargs)
 def store_pull(**kwargs): scp_file('/media/fat/Scripts/.config/downloader/downloader.json', 'downloader.json', **kwargs)
-
+def log_pull(**kwargs): scp_file('/media/fat/Scripts/.config/downloader/downloader.log', 'downloader.log', **kwargs)
 
 def send_build(env=None, **kwargs):
     env = {'DEBUG': 'true', **os.environ.copy(), **(env or {}), 'MISTER': 'true'}
-    with tempfile.NamedTemporaryFile(delete=False) as tmp: subprocess.run(['./src/build.sh'], stdout=tmp, env=env, check=True)
+    with tempfile.NamedTemporaryFile(delete=False) as tmp: subprocess.run(['./src/build.sh'], stderr=sys.stdout, stdout=tmp, env=env, check=True)
     os.chmod(tmp.name, 0o755)
 
     if os.path.exists('dont_download.ini'): scp_file('dont_download.ini', '/media/fat/downloader.ini', **kwargs)
@@ -37,15 +39,24 @@ def send_build(env=None, **kwargs):
 
     os.remove(tmp.name)
 
+def send_compile(env=None, **kwargs):
+    with tempfile.NamedTemporaryFile(delete=False) as tmp: subprocess.run(['./src/compile.sh'], stderr=sys.stdout, stdout=tmp, env=env, check=True)
+    os.chmod(tmp.name, 0o755)
+    scp_file(tmp.name, '/media/fat/downloader_bin', **kwargs)
+    os.remove(tmp.name)
 
-def run_operation(op, env=None, retries=False):
-    {
+def operations_dict(env=None, retries=False):
+    return {
         'store_push': lambda: store_push(retries=retries),
         'store_pull': lambda: store_pull(retries=retries),
+        'log_pull': lambda: log_pull(retries=retries),
+        'build': lambda: [send_build(env=env, retries=retries), print('OK')],
         'run': lambda: run_build(env=env, retries=retries),
-        'launcher': lambda: run_launcher(env=env, retries=retries)
-    }.get(op, lambda: [send_build(env=env, retries=retries), print('OK')])()
-
+        'compile': lambda: send_compile(env=env, retries=retries),
+        'run_compile': lambda: run_compile(env=env, retries=retries),
+        'launcher': lambda: run_launcher(env=env, retries=retries),
+        'copy': lambda: scp_file(sys.argv[2], f'/media/fat/{sys.argv[2]}'),
+    }
 
 def _ssh_pass(cmd, args, out=None, retries=True):
     for i in range(4):
@@ -55,13 +66,13 @@ def _ssh_pass(cmd, args, out=None, retries=True):
             traceback.print_exc()
             time.sleep(30 * (i + 1))
 
-
 def _main():
+    operations = operations_dict()
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', choices=['store_push', 'store_pull', 'run', 'launcher'], nargs='?', default=None)
+    parser.add_argument('command', choices=list(operations), nargs='?', default=None)
     parser.add_argument('parameter', nargs='?', default='')
-    run_operation(parser.parse_args().command)
-
+    op = operations.get(parser.parse_args().command, operations['build'])
+    op()
 
 if __name__ == '__main__':
     _main()
