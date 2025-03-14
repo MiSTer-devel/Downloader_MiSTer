@@ -281,6 +281,7 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
             "errors": [cheats_folder_nes_file_path, cheats_folder_sms_file_path],
             "full_partitions": [MEDIA_FAT],
             "save": False,
+            "failed_zips": ["test:cheats_id"],
             "free": {MEDIA_FAT: 1000 - self.size_nes_cheat - self.size_sms_cheat}
         }, sut, stores, free=free)
 
@@ -294,6 +295,7 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
             "errors": [cheats_folder_nes_file_path, cheats_folder_sms_file_path],
             "full_partitions": [MEDIA_FAT],
             "save": False,
+            "failed_zips": ["test:cheats_id"],
             "free": {MEDIA_FAT: 1000 - self.size_nes_cheat - self.size_sms_cheat}
         }, sut, stores, free=free)
 

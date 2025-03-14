@@ -84,5 +84,6 @@ class OnlineImporterTestBase(unittest.TestCase):
                            installed=expected.get("ok", []),
                            errors=expected.get("errors", []),
                            full_partitions=expected.get("full_partitions", []),
-                           save=expected.get("save", True),)
+                           save=expected.get("save", True),
+                           failed_zips=expected.get("failed_zips", []))
         if free is not None or "free" in expected: self.assertEqual(expected["free"], free)
