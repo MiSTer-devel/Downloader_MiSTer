@@ -7,10 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## Version 2.0 - 2025-03-X
 
 ### Added
+- Rewrote Downloader's core routines with a worker-based concurrency model, maximizing parallelism in this environment while improving efficiency, scalability, and extensibility for future optimizations.
 - The launcher now uses the latest build of Downloader if it's present in the filesystem. The newer version of Downloader will now be installed from [MiSTer Distribution](https://github.com/MiSTer-devel/Distribution_MiSTer) database just like any other standard MiSTer file. Thanks to this, you may now avoid executing remote code altogether by taking [this additional step](README.md#how-to-avoid-executing-remote-code-altogether) during installation. Otherwise, remote code execution only happens once on your first run of Downloader.
 - Documented **Custom INI file** support in [README.md](README.md#custom-ini-file), in case you want to use a separate launcher and INI file to install different databases in isolation through that launcher.
+- Added a docs [plot script](docs/jobs_flow_diagram.py), which helps document the internal worker architecture by generating [flow diagrams](docs/jobs_diagram.png).
+- Added a [debug](src/debug.py) CLI that assists in various development and testing processes.
 
 ### Changed
+- Improvements and fixes in the HTTP client, which is now working more efficiently in highly concurrent scenarios and now takes care of most caching features from the HTTP/1.1 spec. Previously, in very rare cases, connections could stall, and this no longer happens.
+- Fixed timeouts not being triggered in some very rare scenarios, which, together with the previous connection-stalling bug in the HTTP client, would make the Downloader hang with a continuous array of asterisks for much longer than intended.
+- Fixed a bug where **Storage Priority**, set to *external*, would not detect an existing folder with content in setups with many drives connected at the same time.
+- Downloader is now more resilient when encountering databases with incorrect formats. It will still log these errors.
 - The log file `downloader.log` no longer stores debug information by default unless errors occur during the process. To log debug information, set `verbose` to `true` in the INI file, as described in the [README.md](README.md#custom-ini-file).
 - Reboot sequence takes much less time, it went from 30+ seconds to around 3.
 - Fixed database filtering not working properly in various uncommon scenarios.
@@ -19,8 +26,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fixed bug in error handling when restoring user system files during a Linux update by [daph](https://github.com/MiSTer-devel/Downloader_MiSTer/commits?author=daph).
 - Better **custom download filters** documentation by [NFGman](https://github.com/MiSTer-devel/Downloader_MiSTer/commits?author=NFGman). Check it [here](docs/download-filters.md).
 - Expanded filesystem precaching to speed up the check of already installed files.
-- Many minor bug fixes.
 - The SSL check mechanism in the launcher has been made more flexible by covering more return codes. From just 60 to codes: 60, 77, 35, 51, 58, 59, 82, 83. It also has an improved routine to install new certificates, in case they are missing in the system.
+- Made the program react much sooner to interrupt signals (Ctrl+C) when invoked in a terminal.
+- Improved the benchmark script with more visualization outputs.
+- Custom database headers take up a bit less space in the output.
+- A large amount of minor bug fixes and improvements. Check this [PR (warning: +300 commits)](https://github.com/MiSTer-devel/Downloader_MiSTer/pull/51) for more details.
 
 ### Removed
 - Deprecated paths starting with `|`. For potentially external paths (now referred to as "pext paths"), use the path field as instructed in [the updated documentation](docs/custom-databases.md#external-paths). Old `|` paths still work, but support will be fully removed in a future version.
