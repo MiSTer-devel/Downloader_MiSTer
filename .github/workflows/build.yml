@@ -11,9 +11,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Install sharutils
-      run: sudo apt-get install sharutils
-
     - uses: actions/setup-python@v2
       with:
         python-version: '3.9'
@@ -33,7 +30,10 @@ jobs:
       run: cd src && python3 -m unittest discover -s test/system/slow
 
     - name: Build
-      run: ZIP_FILE="$(pwd)/dont_download.zip" ./src/build.sh > dont_download.sh
+      run: |
+        set -euo pipefail
+        SKIP_COMMIT=true ./src/build.sh | sha256sum > latest.id
+        ZIP_FILE="$(pwd)/dont_download.zip" ./src/build.sh > dont_download.sh
 
     - name: Release
       id: release
