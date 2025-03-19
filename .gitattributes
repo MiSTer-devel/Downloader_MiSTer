@@ -1,2 +1,4 @@
 * text eol=lf
 dont_download.sh binary
+*.png binary
+
