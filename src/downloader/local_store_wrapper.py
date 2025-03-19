@@ -23,7 +23,7 @@ from downloader.other import empty_store_without_base_path
 from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict, cast
 from collections import defaultdict, ChainMap
 
-from downloader.path_package import PathPackage, PathType
+from downloader.path_package import PathPackage, PathType, path_pext
 
 NO_HASH_IN_STORE_CODE = 'file_does_not_exist_so_cant_get_hash'
 
@@ -554,11 +554,11 @@ class ReadOnlyStoreAdapter:
         for zip_id, data in grouped.items():
             zip_data = self._store.get('zips', {}).get(zip_id, {})
             data['hash'] = zip_data.get('summary_file', {}).get('hash', NO_HASH_IN_STORE_CODE)
-            is_pext = 'target_folder_path' in zip_data and zip_data['target_folder_path'].startswith('|')
+            is_pext = 'target_folder_path' in zip_data and zip_data['target_folder_path'].startswith('|') or zip_data.get('path', '') == 'pext'
             if not is_pext:
                 continue
-            data['files'] = {'|' + f: d for f, d in data['files'].items()}
-            data['folders'] = {'|' + f: d for f, d in data['folders'].items()}
+            data['files'] = {path_pext(f, d): d for f, d in data['files'].items()}
+            data['folders'] = {path_pext(f, d): d for f, d in data['folders'].items()}
 
         return grouped
 
@@ -708,4 +708,3 @@ def are_zip_descriptions_equal(desc1: Dict[str, Any], desc2: Dict[str, Any]) -> 
 
 def are_zip_file_info_equal(file_info1, file_info2):
     return all(file_info1[k] == file_info2[k] for k in ['hash', 'size', 'url'])
-

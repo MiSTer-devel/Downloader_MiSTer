@@ -64,10 +64,12 @@ class TargetPathsCalculator:
 
         base_path = self._config['base_path']
         for (path, description), pkg in zip(packages, result_pkgs):
+            first_char = path[0]
+
             pkg.rel_path = path
             pkg.description = description
             pkg.ty = ty
-            if path[0] == '/':
+            if first_char == '/':
                 pkg._full_path = path
                 pkg.drive = None
                 pkg.kind = PATH_PACKAGE_KIND_STANDARD
@@ -75,16 +77,14 @@ class TargetPathsCalculator:
                 continue
 
             pkg._full_path = None
-            if 'path' in description:
-                is_system_file = description['path'] == 'system'
-                is_pext_file = description['path'] == 'pext'
-            else:
-                is_system_file = False
-                is_pext_file = False
 
-            if path[0] == '|':  # @TODO: Remove this block after all paths no longer start with |
-                pkg.rel_path = path[1:]
-                is_pext_file = True
+            is_system_file = False
+            is_pext_file = False
+            if 'path' in description:
+                if description['path'] == 'system':
+                    is_system_file = True
+                elif description['path'] == 'pext':
+                    is_pext_file = True
 
             if is_pext_file:
                 external, error = self._deduce_possible_external_target_path(path=pkg.rel_path, path_type=pkg.ty)
@@ -97,10 +97,6 @@ class TargetPathsCalculator:
 
                 pkg.drive, pkg.pext_props = external
                 pkg.kind = PATH_PACKAGE_KIND_PEXT
-
-                if is_system_file: # @TODO: Remove this block after all paths no longer start with |
-                    errors.append(StoragePriorityError(f"System Path '{path}' is incorrect because it starts with '|', please contact the database maintainer."))
-                    continue
 
             elif is_system_file:
                 pkg.drive = self._config['base_system_path']

@@ -6,19 +6,18 @@
     "zips": {},
     "files": {
         "foo.txt": {
-            "delete": [],
             "hash": "133af32b4894d9c5527cc5c91269ee28",
             "size": 20,
             "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/foo.txt"
         },
-        "|games/NES/smb1.nes": {
-            "delete": [],
+        "games/NES/smb1.nes": {
+            "path": "pext",
             "hash": "133af32b4894d9c5527cc5c91269ee28",
             "size": 20,
             "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/foo.txt"
         },
-        "|docs/S32X/S32X.md": {
-            "delete": [],
+        "docs/S32X/S32X.md": {
+            "path": "pext",
             "hash": "133af32b4894d9c5527cc5c91269ee28",
             "size": 20,
             "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/foo.txt"
@@ -26,10 +25,10 @@
     },
     "files_count": 2,
     "folders": {
-        "|games": {},
-        "|games/NES": {},
-        "|docs": {},
-        "|docs/S32X": {}
+        "games": {"path": "pext"},
+        "games/NES": {"path": "pext"},
+        "docs": {"path": "pext"},
+        "docs/S32X": {"path": "pext"}
     },
     "folders_count": 0,
     "latest_zip_url": "https://github.com/MiSTer-devel/Distribution_MiSTer/archive/refs/heads/main.zip",

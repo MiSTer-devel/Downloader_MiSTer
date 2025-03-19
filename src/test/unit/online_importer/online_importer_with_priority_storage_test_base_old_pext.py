@@ -17,19 +17,19 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.constants import FILE_PDFViewer, FOLDER_linux, DISTRIBUTION_MISTER_DB_ID
-from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1_descr, file_nes_smb1, folder_games, \
+from test.objects_old_pext import empty_test_store, store_descr, media_fat, file_nes_smb1_descr, file_nes_smb1, folder_games, \
     folder_games_nes, media_usb1, media_usb2, db_entity, media_drive, \
     file_pdfviewer_descr, file_nes_contra, file_nes_contra_descr, file_nes_palette_a, file_nes_palette_a_descr, \
     folder_games_nes_palettes, db_test, file_nes_manual, file_nes_manual_descr, folder_docs, folder_docs_nes, db_demo, \
     db_id_external_drives_1, db_id_external_drives_2, file_neogeo_md, file_neogeo_md_descr, file_s32x_md, \
     file_s32x_md_descr, zipped_nes_palettes_id, \
     folder_docs_neogeo, folder_docs_s32x, file_foo, file_foo_descr, media_usb0, zip_desc, file_md_sonic_descr, file_md_sonic, folder_games_md
-from test.zip_objects import file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc
+from test.zip_objects_old_pext import file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 
-
-class OnlineImporterWithPriorityStorageTestBase(OnlineImporterTestBase):
+# @TODO: Remove this file when support for the old pext syntax '|' is removed
+class OnlineImporterWithPriorityStorageTestBaseOldPext(OnlineImporterTestBase):
 
     def download_smb1_db(self, store, inputs):
         return self._download_db(db_with_smb1(), store, inputs)
@@ -173,14 +173,14 @@ def _store_files_s32x_md(): return {file_s32x_md: file_s32x_md_descr()}
 def _store_files_neogeo_md(): return {file_neogeo_md: file_neogeo_md_descr()}
 def _store_files_foo_smb1_and_s32_md(): return {**_store_files_smb1(), **_store_files_foo(), **_store_files_s32x_md()}
 def _store_files_contra_and_neogeo_md(): return {**_store_files_contra(), **_store_files_neogeo_md()}
-def _store_folders_games(): return {folder_games: {'path': 'pext'}}
-def _store_folders_docs(): return {folder_docs: {'path': 'pext'}}
-def _store_folders_nes(): return {**_store_folders_games(), folder_games_nes: {'path': 'pext'}}
-def _store_folders_md(): return {**_store_folders_games(), folder_games_md: {'path': 'pext'}}
-def _store_folders_docs_nes(): return {**_store_folders_docs(), folder_docs_nes: {'path': 'pext'}}
-def _store_folders_docs_s32x(): return {**_store_folders_docs(), folder_docs_s32x: {'path': 'pext'}}
-def _store_folders_docs_neogeo(): return {**_store_folders_docs(), folder_docs_neogeo: {'path': 'pext'}}
-def _store_folders_nes_palettes(): return {**_store_folders_nes(), folder_games_nes_palettes: {'path': 'pext'}}
+def _store_folders_games(): return {folder_games: {}}
+def _store_folders_docs(): return {folder_docs: {}}
+def _store_folders_nes(): return {**_store_folders_games(), folder_games_nes: {}}
+def _store_folders_md(): return {**_store_folders_games(), folder_games_md: {}}
+def _store_folders_docs_nes(): return {**_store_folders_docs(), folder_docs_nes: {}}
+def _store_folders_docs_s32x(): return {**_store_folders_docs(), folder_docs_s32x: {}}
+def _store_folders_docs_neogeo(): return {**_store_folders_docs(), folder_docs_neogeo: {}}
+def _store_folders_nes_palettes(): return {**_store_folders_nes(), folder_games_nes_palettes: {}}
 def _store_folders_linux(): return {FOLDER_linux: {'path': 'system'}}
 def _store_files_smb1_and_nes_palettes(): return {**_store_files_nes_palettes(), **_store_files_smb1()}
 def db_with_smb1(): return db_entity(files=_store_files_smb1(), folders=_store_folders_nes())
@@ -188,12 +188,12 @@ def db_demo_with_nes_manual(): return db_entity(db_id=db_demo, files=_store_file
 def db_with_smb1_and_contra(): return db_entity(files=_store_files_smb1_and_contra(), folders=_store_folders_nes())
 def db_with_smb1_and_palettes(): return db_entity(files=_store_files_smb1_and_nes_palettes(), folders=_store_folders_nes_palettes())
 def db_with_pdfviewer(): return db_entity(db_id=DISTRIBUTION_MISTER_DB_ID, files=_store_files_pdfviewer(), folders=_store_folders_linux())
-def db_external_drives_1(): return db_entity(db_id=db_id_external_drives_1, files=_store_files_foo_smb1_and_s32_md(), folders={**_store_folders_nes(), **_store_folders_docs_s32x()})
-def db_external_drives_2(): return db_entity(db_id=db_id_external_drives_2, files=_store_files_contra_and_neogeo_md(), folders={**_store_folders_nes(), **_store_folders_docs_neogeo()})
+def db_external_drives_1(): return db_entity(db_id=db_id_external_drives_1, files=_store_files_foo_smb1_and_s32_md(), folders=[*_store_folders_nes(), *_store_folders_docs_s32x()])
+def db_external_drives_2(): return db_entity(db_id=db_id_external_drives_2, files=_store_files_contra_and_neogeo_md(), folders=[*_store_folders_nes(), *_store_folders_docs_neogeo()])
 
 
 def db_with_zipped_nes_palettes(): return db_entity(
-    folders={**_store_folders_nes(), folder_games_nes_palettes: {'path': 'pext'}},
+    folders={**_store_folders_nes(), folder_games_nes_palettes: {}},
     zips={zipped_nes_palettes_id: zipped_nes_palettes_desc()}
 )
 
@@ -214,12 +214,12 @@ def store_nes_zipped_palettes_on_fat():
     )
 
 
-def _store_zips_nes_zipped_palettes(): return {zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/', is_pext=True)}
-def _store_files_nes_zipped_palettes(): return {file_nes_palette_a: {'path': 'pext', "zip_id": zipped_nes_palettes_id, **file_nes_palette_a_descr_zipped()}}
+def _store_zips_nes_zipped_palettes(): return {zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/')}
+def _store_files_nes_zipped_palettes(): return {file_nes_palette_a[1:]: {"zip_id": zipped_nes_palettes_id, **file_nes_palette_a_descr_zipped()}}
 
 
 def _store_folders_nes_zipped_palettes(): return {
-        folder_games: {'path': 'pext', "zip_id": zipped_nes_palettes_id},
-        folder_games_nes: {'path': 'pext', "zip_id": zipped_nes_palettes_id},
-        folder_games_nes_palettes: {'path': 'pext', "zip_id": zipped_nes_palettes_id},
+        folder_games[1:]: {"zip_id": zipped_nes_palettes_id},
+        folder_games_nes[1:]: {"zip_id": zipped_nes_palettes_id},
+        folder_games_nes_palettes[1:]: {"zip_id": zipped_nes_palettes_id},
     }

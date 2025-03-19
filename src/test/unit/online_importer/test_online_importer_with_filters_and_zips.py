@@ -350,13 +350,13 @@ def store_with_filtered_nes_palette_zip_data():
         zips={
             zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False, zipped_files=False, summary=False),
         },
-        folders={folder_games: {"zip_id": zipped_nes_palettes_id, "tags": ["games"]}},
+        folders={folder_games: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games"]}},
         filtered_zip_data={
             zipped_nes_palettes_id: {
                 "files": {file_nes_palette_a: file_nes_palette_a_descr_zipped(tags=True, url=False)},
                 "folders": {
-                    folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes", "palette"]},
-                    folder_games_nes: {"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes"]}
+                    folder_games_nes_palettes: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games", "nes", "palette"]},
+                    folder_games_nes: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games", "nes"]}
                 }
             }
         }
@@ -368,10 +368,10 @@ def store_with_nes_palette_zip():
         zips={
             zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False, zipped_files=False, summary=False),
         },
-        files={file_nes_palette_a[1:]: file_nes_palette_a_descr_zipped(tags=True, url=False)},
+        files={file_nes_palette_a: file_nes_palette_a_descr_zipped(tags=True, url=False)},
         folders={
-            folder_games[1:]: {"zip_id": zipped_nes_palettes_id, "tags": ["games"]},
-            folder_games_nes[1:]: {"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes"]},
-            folder_games_nes_palettes[1:]: {"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes", "palette"]},
+            folder_games: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games"]},
+            folder_games_nes: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games", "nes"]},
+            folder_games_nes_palettes: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games", "nes", "palette"]},
         }
     )

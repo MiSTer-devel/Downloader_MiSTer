@@ -270,7 +270,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
 
         self.assertEqual(store_descr(
             zips={
-                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/'),
+                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/', is_pext=True),
                 cheats_folder_id: cheats_folder_zip_desc()
             },
             files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},
@@ -289,7 +289,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
             cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files_from_cheats_folder(), summary=summary_json_from_cheats_folder()),
         }), store_descr(
             zips={
-                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes),
+                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes, is_pext=True),
                 cheats_folder_id: cheats_folder_zip_desc()
             },
             files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},
@@ -298,7 +298,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
 
         self.assertEqual(store_descr(
             zips={
-                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes),
+                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes, is_pext=True),
                 cheats_folder_id: cheats_folder_zip_desc()
             },
             files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},

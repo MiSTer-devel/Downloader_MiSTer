@@ -16,15 +16,16 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import FILE_PDFViewer, MEDIA_FAT, K_BASE_PATH
+from downloader.constants import FILE_PDFViewer, MEDIA_FAT, K_BASE_PATH, MEDIA_USB2
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data
-from test.objects import empty_test_store, store_descr, media_fat, file_nes_smb1, folder_games, \
+from test.objects_old_pext import empty_test_store, store_descr, media_fat, file_nes_smb1, folder_games, \
     folder_games_nes, media_usb1, media_usb2, config_with, file_nes_contra, file_nes_palette_a, file_nes_manual, \
     folder_docs, db_id_external_drives_1, db_id_external_drives_2, file_neogeo_md, file_neogeo_md_descr, file_s32x_md, \
-    file_s32x_md_descr, media_usb0, folder_docs_neogeo, folder_docs_s32x, file_foo, empty_store, folder_a, folder_games_md, files_a, \
-    store_test_with_file_a_descr, file_a, file_md_sonic, db_test_with_file_a, db_smb1, db_sonic
-from test.unit.online_importer.online_importer_with_priority_storage_test_base import fs_folders_nes_on_usb1_and_usb2, \
+    file_s32x_md_descr, media_usb0, folder_docs_neogeo, folder_docs_s32x, file_foo, empty_store, folder_a, \
+    folder_games_md, files_a, \
+    store_test_with_file_a_descr, file_a, file_md_sonic, db_test_with_file_a, db_smb1, db_sonic, fix_old_pext_store
+from test.unit.online_importer.online_importer_with_priority_storage_test_base_old_pext import fs_folders_nes_on_usb1_and_usb2, \
     fs_files_smb1_on_usb1, store_smb1_on_usb1, fs_folders_nes_on_usb2, store_smb1_on_usb2, fs_files_smb1_on_usb2, \
     store_smb1_on_usb1_and_usb2, fs_files_smb1_on_usb1_and_usb2, fs_folders_games_on_usb1_and_usb2, \
     store_nes_folder_on_usb1, fs_folders_nes_on_usb1, fs_folders_games_on_usb1_usb2_and_fat, store_smb1, \
@@ -41,18 +42,19 @@ from test.unit.online_importer.online_importer_with_priority_storage_test_base i
     fs_folders_nes_on_delme, hidden_drive, store_pdfviewer_on_base_system_path_hidden, fs_folders_pdfviewers_on_hidden, \
     fs_files_pdfviewers_on_hidden, _store_files_foo, _store_files_s32x_md, _store_files_smb1, _store_folders_nes, \
     _store_folders_docs_s32x, _store_folders_docs_neogeo, _store_files_neogeo_md, _store_files_contra, \
-    OnlineImporterWithPriorityStorageTestBase, store_nes_folder, store_just_nes_palettes_on_usb1, \
+    OnlineImporterWithPriorityStorageTestBaseOldPext, store_nes_folder, store_just_nes_palettes_on_usb1, \
     fs_files_nes_palettes_on_usb1, store_smb1_on_fat, fs_files_sonic_on_usb1, store_sonic_on_usb1, \
     store_nes_folder_on_usb1_and_usb2
 
 
-class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPriorityStorageTestBase):
+# @TODO: Remove this file when support for the old pext syntax '|' is removed
+class TestOnlineImporterWithPriorityStoragePreferSDOldPext(OnlineImporterWithPriorityStorageTestBaseOldPext):
     def test_download_smb1_db___on_empty_store_with_nes_folder_on_usb1_and_usb2___downloads_smb1_on_usb1(self):
         store = empty_test_store()
 
         sut = self.download_smb1_db(store, fs(folders=fs_folders_nes_on_usb1_and_usb2()))
 
-        self.assertEqual(store_smb1_on_usb1(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_on_usb1()), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_usb1(), folders=fs_folders_nes_on_usb1_and_usb2()), sut.fs_data)
         self.assertReports(sut, [file_nes_smb1])
 
@@ -61,9 +63,9 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_db(store, fs(files=fs_files_smb1_on_usb1(), folders=fs_folders_nes_on_usb1_and_usb2()))
 
-        self.assertEqual(store_smb1_on_usb1(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_on_usb1(), ignore=[file_nes_smb1[1:]]), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_usb1(), folders=fs_folders_nes_on_usb1_and_usb2()), sut.fs_data)
-        self.assertReports(sut, [], save=False)
+        self.assertReports(sut, [], save=True)
 
     def test_download_empty_db___after_previous_run___removes_files_from_usb1_but_keeps_usb1_and_usb2_folders(self):
         store = store_smb1_on_usb1()
@@ -79,7 +81,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_db(store, fs(folders=fs_folders_nes_on_usb2()))
 
-        self.assertEqual(store_smb1_on_usb2(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_on_usb2()), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_usb2(), folders=fs_folders_nes_on_usb2()), sut.fs_data)
         self.assertReports(sut, [file_nes_smb1])
 
@@ -88,7 +90,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_db(store, fs(files=fs_files_smb1_on_usb1_and_usb2(), folders=fs_folders_nes_on_usb1_and_usb2()))
 
-        self.assertEqual(store_smb1_on_usb1_and_usb2(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_on_usb1_and_usb2(), ignore=[MEDIA_USB2]), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_usb1_and_usb2(), folders=fs_folders_nes_on_usb1_and_usb2()), sut.fs_data)
         self.assertReports(sut, downloaded=[], validated=[file_nes_smb1])
 
@@ -124,7 +126,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_db(store, fs(folders=fs_folders_games_on_usb1_usb2_and_fat()))
 
-        self.assertEqual(store_smb1(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1()), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_fat(), folders=fs_folders_games_on_usb1_usb2_and_fat() + [media_fat(folder_games_nes)]), sut.fs_data)
         self.assertReports(sut, [file_nes_smb1])
 
@@ -133,7 +135,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_db(store, fs())
 
-        self.assertEqual(store_smb1(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1()), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_fat(), folders=fs_folders_nes_on_fat()), sut.fs_data)
         self.assertReports(sut, [file_nes_smb1])
 
@@ -142,16 +144,16 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_db(store, fs(files=fs_files_smb1_on_fat(), folders=fs_folders_nes_on_fat()))
 
-        self.assertEqual(store_smb1(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1(), ignore=[file_nes_smb1[1:]]), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_fat(), folders=fs_folders_nes_on_fat()), sut.fs_data)
-        self.assertReports(sut, [], save=False)
+        self.assertReports(sut, [], save=True)
 
     def test_download_smb1_db___after_copying_smb1_to_usb1___just_updates_store_and_validates_smb1_on_usb1(self):
         store = store_smb1()
 
         sut = self.download_smb1_db(store, fs(files=fs_files_smb1_on_fat_and_usb1(), folders=fs_folders_nes_on_fat_and_usb1()))
 
-        self.assertEqual(store_smb1_on_fat_and_usb1(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_on_fat_and_usb1(), base_path=False), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_fat_and_usb1(), folders=fs_folders_nes_on_fat_and_usb1()), sut.fs_data)
         self.assertReports(sut, downloaded=[], validated=[file_nes_smb1])
 
@@ -178,7 +180,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_db(store, fs(files=fs_files_smb1_on_usb1(), folders=fs_folders_nes_on_usb1()))
 
-        self.assertEqual(store_smb1_on_usb1(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_on_usb1()), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_usb1(), folders=fs_folders_nes_on_usb1()), sut.fs_data)
         self.assertReports(sut, downloaded=[], validated=[file_nes_smb1])
 
@@ -196,7 +198,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_db(store, fs(folders=fs_folders_nes_on_fat_games_on_fat_usb1()))
 
-        self.assertEqual(store_smb1(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1()), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_fat(), folders=fs_folders_nes_on_fat_games_on_fat_usb1()), sut.fs_data)
         self.assertReports(sut, [file_nes_smb1])
 
@@ -205,7 +207,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_db(store, fs(base_path=delme_drive))
 
-        self.assertEqual(store_smb1_on_delme(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_on_delme()), store)
         self.assertEqual(fs_data(files=fs_files_smb1_on_delme(), folders=fs_folders_nes_on_delme()), sut.fs_data)
         self.assertReports(sut, [file_nes_smb1])
 
@@ -242,7 +244,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_pdfviewer_db(store, fs(config=config_with(base_system_path=hidden_drive)))
 
-        self.assertEqual(store_pdfviewer_on_base_system_path_hidden(), store)
+        self.assertEqual(fix_old_pext_store(store_pdfviewer_on_base_system_path_hidden()), store)
         self.assertEqual(fs_data(folders=fs_folders_pdfviewers_on_hidden(), files=fs_files_pdfviewers_on_hidden()), sut.fs_data)
         self.assertReports(sut, [FILE_PDFViewer])
 
@@ -260,7 +262,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_and_contra(store, fs())
 
-        self.assertEqual(store_smb1_and_contra(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_and_contra()), store)
         self.assertEqual(fs_data(files=fs_files_smb1_and_contra_on_fat(), folders=fs_folders_nes_on_fat()), sut.fs_data)
         self.assertReports(sut, [file_nes_contra, file_nes_smb1])
 
@@ -269,16 +271,16 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_and_contra(store, fs(files=fs_files_smb1_and_contra_on_fat(), folders=fs_folders_nes_on_fat()))
 
-        self.assertEqual(store_smb1_and_contra(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_and_contra(), ignore=[file_nes_smb1[1:], file_nes_contra[1:]]), store)
         self.assertEqual(fs_data(files=fs_files_smb1_and_contra_on_fat(), folders=fs_folders_nes_on_fat()), sut.fs_data)
-        self.assertReports(sut, [], save=False)
+        self.assertReports(sut, [], save=True)
 
     def test_download_smb1_and_contra___after_copying_contra_to_usb1___downloads_smb_to_usb1_and_validates_contra_on_usb1(self):
         store = store_smb1_and_contra()
 
         sut = self.download_smb1_and_contra(store, fs(files=fs_files_smb1_and_contra_on_fat_contra_on_usb1_too(), folders=fs_folders_nes_on_fat_and_usb1()))
 
-        self.assertEqual(store_smb1_and_contra_on_fat_and_usb1(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_and_contra_on_fat_and_usb1(), base_path=False), store)
         self.assertEqual(fs_data(files=fs_files_smb1_and_contra_on_fat_and_usb1(), folders=fs_folders_nes_on_fat_and_usb1()), sut.fs_data)
         self.assertReports(sut, downloaded=[file_nes_smb1], validated=[file_nes_contra])
 
@@ -296,7 +298,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_and_contra(store, fs(files=fs_files_smb1_on_fat_contra_on_usb1(), folders=fs_folders_nes_on_fat_and_usb1()))
 
-        self.assertEqual(store_smb1_on_fat_and_smb1_and_contra_on_usb1(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_on_fat_and_smb1_and_contra_on_usb1(), base_path=False), store)
         self.assertEqual(fs_data(files=fs_files_smb1_and_contra_on_usb1_smb1_on_fat_too(), folders=fs_folders_nes_on_fat_and_usb1()), sut.fs_data)
         self.assertReports(sut, downloaded=[file_nes_smb1], validated=[file_nes_contra])
 
@@ -314,7 +316,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_and_palettes(store, fs())
 
-        self.assertEqual(store_smb1_and_nes_palettes(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_and_nes_palettes()), store)
         self.assertEqual(fs_data(files=fs_files_smb1_and_nes_palettes_on_fat(), folders=fs_folders_nes_palettes_on_fat()), sut.fs_data)
         self.assertReports(sut, [file_nes_palette_a, file_nes_smb1])
 
@@ -332,7 +334,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
 
         sut = self.download_smb1_and_palettes(store, fs(folders=fs_folders_nes_on_usb1()))
 
-        self.assertEqual(store_smb1_and_nes_palettes_on_usb1(), store)
+        self.assertEqual(fix_old_pext_store(store_smb1_and_nes_palettes_on_usb1()), store)
         self.assertEqual(fs_data(files=fs_files_smb1_and_nes_palettes_on_usb1(), folders=fs_folders_nes_palettes_on_usb1()), sut.fs_data)
         self.assertReports(sut, [file_nes_palette_a, file_nes_smb1])
 
@@ -348,7 +350,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
     def test_download_smb1_in_db_test_and_nes_manual_in_db_demo___on_empty_stores_with_games_nes_folder_on_usb1_and_docs_nes_folder_on_usb2___installs_smb1_on_usb1_and_nes_manual_on_usb2(self):
         sut, local_store_dbs = self.download_smb1_in_db_test_and_nes_manual_in_db_demo(fs(folders=fs_folders_games_nes_on_usb1_and_docs_nes_on_usb2()))
 
-        self.assertEqual(store_smb1_on_usb1_and_nes_manual_on_usb2(), local_store_dbs)
+        self.assertEqual({store_id: fix_old_pext_store(store) for store_id, store in store_smb1_on_usb1_and_nes_manual_on_usb2().items()}, local_store_dbs)
         self.assertEqual(fs_data(files=fs_files_smb1_on_usb1_and_nes_manual_on_usb2(), folders=fs_folders_games_nes_on_usb1_and_docs_nes_on_usb2()), sut.fs_data)
         self.assertReports(sut, [file_nes_smb1, file_nes_manual])
 
@@ -365,17 +367,17 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
         sut, local_store_dbs = self.download_external_drives_1_and_2(fs(config=config_with(base_system_path=MEDIA_FAT), folders=external_folders))
 
         self.assertEqual({
-            db_id_external_drives_1: store_descr(
+            db_id_external_drives_1: fix_old_pext_store(store_descr(
                 db_id=db_id_external_drives_1,
                 files=_store_files_foo(),
                 files_usb1=_store_files_s32x_md(), folders_usb1=_store_folders_docs_s32x(),
                 files_usb2=_store_files_smb1(), folders_usb2=_store_folders_nes(),
-            ),
-            db_id_external_drives_2: store_descr(
+            )),
+            db_id_external_drives_2: fix_old_pext_store(store_descr(
                 db_id=db_id_external_drives_2,
                 files_usb0=_store_files_neogeo_md(), folders_usb0=_store_folders_docs_neogeo(),
                 files_usb2=_store_files_contra(), folders_usb2=_store_folders_nes(),
-            ),
+            )),
         }, local_store_dbs)
         self.assertEqual(fs_data(
             files={
@@ -414,7 +416,7 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
         )
         self.assertSystem({
             "fs": fs_data(files=installed_three_dbs_fs_files(), folders=installed_three_dbs_fs_folders()),
-            "stores": installed_three_dbs_store(),
+            "stores": [fix_old_pext_store(store) for store in installed_three_dbs_store()],
             "ok": [file_a, file_nes_smb1, file_md_sonic],
         }, sut, stores)
 
@@ -425,8 +427,8 @@ class TestOnlineImporterWithPriorityStoragePreferSD(OnlineImporterWithPrioritySt
         )
         self.assertSystem({
             "fs": fs_data(files=installed_three_dbs_fs_files(), folders=installed_three_dbs_fs_folders()),
-            "stores": installed_three_dbs_store(),
-            "save": False,
+            "stores": [fix_old_pext_store(store, ignore=[file_nes_smb1[1:], file_md_sonic[1:]]) for store in installed_three_dbs_store()],
+            "save": True,
         }, sut, stores)
 
     def download_three_dbs_with_sd_priority_files(self, input_stores=None, with_fs=None):

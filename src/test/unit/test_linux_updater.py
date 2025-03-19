@@ -78,7 +78,6 @@ def linux_description():
 
 def linux_description_with_version(version):
     return {
-        "delete": [],
         "hash": "d3b619c54c4727ab618bf108013f79d9",
         "size": 83873790,
         "url": linux_url,

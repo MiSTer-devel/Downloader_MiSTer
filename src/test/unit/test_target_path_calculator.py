@@ -39,11 +39,11 @@ tmp_whatever = '/tmp/whatever'
 normal_path_1 = 'normal/file'
 normal_path_2 = 'other/file'
 
-storage_priority_normal_path = '|games/core/file'
+storage_priority_normal_path = 'games/core/file'
 
 games = 'games'
 games_cons = 'games/cons'
-games_cons_file_a = '|games/cons/file_a'
+games_cons_file_a = 'games/cons/file_a'
 
 media_usb0_games_cons = path_with(MEDIA_USB0, games_cons)
 media_usb2_games_cons = path_with(MEDIA_USB2, games_cons)
@@ -92,7 +92,7 @@ class TestTargetPathCalculator(unittest.TestCase):
                 self.assert_system_resolve(expected, path, system_paths)
 
     def test_resolve_storage_priorities(self):
-        self.assertEqual(base_path, sut().deduce_target_path(storage_priority_normal_path, {}, PathType.FILE)[0].drive)
+        self.assertEqual(base_path, sut().deduce_target_path(storage_priority_normal_path, {"path": "pext"}, PathType.FILE)[0].drive)
 
     def test_translate_correct_paths(self):
         for n, (expected, config, file_system) in enumerate([
@@ -113,22 +113,22 @@ class TestTargetPathCalculator(unittest.TestCase):
             (MEDIA_FAT, config___prefer_sd___media_fat(), fs_external_drives()),
         ]):
             with self.subTest('%s: %s' % (n + 1, expected)):
-                self.assert_translated_path(expected, games_cons_file_a, config, file_system)
+                self.assert_translated_path(expected, games_cons_file_a, {"path": "pext"}, config, file_system)
 
     def test_translate_wrong_paths___raises_error(self):
         for path, path_type in [
-            ('|games/yasta', PathType.FILE),
-            ('|yasta', PathType.FILE),
+            ('games/yasta', PathType.FILE),
+            ('yasta', PathType.FILE),
         ]:
             with self.subTest(path):
-                _, e = sut().deduce_target_path(path, {}, path_type)
+                _, e = sut().deduce_target_path(path, {"path": "pext"}, path_type)
                 self.assertIsInstance(e, StoragePriorityError)
 
-    def assert_translated_path(self, expected, path, config=None, file_system_factory: FileSystemFactory=None):
+    def assert_translated_path(self, expected, path, description, config=None, file_system_factory: FileSystemFactory=None):
         file_system_factory = file_system_factory or FileSystemFactory()
         config = config or default_config()
         sut = TargetPathCalculatorFactory(file_system=file_system_factory.create_for_config(config)).target_paths_calculator(config=config)
-        actual, e = sut.deduce_target_path(path, {}, PathType.FILE)
+        actual, e = sut.deduce_target_path(path, description, PathType.FILE)
         if e is not None:
             raise e
         self.assertEqual(expected, actual.drive)

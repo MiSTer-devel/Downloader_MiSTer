@@ -21,15 +21,19 @@ from typing import Dict, Any, Final
 
 from downloader.config import default_config, Environment
 from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, KENV_LOGLEVEL, FILE_MiSTer_new, K_BASE_PATH, \
-    K_FILTER, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_ALLOW_REBOOT, KENV_DEBUG, MEDIA_FAT, MEDIA_USB0, MEDIA_USB1, \
-    MEDIA_USB2, KENV_FAIL_ON_FILE_ERROR, KENV_UPDATE_LINUX, KENV_CURL_SSL, KENV_COMMIT, DEFAULT_CURL_SSL_OPTIONS, \
-    MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, K_DB_URL, K_SECTION, K_OPTIONS, KENV_FORCED_BASE_PATH, \
-    FILE_MiSTer_old
+    K_DOWNLOADER_RETRIES, K_FILTER, K_DATABASES, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, \
+    KENV_ALLOW_REBOOT, KENV_DEBUG, MEDIA_FAT, K_BASE_SYSTEM_PATH, K_CONFIG_PATH, K_ZIP_FILE_COUNT_THRESHOLD, K_STORAGE_PRIORITY, MEDIA_USB0, \
+    MEDIA_USB1, MEDIA_USB2, KENV_FAIL_ON_FILE_ERROR, KENV_UPDATE_LINUX, KENV_CURL_SSL, KENV_COMMIT, DEFAULT_CURL_SSL_OPTIONS, \
+    K_DEFAULT_DB_ID, MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, K_DB_URL, K_SECTION, K_OPTIONS, K_USER_DEFINED_OPTIONS, KENV_FORCED_BASE_PATH, \
+    K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
+    K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_old
 from downloader.db_options import DbOptions
 from downloader.other import empty_store_without_base_path
-from downloader.db_entity import DbEntity
+from downloader.db_entity import DbEntity, fix_files, fix_folders, fix_zip
 import copy
 import tempfile
+
+# @TODO: Remove this file when support for the old pext syntax '|' is removed
 
 file_test_json_zip: Final = 'test.json.zip'
 file_a: Final = 'a/A'
@@ -37,15 +41,15 @@ file_b: Final = 'b/B'
 file_c: Final = 'c/C'
 file_d: Final = 'd/D'
 file_abc: Final = 'a/b/C'
-file_nes_smb1: Final = 'games/NES/smb.nes'
-file_nes_contra: Final = 'games/NES/contra.nes'
-file_nes_palette_a: Final = 'games/NES/Palette/a.pal'
-file_nes_manual: Final = 'docs/NES/nes.md'
-file_md_sonic: Final = 'games/MegaDrive/sonic.md'
+file_nes_smb1: Final = '|games/NES/smb.nes'
+file_nes_contra: Final = '|games/NES/contra.nes'
+file_nes_palette_a: Final = '|games/NES/Palette/a.pal'
+file_nes_manual: Final = '|docs/NES/nes.md'
+file_md_sonic: Final = '|games/MegaDrive/sonic.md'
 file_boot_rom: Final = 'boot.rom'
 file_menu_rbf: Final = 'menu.rbf'
-file_s32x_md: Final = 'docs/S32X/S32X.md'
-file_neogeo_md: Final = 'docs/NeoGeo/NeoGeo.md'
+file_s32x_md: Final = '|docs/S32X/S32X.md'
+file_neogeo_md: Final = '|docs/NeoGeo/NeoGeo.md'
 file_foo: Final = 'foo.txt'
 file_save_psx_castlevania: Final = 'saves/PSX/castlevania.sav'
 hash_menu_rbf: Final = 'menu.rbf'
@@ -58,14 +62,14 @@ folder_b: Final = 'b'
 folder_c: Final = 'c'
 folder_d: Final = 'd'
 folder_ab: Final = 'a/b'
-folder_games: Final = 'games'
-folder_games_nes: Final = 'games/NES'
-folder_games_nes_palettes: Final = 'games/NES/Palette'
-folder_games_md: Final = 'games/MegaDrive'
-folder_docs: Final = 'docs'
-folder_docs_nes: Final = 'docs/NES'
-folder_docs_neogeo: Final = 'docs/NeoGeo'
-folder_docs_s32x: Final = 'docs/S32X'
+folder_games: Final = '|games'
+folder_games_nes: Final = '|games/NES'
+folder_games_nes_palettes: Final = '|games/NES/Palette'
+folder_games_md: Final = '|games/MegaDrive'
+folder_docs: Final = '|docs'
+folder_docs_nes: Final = '|docs/NES'
+folder_docs_neogeo: Final = '|docs/NeoGeo'
+folder_docs_s32x: Final = '|docs/S32X'
 folder_save_psx: Final = 'saves/PSX'
 db_test: Final = 'test'
 db_palettes: Final = 'db_palettes'
@@ -154,29 +158,29 @@ def config_with(
 
     config = default_config()
     if filter_value is not None:
-        config['filter'] = filter_value
+        config[K_FILTER] = filter_value
     if base_path is not None:
-        config['base_path'] = base_path.lower()
+        config[K_BASE_PATH] = base_path.lower()
     if base_system_path is not None:
-        config['base_system_path'] = base_system_path.lower()
+        config[K_BASE_SYSTEM_PATH] = base_system_path.lower()
     if storage_priority is not None:
-        config['storage_priority'] = storage_priority.lower()
+        config[K_STORAGE_PRIORITY] = storage_priority.lower()
     if config_path is not None:
-        config['config_path'] = Path(config_path)
+        config[K_CONFIG_PATH] = Path(config_path)
     if zip_file_count_threshold is not None:
-        config['zip_file_count_threshold'] = zip_file_count_threshold
+        config[K_ZIP_FILE_COUNT_THRESHOLD] = zip_file_count_threshold
     if zip_accumulated_mb_threshold is not None:
-        config['zip_accumulated_mb_threshold'] = zip_accumulated_mb_threshold
+        config[K_ZIP_ACCUMULATED_MB_THRESHOLD] = zip_accumulated_mb_threshold
     if downloader_retries is not None:
-        config['downloader_retries'] = downloader_retries
+        config[K_DOWNLOADER_RETRIES] = downloader_retries
     if default_db_id is not None:
-        config['default_db_id'] = default_db_id
+        config[K_DEFAULT_DB_ID] = default_db_id
     if databases is not None:
-        config['databases'] = databases
+        config[K_DATABASES] = databases
     if user_defined_options is not None:
-        config['user_defined_options'] = user_defined_options
+        config[K_USER_DEFINED_OPTIONS] = user_defined_options
     if minimum_free_space is not None:
-        config['minimum_system_free_space_mb'] = minimum_free_space
+        config[K_MINIMUM_SYSTEM_FREE_SPACE_MB] = minimum_free_space
     return config
 
 
@@ -209,7 +213,7 @@ def temp_name():
         return temp.name
 
 
-def zip_desc(description, target_folder_path, is_pext=None, zipped_files=None, summary=None, summary_hash=None, summary_size=None, contents_hash=None, contents_size=None, summary_internal_zip_id=None):
+def zip_desc(description, target_folder_path, zipped_files=None, summary=None, summary_hash=None, summary_size=None, contents_hash=None, contents_size=None, summary_internal_zip_id=None):
     json = {
         "kind": "extract_all_contents",
         "base_files_url": "https://base_files_url",
@@ -221,8 +225,6 @@ def zip_desc(description, target_folder_path, is_pext=None, zipped_files=None, s
         },
         "target_folder_path": target_folder_path,
     }
-    if is_pext is True:
-        json['path'] = 'pext'
     if summary_internal_zip_id is not None:
         json['internal_summary'] = {} if summary is None else {
             'files': {
@@ -371,7 +373,7 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
         'db_id': db_id if db_id is not None else db_test,
         'db_files': db_files if db_files is not None else [],
         'files': files if files is not None else {},
-        'folders': folders if folders is not None else {},
+        'folders': _fix_folders(folders) if folders is not None else {},
         'base_files_url': base_files_url if base_files_url is not None else '',
         'zips': zips if zips is not None else {},
         'default_options': default_options if default_options is not None else {},
@@ -385,6 +387,12 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
         db_props['header'] = header
     entity = DbEntity(db_props, section if section is not None else db_id if db_id is not None else db_test)
     return entity
+
+
+def _fix_folders(folders):
+    if isinstance(folders, list):
+        folders = {f: {} for f in folders}
+    return folders
 
 
 def raw_db_empty_with_linux_descr():
@@ -541,53 +549,48 @@ def file_system_abc_descr():
 
 def file_nes_smb1_descr(size=None):
     return {
-        "hash": file_nes_smb1,
+        "hash": file_nes_smb1[1:],
         "size": file_size_smb1 if size is None else size,
-        "path": "pext",
         "url": "https://smb.nes"
     }
 
 
 def file_md_sonic_descr(size=None):
     return {
-        "hash": file_md_sonic,
+        "hash": file_md_sonic[1:],
         "size": file_size_sonic if size is None else size,
-        "path": "pext",
         "url": "https://sonic.md"
     }
 
 
 def db_smb1(db_id=None, descr=None):
-    return db_entity(db_id=db_id, folders={folder_games: {'path': 'pext'}, folder_games_nes: {'path': 'pext'}}, files={file_nes_smb1: file_nes_smb1_descr() if descr is None else descr})
+    return db_entity(db_id=db_id, folders=[folder_games, folder_games_nes], files={file_nes_smb1: file_nes_smb1_descr() if descr is None else descr})
 
 
 def db_sonic(db_id=None, descr=None):
-    return db_entity(db_id=db_id, folders={folder_games: {'path': 'pext'}, folder_games_md: {'path': 'pext'}}, files={file_md_sonic: file_md_sonic_descr() if descr is None else descr})
+    return db_entity(db_id=db_id, folders=[folder_games, folder_games_md], files={file_md_sonic: file_md_sonic_descr() if descr is None else descr})
 
 
 def file_nes_manual_descr():
     return {
-        "hash": file_nes_manual,
+        "hash": file_nes_manual[1:],
         "size": 22125020,
-        "path": "pext",
         "url": "https://nes.md"
     }
 
 
 def file_nes_contra_descr():
     return {
-        "hash": file_nes_contra,
+        "hash": file_nes_contra[1:],
         "size": 2915010,
-        "path": "pext",
         "url": "https://contra.nes"
     }
 
 
 def file_nes_palette_a_descr(url: bool = True, zip_id: bool = False, tags: bool = False, zip_path: bool = False):
     return tweak_descr({
-        "hash": file_nes_palette_a,
+        "hash": file_nes_palette_a[1:],
         "size": 2905020,
-        "path": "pext",
         "url": "https://a.pal",
         "zip_id": zipped_nes_palettes_id,
         "zip_path": file_nes_palette_a.removeprefix(folder_games_nes + '/'),
@@ -601,18 +604,46 @@ def file_nes_palette_a_descr(url: bool = True, zip_id: bool = False, tags: bool 
 
 def file_neogeo_md_descr():
     return {
-        "hash": file_neogeo_md,
+        "hash": file_neogeo_md[1:],
         "size": 2905029,
-        "path": "pext",
         "url": "https://neogeo.md"
     }
 
 
+def fix_old_pext_store(store, base_path=True, ignore: list[str] = None):
+    if ignore is None:
+        ignore = []
+    if base_path:
+        for file_path, file_description in store['files'].items():
+            if file_path in ignore: continue
+            if file_path.startswith('games') or file_path.startswith('docs'):
+                file_description['path'] = 'pext'
+        for folder_path, folder_description in store['folders'].items():
+            if folder_path.startswith('games') or folder_path.startswith('docs'):
+                folder_description['path'] = 'pext'
+    if 'zips' in store:
+        for zip_id, zip_desc in store['zips'].items():
+            fix_zip(zip_desc)
+    if 'filtered_zip_data' in store:
+        for zip_id, zip_summary in store['filtered_zip_data'].items():
+            fix_files(zip_summary['files'])
+            fix_folders(zip_summary['folders'])
+    if 'external' in store:
+        for drive, external in store['external'].items():
+            if drive in ignore: continue
+            for file_path, file_description in external['files'].items():
+                if file_path in ignore: continue
+                if file_path.startswith('games') or file_path.startswith('docs'):
+                    file_description['path'] = 'pext'
+            for folder_path, folder_description in external['folders'].items():
+                if folder_path.startswith('games') or folder_path.startswith('docs'):
+                    folder_description['path'] = 'pext'
+    return store
+
 def file_s32x_md_descr():
     return {
-        "hash": file_s32x_md,
+        "hash": file_s32x_md[1:],
         "size": 2905019,
-        "path": "pext",
         "url": "https://s32x.md"
     }
 
@@ -787,7 +818,7 @@ def default_env() -> Environment:
 
 def debug_env():
     env = default_env()
-    env['DEBUG'] = 'true'
+    env[KENV_DEBUG] = 'true'
     return env
 
 

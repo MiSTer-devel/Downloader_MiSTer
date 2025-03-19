@@ -55,11 +55,15 @@ external_contra_nes_file_drive_0 = path_with(tmp_delme_external_drive_0, contra_
 external_smb1_nes_file_drive_0 = path_with(tmp_delme_external_drive_0, smb1_nes_file)
 external_s32x_md_file_drive_0 = path_with(tmp_delme_external_drive_0, s32x_md_file)
 
-class TestSandboxedExternalDrivesInstall(SandboxTestBase):
+# @TODO: Eliminate this file and all related json and ini files when support for the old pext syntax '|' is removed
+
+class TestSandboxedExternalDrivesInstallOldPext(SandboxTestBase):
+    external_drives_db_1_json_old_pext = "test/system/fixtures/sandboxed_install/external_drives/external_drives_db_1_old_pext.json"
+    external_drives_db_2_json_old_pext = "test/system/fixtures/sandboxed_install/external_drives/external_drives_db_2_old_pext.json"
     external_drives_db_1_json = "test/system/fixtures/sandboxed_install/external_drives/external_drives_db_1.json"
     external_drives_db_2_json = "test/system/fixtures/sandboxed_install/external_drives/external_drives_db_2.json"
-    external_drives_prefer_sd_ini = "test/system/fixtures/sandboxed_install/external_drives/external_drives_prefer_sd.ini"
-    external_drives_prefer_external_ini = "test/system/fixtures/sandboxed_install/external_drives/external_drives_prefer_external.ini"
+    external_drives_prefer_sd_ini = "test/system/fixtures/sandboxed_install/external_drives/external_drives_prefer_sd_old_pext.ini"
+    external_drives_prefer_external_ini = "test/system/fixtures/sandboxed_install/external_drives/external_drives_prefer_external_old_pext.ini"
 
     def setUp(self) -> None:
         cleanup(self.external_drives_prefer_sd_ini)
@@ -108,8 +112,14 @@ class TestSandboxedExternalDrivesInstall(SandboxTestBase):
 
         delete_folder(tmp_delme_external)
 
+        db_1 = load_json(self.external_drives_db_1_json)
+        db_2 = load_json(self.external_drives_db_2_json)
+
         self.assertExternalDrivesExecutesWithSDPreference({
-            'local_store': self.expectedLocalStore_WithGamesAndDocs(),
+            'local_store': local_store_files([
+            ('external_drives_1', db_1['files'], db_1['folders']),
+            ('external_drives_2', db_2['files'], db_2['folders']),
+        ]),
             'files': self.expectedFiles_WithGamesAndDocs(),
             'installed_log': [s32x_md_file, smb1_nes_file, contra_nes_file, neogeo_md_file]
         })
@@ -124,8 +134,14 @@ class TestSandboxedExternalDrivesInstall(SandboxTestBase):
 
         self.create_external_drives_folders_with_subfolders()
 
+        db_1 = load_json(self.external_drives_db_1_json)
+        db_2 = load_json(self.external_drives_db_2_json)
+
         self.assertExternalDrivesExecutesWithSDPreference({
-            'local_store': self.expectedLocalStore_WithGamesAndDocs(),
+            'local_store': local_store_files([
+            ('external_drives_1', db_1['files'], db_1['folders']),
+            ('external_drives_2', db_2['files'], db_2['folders']),
+        ]),
             'files': self.expectedFiles_WithGamesAndDocs(),
             'installed_log': [s32x_md_file, smb1_nes_file, contra_nes_file, neogeo_md_file]
         })
@@ -162,8 +178,14 @@ class TestSandboxedExternalDrivesInstall(SandboxTestBase):
     def test_external_drives_db___with_sd_preference_but_without_external_subfolders___installs_correctly_on_sd(self):
         self.create_external_drives_folders_without_subfolders()
 
+        db_1 = load_json(self.external_drives_db_1_json)
+        db_2 = load_json(self.external_drives_db_2_json)
+
         self.assertExternalDrivesExecutesWithSDPreference({
-            'local_store': self.expectedLocalStore_WithGamesAndDocs(),
+            'local_store': local_store_files([
+            ('external_drives_1', db_1['files'], db_1['folders']),
+            ('external_drives_2', db_2['files'], db_2['folders']),
+        ]),
             'files': self.expectedFiles_WithGamesAndDocs(),
             'installed_log': [smb1_nes_file, s32x_md_file, foo_file, contra_nes_file, neogeo_md_file]
         })
@@ -249,24 +271,24 @@ class TestSandboxedExternalDrivesInstall(SandboxTestBase):
         return hashes(tmp_delme_sandbox, self.expectedInternalDb1Files_WithNoGamesNoDocs())
 
     def expectedInternalDb1Files_WithNoGamesNoDocs(self):
-        input_db = load_json(self.external_drives_db_1_json)
+        input_db = load_json(self.external_drives_db_1_json_old_pext)
         return {f: d for f, d in input_db['files'].items() if not is_pext(f, d)}
 
     def expectedInternalDb2Files_WithNoGamesNoDocs(self):
-        input_db = load_json(self.external_drives_db_2_json)
+        input_db = load_json(self.external_drives_db_2_json_old_pext)
         return {f: d for f, d in input_db['files'].items() if not is_pext(f, d)}
 
     def expectedLocalStore_WithGamesAndDocs(self):
-        db_1 = load_json(self.external_drives_db_1_json)
-        db_2 = load_json(self.external_drives_db_2_json)
+        db_1 = load_json(self.external_drives_db_1_json_old_pext)
+        db_2 = load_json(self.external_drives_db_2_json_old_pext)
         return local_store_files([
             ('external_drives_1', db_1['files'], db_1['folders']),
             ('external_drives_2', db_2['files'], db_2['folders']),
         ])
 
     def expectedFiles_WithGamesAndDocs(self):
-        db_1 = load_json(self.external_drives_db_1_json)
-        db_2 = load_json(self.external_drives_db_2_json)
+        db_1 = load_json(self.external_drives_db_1_json_old_pext)
+        db_2 = load_json(self.external_drives_db_2_json_old_pext)
         return sorted([*hashes(tmp_delme_sandbox, db_1['files']), *hashes(tmp_delme_sandbox, db_2['files'])])
 
     def files_from_external_drive(self, drive_path):

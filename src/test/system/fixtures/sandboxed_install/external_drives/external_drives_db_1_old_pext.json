@@ -1,18 +1,21 @@
 {
     "db_files": [],
-    "db_id": "external_drives_2",
+    "db_id": "external_drives_1",
     "db_url": "sandbox_db.json",
     "base_files_url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/",
     "zips": {},
     "files": {
-        "games/NES/contra.nes": {
-            "path": "pext",
+        "foo.txt": {
             "hash": "133af32b4894d9c5527cc5c91269ee28",
             "size": 20,
             "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/foo.txt"
         },
-        "docs/NeoGeo/NeoGeo.md": {
-            "path": "pext",
+        "|games/NES/smb1.nes": {
+            "hash": "133af32b4894d9c5527cc5c91269ee28",
+            "size": 20,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/foo.txt"
+        },
+        "|docs/S32X/S32X.md": {
             "hash": "133af32b4894d9c5527cc5c91269ee28",
             "size": 20,
             "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/src/test/system/fixtures/sandboxed_install/files/foo.txt"
@@ -20,10 +23,10 @@
     },
     "files_count": 2,
     "folders": {
-        "games": {"path": "pext"},
-        "games/NES": {"path": "pext"},
-        "docs": {"path": "pext"},
-        "docs/NeoGeo": {"path": "pext"}
+        "|games": {},
+        "|games/NES": {},
+        "|docs": {},
+        "|docs/S32X": {}
     },
     "folders_count": 0,
     "latest_zip_url": "https://github.com/MiSTer-devel/Distribution_MiSTer/archive/refs/heads/main.zip",

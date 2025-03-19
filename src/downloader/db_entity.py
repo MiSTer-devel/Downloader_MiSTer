@@ -156,14 +156,38 @@ def check_folder_paths(folders: list[str], db_id: str) -> None:
 def fix_folders(folders: dict[str, Any]) -> None:
     if len(folders) == 0: return
 
-    rename_folders = []
-    for folder_path, folder_description in folders.items():
-        if folder_path.endswith('/'):
-            rename_folders.append((folder_path, folder_description))
-
-    for folder_path, folder_description in rename_folders:
-        folders[folder_path[:-1]] = folder_description
+    for folder_path in [folder_path for folder_path, folder_description in folders.items() if folder_path.endswith('/')]:
+        folders[folder_path[:-1]] = folders[folder_path]
         folders.pop(folder_path)
+
+    old_pext_folders = {f[1:]: add_pext(d) for f, d in folders.items() if f[0] == '|'}
+    if len(old_pext_folders) > 0:
+        non_old_pext_folders = {f: d for f, d in folders.items() if f[0] != '|'}
+        folders.clear()
+        folders.update(non_old_pext_folders)
+        folders.update(old_pext_folders)
+
+def fix_files(files: dict[str, Any]) -> None:
+    if len(files) == 0: return
+
+    old_pext_files = {f[1:]: add_pext(d) for f, d in files.items() if f[0] == '|'}
+    if len(old_pext_files) > 0:
+        non_old_pext_files = {f: d for f, d in files.items() if f[0] != '|'}
+        files.clear()
+        files.update(non_old_pext_files)
+        files.update(old_pext_files)
+
+def fix_zip(zip_desc: dict[str, Any]) -> bool:
+    if 'target_folder_path' in zip_desc and zip_desc['target_folder_path'][0] == '|':
+        zip_desc['target_folder_path'] = zip_desc['target_folder_path'][1:]
+        zip_desc['path'] = 'pext'
+        return True
+    else:
+        return False
+
+def add_pext(desc: dict[str, Any]) -> dict[str, Any]:
+    desc['path'] = 'pext'
+    return desc
 
 def _validate_and_extract_parts_from_path(db_id: str, path: str) -> list[str]:
     if not isinstance(path, str):
