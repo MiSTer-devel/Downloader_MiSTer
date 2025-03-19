@@ -235,6 +235,8 @@ class OnlineImporter:
         for db_id, zip_id in box.removed_zips():
             write_stores[db_id].remove_zip_id(zip_id)
 
+        fs = self._worker_ctx.file_system
+
         if len(files_to_consume := box.consume_files()) > 0:
             logger.bench('OnlineImporter files_to_consume start.')
             processed_file_names: set[str] = {file_pkg.rel_path for file_pkgs, db_id in box.non_duplicated_files() for file_pkg in file_pkgs}
@@ -243,21 +245,23 @@ class OnlineImporter:
 
             for pkg, dbs in files_to_consume:
                 for db_id in dbs:
+                    if pkg.rel_path in processed_file_names: continue
+                    for is_external, drive in read_stores[db_id].list_other_drives_for_file(pkg.rel_path, pkg.drive):
+                        file_path = os.path.join(drive, pkg.rel_path)
+                        if fs.is_file(file_path):
+                            fs.unlink(file_path)
+
+                for db_id in dbs:
                     write_stores[db_id].remove_file(pkg.rel_path)
                     write_stores[db_id].remove_file_from_zips(pkg.rel_path)
 
                 if pkg.rel_path in processed_file_names: continue
+                if pkg.is_pext_external():
+                    full_path = os.path.join(self._worker_ctx.config['base_path'], pkg.rel_path)
+                    if fs.is_file(full_path):
+                        fs.unlink(full_path)
 
-                for db_id in dbs:
-                    if not read_stores[db_id].has_externals:
-                        continue
-
-                    for drive in read_stores[db_id].external_drives:
-                        file_path = os.path.join(drive, pkg.rel_path)
-                        if self._worker_ctx.file_system.is_file(file_path):
-                            self._worker_ctx.file_system.unlink(file_path)
-
-                self._worker_ctx.file_system.unlink(pkg.full_path)
+                fs.unlink(pkg.full_path)
                 processed_files[list(dbs)[0]].append(pkg)
                 processed_file_names.add(pkg.rel_path)
                 removed_files.append((pkg, dbs))
@@ -289,7 +293,7 @@ class OnlineImporter:
                     write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
                 continue
 
-            if self._worker_ctx.file_system.folder_has_items(pkg.full_path):
+            if fs.folder_has_items(pkg.full_path):
                 continue
 
             for db_id in dbs:
@@ -297,22 +301,26 @@ class OnlineImporter:
                     if is_external:
                         # @TODO: This count part blow is for checking if previously it was previously stored as "is_pext_external_subfolder", but since this information is lost, we need to do this. When we store "path" = "pext" we will have this information again, so we can do this much cleaner.
                         if pkg.rel_path.count('/') >= 2 and pkg.rel_path.count('/') >= 2 \
-                                and not self._worker_ctx.file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
+                                and not fs.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
                             write_stores[db_id].remove_external_folder(drive, pkg.rel_path)
                             write_stores[db_id].remove_external_folder_from_zips(drive, pkg.rel_path)
-                            self._worker_ctx.file_system.remove_folder(full_ext_path)
+                            fs.remove_folder(full_ext_path)
                     else:
-                        if not self._worker_ctx.file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
-                            self._worker_ctx.file_system.remove_folder(full_ext_path)
+                        if not fs.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
+                            fs.remove_folder(full_ext_path)
                             write_stores[db_id].remove_local_folder(pkg.rel_path)
                             write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
 
-                self._worker_ctx.file_system.remove_folder(pkg.full_path)
-
                 if pkg.is_pext_external() and pkg.drive is not None:
-                    write_stores[db_id].remove_external_folder(pkg.drive, pkg.rel_path)
-                    write_stores[db_id].remove_external_folder_from_zips(pkg.drive, pkg.rel_path)
+                    if not pkg.is_pext_external_subfolder() and not pkg.is_pext_parent():
+                        fs.remove_folder(pkg.full_path)
+                        write_stores[db_id].remove_external_folder(pkg.drive, pkg.rel_path)
+                        write_stores[db_id].remove_external_folder_from_zips(pkg.drive, pkg.rel_path)
+                    full_path = os.path.join(self._worker_ctx.config['base_path'], pkg.rel_path)
+                    if fs.is_folder(full_path) and not fs.folder_has_items(full_path):
+                        fs.remove_folder(full_path)
                 else:
+                    fs.remove_folder(pkg.full_path)
                     write_stores[db_id].remove_local_folder(pkg.rel_path)
                     write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
 

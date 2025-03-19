@@ -18,7 +18,7 @@
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from downloader.db_entity import check_no_url_files, fix_folders
+from downloader.db_entity import check_no_url_files, fix_folders, fix_files, fix_zip
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_zip_kind, make_transfer_job
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
@@ -41,8 +41,11 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         logger.bench('ProcessZipIndexWorker start: ', db.db_id, zip_id)
         store = job.store.select(job.zip_index).read_only()
 
-        logger.bench('ProcessZipIndexWorker fix folders: ', db.db_id, zip_id)
+        logger.bench('ProcessZipIndexWorker fix zips, files & folders: ', db.db_id, zip_id)
         fix_folders(summary.folders)  # @TODO: Try to look for a better place to put this, while validating zip_index entity for example which we don't do yet.
+        fix_files(summary.files)
+        if fix_zip(zip_description):
+            job.has_new_zip_summary = True
 
         non_existing_pkgs, need_update_pkgs, created_folders, zip_data, error = process_index_job_main_sequence(self._ctx, job, summary, store)
         if error is not None:
@@ -124,7 +127,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             if 'target_folder_path' not in description or not isinstance(description['target_folder_path'], str):
                 return None, Exception('extract_all_contents zip requires string "target_folder_path".')
             else:
-                return calculator.deduce_target_path(description['target_folder_path'], {}, PathType.FOLDER)
+                return calculator.deduce_target_path(description['target_folder_path'], description, PathType.FOLDER)
         elif kind == ZipKind.EXTRACT_SINGLE_FILES:
             return None, None
         else: raise ValueError(f"Impossible kind '{kind}'")
@@ -155,7 +158,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             return
 
         path_pkg, path_error = self._ctx.target_paths_calculator_factory.target_paths_calculator(job.config)\
-            .deduce_target_path(path, {}, PathType.FOLDER)
+            .deduce_target_path(path, job.zip_description, PathType.FOLDER)
 
         if path_error is not None:
             self._ctx.swallow_error(path_error)
@@ -164,16 +167,16 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             drive = path_pkg.pext_props.drive
             fragment['external_paths'][drive] = {'files': {}, 'folders': {}}
             for file_path, file_description in job.zip_index.files.items():
-                fragment['external_paths'][drive]['files'][file_path[1:]] = file_description
+                fragment['external_paths'][drive]['files'][file_path[1:] if file_path[0] == '|' else file_path] = file_description
 
             for folder_path, folder_description in job.zip_index.folders.items():
-                fragment['external_paths'][drive]['folders'][folder_path[1:]] = folder_description
+                fragment['external_paths'][drive]['folders'][folder_path[1:] if folder_path[0] == '|' else folder_path] = folder_description
         elif path_pkg.is_pext_standard():
             for file_path, file_description in job.zip_index.files.items():
-                fragment['base_paths']['files'][file_path[1:]] = file_description
+                fragment['base_paths']['files'][file_path[1:] if file_path[0] == '|' else file_path] = file_description
 
             for folder_path, folder_description in job.zip_index.folders.items():
-                fragment['base_paths']['folders'][folder_path[1:]] = folder_description
+                fragment['base_paths']['folders'][folder_path[1:] if folder_path[0] == '|' else folder_path] = folder_description
 
         else:
             for file_path, file_description in job.zip_index.files.items():

@@ -130,7 +130,7 @@ class PathPackage:
 
     def db_path(self) -> str:
         if self.kind == PATH_PACKAGE_KIND_PEXT:
-            return '|' + self.rel_path
+            return path_pext(self.rel_path, self.description)
         else:
             return self.rel_path
 
@@ -171,5 +171,11 @@ class PextPathProps:
             self.other_drives,
             self.is_subfolder,
         )
+
+
+def path_pext(path: str, description: dict[str, Any]) -> str:
+    if 'path' not in description or description['path'] != 'pext':
+        return '|' + path
+    return path
 
 RemovedCopy = Tuple[bool, str, str]

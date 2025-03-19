@@ -18,7 +18,7 @@
 
 from typing import Dict, Any, Optional, Tuple
 
-from downloader.db_entity import check_zip, fix_folders
+from downloader.db_entity import check_zip, fix_folders, fix_files
 from downloader.db_utils import build_db_config
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_process_zip_index_job, make_open_zip_summary_job, make_zip_tag, ZipJobContext
@@ -41,6 +41,7 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
         read_only_store = job.store.read_only()
 
         fix_folders(job.db.folders)
+        fix_files(job.db.files)
 
         self._ctx.file_download_session_logger.print_header(job.db)
         logger.bench("ProcessDbMainWorker Building db config: ", job.db.db_id)
