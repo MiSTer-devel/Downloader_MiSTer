@@ -84,6 +84,9 @@ class FullRunService:
             sys.stdout.flush()
             self._os_utils.sync()
             self._waiter.sleep(3)
+            if self._linux_updater.needs_reboot():
+                self._os_utils.sync()
+                self._waiter.sleep(20)
             self._os_utils.reboot()
 
         return result
