@@ -61,6 +61,9 @@ class FileSystemFactory:
     def set_unzip_will_error(self):
         self._fake_failures['unzip_error'] = True
 
+    def set_read_error(self):
+        self._fake_failures['read_error'] = True
+
     def create_for_config(self, config):
         return FakeFileSystem(self._state, config, self._fake_failures, self._write_records, self._fs_cache)
 

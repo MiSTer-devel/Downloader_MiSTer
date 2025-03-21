@@ -15,7 +15,7 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from downloader.jobs.worker_context import DownloaderWorkerFailPolicy
+from downloader.fail_policy import FailPolicy
 from test.fake_file_system_factory import fs_data
 from test.fake_online_importer import OnlineImporter
 from test.objects import empty_test_store, file_nes_palette_a, file_nes_smb1, db_test, db_entity, file_nes_smb1_descr, files_smb1, folder_games, folder_games_nes, folder_games_nes_palettes\
@@ -26,7 +26,7 @@ from test.zip_objects import file_nes_palette_a_descr_zipped
 
 class TestOnlineImporterWithPriorityStorage(OnlineImporterWithPriorityStorageTestBase):
     def test_download_dbs_contents___with_wrong_db_including_system_and_external_paths_simultaneously___when_fault_tolerant___ignores_system_attribute_and_installs_files(self):
-        sut = OnlineImporter(fail_policy=DownloaderWorkerFailPolicy.FAULT_TOLERANT)
+        sut = OnlineImporter(fail_policy=FailPolicy.FAULT_TOLERANT)
         store = empty_test_store()
 
         sut.add_db(self._db_with_smb1_and_nes_palettes(), store).download(False)

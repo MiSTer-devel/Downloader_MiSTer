@@ -24,6 +24,7 @@ from typing import Dict, Optional, Tuple, List, Set, Type, TypeVar, Generic, Pro
 
 from downloader.db_entity import DbEntity
 from downloader.interruptions import Interruptions
+from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.path_package import PathPackage
 from downloader.waiter import Waiter
@@ -289,7 +290,8 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
     def print_job_started(self, job: Job) -> None:
         if isinstance(job, FetchFileJob) and job.db_id is not None:
             self._print_line(job.pkg.rel_path)
-
+        if isinstance(job, FetchDataJob):
+            self._logger.bench('FetchDataJob started: ', job.source)
         self._check_time = time.time() + 2.0
 
     def print_work_in_progress(self) -> None:
@@ -308,6 +310,8 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
             self._symbols.append('.')
             if self._needs_newline or self._check_time < time.time():
                 self._print_symbols()
+        if isinstance(job, FetchDataJob):
+            self._logger.bench('FetchDataJob completed: ', job.source)
 
     def _print_symbols(self) -> None:
         if len(self._symbols) == 0:

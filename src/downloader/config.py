@@ -121,7 +121,7 @@ def default_config() -> Config:
         'allow_delete': AllowDelete.ALL,
         'allow_reboot': AllowReboot.ALWAYS,
         'update_linux': True,
-        'downloader_threads_limit': 20,
+        'downloader_threads_limit': 3,
         'downloader_timeout': 300,
         'downloader_retries': 3,
         'zip_file_count_threshold': 60,

@@ -18,7 +18,7 @@
 
 from downloader.config import default_config
 from downloader.constants import K_BASE_PATH
-from downloader.jobs.worker_context import DownloaderWorkerFailPolicy
+from downloader.fail_policy import FailPolicy
 from test.fake_file_system_factory import fs_data
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.objects import db_test_descr, empty_zip_summary, folder_games_nes, store_descr, empty_test_store, media_fat, db_entity, file_a, zipped_file_a_descr, zip_desc, zipped_nes_palettes_id
@@ -218,7 +218,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         self.assertEverythingIsClean(sut, store, save=True)
 
     def test_download_unibios_from_official_url___on_empty_store_and_failing_unzip___installs_only_the_file_not_in_zip(self):
-        sut = OnlineImporter(fail_policy=DownloaderWorkerFailPolicy.FAULT_TOLERANT)
+        sut = OnlineImporter(fail_policy=FailPolicy.FAULT_TOLERANT)
         sut.fs_factory.set_unzip_will_error()
         store = empty_test_store()
 
@@ -241,7 +241,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
     def test_download_unibios_from_official_url___on_second_run_after_failing_with_failing_unzips___still_fails_on_unibios(self):
         sut = OnlineImporter.from_implicit_inputs(
             ImporterImplicitInputs(files={file_neogeo_000lo: file_neogeo_000lo_descr()}, folders=fs_folders_neogeo_bios()),
-            fail_policy=DownloaderWorkerFailPolicy.FAULT_TOLERANT
+            fail_policy=FailPolicy.FAULT_TOLERANT
         )
         sut.fs_factory.set_unzip_will_error()
         store = store_with_unibios_from_zip()

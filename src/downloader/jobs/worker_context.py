@@ -18,25 +18,22 @@
 
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
-from enum import Enum, auto
 from typing import Optional
 
+from downloader.base_path_relocator import BasePathRelocator
 from downloader.config import Config
 from downloader.external_drives_repository import ExternalDrivesRepository
+from downloader.fail_policy import FailPolicy
 from downloader.file_filter import FileFilterFactory
 from downloader.file_system import FileSystem
 from downloader.free_space_reservation import FreeSpaceReservation
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import Job, Worker, ProgressReporter, JobContext
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
+from downloader.local_repository import LocalRepository
 from downloader.logger import Logger
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.waiter import Waiter
-
-
-class DownloaderWorkerFailPolicy(Enum):
-    FAIL_FAST = auto()
-    FAULT_TOLERANT = auto()
 
 
 class NilJob(Job): type_id = -1
@@ -51,17 +48,19 @@ class DownloaderWorkerContext:
     waiter: Waiter
     file_download_session_logger: FileDownloadSessionLogger
     progress_reporter: ProgressReporter
+    local_repository: LocalRepository
+    base_path_relocator: BasePathRelocator
     installation_report: InstallationReportImpl
     free_space_reservation: FreeSpaceReservation
     external_drives_repository: ExternalDrivesRepository
     file_filter_factory: FileFilterFactory
     target_paths_calculator_factory: TargetPathsCalculatorFactory
     config: Config
-    fail_policy: DownloaderWorkerFailPolicy = DownloaderWorkerFailPolicy.FAULT_TOLERANT
+    fail_policy: FailPolicy = FailPolicy.FAULT_TOLERANT
 
     def swallow_error(self, e: Optional[Exception], print: bool = True):
         if e is None: return
-        if self.fail_policy == DownloaderWorkerFailPolicy.FAIL_FAST:
+        if self.fail_policy == FailPolicy.FAIL_FAST:
             raise e
         self.logger.debug(e)
         if print: self.logger.print(f"ERROR: {e}")

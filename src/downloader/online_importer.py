@@ -31,6 +31,7 @@ from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.jobs_factory import make_transfer_job
+from downloader.jobs.load_local_store_job import LoadLocalStoreJob, local_store_tag
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.reporters import InstallationReport
@@ -53,42 +54,35 @@ class OnlineImporter:
         self._job_system = job_system
         self._worker_ctx = worker_ctx
         self._free_space_reservation = free_space_reservation
-        self._local_store: Optional[LocalStoreWrapper] = None
         self._box = InstallationBox()
+        self._local_store: Optional[LocalStoreWrapper] = None
         self._needs_reboot = False
         self._needs_save = False
 
     def _make_workers(self) -> dict[int, Worker]:
         return {w.job_type_id(): w for w in make_workers(self._worker_ctx)}
 
-    def _make_jobs(self, db_pkgs: list[DbSectionPackage], local_store: LocalStoreWrapper, full_resync: bool) -> list[Job]:
+    def _make_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]:
         jobs: list[Job] = []
+        load_local_store_job = LoadLocalStoreJob(db_pkgs).add_tag(local_store_tag)
         for pkg in db_pkgs:
             transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
-            self._logger.debug('Loading db from: ', pkg.section['db_url'])
             transfer_job.after_job = OpenDbJob(  # type: ignore[union-attr]
                 transfer_job=transfer_job,
                 section=pkg.db_id,
                 ini_description=pkg.section,
-                store=local_store.store_by_id(pkg.db_id),
-                full_resync=full_resync,
+                load_local_store_job=load_local_store_job,
             )
             jobs.append(transfer_job)  # type: ignore[arg-type]
+        jobs.append(load_local_store_job)
         return jobs
 
-    def set_local_store(self, local_store: LocalStoreWrapper) -> None:
-        self._local_store = local_store
-
-    def download_dbs_contents(self, db_pkgs: list[DbSectionPackage], full_resync: bool):
-        if self._local_store is None: raise Exception("Local store is not set")
-
+    def download_dbs_contents(self, db_pkgs: list[DbSectionPackage]) -> Optional[BaseException]:
         logger = self._logger
         logger.bench('OnlineImporter start.')
-        
-        local_store: LocalStoreWrapper = self._local_store
 
         self._job_system.register_workers(self._make_workers())
-        self._job_system.push_jobs(self._make_jobs(db_pkgs, local_store, full_resync))
+        self._job_system.push_jobs(self._make_jobs(db_pkgs))
 
         file_mister_present = self._worker_ctx.file_system.is_file(os.path.join(MEDIA_FAT, FILE_MiSTer), use_cache=False)
 
@@ -101,6 +95,13 @@ class OnlineImporter:
         report: InstallationReport = self._worker_ctx.installation_report
 
         box.set_unused_filter_tags(self._worker_ctx.file_filter_factory.unused_filter_parts())
+
+        for load_local_store_job in report.get_completed_jobs(LoadLocalStoreJob):
+            self._local_store = load_local_store_job.local_store
+
+        local_store_err: Optional[BaseException] = None
+        for load_local_store_job, e in report.get_failed_jobs(LoadLocalStoreJob):
+            local_store_err = e
 
         for open_db_job, _e in report.get_failed_jobs(OpenDbJob):
             box.add_failed_db(open_db_job.section)
@@ -219,6 +220,12 @@ class OnlineImporter:
             box.add_failed_db(transfer_job.db_id)
 
         logger.bench('OnlineImporter applying changes on stores...')
+
+        if self._local_store is None:
+            logger.bench('OnlineImporter could not progress without loaded store.')
+            return local_store_err
+
+        local_store = self._local_store
 
         write_stores = {}
         read_stores = {}
@@ -357,9 +364,14 @@ class OnlineImporter:
         for wrong_db_opts_err in box.wrong_db_options():
             self._worker_ctx.swallow_error(wrong_db_opts_err)
 
-        logger.bench('OnlineImporter done.')
-        return self
- 
+        logger.bench('OnlineImporter saving store...')
+
+    def save_local_store(self) -> Optional[Exception]:
+        if self._local_store is None:
+            return None
+        self._worker_ctx.logger.bench('OnlineImporter saving store...')
+        return self._worker_ctx.local_repository.save_store(self._local_store)
+
     @staticmethod
     def _clean_store(store) -> None:
         for file_description in store['files'].values():

@@ -20,7 +20,7 @@ from pathlib import Path
 
 from downloader.config import default_config
 from downloader.full_run_service import FullRunService as ProductionFullRunService
-from downloader.jobs.worker_context import DownloaderWorkerFailPolicy
+from downloader.fail_policy import FailPolicy
 from test.fake_os_utils import SpyOsUtils
 from test.fake_waiter import NoWaiter
 from test.fake_external_drives_repository import ExternalDrivesRepository
@@ -46,7 +46,7 @@ class FullRunService(ProductionFullRunService):
             certificates_fix=None,
             external_drives_repository=None,
             start_on_db_processing: bool = False,
-            fail_policy: DownloaderWorkerFailPolicy = DownloaderWorkerFailPolicy.FAULT_TOLERANT
+            fail_policy: FailPolicy = FailPolicy.FAULT_TOLERANT
     ):
 
         config = config or default_config()

@@ -26,7 +26,7 @@ from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config
 from downloader.constants import EXIT_ERROR_NO_CERTS, EXIT_ERROR_STORE_NOT_SAVED, EXIT_ERROR_FAILED_FILES, \
-    EXIT_ERROR_FAILED_DBS
+    EXIT_ERROR_FAILED_DBS, EXIT_ERROR_STORE_NOT_LOADED
 from downloader.db_utils import DbSectionPackage, sorted_db_sections
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.linux_updater import LinuxUpdater
@@ -105,23 +105,16 @@ class FullRunService:
             self._waiter.sleep(50)
             return EXIT_ERROR_NO_CERTS
 
-        local_store = self._local_repository.load_store()
-
-        db_pkgs = [DbSectionPackage(db_id, section, local_store.store_by_id(db_id)) for db_id, section in sorted_db_sections(self._config)]
+        db_pkgs = [DbSectionPackage(db_id, section) for db_id, section in sorted_db_sections(self._config)]
         #db_pkgs = [db_pkg for db_pkg in db_pkgs  if db_pkg.db_id == 'distribution_mister']
 
-        for relocation_package in self._base_path_relocator.relocating_base_paths(db_pkgs):
-            self._base_path_relocator.relocate_non_system_files(relocation_package)
-            err = self._local_repository.save_store(local_store)
-            if err is not None:
-                self._logger.debug('WARNING! Base path relocation could not be saved in the store!')
-                continue
+        load_err = self._online_importer.download_dbs_contents(db_pkgs)
+        if load_err is not None:
+            self._logger.print('ERROR! Store could not be saved because of a File System Error!')
+            self._logger.debug(load_err)
+            return EXIT_ERROR_STORE_NOT_LOADED
 
-        full_resync = not self._local_repository.has_last_successful_run()
-        self._online_importer.set_local_store(local_store)
-        self._online_importer.download_dbs_contents(db_pkgs, full_resync)
-
-        save_err = self._local_repository.save_store(local_store)
+        save_err = self._online_importer.save_local_store()
 
         install_box = self._online_importer.box()
         self._display_summary(install_box, self._config['start_time'])
@@ -166,7 +159,7 @@ class FullRunService:
 
         self._logger.print()
         self._logger.print('===========================')
-        self._logger.print(f'Downloader 2.0 ({self._config["commit"][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        self._logger.print(f'Downloader 2.1 ({self._config["commit"][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
         self._logger.debug('Commit: %s', self._config["commit"])
         self._logger.print(f'Log: {self._local_repository.logfile_path}')
         if len(box.unused_filter_tags()) > 0:

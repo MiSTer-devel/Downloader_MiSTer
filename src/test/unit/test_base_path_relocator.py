@@ -22,7 +22,7 @@ from downloader.base_path_relocator import RelocatorError
 from downloader.config import default_config
 from downloader.constants import MEDIA_FAT, MEDIA_USB0
 from downloader.db_utils import DbSectionPackage
-from test.fake_local_store_wrapper import StoreWrapper
+from test.fake_local_store_wrapper import local_store_wrapper
 from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_file_system_factory import FileSystemFactory
@@ -52,19 +52,19 @@ class TestBasePathRelocator(unittest.TestCase):
 
     def test_relocating_base_paths___with_empty_pkgs___returns_empty_array(self):
         self.sut_on(MEDIA_FAT)
-        self.assertEqual([], self.sut.relocating_base_paths([]))
+        self.assertEqual([], self.sut.relocating_base_paths([], local_store_wrapper({})))
 
     def test_relocating_base_paths___with_pkgs_containing_new_store___returns_empty_array(self):
         self.sut_on(MEDIA_FAT)
-        self.assertEqual([], self.sut.relocating_base_paths(pkgs(empty_store(base_path=MEDIA_FAT))))
+        self.assertEqual([], self.sut.relocating_base_paths(pkgs(), stores(empty_store(base_path=MEDIA_FAT))))
 
     def test_relocating_base_paths___with_pkgs_containing_old_store_with_matching_base_path___returns_empty_array(self):
         self.sut_on(MEDIA_FAT)
-        self.assertEqual([], self.sut.relocating_base_paths(pkgs(media_fat_store())))
+        self.assertEqual([], self.sut.relocating_base_paths(pkgs(), stores(media_fat_store())))
 
     def test_relocating_base_paths___with_pkgs_containing_old_store_with_non_matching_base_path___returns_a_length_one_array(self):
         self.sut_on(MEDIA_USB0)
-        self.assertEqual(1, len(self.sut.relocating_base_paths(pkgs(media_fat_store_with_system_file()))))
+        self.assertEqual(1, len(self.sut.relocating_base_paths(pkgs(), stores(media_fat_store_with_system_file()))))
 
     def test_relocate_non_system_files___with_package_with_system_file_moved_from_fat_to_usb0___causes_system_file_to_stay_at_fat(self):
         self.file_system_state.add_file_a(MEDIA_FAT)
@@ -98,9 +98,12 @@ class TestBasePathRelocator(unittest.TestCase):
 
     def relocate_non_system_files_to_media_usb0(self, store):
         self.sut_on(MEDIA_USB0)
-        packages = self.sut.relocating_base_paths(pkgs(store))
+        packages = self.sut.relocating_base_paths(pkgs(), stores(store))
         self.sut.relocate_non_system_files(packages[0])
 
 
-def pkgs(input_store):
-    return [DbSectionPackage(db_id=db_test, section={}, store=StoreWrapper(input_store))]
+def pkgs():
+    return [DbSectionPackage(db_id=db_test, section={'section': db_test, 'db_url': 'http://uri'})]
+
+def stores(input_store):
+    return local_store_wrapper({db_test: input_store})

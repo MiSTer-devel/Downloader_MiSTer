@@ -1,5 +1,5 @@
 # Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
-
+from downloader.fail_policy import FailPolicy
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -24,8 +24,8 @@ from test.fake_logger import NoLogger
 
 
 class LocalRepository(ProductionLocalRepository):
-    def __init__(self, config=None, file_system=None, store_migrator=None, external_drive_repository=None, file_system_factory=None):
+    def __init__(self, config=None, file_system=None, store_migrator=None, external_drive_repository=None, file_system_factory=None, fail_policy=None):
         file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
         file_system = file_system_factory.create_for_system_scope() if file_system is None else file_system
         external_drive_repository = ExternalDrivesRepository(file_system=file_system) if external_drive_repository is None else external_drive_repository
-        super().__init__(config_with(config_path='') if config is None else config, NoLogger(), file_system, store_migrator or StoreMigrator(), external_drive_repository)
+        super().__init__(config_with(config_path='') if config is None else config, NoLogger(), file_system, store_migrator or StoreMigrator(), external_drive_repository, fail_policy=fail_policy or FailPolicy.FAIL_FAST)

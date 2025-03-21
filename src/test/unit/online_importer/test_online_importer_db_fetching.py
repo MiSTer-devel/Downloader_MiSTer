@@ -19,13 +19,17 @@
 from typing import Optional
 import unittest
 
-from downloader.constants import K_SECTION, K_DB_URL, MEDIA_FAT
+from downloader.constants import K_SECTION, K_DB_URL, FILE_downloader_storage_json
 from downloader.db_utils import DbSectionPackage
-from downloader.jobs.worker_context import DownloaderWorkerFailPolicy
+from downloader.fail_policy import FailPolicy
+from downloader.job_system import JobFailPolicy
+from downloader.jobs.abort_worker import AbortJob
+from downloader.jobs.fetch_data_job import FetchDataJob
+from downloader.jobs.load_local_store_job import LoadLocalStoreJob
+from downloader.jobs.open_db_job import OpenDbJob
 from test.fake_importer_implicit_inputs import NetworkState
-from test.fake_local_store_wrapper import local_store_wrapper
 from test.fake_online_importer import OnlineImporter
-from test.objects import db_test_descr, db_test, empty_store
+from test.objects import db_test_descr, db_test, media_usb0
 from test.fake_file_system_factory import FileSystemFactory
 
 http_db_url = 'https://this_is_my_uri.json.zip'
@@ -46,23 +50,48 @@ class TestOnlineImporterDbFetching(unittest.TestCase):
         self.assertEqual(db_test_descr().extract_props(), fetch_all(fs_db_path, file_system_factory))
 
     def test_fetch_all___db_with_wrong_downloaded_file___returns_none(self):
-        self.assertEqual(None, fetch_all(http_db_url, fail=DownloaderWorkerFailPolicy.FAULT_TOLERANT))
+        self.assertEqual(None, fetch_all(http_db_url, fail=FailPolicy.FAULT_TOLERANT))
 
     def test_fetch_all___db_with_failing_http_uri___returns_none(self):
         self.assertEqual(None, fetch_all(http_db_url, network_state=NetworkState(storing_problems={http_db_url: 99})))
 
-1
-def fetch_all(db_url: str, file_system_factory: Optional[FileSystemFactory] = None, network_state: Optional[NetworkState] = None, fail: Optional[DownloaderWorkerFailPolicy] = None):
+    def test_load_store_job___always_fails___job_system_gets_ongoing_jobs_cancelled(self):
+        db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().extract_props()}
+        file_system_factory = FileSystemFactory.from_state(files={
+            fs_db_path: db_description,
+            media_usb0(FILE_downloader_storage_json): {'hash': 'ignore', 'unzipped_json': {}},
+        })
+        file_system_factory.set_read_error()
+
+        sut = OnlineImporter(
+            file_system_factory=file_system_factory,
+            network_state=NetworkState(remote_files={http_db_url: db_description}),
+            start_on_db_processing=False,
+            job_fail_policy=JobFailPolicy.FAULT_TOLERANT
+        )
+
+        db_pkg = DbSectionPackage(
+            db_id=db_test,
+            section={'db_url': http_db_url, 'section': db_test},
+        )
+        sut.download_dbs_contents([db_pkg])
+
+        self.assertTrue(sut.job_system.are_jobs_cancelled())
+        self.assertEqual({
+            "job_started": {FetchDataJob.__name__: 1, LoadLocalStoreJob.__name__: 4, AbortJob.__name__: 1, OpenDbJob.__name__: 1},
+            "job_completed": {AbortJob.__name__: 1, FetchDataJob.__name__: 1},
+            "job_retried": {LoadLocalStoreJob.__name__: 4, OpenDbJob.__name__: 1},
+            "job_cancelled": {FetchDataJob.__name__: 1}
+        }, sut.jobs_tracks())
+
+def fetch_all(db_url: str, file_system_factory: Optional[FileSystemFactory] = None, network_state: Optional[NetworkState] = None, fail: Optional[FailPolicy] = None, job_fail: Optional[JobFailPolicy] = None):
     file_system_factory = file_system_factory or FileSystemFactory()
-    sut = OnlineImporter(file_system_factory=file_system_factory, network_state=network_state, start_on_db_processing=False, fail_policy=fail)
-    local_store = local_store_wrapper({db_test: empty_store(MEDIA_FAT)})
+    sut = OnlineImporter(file_system_factory=file_system_factory, network_state=network_state, start_on_db_processing=False, fail_policy=fail, job_fail_policy=job_fail)
     db_pkg = DbSectionPackage(
         db_id=db_test,
-        section={'db_url': db_url},
-        store=local_store.store_by_id(db_test),
+        section={'db_url': db_url, 'section': db_test},
     )
-    sut.set_local_store(local_store)
-    sut.download_dbs_contents([db_pkg], False)
+    sut.download_dbs_contents([db_pkg])
     dbs = sut.box().installed_dbs()
     if len(dbs) == 0:
         return None

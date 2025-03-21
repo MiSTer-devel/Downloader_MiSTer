@@ -19,6 +19,7 @@ import json
 import unittest
 
 from downloader.constants import MEDIA_FAT, MEDIA_USB0, FILE_downloader_storage_zip, FILE_downloader_external_storage, FILE_downloader_storage_json
+from downloader.fail_policy import FailPolicy
 from downloader.local_store_wrapper import LocalStoreWrapper
 from downloader.store_migrator import make_new_local_store
 from test.fake_store_migrator import StoreMigrator
@@ -127,7 +128,7 @@ class TestLocalRepository(unittest.TestCase):
     def test_load_store___when_there_is_an_error_on_internal_store___returns_an_empty_store(self):
         files_system = fs(files=db_files_internal_empty())
         files_system[0].set_read_error()
-        store = load_store(files_system)
+        store = load_store(files_system, fail_policy=FailPolicy.FAULT_TOLERANT)
         self.assertEqual({}, store)
 
     def test_load_store___when_there_is_no_internal_store_and_an_error_on_external_store___ignores_the_external_store_and_returns_an_empty_store(self):
@@ -152,9 +153,9 @@ def save_store(fs_objects, input_local_store):
     return files
 
 
-def load_store(fs_objects):
+def load_store(fs_objects, fail_policy=None):
     file_system, fs_state = fs_objects
-    sut = LocalRepository(config=fs_state.config, file_system=file_system)
+    sut = LocalRepository(config=fs_state.config, file_system=file_system, fail_policy=fail_policy)
     return sut.load_store().unwrap_local_store()['dbs']
 
 

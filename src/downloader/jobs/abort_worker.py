@@ -16,21 +16,19 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import field, dataclass
-
-from downloader.config import ConfigDatabaseSection
-from downloader.job_system import Job, JobSystem
-from downloader.jobs.load_local_store_job import LoadLocalStoreJob
-from downloader.jobs.transfer_job import TransferJob
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.job_system import Job, JobSystem, WorkerResult
+from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 
 
-@dataclass(eq=False, order=False)
-class OpenDbJob(Job):
-    type_id: int = field(init=False, default=JobSystem.get_job_type_id())
-    transfer_job: TransferJob # Job & Transferrer @TODO: Python 3.10
-    section: str
-    ini_description: ConfigDatabaseSection
-    load_local_store_job: LoadLocalStoreJob
+class AbortJob(Job): type_id: int = JobSystem.get_job_type_id()
 
-    def retry_job(self): return self.transfer_job
+class AbortWorker(DownloaderWorker):
+    def __init__(self, ctx: DownloaderWorkerContext) -> None:
+        self._ctx = ctx
+
+    def job_type_id(self) -> int: return AbortJob.type_id
+    def reporter(self): return self._ctx.progress_reporter
+
+    def operate_on(self, job: Job) -> WorkerResult:
+        self._ctx.job_ctx.cancel_pending_jobs()
+        return [], None

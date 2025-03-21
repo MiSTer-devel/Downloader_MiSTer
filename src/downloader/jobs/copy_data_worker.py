@@ -1,5 +1,4 @@
 # Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
-import hashlib
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,6 +16,7 @@ import hashlib
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+import hashlib
 from downloader.job_system import WorkerResult
 from downloader.jobs.copy_data_job import CopyDataJob
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext

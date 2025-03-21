@@ -21,6 +21,7 @@ from typing import Optional
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
     FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json
 from downloader.external_drives_repository import ExternalDrivesRepository
+from downloader.fail_policy import FailPolicy
 from downloader.file_system import FileSystem, FsError
 from downloader.local_store_wrapper import LocalStoreWrapper
 from downloader.logger import FilelogSaver, Logger
@@ -30,12 +31,13 @@ from downloader.config import Config
 
 
 class LocalRepository(FilelogSaver):
-    def __init__(self, config: Config, logger: Logger, file_system: FileSystem, store_migrator: StoreMigrator, external_drives_repository: ExternalDrivesRepository) -> None:
+    def __init__(self, config: Config, logger: Logger, file_system: FileSystem, store_migrator: StoreMigrator, external_drives_repository: ExternalDrivesRepository, fail_policy: FailPolicy = FailPolicy.FAULT_TOLERANT) -> None:
         self._config = config
         self._logger = logger
         self._file_system = file_system
         self._store_migrator = store_migrator
         self._external_drives_repository = external_drives_repository
+        self._fail_policy = fail_policy
         self._storage_path_save_value: Optional[str] = None
         self._storage_path_old_value: Optional[str] = None
         self._storage_path_load_value: Optional[str] = None
@@ -125,6 +127,8 @@ class LocalRepository(FilelogSaver):
             return LocalStoreWrapper(local_store)
 
         except Exception as e:
+            if self._fail_policy == FailPolicy.FAIL_FAST:
+                raise e
             self._logger.debug(e)
             self._logger.print('ERROR: Could not load store')
             return LocalStoreWrapper(make_new_local_store(self._store_migrator))

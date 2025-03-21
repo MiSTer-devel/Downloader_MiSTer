@@ -16,16 +16,16 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from collections import defaultdict
 import signal
 import unittest
 from functools import reduce
 
-from downloader.job_system import CantSetSignalsException, Job, JobFailPolicy, JobSystem, JobSystemAbortException, Worker, CycleDetectedException, ProgressReporter, CantPushJobs, \
+from downloader.job_system import CantSetSignalsException, Job, JobFailPolicy, JobSystem, JobSystemAbortException, Worker, CycleDetectedException, \
+    CantPushJobs, \
     CantRegisterWorkerException, CantExecuteJobs, CantWaitWhenNotExecutingJobs, WorkerResult
 from typing import Dict, Optional, List
 
-from downloader.jobs.reporters import JobTagTracking
+from test.fake_job_system import TestProgressReporter
 from test.fake_logger import NoLogger
 
 
@@ -347,45 +347,3 @@ class TestWorker(Worker):
         return [], None
 
 
-class TestProgressReporter(ProgressReporter):
-
-    def __init__(self):
-        self.started_jobs = {}
-        self.completed_jobs = {}
-        self.failed_jobs = {}
-        self.retried_jobs = {}
-        self.cancelled_jobs = {}
-        self.tracker = JobTagTracking()
-
-    def reset(self): self.__init__()
-
-    def notify_work_in_progress(self):
-        pass
-
-    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
-        for job in jobs:
-            job.add_tag(job.type_id)
-            self.cancelled_jobs[job.type_id] = self.cancelled_jobs.get(job.type_id, 0) + 1
-        self.tracker.add_jobs_cancelled(jobs)
-
-    def notify_job_started(self, job: Job):
-        job.add_tag(job.type_id)
-        self.started_jobs[job.type_id] = self.started_jobs.get(job.type_id, 0) + 1
-        self.tracker.add_job_started(job)
-
-    def notify_job_completed(self, job: Job, next_jobs: List[Job]):
-        job.add_tag(job.type_id)
-        for c_job in next_jobs: c_job.add_tag(c_job.type_id)
-        self.completed_jobs[job.type_id] = self.completed_jobs.get(job.type_id, 0) + 1
-        self.tracker.add_job_completed(job, next_jobs)
-
-    def notify_job_failed(self, job: Job, _exception: BaseException):
-        job.add_tag(job.type_id)
-        self.failed_jobs[job.type_id] = self.failed_jobs.get(job.type_id, 0) + 1
-        self.tracker.add_job_failed(job)
-
-    def notify_job_retried(self, job: Job, retry_job: Job, _exception: BaseException):
-        job.add_tag(job.type_id)
-        retry_job.add_tag(retry_job.type_id)
-        self.retried_jobs[job.type_id] = self.retried_jobs.get(job.type_id, 0) + 1
-        self.tracker.add_job_retried(job, retry_job)
