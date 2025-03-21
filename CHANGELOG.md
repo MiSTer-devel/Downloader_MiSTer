@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Version 2.1 - 2025-03-21
+
+### Changed
+- The time measurement shown at the end of the run now includes the time spent importing modules, making it much closer to real time. Now, there is around a second of mismatch, whereas before, the realtime was around 4.5 seconds more than the output.
+- The loading of the internal store now also happens in parallel, which makes the process a bit faster in short runs.
+- Optimized the database processing by removing support for the deprecated `|` paths. If your database has a `|` path, it will be converted to the new format on the fly.
+- Adjusted default value for `downloader_threads_limit` from 20 to 3, to improve efficiency of short-runs.
+- Fixed a bug that affected new users or users with custom launchers.
+- Fixed a bug that prevented PNG images from rendering correctly. Images in the `docs/` will now display normally.
+- The reboot wait, which was significantly reduced in Downloader 2.0, is now longer for Linux updates to prevent issues. However, it is still shorter than in Downloader 1.8 for this scenario.
+
 ## Version 2.0 - 2025-03-14
 
 ### Added

@@ -610,7 +610,7 @@ def load_json_from_zip(input: Union[str, io.BytesIO]) -> Dict[str, Any]:
 
 
 def _load_json(file_path: str) -> Dict[str, Any]:
-    with open(file_path, "r") as f:
+    with open(file_path, "r", buffering=8192) as f:
         return json.loads(f.read())
 
 

@@ -16,21 +16,22 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import field, dataclass
+from typing import Optional
 
-from downloader.config import ConfigDatabaseSection
+from downloader.db_utils import DbSectionPackage
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.load_local_store_job import LoadLocalStoreJob
-from downloader.jobs.transfer_job import TransferJob
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.jobs.abort_worker import AbortJob
+from downloader.local_store_wrapper import LocalStoreWrapper
 
+local_store_tag = 'local_store'
 
-@dataclass(eq=False, order=False)
-class OpenDbJob(Job):
-    type_id: int = field(init=False, default=JobSystem.get_job_type_id())
-    transfer_job: TransferJob # Job & Transferrer @TODO: Python 3.10
-    section: str
-    ini_description: ConfigDatabaseSection
-    load_local_store_job: LoadLocalStoreJob
+class LoadLocalStoreJob(Job):
+    type_id: int = JobSystem.get_job_type_id()
+    def __init__(self, db_pkgs: list[DbSectionPackage], /) -> None:
+        self.db_pkgs = db_pkgs
 
-    def retry_job(self): return self.transfer_job
+        # Results
+        self.local_store: Optional[LocalStoreWrapper] = None
+        self.full_resync: bool = False
+
+    def backup_job(self) -> Optional[Job]: return AbortJob()

@@ -20,7 +20,7 @@ from typing import Any, Dict, List
 from downloader.config import Config, config_with_base_path
 from downloader.db_utils import DbSectionPackage
 from downloader.file_system import FileSystem, FileSystemFactory
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.local_store_wrapper import StoreWrapper, LocalStoreWrapper
 from downloader.logger import Logger
 from downloader.waiter import Waiter
 
@@ -32,13 +32,14 @@ class BasePathRelocator:
         self._waiter = waiter
         self._logger = logger
 
-    def relocating_base_paths(self, db_pkgs: List[DbSectionPackage]) -> List['BasePathRelocatorPackage']:
+    def relocating_base_paths(self, db_pkgs: List[DbSectionPackage], local_store: LocalStoreWrapper) -> List['BasePathRelocatorPackage']:
         result = []
         for pkg in db_pkgs:
-            if not pkg.store.read_only().has_base_path():
-                pkg.store.write_only().set_base_path(self._config['base_path'])
+            store = local_store.store_by_id(pkg.db_id)
+            if not store.read_only().has_base_path():
+                store.write_only().set_base_path(self._config['base_path'])
 
-            from_base_path = pkg.store.read_only().base_path
+            from_base_path = store.read_only().base_path
             to_base_path = self._config['base_path']
 
             if to_base_path == from_base_path:
@@ -49,7 +50,7 @@ class BasePathRelocator:
             to_file_system = self._file_system_factory.create_for_config(config_with_base_path(self._config, to_base_path))
 
             result.append(BasePathRelocatorPackage(
-                pkg.store,
+                store,
                 self._config,
                 from_file_system,
                 to_file_system,

@@ -132,7 +132,7 @@ class ConfigReader:
         result['fail_on_file_error'] = self._env['FAIL_ON_FILE_ERROR'] == 'true'
         result['commit'] = self._valid_max_length('COMMIT', self._env['COMMIT'], 50)
         result['default_db_id'] = self._valid_db_id(K_DEFAULT_DB_ID, self._env['DEFAULT_DB_ID'])
-        result['start_time'] = time.time()
+        result['start_time'] = self._start_time
         result['logfile'] = self._env['LOGFILE']
         result['config_path'] = Path(config_path)
 

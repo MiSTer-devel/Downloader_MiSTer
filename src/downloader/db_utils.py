@@ -29,8 +29,7 @@ from downloader.local_store_wrapper import StoreWrapper
 class DbSectionPackage:
     db_id: str
     section: ConfigDatabaseSection
-    store: StoreWrapper
- 
+
 
 def sorted_db_sections(config: Config) -> List[Tuple[str, ConfigDatabaseSection]]:
     result = []

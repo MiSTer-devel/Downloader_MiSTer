@@ -18,9 +18,11 @@
 
 from typing import List
 
+from downloader.jobs.abort_worker import AbortWorker
 from downloader.jobs.copy_data_worker import CopyDataWorker
 from downloader.jobs.fetch_data_worker import FetchDataWorker
 from downloader.jobs.fetch_file_worker import FetchFileWorker
+from downloader.jobs.load_local_store_worker import LoadLocalStoreWorker
 from downloader.jobs.open_db_worker import OpenDbWorker
 from downloader.jobs.open_zip_contents_worker import OpenZipContentsWorker
 from downloader.jobs.open_zip_summary_worker import OpenZipSummaryWorker
@@ -33,6 +35,7 @@ from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerCon
 
 def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
     return [
+        AbortWorker(ctx),
         CopyDataWorker(ctx),
         FetchFileWorker(progress_reporter=ctx.progress_reporter, http_gateway=ctx.http_gateway, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout']),
         FetchDataWorker(progress_reporter=ctx.progress_reporter, http_gateway=ctx.http_gateway, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout']),
@@ -41,6 +44,7 @@ def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
         WaitDbZipsWorker(ctx),
         ProcessDbMainWorker(ctx),
         ProcessZipIndexWorker(ctx),
+        LoadLocalStoreWorker(ctx),
         OpenZipSummaryWorker(ctx),
-        OpenZipContentsWorker(ctx)
+        OpenZipContentsWorker(ctx),
     ]

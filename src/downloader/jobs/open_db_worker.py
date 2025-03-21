@@ -21,6 +21,7 @@ from typing import Any
 from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
 from downloader.db_entity import DbEntity
 from downloader.job_system import WorkerResult
+from downloader.jobs.load_local_store_job import local_store_tag
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.worker_context import DownloaderWorkerBase
@@ -31,18 +32,33 @@ class OpenDbWorker(DownloaderWorkerBase):
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: OpenDbJob) -> WorkerResult:  # type: ignore[override]
+        self._ctx.logger.bench('OpenDbWorker Loading database: ', job.section)
         try:
             db = self._open_db(job.section, job.transfer_job.source, job.transfer_job.transfer())  # type: ignore[union-attr]
         except Exception as e:
             self._ctx.swallow_error(e)
             return [], e
 
+        self._ctx.logger.bench('OpenDbWorker database opened: ', job.section)
+
         calcs = job.transfer_job.calcs  # type: ignore[union-attr]
         if calcs is None:
             self._ctx.swallow_error(Exception(f'OpenDbWorker [{db.db_id}] must receive a transfer_job with calcs not null.'))
             calcs = {}
 
-        ini_description, store, full_resync = job.ini_description, job.store, job.full_resync
+        while self._ctx.installation_report.any_in_progress_job_with_tags(_local_store_tags):
+            self._ctx.logger.bench('OpenDbWorker waiting for store: ', job.section)
+            self._ctx.job_ctx.wait_for_other_jobs(0.06)
+
+        self._ctx.logger.bench('OpenDbWorker store received: ', job.section)
+        local_store, full_resync = job.load_local_store_job.local_store, job.load_local_store_job.full_resync
+        if local_store is None:
+            return [], Exception('OpenDbWorker must receive a LoadLocalStoreJob with local_store not null.')
+
+        store = local_store.store_by_id(job.section)
+        ini_description = job.ini_description
+
+        self._ctx.logger.bench('OpenDbWorker done: ', job.section)
         return [ProcessDbMainJob(
             db=db,
             db_hash=calcs.get('hash', DB_STATE_SIGNATURE_NO_HASH),
@@ -53,9 +69,10 @@ class OpenDbWorker(DownloaderWorkerBase):
         )], None
 
     def _open_db(self, section: str, source: str, transfer: Any, /) -> DbEntity:
-        self._ctx.logger.bench('OpenDbWorker Loading database: ', section)
         db_props = self._ctx.file_system.load_dict_from_transfer(source, transfer)
         self._ctx.logger.bench('OpenDbWorker Validating database: ', section)
         db_entity = DbEntity(db_props, section)
-        self._ctx.logger.bench('OpenDbWorker end: ', section)
         return db_entity
+
+
+_local_store_tags = [local_store_tag]

@@ -83,6 +83,7 @@ class JobSystem(JobContext):
     def timed_out(self) -> bool: return self._timed_out
     def get_unhandled_exceptions(self) -> Iterable[BaseException]: return self._unhandled_errors
     def pending_jobs_amount(self) -> int: return self._pending_jobs_amount
+    def are_jobs_cancelled(self) -> bool: return self._are_jobs_cancelled
 
     def set_interfering_signals(self, signals: List[signal.Signals]) -> None:
         with self._lock:
@@ -178,10 +179,12 @@ class JobSystem(JobContext):
 
     def _execute_with_threads(self, max_threads: int) -> None:
         with self._temporary_signal_handlers(), ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
-            futures: list[Tuple['_JobPackage', Future[None]]] = []
+            futures: list[Tuple['_JobPackage', Future[None]]] = [(package, thread_executor.submit(self._operate_on_next_job, package, self._notifications)) for package in self._job_queue]
+            max_futures = max(max_threads * 1.5, len(futures))
+            self._job_queue.clear()
             while (self._pending_jobs_amount > 0 or futures) and self._are_jobs_cancelled is False:
-                package = self._job_queue.popleft() if self._job_queue else None
-                if package is not None:
+                while self._job_queue and (len(futures) < max_futures):
+                    package = self._job_queue.popleft()
                     assert_success = self._assert_there_are_no_cycles(package)
                     if assert_success:
                         future = thread_executor.submit(self._operate_on_next_job, package, self._notifications)

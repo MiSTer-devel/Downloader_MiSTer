@@ -91,6 +91,7 @@ class FullRunServiceFactory:
         file_filter_factory = FileFilterFactory(self._logger)
         free_space_reservation = LinuxFreeSpaceReservation(logger=self._logger, config=config) if system_file_system.is_file(FILE_MiSTer_version) else UnlimitedFreeSpaceReservation()
         linux_updater = LinuxUpdater(self._logger, config, system_file_system, safe_file_fetcher)
+        base_path_relocator = BasePathRelocator(config, file_system_factory, waiter, self._logger)
 
         workers_ctx = DownloaderWorkerContext(
             job_ctx=job_system,
@@ -100,6 +101,8 @@ class FullRunServiceFactory:
             file_system=system_file_system,
             installation_report=installation_report,
             progress_reporter=file_download_reporter,
+            local_repository=local_repository,
+            base_path_relocator=base_path_relocator,
             file_download_session_logger=file_download_reporter,
             free_space_reservation=free_space_reservation,
             external_drives_repository=external_drives_repository,
@@ -118,7 +121,7 @@ class FullRunServiceFactory:
             online_importer,
             linux_updater,
             RebootCalculator(config, self._logger, system_file_system),
-            BasePathRelocator(config, file_system_factory, waiter, self._logger),
+            base_path_relocator,
             CertificatesFix(config, system_file_system, waiter, self._logger),
             external_drives_repository,
             LinuxOsUtils(),
