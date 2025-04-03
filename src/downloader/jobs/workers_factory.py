@@ -38,7 +38,7 @@ def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
         AbortWorker(ctx),
         CopyDataWorker(ctx),
         FetchFileWorker(progress_reporter=ctx.progress_reporter, http_gateway=ctx.http_gateway, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout']),
-        FetchDataWorker(progress_reporter=ctx.progress_reporter, http_gateway=ctx.http_gateway, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout']),
+        FetchDataWorker(ctx, timeout=ctx.config['downloader_timeout']),
         OpenDbWorker(ctx),
         ProcessDbIndexWorker(ctx),
         WaitDbZipsWorker(ctx),

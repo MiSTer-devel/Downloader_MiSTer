@@ -71,7 +71,7 @@ class FullRunServiceFactory:
         http_connection_timeout = config['downloader_timeout'] / 4 if config['downloader_timeout'] > 60 else 15
 
         http_gateway = HttpGateway(
-            ssl_ctx=context_from_curl_ssl(config['curl_ssl']),
+            ssl_ctx=context_from_curl_ssl(config['curl_ssl'], self._logger),
             timeout=http_connection_timeout,
             logger=DebugOnlyLoggerDecorator(self._logger) if config['http_logging'] else None
         )
@@ -131,14 +131,19 @@ class FullRunServiceFactory:
         return instance
 
 
-def context_from_curl_ssl(curl_ssl):
-    context = ssl.create_default_context()
+def context_from_curl_ssl(curl_ssl, logger: Logger):
+    try:
+        context = ssl.create_default_context()
 
-    if curl_ssl.startswith('--cacert '):
-        cacert_file = curl_ssl[len('--cacert '):]
-        context.load_verify_locations(cacert_file)
-    elif curl_ssl == '--insecure':
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
+        if curl_ssl.startswith('--cacert '):
+            cacert_file = curl_ssl[len('--cacert '):]
+            context.load_verify_locations(cacert_file)
+        elif curl_ssl == '--insecure':
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
 
-    return context
+        return context
+    except Exception as e:
+        logger.debug(e)
+        logger.print('WARNING! Ignoring SSL parameters...')
+        return ssl.create_default_context()

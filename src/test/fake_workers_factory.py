@@ -37,7 +37,7 @@ def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
                 progress_reporter=ctx.progress_reporter, http_gateway=fake_http, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout'],
             ), fake_http),
             FakeWorkerDecorator(FetchDataWorker(
-                progress_reporter=ctx.progress_reporter, http_gateway=fake_http, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout'],
+               ctx=ctx, timeout=ctx.config['downloader_timeout'],
             ), fake_http),
         ])
 

@@ -53,7 +53,7 @@ class TestOnlineImporterDbFetching(unittest.TestCase):
         self.assertEqual(None, fetch_all(http_db_url, fail=FailPolicy.FAULT_TOLERANT))
 
     def test_fetch_all___db_with_failing_http_uri___returns_none(self):
-        self.assertEqual(None, fetch_all(http_db_url, network_state=NetworkState(storing_problems={http_db_url: 99})))
+        self.assertEqual(None, fetch_all(http_db_url, fail=FailPolicy.FAULT_TOLERANT, network_state=NetworkState(storing_problems={http_db_url: 99})))
 
     def test_load_store_job___always_fails___job_system_gets_ongoing_jobs_cancelled(self):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().extract_props()}

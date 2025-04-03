@@ -288,7 +288,7 @@ class FakeFileSystem(ProductionFileSystem):
 
     def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> Tuple[io.BytesIO, str]:
         if in_stream.storing_problems:
-            return
+            raise FsError('Storing Problems')
 
         return in_stream.buf, in_stream.description['hash'] if calc_md5 else ''
 
