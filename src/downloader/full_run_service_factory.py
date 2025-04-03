@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import ssl
-from typing import Dict
+from typing import Dict, Tuple, Optional
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config
@@ -70,8 +70,12 @@ class FullRunServiceFactory:
 
         http_connection_timeout = config['downloader_timeout'] / 4 if config['downloader_timeout'] > 60 else 15
 
+        ssl_ctx, ssl_err = context_from_curl_ssl(config['curl_ssl'])
+        if ssl_err is not None:
+            self._logger.debug(ssl_err)
+            self._logger.print('WARNING! Ignoring SSL parameters...')
         http_gateway = HttpGateway(
-            ssl_ctx=context_from_curl_ssl(config['curl_ssl'], self._logger),
+            ssl_ctx=ssl_ctx,
             timeout=http_connection_timeout,
             logger=DebugOnlyLoggerDecorator(self._logger) if config['http_logging'] else None
         )
@@ -131,7 +135,7 @@ class FullRunServiceFactory:
         return instance
 
 
-def context_from_curl_ssl(curl_ssl, logger: Logger):
+def context_from_curl_ssl(curl_ssl) -> Tuple[ssl.SSLContext, Optional[Exception]]:
     try:
         context = ssl.create_default_context()
 
@@ -142,8 +146,6 @@ def context_from_curl_ssl(curl_ssl, logger: Logger):
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
 
-        return context
+        return context, None
     except Exception as e:
-        logger.debug(e)
-        logger.print('WARNING! Ignoring SSL parameters...')
-        return ssl.create_default_context()
+        return ssl.create_default_context(), e
