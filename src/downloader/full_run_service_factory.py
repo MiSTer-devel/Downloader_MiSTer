@@ -94,7 +94,7 @@ class FullRunServiceFactory:
 
         file_filter_factory = FileFilterFactory(self._logger)
         free_space_reservation = LinuxFreeSpaceReservation(logger=self._logger, config=config) if system_file_system.is_file(FILE_MiSTer_version) else UnlimitedFreeSpaceReservation()
-        linux_updater = LinuxUpdater(self._logger, config, system_file_system, safe_file_fetcher)
+        linux_updater = LinuxUpdater(self._logger, waiter, config, system_file_system, safe_file_fetcher)
         base_path_relocator = BasePathRelocator(config, file_system_factory, waiter, self._logger)
 
         workers_ctx = DownloaderWorkerContext(

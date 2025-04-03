@@ -20,6 +20,7 @@ from downloader.config import default_config
 from downloader.constants import FILE_MiSTer_version, FILE_downloader_needs_reboot_after_linux_update
 from downloader.db_entity import DbEntity
 from downloader.linux_updater import LinuxUpdater as ProductionLinuxUpdater
+from test.fake_waiter import NoWaiter
 from test.fake_logger import NoLogger
 from test.fake_file_fetcher import SafeFileFetcher
 from test.fake_file_system_factory import FileSystemFactory
@@ -32,7 +33,7 @@ class LinuxUpdater(ProductionLinuxUpdater):
         config = config or default_config()
         fetcher = fetcher or SafeFileFetcher(config, self.file_system, network_state)
         self._dbs = []
-        super().__init__(NoLogger(), config, self.file_system, fetcher)
+        super().__init__(NoLogger(), NoWaiter(), config, self.file_system, fetcher)
 
     def add_db(self, db: DbEntity) -> 'LinuxUpdater':
         self._dbs.append(db)

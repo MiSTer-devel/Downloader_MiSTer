@@ -21,7 +21,6 @@ import json
 import sys
 import tempfile
 import os.path
-import time
 from typing import Dict, List, Any
 from downloader.config import Config
 from downloader.constants import FILE_7z_util_uninstalled, FILE_7z_util_uninstalled_description, FILE_Linux_uninstalled, FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version, FILE_7z_util, FILE_Linux_user_files
@@ -29,12 +28,14 @@ from downloader.db_entity import DbEntity
 from downloader.file_system import FileSystem
 from downloader.jobs.fetch_file_worker import SafeFileFetcher
 from downloader.logger import Logger
+from downloader.waiter import Waiter
 
 
 class LinuxUpdater:
-    def __init__(self, logger: Logger, config: Config, file_system: FileSystem, fetcher: SafeFileFetcher) -> None:
+    def __init__(self, logger: Logger, waiter: Waiter, config: Config, file_system: FileSystem, fetcher: SafeFileFetcher) -> None:
         self._config = config
         self._logger = logger
+        self._waiter = waiter
         self._file_system = file_system
         self._fetcher = fetcher
         self._linux_descriptions: list[dict[str, Any]] = []
@@ -86,7 +87,9 @@ class LinuxUpdater:
         self._logger.print('Latest linux version -> %s' % linux['version'][-6:])
         self._logger.print()
 
-        self._logger.print('Fetching the new Linux image... (this can take a while)')
+        self._logger.print('Fetching the new Linux image... (this can take a while)', flush=True)
+        self._waiter.sleep(0.5)
+
         error = self._fetcher.fetch_file(linux, FILE_Linux_uninstalled)
         if error is not None:
             self._logger.print('ERROR! Could not fetch the Linux image.')
@@ -171,7 +174,7 @@ class LinuxUpdater:
         self._logger.print("======================================================================================")
         self._logger.print(flush=True)
         sys.stdout.flush()
-        time.sleep(0.5)
+        self._waiter.sleep(0.5)
 
         result = subprocess.run('''
                     sync
