@@ -21,6 +21,7 @@ import json
 import sys
 import tempfile
 import os.path
+import time
 from typing import Dict, List, Any
 from downloader.config import Config
 from downloader.constants import FILE_7z_util_uninstalled, FILE_7z_util_uninstalled_description, FILE_Linux_uninstalled, FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version, FILE_7z_util, FILE_Linux_user_files
@@ -85,7 +86,7 @@ class LinuxUpdater:
         self._logger.print('Latest linux version -> %s' % linux['version'][-6:])
         self._logger.print()
 
-        self._logger.print('Fetching the new Linux image...')
+        self._logger.print('Fetching the new Linux image... (this can take a while)')
         error = self._fetcher.fetch_file(linux, FILE_Linux_uninstalled)
         if error is not None:
             self._logger.print('ERROR! Could not fetch the Linux image.')
@@ -168,9 +169,10 @@ class LinuxUpdater:
         self._logger.print("and copy the content of the files/linux/ directory in the linux directory of the SD.")
         self._logger.print("Reflash the bootloader with the SD Installer if needed.")
         self._logger.print("======================================================================================")
-        self._logger.print()
-
+        self._logger.print(flush=True)
         sys.stdout.flush()
+        time.sleep(0.5)
+
         result = subprocess.run('''
                     sync
                     mv -f "/media/fat/linux.update/files/linux/linux.img" "/media/fat/linux/linux.img.new"
