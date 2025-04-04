@@ -179,7 +179,7 @@ class LinuxUpdater:
         result = subprocess.run('''
                     sync
                     mv -f "/media/fat/linux.update/files/linux/linux.img" "/media/fat/linux/linux.img.new"
-                    mv -f "/media/fat/linux.update/files/linux/"* "/media/fat/linux/"
+                    rsync --exclude="gamecontrollerdb/" --out-format='%n' -a "/media/fat/linux.update/files/linux/" "/media/fat/linux/"
                     rm -R "/media/fat/linux.update" > /dev/null 2>&1
                     sync
                     /media/fat/linux/updateboot
