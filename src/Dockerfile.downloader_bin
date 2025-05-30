@@ -1,0 +1,16 @@
+ARG BASE_IMAGE=arm32v7-nuitka
+FROM ${BASE_IMAGE}
+
+WORKDIR /app
+COPY downloader /app/downloader/
+COPY __main__.py commit.py /app/
+
+RUN nuitka --lto=yes --follow-imports \
+    --python-flag=no_site \
+    --python-flag=-OO \
+    --jobs=$(nproc) \
+    --include-package=downloader __main__.py
+
+RUN upx --best __main__.bin
+
+CMD ["cat", "__main__.bin"]

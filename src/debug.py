@@ -40,10 +40,9 @@ def send_build(env=None, **kwargs):
     os.remove(tmp.name)
 
 def send_compile(env=None, **kwargs):
-    with tempfile.NamedTemporaryFile(delete=False) as tmp: subprocess.run(['./src/compile.sh'], stderr=sys.stdout, stdout=tmp, env=env, check=True)
-    os.chmod(tmp.name, 0o755)
-    scp_file(tmp.name, '/media/fat/downloader_bin', **kwargs)
-    os.remove(tmp.name)
+    subprocess.run(['./src/compile.sh', 'downloader_bin'], check=True, env=env)
+    os.chmod('downloader_bin', 0o755)
+    scp_file('downloader_bin', '/media/fat/downloader_bin', **kwargs)
 
 def operations_dict(env=None, retries=False):
     return {

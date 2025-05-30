@@ -6,11 +6,19 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
+
   build:
     runs-on: ubuntu-latest
 
     steps:
+    - run: echo "owner_lc=$(echo "${GITHUB_REPOSITORY_OWNER,,}")" >> "$GITHUB_OUTPUT"
+      id: vars
+
     - uses: actions/setup-python@v2
       with:
         python-version: '3.9'
@@ -26,16 +34,68 @@ jobs:
     - name: System Quick Tests
       run: cd src && python3 -m unittest discover -s test/system/quick
 
-    - name: System Slow Tests
-      run: cd src && python3 -m unittest discover -s test/system/slow
-
     - name: Build
+      id: build
       run: |
         set -euo pipefail
+        IFS=$'\n\t'
+
         SKIP_COMMIT=true ./src/build.sh | sha256sum > latest.id
         ZIP_FILE="$(pwd)/dont_download.zip" ./src/build.sh > dont_download.sh
 
+        git fetch origin main
+
+        if ! git diff --exit-code \
+                     --unified=0 \
+                     --ignore-matching-lines='export COMMIT' \
+                     origin/main -- latest.id
+        then
+          echo "New build detected." >> $GITHUB_STEP_SUMMARY
+          echo "NEW_RELEASE=yes" >> "$GITHUB_OUTPUT"
+        else
+          echo "Skipping build, no changes detected." >> $GITHUB_STEP_SUMMARY
+          echo "NEW_RELEASE=no" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: System Slow Tests
+      if: steps.build.outputs.NEW_RELEASE == 'yes'
+      run: cd src && python3 -m unittest discover -s test/system/slow
+
+    - uses: docker/setup-qemu-action@v2
+      if: steps.build.outputs.NEW_RELEASE == 'yes'
+      with:
+        platforms: arm/v7
+
+    - uses: docker/setup-buildx-action@v2
+      if: steps.build.outputs.NEW_RELEASE == 'yes'
+
+    - uses: docker/login-action@v2
+      if: steps.build.outputs.NEW_RELEASE == 'yes'
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Nuitka
+      if: steps.build.outputs.NEW_RELEASE == 'yes'
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        file: src/Dockerfile.nuitka
+        platforms: linux/arm/v7
+        push: true
+        tags: ghcr.io/${{ steps.vars.outputs.owner_lc }}/arm32v7-nuitka:latest
+        cache-from: type=registry,ref=ghcr.io/${{ steps.vars.outputs.owner_lc }}/arm32v7-nuitka:cache
+        cache-to: type=registry,ref=ghcr.io/${{ steps.vars.outputs.owner_lc }}/arm32v7-nuitka:cache,mode=max
+
+    - name: Compile
+      if: steps.build.outputs.NEW_RELEASE == 'yes'
+      run: ./src/compile.sh downloader_bin
+      env:
+        NUITKA_IMAGE: ghcr.io/${{ steps.vars.outputs.owner_lc }}/arm32v7-nuitka:latest
+
     - name: Release
+      if: steps.build.outputs.NEW_RELEASE == 'yes'
       id: release
       run: |
         git config --global user.email "theypsilon@gmail.com"
