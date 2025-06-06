@@ -23,17 +23,13 @@ class SafeFetchInfo(TypedDict):
     hash: str
     size: int
 
-# Default SSL option
-
-DEFAULT_CACERT_FILE: Final[str] = '/etc/ssl/certs/cacert.pem'
-DEFAULT_CURL_SSL_OPTIONS: Final[str] = '--cacert %s' % DEFAULT_CACERT_FILE
-DEFAULT_UPDATE_LINUX_ENV: Final[str] = 'undefined'
-DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB: Final[int] = 512
-DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB: Final[int] = 128
-
 # Pre-selected database
 DISTRIBUTION_MISTER_DB_URL: Final[str] = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'
 DISTRIBUTION_MISTER_DB_ID: Final[str] = 'distribution_mister'
+
+# Reboot wait times
+REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE: Final[int] = 30
+REBOOT_WAIT_TIME_STANDARD: Final[int] = 5
 
 # File System affixes
 SUFFIX_file_in_progress: Final[str] = '._downloader_in_progress'
@@ -93,9 +89,10 @@ FILE_Linux_user_files: Final[list[tuple[str, str]]] = [
     ('/media/fat/linux/fstab', '/etc/fstab'),
 ]
 
-# Reboot files
+# Signal files
 FILE_downloader_needs_reboot_after_linux_update: Final[str] = '/tmp/downloader_needs_reboot_after_linux_update'
 FILE_mister_downloader_needs_reboot: Final[str] = '/tmp/MiSTer_downloader_needs_reboot'
+FILE_downloader_run_signal: Final[str] = '/tmp/downloader_run_signal'
 
 # Hash exceptional cases
 HASH_file_does_not_exist: Final[str] = 'file_does_not_exist'
@@ -128,12 +125,9 @@ STORAGE_PATHS_PRIORITY_SEQUENCE: Final[list[str]] = [
 ]
 
 # Filters
-
 ESSENTIAL_TERM: Final[str] = 'essential'
 
-# Dictionary Keys:
-
-# Config
+# Config Dictionary Keys
 K_BASE_PATH: Final[str] = 'base_path'
 K_BASE_SYSTEM_PATH: Final[str] = 'base_system_path'
 K_STORAGE_PRIORITY: Final[str] = 'storage_priority'
@@ -163,7 +157,14 @@ K_IS_PC_LAUNCHER: Final[str] = 'is_pc_launcher'
 K_MINIMUM_SYSTEM_FREE_SPACE_MB: Final[str] = 'minimum_system_free_space_mb'
 K_MINIMUM_EXTERNAL_FREE_SPACE_MB: Final[str] = 'minimum_external_free_space_mb'
 
-# Env
+# Default Config option
+DEFAULT_CACERT_FILE: Final[str] = '/etc/ssl/certs/cacert.pem'
+DEFAULT_CURL_SSL_OPTIONS: Final[str] = '--cacert %s' % DEFAULT_CACERT_FILE
+DEFAULT_UPDATE_LINUX_ENV: Final[str] = 'undefined'
+DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB: Final[int] = 512
+DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB: Final[int] = 128
+
+# Env Dictionary Keys
 KENV_DOWNLOADER_LAUNCHER_PATH: Final[str] = 'DOWNLOADER_LAUNCHER_PATH'
 KENV_DOWNLOADER_INI_PATH: Final[str] = 'DOWNLOADER_INI_PATH'
 KENV_CURL_SSL: Final[str] = 'CURL_SSL'

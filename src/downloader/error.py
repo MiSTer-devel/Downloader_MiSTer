@@ -15,10 +15,5 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-from enum import Enum, auto
 
-
-class FailPolicy(Enum):
-    FAIL_FAST = auto()
-    FAULT_TOLERANT = auto()
-    FAULT_TOLERANT_ON_CUSTOM_DOWNLOADER_ERRORS = auto()
+class DownloaderError(Exception): pass

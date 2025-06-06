@@ -17,14 +17,16 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from pathlib import Path
+from typing import Optional
 
 from downloader.config import default_config
 from downloader.full_run_service import FullRunService as ProductionFullRunService
 from downloader.fail_policy import FailPolicy
+from downloader.job_system import JobFailPolicy
 from test.fake_os_utils import SpyOsUtils
 from test.fake_waiter import NoWaiter
 from test.fake_external_drives_repository import ExternalDrivesRepository
-from test.fake_importer_implicit_inputs import FileSystemState
+from test.fake_importer_implicit_inputs import FileSystemState, NetworkState
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_linux_updater import LinuxUpdater
@@ -45,27 +47,32 @@ class FullRunService(ProductionFullRunService):
             os_utils=None,
             certificates_fix=None,
             external_drives_repository=None,
+            local_repository=None,
             start_on_db_processing: bool = False,
-            fail_policy: FailPolicy = FailPolicy.FAULT_TOLERANT
+            network_state: Optional[NetworkState] = None,
+            fail_policy: FailPolicy = FailPolicy.FAULT_TOLERANT_ON_CUSTOM_DOWNLOADER_ERRORS,
+            job_fail_policy: JobFailPolicy = None,
     ):
 
         config = config or default_config()
         file_system_factory = FileSystemFactory(config=config) if file_system_factory is None else file_system_factory
         system_file_system = file_system_factory.create_for_system_scope()
-        linux_updater = linux_updater or LinuxUpdater(file_system=system_file_system)
+        linux_updater = linux_updater or LinuxUpdater(network_state=network_state, file_system=system_file_system)
+        local_repository = local_repository or LocalRepository(config=config, file_system=system_file_system)
         super().__init__(config,
                          NoLogger(),
                          NoLogger(),
                          NoLogger(),
-                         LocalRepository(config=config, file_system=system_file_system),
-                         OnlineImporter(file_system_factory=file_system_factory, start_on_db_processing=start_on_db_processing, fail_policy=fail_policy),
+                         local_repository,
+                         OnlineImporter(job_fail_policy=job_fail_policy, network_state=network_state, file_system_factory=file_system_factory, start_on_db_processing=start_on_db_processing, fail_policy=fail_policy, local_repository=local_repository),
                          linux_updater,
                          RebootCalculator(file_system=system_file_system),
                          BasePathRelocator(),
                          certificates_fix or CertificatesFix(file_system_factory=file_system_factory),
                          external_drives_repository or ExternalDrivesRepository(file_system=system_file_system),
                          os_utils or SpyOsUtils(),
-                         NoWaiter()
+                         NoWaiter(),
+                         system_file_system
                 )
 
     @staticmethod
@@ -94,15 +101,18 @@ class FullRunService(ProductionFullRunService):
         )
 
     @staticmethod
-    def with_single_db(db_id, db_descr, linux_updater=None, update_linux=None, os_utils=None, certificates_fix=None, file_system_factory=None) -> ProductionFullRunService:
+    def with_single_db(db_id, db_descr, linux_updater=None, job_fail_policy=None, local_repository=None, update_linux=None, os_utils=None, certificates_fix=None, file_system_factory=None, fs_state: Optional[FileSystemState] = None, network_state: Optional[NetworkState] = None) -> ProductionFullRunService:
         config = FullRunService.single_db_config(db_id, update_linux)
-        file_system_factory = file_system_factory or FileSystemFactory(config=config, state=FileSystemState(config=config, files={db_id: {'unzipped_json': db_descr}}))
+        file_system_factory = file_system_factory or FileSystemFactory(config=config, state=fs_state or FileSystemState(config=config, files={db_id: {'unzipped_json': db_descr}}))
         return FullRunService(
             config=config,
             linux_updater=linux_updater,
             os_utils=os_utils,
+            job_fail_policy=job_fail_policy,
+            local_repository=local_repository,
             certificates_fix=certificates_fix,
             file_system_factory=file_system_factory,
+            network_state=network_state or NetworkState(remote_files={'https://' + db_id: {'unzipped_json': db_descr}}),
         )
 
     @staticmethod
@@ -112,7 +122,7 @@ class FullRunService(ProductionFullRunService):
         config.update({
                 'databases': {
                     db_id: {
-                        'db_url': db_id,
+                        'db_url': 'https://' + db_id,
                         'section': db_id
                     }
                 },
@@ -126,10 +136,10 @@ class FullRunService(ProductionFullRunService):
         return config
 
     @staticmethod
-    def with_no_dbs() -> ProductionFullRunService:
+    def with_no_dbs(file_system_factory=None) -> ProductionFullRunService:
         config = default_config()
         config.update({
             'databases': {}, 'verbose': False, 'config_path': Path(''), 'user_defined_options': [],
             'commit': 'test', 'fail_on_file_error': True
         })
-        return FullRunService(config)
+        return FullRunService(file_system_factory=file_system_factory, config=config)

@@ -18,6 +18,8 @@
 
 from typing import Set, TypedDict, Any, Optional
 
+from downloader.error import DownloaderError
+
 
 class DbOptionsProps(TypedDict, total=False):
     filter: str
@@ -60,7 +62,7 @@ class DbOptions:
         return self._props
 
 
-class DbOptionsValidationException(Exception):
+class DbOptionsValidationException(DownloaderError):
     def __init__(self, fields: list[str]) -> None:
         self.fields = fields
 

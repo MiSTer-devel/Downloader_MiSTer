@@ -55,7 +55,7 @@ class SandboxTestBase(unittest.TestCase):
 
         transform_windows_paths_from_expected(expected)
 
-        config = ConfigReader(NoLogger(), debug_env(), time.time()).read_config(ini_path)
+        config = ConfigReader(NoLogger(), debug_env(), time.monotonic()).read_config(ini_path)
         self.file_system = make_production_filesystem_factory(config).create_for_system_scope()
         counter = 0
         if 'local_store' in expected:
@@ -128,7 +128,7 @@ class SandboxTestBase(unittest.TestCase):
         env['CURL_SSL'] = ''
         env['DEFAULT_BASE_PATH'] = tmp_default_base_path
 
-        config_reader = ConfigReader(logger, env, time.time())
+        config_reader = ConfigReader(logger, env, time.monotonic())
         factory = FullRunServiceFactory(logger, NoLogger(), log_mgr, external_drives_repository_factory=external_drives_repository_factory)
         return execute_full_run(factory, config_reader, argv or [])
 
@@ -180,7 +180,7 @@ def fix_relative_files(files):
 def cleanup(ini_path):
     env = debug_env()
     env['DEFAULT_BASE_PATH'] = tmp_default_base_path
-    config = ConfigReader(NoLogger(), env, time.time()).read_config(ini_path)
+    config = ConfigReader(NoLogger(), env, time.monotonic()).read_config(ini_path)
     delete_folder(config['base_path'])
     delete_folder(config['base_system_path'])
     create_folder(config['base_path'])

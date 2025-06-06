@@ -18,6 +18,7 @@
 
 from downloader.constants import K_BASE_PATH, DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, \
     DB_STATE_SIGNATURE_NO_TIMESTAMP, DB_STATE_SIGNATURE_NO_FILTER
+from downloader.error import DownloaderError
 from downloader.jobs.index import Index
 from downloader.other import empty_store_without_base_path
 from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict, cast
@@ -82,8 +83,8 @@ class LocalStoreWrapper:
         return self._dirty
 
 
-class LocalStoreValidationException(Exception): pass
-class ReadOnlyStoreException(Exception): pass
+class LocalStoreValidationException(DownloaderError): pass
+class ReadOnlyStoreException(DownloaderError): pass
 
 
 class StoreWrapper:

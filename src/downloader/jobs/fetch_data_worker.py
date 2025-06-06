@@ -17,10 +17,14 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import io
+import socket
+from http.client import HTTPException
+from urllib.error import URLError
+
 from downloader.job_system import WorkerResult
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
-from downloader.jobs.errors import FileDownloadError
+from downloader.jobs.errors import FileDownloadError, FileValidationError
 from typing import Optional, Any
 
 
@@ -35,6 +39,7 @@ class FetchDataWorker(DownloaderWorker):
     def operate_on(self, job: FetchDataJob) -> WorkerResult:  # type: ignore[override]
         job.data, error = self._fetch_data(job.source, job.description.get('hash', None), job.description.get('size', None), job.calcs)
         if error is not None:
+            self._ctx.swallow_error(error)
             return [], error
 
         return [] if job.after_job is None else [job.after_job], None
@@ -50,16 +55,19 @@ class FetchDataWorker(DownloaderWorker):
                 calc_size = buf.getbuffer().nbytes
 
                 if valid_hash is not None and calc_hash != valid_hash:
-                    raise FileDownloadError(f'Bad hash on {final_url} ({valid_hash} != {calc_hash})')
+                    raise FileValidationError(f'Bad hash on {final_url} ({valid_hash} != {calc_hash})')
                 if valid_size is not None:
                     if calc_size != valid_size:
-                        raise FileDownloadError(f'Bad size on {final_url} ({valid_size} != {calc_size})')
+                        raise FileValidationError(f'Bad size on {final_url} ({valid_size} != {calc_size})')
                 if calcs is not None:
                     calcs['hash'] = calc_hash
                     calcs['size'] = calc_size
 
                 return buf, None
 
-        except Exception as e:
-            self._ctx.swallow_error(e)
-            return None, e
+        except socket.gaierror as e: return None, FileDownloadError(f'Socket Address Error! {url}: {str(e)}', e)
+        except URLError as e: return None, FileDownloadError(f'URL Error! {url}: {e.reason}', e)
+        except HTTPException as e: return None, FileDownloadError(f'HTTP Error! {url}: {str(e)}', e)
+        except ConnectionResetError as e: return None, FileDownloadError(f'Connection reset error! {url}: {str(e)}', e)
+        except OSError as e: return None, FileDownloadError(f'OS Error! {url}: {e.errno} {str(e)}', e)
+        except Exception as e: return None, e

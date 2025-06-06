@@ -70,9 +70,9 @@ def main() -> None:
                 )
                 job_system.push_job(fetch)
 
-        start = time.time()
+        start = time.monotonic()
         job_system.execute_jobs()
-        end = time.time()
+        end = time.monotonic()
 
     print()
     print('Completed jobs: ')

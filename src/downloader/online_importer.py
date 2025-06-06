@@ -25,9 +25,11 @@ from downloader.config import Config
 from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY, MEDIA_FAT
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
+from downloader.error import DownloaderError
 from downloader.job_system import Job, Worker
+from downloader.jobs.abort_worker import AbortJob
 from downloader.jobs.copy_data_job import CopyDataJob
-from downloader.jobs.errors import WrongDatabaseOptions
+from downloader.jobs.errors import WrongDatabaseOptions, FileDownloadError
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.jobs_factory import make_transfer_job
@@ -58,6 +60,7 @@ class OnlineImporter:
         self._local_store: Optional[LocalStoreWrapper] = None
         self._needs_reboot = False
         self._needs_save = False
+        self._first_time = True
 
     def _make_workers(self) -> dict[int, Worker]:
         return {w.job_type_id(): w for w in make_workers(self._worker_ctx)}
@@ -74,7 +77,7 @@ class OnlineImporter:
                 load_local_store_job=load_local_store_job,
             )
             jobs.append(transfer_job)  # type: ignore[arg-type]
-        jobs.append(load_local_store_job)
+        jobs.insert(int(len(jobs) / 2) + 1, load_local_store_job)
         return jobs
 
     def download_dbs_contents(self, db_pkgs: list[DbSectionPackage]) -> Optional[BaseException]:
@@ -87,21 +90,33 @@ class OnlineImporter:
         file_mister_present = self._worker_ctx.file_system.is_file(os.path.join(MEDIA_FAT, FILE_MiSTer), use_cache=False)
 
         logger.bench('OnlineImporter execute jobs start.')
+        self._job_system.pending_jobs_amount()
         self._job_system.execute_jobs()
         self._worker_ctx.file_download_session_logger.print_pending()
         logger.bench('OnlineImporter execute jobs done.')
+
+        if self._first_time:
+            self._first_time = False
+        else:
+            # @TODO: Maybe use a factory to avoid resetting state
+            self._box = InstallationBox()
+            self._worker_ctx.installation_report.reset()
 
         box = self._box
         report: InstallationReport = self._worker_ctx.installation_report
 
         box.set_unused_filter_tags(self._worker_ctx.file_filter_factory.unused_filter_parts())
 
-        for load_local_store_job in report.get_completed_jobs(LoadLocalStoreJob):
-            self._local_store = load_local_store_job.local_store
-
         local_store_err: Optional[BaseException] = None
-        for load_local_store_job, e in report.get_failed_jobs(LoadLocalStoreJob):
-            local_store_err = e
+        load_local_store_jobs = report.get_completed_jobs(LoadLocalStoreJob)
+        if len(load_local_store_jobs) >= 1:
+            self._local_store = load_local_store_jobs[0].local_store
+        elif self._local_store is None:
+            load_local_store_job_errors = report.get_failed_jobs(LoadLocalStoreJob)
+            if len(load_local_store_job_errors) > 0:
+                local_store_err = load_local_store_job_errors[0][1]
+            else:
+                local_store_err = DownloaderError('Local Store was not loaded.')
 
         for open_db_job, _e in report.get_failed_jobs(OpenDbJob):
             box.add_failed_db(open_db_job.section)
@@ -209,7 +224,16 @@ class OnlineImporter:
             self._logger.print('Your system won\'nt be able to boot until you do so!')
             sys.exit(EXIT_ERROR_BAD_NEW_BINARY)
 
-        for transfer_job, _e in report.get_failed_jobs(FetchDataJob) + report.get_failed_jobs(CopyDataJob):
+        db_fetch_success = 0
+        for fetch_data_job in report.get_completed_jobs(FetchDataJob):
+            if isinstance(fetch_data_job.after_job, OpenDbJob):
+                db_fetch_success += 1
+
+        db_fetch_errors = 0
+        for transfer_job, e in report.get_failed_jobs(FetchDataJob) + report.get_failed_jobs(CopyDataJob):
+            if isinstance(transfer_job, FetchDataJob) and isinstance(e, FileDownloadError) and isinstance(transfer_job.after_job, OpenDbJob):
+                db_fetch_errors += 1
+
             box.add_failed_file(transfer_job.source)  # @TODO: This should not count as a file, but as a "source".
             if transfer_job.db_id is None:
                 continue
@@ -220,6 +244,11 @@ class OnlineImporter:
             box.add_failed_db(transfer_job.db_id)
 
         logger.bench('OnlineImporter applying changes on stores...')
+
+        network_problems = db_fetch_success == 0 and db_fetch_errors > 0
+        if network_problems:
+            logger.bench('OnlineImporter could not progress with network problems.')
+            return NetworkProblems(f'Network problems detected. db_fetch_success == {db_fetch_success} and db_fetch_errors == {db_fetch_errors}')
 
         if self._local_store is None:
             logger.bench('OnlineImporter could not progress without loaded store.')
@@ -597,4 +626,6 @@ class InstallationBox:
         result = sorted([(x[0], x[1]) for x in self._directory_removals.values()], key=lambda x: len(x[0].rel_path))
         self._directory_removals.clear()
         return result
-    
+
+
+class NetworkProblems(DownloaderError): pass

@@ -129,7 +129,8 @@ class FullRunServiceFactory:
             CertificatesFix(config, system_file_system, waiter, self._logger),
             external_drives_repository,
             LinuxOsUtils(),
-            waiter
+            waiter,
+            system_file_system,
         )
         instance.configure_components()
         return instance

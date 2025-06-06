@@ -26,13 +26,15 @@ from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config
 from downloader.constants import EXIT_ERROR_NO_CERTS, EXIT_ERROR_STORE_NOT_SAVED, EXIT_ERROR_FAILED_FILES, \
-    EXIT_ERROR_FAILED_DBS, EXIT_ERROR_STORE_NOT_LOADED
+    EXIT_ERROR_FAILED_DBS, EXIT_ERROR_STORE_NOT_LOADED, FILE_downloader_run_signal, REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE, \
+    REBOOT_WAIT_TIME_STANDARD
 from downloader.db_utils import DbSectionPackage, sorted_db_sections
 from downloader.external_drives_repository import ExternalDrivesRepository
+from downloader.file_system import FileSystem
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository
 from downloader.logger import FilelogManager, Logger, ConfigLogManager
-from downloader.online_importer import OnlineImporter, InstallationBox
+from downloader.online_importer import OnlineImporter, InstallationBox, NetworkProblems
 from downloader.os_utils import OsUtils
 from downloader.other import format_files_message, format_folders_message, format_zips_message
 from downloader.reboot_calculator import RebootCalculator
@@ -40,7 +42,7 @@ from downloader.waiter import Waiter
 
 
 class FullRunService:
-    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, local_repository: LocalRepository, online_importer: OnlineImporter, linux_updater: LinuxUpdater, reboot_calculator: RebootCalculator, base_path_relocator: BasePathRelocator, certificates_fix: CertificatesFix, external_drives_repository: ExternalDrivesRepository, os_utils: OsUtils, waiter: Waiter) -> None:
+    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, local_repository: LocalRepository, online_importer: OnlineImporter, linux_updater: LinuxUpdater, reboot_calculator: RebootCalculator, base_path_relocator: BasePathRelocator, certificates_fix: CertificatesFix, external_drives_repository: ExternalDrivesRepository, os_utils: OsUtils, waiter: Waiter, file_system: FileSystem) -> None:
         self._waiter = waiter
         self._os_utils = os_utils
         self._external_drives_repository = external_drives_repository
@@ -54,6 +56,7 @@ class FullRunService:
         self._filelog_manager = filelog_manager
         self._printlog_manager = printlog_manager
         self._config = config
+        self._file_system = file_system
 
     def configure_components(self) -> None:
         self._printlog_manager.configure(self._config)
@@ -69,28 +72,32 @@ class FullRunService:
             self._logger.print(drive)
 
         self._logger.bench('Print Drives done.')
+        self._remove_run_signal()
+
         return 0
 
     def full_run(self):
         self._logger.bench('Full Run start.')
         result = self._full_run_impl()
         self._logger.bench('Full Run done.')
+        self._remove_run_signal()
 
         if not self._config['is_pc_launcher'] and self._needs_reboot():
             self._logger.print()
             if self._linux_updater.needs_reboot():
-                self._logger.print("Rebooting in 30 seconds. Please do not turn off your device!")
+                self._logger.print(f"Rebooting in {REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE} seconds. Please do not turn off your device!")
             else:
-                self._logger.print("Rebooting in 3 seconds...")
+                self._logger.print(f"Rebooting in {REBOOT_WAIT_TIME_STANDARD} seconds...")
             sys.stdout.flush()
             self._filelog_manager.finalize()
             sys.stdout.flush()
             self._os_utils.sync()
-            self._waiter.sleep(3)
             if self._linux_updater.needs_reboot():
                 self._waiter.sleep(1)
                 self._os_utils.sync()
-                self._waiter.sleep(30)
+                self._waiter.sleep(REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE - 1)
+            else:
+                self._waiter.sleep(REBOOT_WAIT_TIME_STANDARD)
             self._os_utils.reboot()
 
         return result
@@ -102,21 +109,25 @@ class FullRunService:
 
         self._local_repository.ensure_base_paths()
 
-        if not self._check_certificates():
-            self._logger.print("ERROR: Couldn't load certificates.")
-            self._logger.print()
-            self._logger.print("Please, reboot your system and try again.")
-            self._waiter.sleep(50)
-            return EXIT_ERROR_NO_CERTS
-
         db_pkgs = [DbSectionPackage(db_id, section) for db_id, section in sorted_db_sections(self._config)]
         #db_pkgs = [db_pkg for db_pkg in db_pkgs  if db_pkg.db_id == 'distribution_mister']
 
-        load_err = self._online_importer.download_dbs_contents(db_pkgs)
-        if load_err is not None:
-            self._logger.print('ERROR! Store could not be saved because of a File System Error!')
-            self._logger.debug(load_err)
-            return EXIT_ERROR_STORE_NOT_LOADED
+        download_dbs_err = self._online_importer.download_dbs_contents(db_pkgs)
+        if download_dbs_err is not None:
+            self._logger.debug(download_dbs_err)
+            if isinstance(download_dbs_err, NetworkProblems):
+                if not self._check_certificates():
+                    self._logger.print("ERROR: Couldn't load certificates.")
+                    self._logger.print()
+                    self._logger.print("Please, reboot your system and try again.")
+                    self._waiter.sleep(50)
+                    return EXIT_ERROR_NO_CERTS
+
+                download_dbs_err = self._online_importer.download_dbs_contents(db_pkgs)
+
+            if download_dbs_err is not None:
+                self._logger.print('ERROR! Store could not be saved because of a File System Error!')
+                return EXIT_ERROR_STORE_NOT_LOADED
 
         save_err = self._online_importer.save_local_store()
 
@@ -159,11 +170,11 @@ class FullRunService:
         return False
 
     def _display_summary(self, box: InstallationBox, start_time) -> None:
-        run_time = str(datetime.timedelta(seconds=time.time() - start_time))[0:-4]
+        run_time = str(datetime.timedelta(seconds=time.monotonic() - start_time))[0:-4]
 
         self._logger.print()
         self._logger.print('===========================')
-        self._logger.print(f'Downloader 2.1 ({self._config["commit"][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        self._logger.print(f'Downloader 2.2 ({self._config["commit"][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
         self._logger.debug('Commit: %s', self._config["commit"])
         self._logger.print(f'Log: {self._local_repository.logfile_path}')
         if len(box.unused_filter_tags()) > 0:
@@ -215,3 +226,7 @@ class FullRunService:
 
     def _needs_reboot(self):
         return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.needs_reboot())
+
+    def _remove_run_signal(self) -> None:
+        if self._file_system.is_file(FILE_downloader_run_signal):
+            self._file_system.unlink(FILE_downloader_run_signal)

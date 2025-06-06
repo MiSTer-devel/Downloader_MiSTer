@@ -5,14 +5,16 @@ set -euo pipefail
 
 echo "Building Dockerfile.downloader_bin into ${1}..."
 
+TARGET_FILE="$(pwd)/${1}"
+
 cd src
 
 echo "default_commit = '$(git rev-parse --short HEAD)'" > "commit.py"
 
 if [[ "${NUITKA_IMAGE:-}" == "" ]] ; then
-  docker buildx build --platform=linux/arm/v7 --load -t arm32v7-nuitka -f src/Dockerfile.nuitka  .
+  docker buildx build --platform=linux/arm/v7 --load -t arm32v7-nuitka -f Dockerfile.nuitka  .
 fi
 docker buildx build --build-arg BASE_IMAGE="${NUITKA_IMAGE:-arm32v7-nuitka}" --platform=linux/arm/v7 --load -t downloader_bin_builder -f Dockerfile.downloader_bin . > /dev/null
-docker create --name downloader_bin_container downloader_bin_builder
-docker cp downloader_bin_container:/app/__main__.bin "${1}"
+docker create --platform=linux/arm/v7 --name downloader_bin_container downloader_bin_builder
+docker cp downloader_bin_container:/app/__main__.bin "${TARGET_FILE}"
 docker rm downloader_bin_container

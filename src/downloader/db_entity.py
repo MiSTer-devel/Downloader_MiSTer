@@ -25,6 +25,7 @@ from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FI
     FILE_glow, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, DISTRIBUTION_MISTER_DB_ID, FILE_gamecontrollerdb_user, \
     FILE_yc_txt
 from downloader.db_options import DbOptions
+from downloader.error import DownloaderError
 from downloader.path_package import PathPackage
 
 
@@ -223,4 +224,4 @@ folders_with_non_overridable_files: Final[tuple[str, ...]] = tuple(item.lower() 
 exceptional_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, FILE_gamecontrollerdb_user, FILE_yc_txt])
 distribution_mister_exceptional_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow])
 
-class DbEntityValidationException(Exception): pass
+class DbEntityValidationException(DownloaderError): pass

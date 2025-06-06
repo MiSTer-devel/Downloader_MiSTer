@@ -1,5 +1,5 @@
 # Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
-from downloader.constants import SafeFetchInfo
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -16,12 +16,13 @@ from downloader.constants import SafeFetchInfo
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from downloader.constants import SafeFetchInfo
 from downloader.file_system import FileSystem
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.worker_context import DownloaderWorker
-from downloader.jobs.errors import FileDownloadError
+from downloader.jobs.errors import FileDownloadError, FileValidationError
 import socket
 from urllib.error import URLError
 from http.client import HTTPException
@@ -58,7 +59,7 @@ class FetchFileWorker(DownloaderWorker):
         try:
             if file_hash != desc['hash']:
                 self._file_system.unlink(file_path, verbose=False)
-                return [], FileDownloadError(f"Bad hash on {job.pkg.rel_path} ({desc['hash']} != {file_hash})")
+                return [], FileValidationError(f"Bad hash on {job.pkg.rel_path} ({desc['hash']} != {file_hash})")
 
             if file_path != target_path:
                 if backup_path is not None and self._file_system.is_file(target_path, use_cache=False):  # @TODO: See if use_cache is needed
@@ -85,18 +86,12 @@ class FileFetcher:
 
                 file_size, file_hash = self._file_system.write_incoming_stream(in_stream, download_path, self._timeout)
 
-        except socket.gaierror as e:
-            return 0, '', FileDownloadError(f'Socket Address Error! {url}: {str(e)}', e)
-        except URLError as e:
-            return 0, '', FileDownloadError(f'URL Error! {url}: {e.reason}', e)
-        except HTTPException as e:
-            return 0, '', FileDownloadError(f'HTTP Error! {url}: {str(e)}', e)
-        except ConnectionResetError as e:
-            return 0, '', FileDownloadError(f'Connection reset error! {url}: {str(e)}', e)
-        except OSError as e:
-            return 0, '', FileDownloadError(f'OS Error! {url}: {e.errno} {str(e)}', e)
-        except BaseException as e:
-            return 0, '', FileDownloadError(f'Exception during download! {url}: {str(e)}')
+        except socket.gaierror as e: return 0, '', FileDownloadError(f'Socket Address Error! {url}: {str(e)}', e)
+        except URLError as e: return 0, '', FileDownloadError(f'URL Error! {url}: {e.reason}', e)
+        except HTTPException as e: return 0, '', FileDownloadError(f'HTTP Error! {url}: {str(e)}', e)
+        except ConnectionResetError as e: return 0, '', FileDownloadError(f'Connection reset error! {url}: {str(e)}', e)
+        except OSError as e: return 0, '', FileDownloadError(f'OS Error! {url}: {e.errno} {str(e)}', e)
+        except BaseException as e: return 0, '', FileDownloadError(f'Exception during download! {url}: {str(e)}')
 
         if not self._file_system.is_file(download_path, use_cache=False):
             return 0, '', FileDownloadError(f'File from {url} could not be stored.')
@@ -116,17 +111,17 @@ class SafeFileFetcher:
         self._waiter = waiter
         self._fetcher = FileFetcher(http_gateway, file_system, config['downloader_timeout'])
 
-    def fetch_file(self, description: SafeFetchInfo, path: str) -> Optional[FileDownloadError]:
+    def fetch_file(self, description: SafeFetchInfo, path: str) -> Optional[Exception]:
         i = self._retries
         while True:
             file_size, file_hash, error = self._fetcher.fetch_file(description['url'], path)
             if error is None:
                 if file_hash != description['hash']:
-                    error = FileDownloadError(f'Hash mismatch! {description["url"]}: calculated hash {file_hash} != {description["hash"]}')
+                    error = FileValidationError(f'Hash mismatch! {description["url"]}: calculated hash {file_hash} != {description["hash"]}')
 
             if error is None:
                 if file_size != description['size']:
-                    error = FileDownloadError(f'Size mismatch! {description["url"]}: calculated size {file_size} != {description["size"]}')
+                    error = FileValidationError(f'Size mismatch! {description["url"]}: calculated size {file_size} != {description["size"]}')
 
             i -= 1
             if error is None or i <= 0:

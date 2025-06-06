@@ -290,7 +290,7 @@ class FakeFileSystem(ProductionFileSystem):
         if in_stream.storing_problems:
             raise FsError('Storing Problems')
 
-        return in_stream.buf, in_stream.description['hash'] if calc_md5 else ''
+        return in_stream.buf, in_stream.description.get('hash', 'no_hash') if calc_md5 else ''
 
     def unlink(self, path, verbose=True):
         full_path = self._path(path)

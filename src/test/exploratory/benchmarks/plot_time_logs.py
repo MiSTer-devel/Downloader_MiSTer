@@ -70,8 +70,8 @@ def plot_data(ax, data, color, label, outliers, y_max, y_min):
 
 def main(log_path):
     data = {
-        'improved': {'label': 'Downloader 2.1', 'short_label': 'v2.1'},
-        'baseline': {'label': 'Downloader 2.0', 'short_label': 'v2.0'}
+        'improved': {'label': 'Downloader 2.2', 'short_label': 'v2.2'},
+        'baseline': {'label': 'Downloader 2.1', 'short_label': 'v2.1'}
     }
     times = dict(zip(data, parse_times(log_path)))
     indices = np.arange(len(times['improved']))
@@ -97,7 +97,7 @@ def main(log_path):
 
     for d in data.values():
         d['regression'] = np.polyval(np.polyfit(indices, d['arr'], 1), indices)
-        mask = np.abs(d['arr'] - np.median(d['arr'])) <= 4 * iqr(d['arr'])
+        mask = np.abs(d['arr'] - np.median(d['arr'])) <= 8 * iqr(d['arr'])
         d['valid'], d['outliers'] = d['arr'][mask], d['arr'][~mask]
         d['avg_valid'] = d['valid'].mean()
 
@@ -105,7 +105,9 @@ def main(log_path):
     raw_improvement = percent_faster(data['improved']['mean'], data['baseline']['mean'])
 
     print(f'Improvement: {improvement}%')
-    for d in data.values(): print(f'{d["label"]} Outliers:', d['outliers'])
+    for d in data.values():
+        print(f'{d["label"]} Outliers:', d['outliers'])
+        print(f'{d["label"]} Mean without Outliers: {(d["valid"]).mean()}')
     print(f'Improvement with outliers: {raw_improvement}%')
 
     y_max = max(max(data[k]['valid']) for k in data)
