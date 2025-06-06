@@ -67,7 +67,7 @@ FILE_downloader_external_storage: Final[str] = '.downloader_db.json'
 FILE_downloader_last_successful_run: Final[str] = 'Scripts/.config/downloader/%s.last_successful_run'
 FILE_downloader_log: Final[str] = 'Scripts/.config/downloader/%s.log'
 FILE_downloader_ini: Final[str] = '/media/fat/downloader.ini'
-FILE_downloader_launcher_script: Final[str] = 'Scripts/downloader.sh'
+FILE_downloader_launcher_script: Final[str] = 'Scripts/update.sh'
 
 # Linux Update files
 FILE_MiSTer_version: Final[str] = '/MiSTer.version'

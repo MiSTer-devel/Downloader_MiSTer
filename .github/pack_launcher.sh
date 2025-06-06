@@ -8,5 +8,6 @@ if ! gh release list | grep -q "latest" ; then
     sleep 15s
 fi
 
-zip "MiSTer_Downloader.zip" downloader.sh
+cp downloader.sh update.sh
+zip "MiSTer_Downloader.zip" update.sh
 gh release upload "latest" "MiSTer_Downloader.zip" --clobber

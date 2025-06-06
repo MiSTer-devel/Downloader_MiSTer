@@ -4,9 +4,9 @@ This tool installs and **updates all the cores** and other extra files for your 
 
 ### Setup and Usage
 
-Download this [ZIP file](https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/MiSTer_Downloader.zip) and extract `downloader.sh` to your `/Scripts` folder on your primary SD card (create that folder if it doesn't exist). You only need to perform this operation once, since this tool self-updates itself.
+This tool is usually pre-installed in your MiSTer. If not, download this [ZIP file](https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/MiSTer_Downloader.zip) and extract `update.sh` to your `/Scripts` folder on your primary SD card (create that folder if it doesn't exist). You only need to perform this operation once, since this tool self-updates itself.
 
-To use it, on your MiSTer main menu, go to the *Scripts* screen, and select `downloader`.
+To use it, on your MiSTer main menu, go to the *Scripts* screen, and select `update`.
 
 ### Options
 
@@ -118,7 +118,7 @@ NOTE: If you manually add custom databases, you might want to make sure that you
 
 ### Custom INI file
 
-You can use a different INI file by renaming the launcher `downloader.sh` to your preferred name. After renaming the launcher, it will use an INI file with the same name but with the .ini extension. For instance, if you rename the launcher to `/media/fat/Scripts/my_custom_name.sh`, it will use the INI file `/media/fat/my_custom_name.ini` instead of `/media/fat/downloader.ini`.
+You can use a different INI file by renaming the launcher `update.sh` to your preferred name. After renaming the launcher, it will use an INI file with the same name but with the .ini extension. For instance, if you rename the launcher to `/media/fat/Scripts/my_custom_name.sh`, it will use the INI file `/media/fat/my_custom_name.ini` instead of `/media/fat/downloader.ini`.
 
 This flexibility allows for various use cases, such as running a specific database in isolation.
 
