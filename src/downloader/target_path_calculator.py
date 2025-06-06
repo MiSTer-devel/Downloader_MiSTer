@@ -23,6 +23,7 @@ from itertools import repeat
 from pathlib import Path
 
 from downloader.config import Config
+from downloader.error import DownloaderError
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
 from downloader.constants import K_STORAGE_PRIORITY, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, STORAGE_PRIORITY_PREFER_EXTERNAL
@@ -205,7 +206,7 @@ class TargetPathsCalculator:
         return result, () if others is None else others
 
 
-class StoragePriorityError(Exception): pass
+class StoragePriorityError(DownloaderError): pass
 
 class StoragePriorityRegistryEntry:
     def __init__(self) -> None:

@@ -69,7 +69,7 @@ class JobSystem(JobContext):
         self._fail_policy: JobFailPolicy = fail_policy
         self._job_queue: Deque[_JobPackage] = deque()
         self._unhandled_errors: List[BaseException] = []
-        self._notifications: queue.Queue[Tuple[_JobState, _JobPackage, Optional[_JobError]]] = queue.Queue()
+        self._notifications: queue.Queue[Tuple[_JobState, _JobPackage, Exception]] = queue.Queue()
         self._jobs_cancelled: List[Job] = []
         self._workers: Dict[int, Worker] = {}
         self._lock = threading.Lock()
@@ -222,7 +222,7 @@ class JobSystem(JobContext):
             if self._fail_policy == JobFailPolicy.FAIL_GRACEFULLY and self._unhandled_errors:
                 self._are_jobs_cancelled = True
 
-    def _operate_on_next_job(self, package: '_JobPackage', notifications: queue.Queue[Tuple['_JobState', '_JobPackage', Optional['_JobError']]]) -> None:
+    def _operate_on_next_job(self, package: '_JobPackage', notifications: queue.Queue[Tuple['_JobState', '_JobPackage', Optional[Exception]]]) -> None:
         if self._are_jobs_cancelled:
             notifications.put((_JobState.JOB_CANCELLED, package, None))
             return
@@ -233,7 +233,7 @@ class JobSystem(JobContext):
         jobs, error = worker.operate_on(job)
 
         if error is not None:
-            notifications.put((_JobState.NIL, package, _JobError(error)))
+            notifications.put((_JobState.NIL, package, error))
         else:
             package.next_jobs = jobs
             notifications.put((_JobState.JOB_COMPLETED, package, None))
@@ -571,12 +571,6 @@ class _JobPackage:
 
     # Consider removing __str__ at least in non-debug environments
     def __str__(self) -> str: return f'JobPackage(job_type_id={self.job.type_id}, job_class={self.job.__class__.__name__}, tries={self.tries})'
-
-class _JobError(Exception):
-    def __init__(self, child: Exception) -> None:
-        super().__init__(child)
-        self.child = child
-        self.__cause__ = child
 
 def _wrap_unknown_base_error(e: BaseException) -> Exception:
     if isinstance(e, Exception): return e

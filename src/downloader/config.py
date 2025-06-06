@@ -24,6 +24,7 @@ from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_DOWNLOADER_
     MEDIA_FAT, DISTRIBUTION_MISTER_DB_ID, K_DOWNLOADER_THREADS_LIMIT, STORAGE_PRIORITY_PREFER_SD, \
     DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB, DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB
 from downloader.db_options import DbOptions
+from downloader.error import DownloaderError
 
 
 class Environment(TypedDict):
@@ -145,6 +146,6 @@ def download_sensitive_configs() -> List[str]:
     return [K_BASE_PATH, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES]
 
 
-class InvalidConfigParameter(Exception):
+class InvalidConfigParameter(DownloaderError):
     pass
 

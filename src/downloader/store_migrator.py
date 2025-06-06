@@ -18,6 +18,7 @@
 
 from typing import Protocol, Any
 
+from downloader.error import DownloaderError
 from downloader.logger import Logger
 
 
@@ -58,7 +59,7 @@ def make_new_local_store(store_migrator) -> dict[str, Any]:
     }
 
 
-class WrongMigrationException(Exception):
+class WrongMigrationException(DownloaderError):
     pass
 
 

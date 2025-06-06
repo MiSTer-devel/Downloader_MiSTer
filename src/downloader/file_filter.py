@@ -24,6 +24,7 @@ from abc import ABC, abstractmethod
 from downloader.config import Config
 from downloader.constants import ESSENTIAL_TERM
 from downloader.db_entity import DbEntity
+from downloader.error import DownloaderError
 from downloader.jobs.index import Index
 from downloader.logger import Logger
 
@@ -234,7 +235,7 @@ class AlwaysFilters(FilterCalculator):
         return True
 
 
-class BadFileFilterPartException(Exception):
+class BadFileFilterPartException(DownloaderError):
     def __init__(self, part: str) -> None:
         super().__init__(f'Bad filter part: {part}')
         self.part: str = part

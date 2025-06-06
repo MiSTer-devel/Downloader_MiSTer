@@ -13,7 +13,7 @@ Typically, you would place it in the root of your MiSTer SD card, so that you ca
 
 ## Get the launcher
 
-Download this [ZIP file](https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/MiSTer_Downloader_PC_Launcher.zip) and extract the file `downloader_pc_launcher.py` to the location where you'll want to install all the files. For example, to the root folder of your MiSTer SD card.
+Download this [ZIP file](https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/MiSTer_Downloader_PC_Launcher.zip) and extract the file `downloader_pc_launcher.py` to the location where you plan to install all the files. For example, the root of your MiSTer SD card.
 
 ## How to run the launcher on Windows?
 

@@ -19,11 +19,14 @@
 
 from typing import Optional
 
+from downloader.error import DownloaderError
 
-class GetFileError(Exception):
+
+class GetFileError(DownloaderError):
     def __init__(self, message: str, cause: Optional[Exception] = None) -> None:
         super().__init__(message)
         self.__cause__ = cause
 class FileDownloadError(GetFileError): pass
+class FileValidationError(GetFileError): pass
 class FileCopyError(GetFileError): pass
-class WrongDatabaseOptions(Exception): pass
+class WrongDatabaseOptions(DownloaderError): pass

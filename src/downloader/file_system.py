@@ -30,6 +30,7 @@ from typing import Final, List, Optional, Set, Dict, Any, Tuple, Union
 
 from downloader.config import AllowDelete, Config
 from downloader.constants import HASH_file_does_not_exist
+from downloader.error import DownloaderError
 from downloader.logger import Logger, OffLogger
 from downloader.path_package import PathPackage
 
@@ -225,7 +226,7 @@ class ReadOnlyFileSystem:
 
 
 class UnlinkTemporaryException: pass
-class FsError(Exception): pass
+class FsError(DownloaderError): pass
 class FsOperationsError(FsError): pass
 class FolderCreationError(FsError): pass
 class FileCopyError(FsError): pass
@@ -408,12 +409,12 @@ class _FileSystem(FileSystem):
         return self._path(path)
 
     def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /) -> tuple[int, str]:
-        start_time = time.time()
+        start_time = time.monotonic()
         md5_hasher = hashlib.md5()
         file_size = 0
         with open(target_path, 'wb') as out_file:
             while True:
-                elapsed_time = time.time() - start_time
+                elapsed_time = time.monotonic() - start_time
                 if elapsed_time > timeout:
                     raise FsTimeoutError(f"Copy operation timed out after {timeout} seconds.")
 
@@ -582,7 +583,7 @@ class _FileSystem(FileSystem):
         return os.path.join(self._config['base_path'], path)
 
 
-class InvalidFileResolution(Exception):
+class InvalidFileResolution(DownloaderError):
     pass
 
 

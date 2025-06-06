@@ -22,6 +22,7 @@ from typing import Optional
 
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.config import Config
+from downloader.error import DownloaderError
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.fail_policy import FailPolicy
 from downloader.file_filter import FileFilterFactory
@@ -60,8 +61,12 @@ class DownloaderWorkerContext:
 
     def swallow_error(self, e: Optional[Exception], print: bool = True):
         if e is None: return
-        if self.fail_policy == FailPolicy.FAIL_FAST:
-            raise e
+        if self.fail_policy != FailPolicy.FAULT_TOLERANT:
+            if self.fail_policy == FailPolicy.FAIL_FAST:
+                raise e
+            elif self.fail_policy == FailPolicy.FAULT_TOLERANT_ON_CUSTOM_DOWNLOADER_ERRORS and not isinstance(e, DownloaderError):
+                raise e
+
         self.logger.debug(e)
         if print: self.logger.print(f"ERROR: {e}")
 

@@ -19,6 +19,7 @@
 from typing import Any, Dict, List
 from downloader.config import Config, config_with_base_path
 from downloader.db_utils import DbSectionPackage
+from downloader.error import DownloaderError
 from downloader.file_system import FileSystem, FileSystemFactory
 from downloader.local_store_wrapper import StoreWrapper, LocalStoreWrapper
 from downloader.logger import Logger
@@ -171,5 +172,5 @@ class BasePathRelocatorPackage:
         return self._config['base_path']
 
 
-class RelocatorError(Exception):
+class RelocatorError(DownloaderError):
     pass

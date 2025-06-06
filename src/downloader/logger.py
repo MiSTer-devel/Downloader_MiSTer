@@ -197,4 +197,4 @@ class DebugOnlyLoggerDecorator(Logger):
         self._decorated_logger.bench(*args)
 
 def time_str(start_time: float) -> str:
-    return str(datetime.timedelta(seconds=time.time() - start_time))[0:-3]
+    return str(datetime.timedelta(seconds=time.monotonic() - start_time))[0:-3]

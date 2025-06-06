@@ -18,7 +18,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import time
-start_time = time.time()
+start_time = time.monotonic()
 
 from sys import exit
 

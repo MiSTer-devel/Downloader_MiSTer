@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Version 2.2 - 2025-06-06
+
+### Added
+- The CI now produces a binary of Downloader (`downloader_bin`), which is available in the latest GitHub release.
+- When installed, `downloader_bin` is used by the launcher script by default, providing a significant speedup. If `downloader_bin` fails unexpectedly, The launcher displays an error, logs it to `/media/fat/Scripts/.config/downloader/downloader_bin_error.log`, and then falls back to the standard Python build. 
+
+## Changed
+- The launcher script now uses the SSL certificate file at `Scripts/.config/downloader/cacert.pem`, falling back to `/etc/ssl/certs/cacert.pem`, and prompts to install new certificates if none are available.
+- SSL certificates are now checked only when Downloader fails to fetch secure content, saving around half a second per run.
+- Loading the local store now occurs in the middle of the initial job pipeline, yielding a small speedup.
+- Using a more precise time function to avoid spurious time errors (time.monotonic).
+- When downloader detects `/tmp/downloader_run_signal`, it removes the file at the end of the run so it can signal abnormal termination. The launcher uses this to detect unexpected `downloader_bin` failures.
+- Output only shows the read of `downloader.ini` file when `verbose` is set to `true`.
+- Various refactors in the CI pipeline (build, compile, and release steps) and in error handling.
+- Eliminated mv-related errors during Linux updates by using rsync instead.
+- Increased wait time before rebooting after a Linux update from 24 to 31 seconds. And reboot after firmware update from 3 to 5 seconds.
+- Minor fixes and improvements.
+
 ## Version 2.1 - 2025-03-21
 
 ### Changed

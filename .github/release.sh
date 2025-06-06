@@ -15,8 +15,6 @@ if "latest" not in has_latest.stdout:
     time.sleep(15)
 
 md5sum('dont_download.zip', 'dont_download.zip.md5')
-md5sum('src/downloader.zip', 'downloader.zip.md5')
-md5sum('src/downloader_bin', 'downloader_bin.md5')
 
 subprocess.run(['git', 'add', 'dont_download.sh', 'latest.id'], check=True)
 subprocess.run(['git', 'commit', '-m', 'BOT: New dont_download.sh'], check=True)
@@ -27,7 +25,5 @@ subprocess.run([
     'dont_download.zip',
     'dont_download.zip.md5',
     'src/downloader.zip',
-    'downloader.zip.md5',
-    'src/downloader_bin',
-    'downloader_bin.md5'
+    'downloader_bin',
   ], check=True)

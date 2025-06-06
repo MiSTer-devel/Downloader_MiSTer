@@ -90,6 +90,11 @@ class JobTagTracking:
         self._initiated: set[int] = set()
         self._ended: set[int] = set()
 
+    def reset(self) -> None:
+        self.in_progress.clear()
+        self._initiated.clear()
+        self._ended.clear()
+
     def add_job_started(self, job: Job) -> None:
         self._add_job_in_progress(job)
 
@@ -179,6 +184,19 @@ class InstallationReportImpl(InstallationReport):
         # Following might be modified and read in multiple threads
         self._jobs_tag_completed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
         self._jobs_tag_failed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
+
+    def reset(self) -> None:
+        self._jobs_started.clear()
+        self._jobs_completed.clear()
+        self._jobs_cancelled.clear()
+        self._jobs_failed.clear()
+        self._jobs_retried.clear()
+        self._processed_files_set.data.clear()
+        self._processed_folders.data.clear()
+        self._processed_folders_set.data.clear()
+        self._jobs_tag_tracking.data.reset()
+        self._jobs_tag_completed.data.clear()
+        self._jobs_tag_failed.data.clear()
 
     def add_job_started(self, job: Job) -> None:
         self._jobs_started[job.type_id].append(job)
@@ -292,12 +310,12 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
             self._print_line(job.pkg.rel_path)
         if isinstance(job, FetchDataJob):
             self._logger.bench('FetchDataJob started: ', job.source)
-        self._check_time = time.time() + 2.0
+        self._check_time = time.monotonic() + 2.0
 
     def print_work_in_progress(self) -> None:
         if self._deactivated:
             return
-        now = time.time()
+        now = time.monotonic()
         if self._check_time < now:
             self._symbols.append('*')
             self._print_symbols()
@@ -308,7 +326,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
     def print_job_completed(self, job: Job, _next_jobs: List[Job]) -> None:
         if isinstance(job, FetchFileJob) and job.db_id is not None:
             self._symbols.append('.')
-            if self._needs_newline or self._check_time < time.time():
+            if self._needs_newline or self._check_time < time.monotonic():
                 self._print_symbols()
         if isinstance(job, FetchDataJob):
             self._logger.bench('FetchDataJob completed: ', job.source)
@@ -324,7 +342,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
 
         self._need_clear_header = False
         self._needs_newline = True
-        self._check_time = time.time() + (1.0 if last_is_asterisk else 2.0)
+        self._check_time = time.monotonic() + (1.0 if last_is_asterisk else 2.0)
 
     def _print_line(self, line: str) -> None:
         if self._need_clear_header: line = '\n' + line
@@ -335,7 +353,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
 
     def print_progress_line(self, line: str) -> None:
         self._print_line(line)
-        self._check_time = time.time() + 2.0
+        self._check_time = time.monotonic() + 2.0
 
     def print_pending(self) -> None:
         self._print_symbols()
@@ -376,7 +394,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
             )
 
         self._need_clear_header = True
-        self._check_time = time.time() + 2.0
+        self._check_time = time.monotonic() + 2.0
 
     def print_job_failed(self, job: Job, exception: BaseException) -> None:
         self._print_job_error(job, exception)

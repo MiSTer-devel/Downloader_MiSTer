@@ -72,8 +72,6 @@ class ConfigReader:
         return result.replace('/update.ini', '/downloader.ini')
 
     def read_config(self, config_path: str) -> Config:
-        self._logger.print("Reading file: %s" % config_path)
-
         result = default_config()
         result['debug'] = self._env['DEBUG'] == 'true'
         if result['debug']:
@@ -86,6 +84,7 @@ class ConfigReader:
             if 'http' in self._env['LOGLEVEL']:
                 result['http_logging'] = True
 
+        if result['verbose']: self._logger.print("Reading file: %s" % config_path)
         if result['verbose']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read config start.')
 
         if self._env['DEFAULT_BASE_PATH'] is not None:
@@ -109,13 +108,13 @@ class ConfigReader:
             elif section_id in result['databases']:
                 raise InvalidConfigParameter("Can't import db for section '%s' twice" % section_id)
 
-            self._logger.print("Reading '%s' db section" % section)
+            if result['verbose']: self._logger.print("Reading '%s' db section" % section)
             result['databases'][section_id] = self._parse_database_section(default_db, parser, section_id)
 
         if result['verbose']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read sections done.')
 
         if len(result['databases']) == 0:
-            self._logger.print('Reading default db')
+            if result['verbose']: self._logger.print('Reading default db')
             self._add_default_database(ini_config, result)
 
         if self._env['ALLOW_REBOOT'] is not None:
