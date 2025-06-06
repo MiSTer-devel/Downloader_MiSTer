@@ -46,43 +46,59 @@ elif [ -s "${CACERT_PEM_0}" ] ; then
     export SSL_CERT_FILE="${CACERT_PEM_0}"
 elif [[ "${CURL_SSL:-}" != "--insecure" ]] ; then
     set +e
-    dialog --keep-window --title "Bad Certificates" --defaultno \
-        --yesno "CA certificates need to be fixed, do you want me to fix them?\n\nNOTE: This operation will delete files at /etc/ssl/certs" \
-        7 65
-    DIALOG_RET=$?
+    curl "https://github.com" > /dev/null 2>&1
+    CURL_RET=$?
     set -e
 
-    if [[ "${DIALOG_RET}" != "0" ]] ; then
-        echo "No secure connection is possible without fixing the certificates."
-        exit 1
-    fi
+    case $CURL_RET in
+      0)
+        ;;
+      *)
+        if ! which dialog > /dev/null 2>&1 ; then
+            echo "ERROR: CURL returned error code ${CURL_RET}."
+            exit $CURL_RET
+        fi
 
-    RO_ROOT="false"
-    if mount | grep "on / .*[(,]ro[,$]" -q ; then
-        RO_ROOT="true"
-    fi
-    [ "${RO_ROOT}" == "true" ] && mount / -o remount,rw
-    rm /etc/ssl/certs/* 2> /dev/null || true
-    echo
-    echo "Installing cacert.pem from https://curl.se"
-    curl --insecure --location -o /tmp/cacert.pem "https://curl.se/ca/cacert.pem"
-    curl --insecure --location -o /tmp/cacert.pem.sha256 "https://curl.se/ca/cacert.pem.sha256"
+        set +e
+        dialog --keep-window --title "Bad Certificates" --defaultno \
+            --yesno "CA certificates need to be fixed, do you want me to fix them?\n\nNOTE: This operation will delete files at /etc/ssl/certs" \
+            7 65
+        DIALOG_RET=$?
+        set -e
 
-    DOWNLOAD_SHA256=$(cat /tmp/cacert.pem.sha256 | awk '{print $1}')
-    CALCULATED_SHA256=$(sha256sum /tmp/cacert.pem | awk '{print $1}')
+        if [[ "${DIALOG_RET}" != "0" ]] ; then
+            echo "No secure connection is possible without fixing the certificates."
+            exit 1
+        fi
 
-    if [[ "${DOWNLOAD_SHA256}" == "${CALCULATED_SHA256}" ]]; then
-        mv /tmp/cacert.pem "${CACERT_PEM_0}"
-        sync
-    else
-        echo "Checksum validation for downloaded CA certificate failed."
-        echo "Please try again later."
-        exit 0
-    fi
+        RO_ROOT="false"
+        if mount | grep "on / .*[(,]ro[,$]" -q ; then
+            RO_ROOT="true"
+        fi
+        [ "${RO_ROOT}" == "true" ] && mount / -o remount,rw
+        rm /etc/ssl/certs/* 2> /dev/null || true
+        echo
+        echo "Installing cacert.pem from https://curl.se"
+        curl --insecure --location -o /tmp/cacert.pem "https://curl.se/ca/cacert.pem"
+        curl --insecure --location -o /tmp/cacert.pem.sha256 "https://curl.se/ca/cacert.pem.sha256"
 
-    [ "${RO_ROOT}" == "true" ] && mount / -o remount,ro
+        DOWNLOAD_SHA256=$(cat /tmp/cacert.pem.sha256 | awk '{print $1}')
+        CALCULATED_SHA256=$(sha256sum /tmp/cacert.pem | awk '{print $1}')
 
-    export SSL_CERT_FILE="${CACERT_PEM_0}"
+        if [[ "${DOWNLOAD_SHA256}" == "${CALCULATED_SHA256}" ]]; then
+            mv /tmp/cacert.pem "${CACERT_PEM_0}"
+            sync
+        else
+            echo "Checksum validation for downloaded CA certificate failed."
+            echo "Please try again later."
+            exit 0
+        fi
+
+        [ "${RO_ROOT}" == "true" ] && mount / -o remount,ro
+
+        export SSL_CERT_FILE="${CACERT_PEM_0}"
+        ;;
+    esac
 fi
 
 download_file() {
