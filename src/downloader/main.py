@@ -20,6 +20,7 @@
 import traceback
 import sys
 import os
+import locale
 from pathlib import Path
 from typing import Optional
 
@@ -34,6 +35,7 @@ def main(env: Environment, start_time: float) -> int:
     # This function should be called in __main__.py which just bootstraps the application.
     # It should receive an 'env' dictionary produced by calling the "read_env" function below.
 
+    locale.setlocale(locale.LC_CTYPE, "")
     logger = TopLogger.for_main()
     # noinspection PyBroadException
     try:
