@@ -613,37 +613,6 @@ def file_neogeo_md_descr():
         "url": "https://neogeo.md"
     }
 
-
-def fix_old_pext_store(store, base_path=True, ignore: list[str] = None):
-    if ignore is None:
-        ignore = []
-    if base_path:
-        for file_path, file_description in store['files'].items():
-            if file_path in ignore: continue
-            if file_path.startswith('games') or file_path.startswith('docs'):
-                file_description['path'] = 'pext'
-        for folder_path, folder_description in store['folders'].items():
-            if folder_path.startswith('games') or folder_path.startswith('docs'):
-                folder_description['path'] = 'pext'
-    if 'zips' in store:
-        for zip_id, zip_desc in store['zips'].items():
-            fix_zip(zip_desc)
-    if 'filtered_zip_data' in store:
-        for zip_id, zip_summary in store['filtered_zip_data'].items():
-            fix_files(zip_summary['files'])
-            fix_folders(zip_summary['folders'])
-    if 'external' in store:
-        for drive, external in store['external'].items():
-            if drive in ignore: continue
-            for file_path, file_description in external['files'].items():
-                if file_path in ignore: continue
-                if file_path.startswith('games') or file_path.startswith('docs'):
-                    file_description['path'] = 'pext'
-            for folder_path, folder_description in external['folders'].items():
-                if folder_path.startswith('games') or folder_path.startswith('docs'):
-                    folder_description['path'] = 'pext'
-    return store
-
 def file_s32x_md_descr():
     return {
         "hash": file_s32x_md[1:],

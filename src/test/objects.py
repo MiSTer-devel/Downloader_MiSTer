@@ -27,7 +27,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     FILE_MiSTer_old, DATABASE_LATEST_SUPPORTED_VERSION
 from downloader.db_options import DbOptions
 from downloader.other import empty_store_without_base_path
-from downloader.db_entity import DbEntity
+from downloader.db_entity import DbEntity, ZipIndexEntity
 import copy
 import tempfile
 
@@ -150,6 +150,8 @@ def config_with(
         default_db_id=None,
         user_defined_options=None,
         minimum_free_space=None,
+        file_checking=None,
+
         databases: Dict[str, Any] = None):
 
     config = default_config()
@@ -177,6 +179,8 @@ def config_with(
         config['user_defined_options'] = user_defined_options
     if minimum_free_space is not None:
         config['minimum_system_free_space_mb'] = minimum_free_space
+    if file_checking is not None:
+        config['file_checking'] = file_checking
     return config
 
 
@@ -366,7 +370,7 @@ def db_description(db_url: str = None, section: str = None, options: DbOptions =
     return description
 
 
-def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, default_options=None, timestamp=None, linux=None, header=None, section=None, tag_dictionary=None, version=None):
+def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, default_options=None, timestamp=None, linux=None, header=None, section=None, tag_dictionary=None, version=None) -> DbEntity:
     db_props = {
         'db_id': db_id if db_id is not None else db_test,
         'db_files': db_files if db_files is not None else [],
@@ -390,6 +394,14 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
         raise Exception("db_entity() created database needing migration.")
 
     return entity
+
+def zip_index_entity(files=None, folders=None, base_files_url=None, version=None) -> ZipIndexEntity:
+    return ZipIndexEntity(
+        files=files if files is not None else {},
+        folders=folders if folders is not None else {},
+        base_files_url=base_files_url if base_files_url is not None else '',
+        version=version if version is not None else DATABASE_LATEST_SUPPORTED_VERSION
+    )
 
 
 def raw_db_empty_with_linux_descr():
@@ -738,8 +750,8 @@ def store_with_folders(folders, db_id=None):
     return db_to_store(db_with_folders(db_id or db_test, folders))
 
 
-def db_test_with_file_a(db_id=None, descr=None):
-    return db_entity(db_id=db_id, db_files=[file_test_json_zip], files={file_a: file_a_descr() if descr is None else descr}, folders={folder_a: {}})
+def db_test_with_file_a(db_id=None, descr=None, timestamp=None):
+    return db_entity(db_id=db_id, db_files=[file_test_json_zip], files={file_a: file_a_descr() if descr is None else descr}, folders={folder_a: {}}, timestamp=timestamp)
 
 
 def db_test_with_file_b(db_id=None, descr=None):

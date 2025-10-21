@@ -91,6 +91,7 @@ class OnlineImporter(ProductionOnlineImporter):
         external_drives_repository = ExternalDrivesRepository(file_system=self.file_system)
         local_repository = local_repository or LocalRepository(config=self._config, file_system=self.file_system)
         base_path_relocator = base_path_relocator or BasePathRelocator(config=self._config, file_system_factory=self.fs_factory)
+        old_pext_paths = set()
         self._worker_ctx = DownloaderWorkerContext(
             job_ctx=self._job_system,
             waiter=waiter,
@@ -105,7 +106,7 @@ class OnlineImporter(ProductionOnlineImporter):
             free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation(),
             external_drives_repository=ExternalDrivesRepository(file_system=self.file_system),
             file_filter_factory=file_filter_factory or FileFilterFactory(NoLogger()),
-            target_paths_calculator_factory=TargetPathsCalculatorFactory(self.file_system, external_drives_repository),
+            target_paths_calculator_factory=TargetPathsCalculatorFactory(self.file_system, external_drives_repository, old_pext_paths),
             config=self._config,
             fail_policy=fail_policy or FailPolicy.FAIL_FAST
         )
@@ -116,10 +117,13 @@ class OnlineImporter(ProductionOnlineImporter):
             logger,
             job_system=self._job_system,
             worker_ctx=self._worker_ctx,
-            free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation()
+            free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation(),
+            old_pext_paths=old_pext_paths
         )
 
         self.dbs = []
+        self._store_sigs = {}
+        self._db_sigs = {}
 
     def _make_workers(self) -> Dict[int, DownloaderWorker]:
         return {w.job_type_id(): w for w in make_workers(self._worker_ctx)}
@@ -133,11 +137,15 @@ class OnlineImporter(ProductionOnlineImporter):
 
         jobs = []
         for db, _store, ini_description in self.dbs:
-            jobs.append(ProcessDbMainJob(db=db, ini_description=ini_description, store=self._local_store.store_by_id(db.db_id)))
+            process_main_db_job = ProcessDbMainJob(db=db, ini_description=ini_description, store=self._local_store.store_by_id(db.db_id))
+            if db.db_id in self._db_sigs:
+                process_main_db_job.db_hash = self._db_sigs[db.db_id].get('hash', process_main_db_job.db_hash)
+                process_main_db_job.db_size = self._db_sigs[db.db_id].get('size', process_main_db_job.db_size)
+            jobs.append(process_main_db_job)
         return jobs
 
     @staticmethod
-    def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs, free_space_reservation=None, fail_policy=FailPolicy.FAULT_TOLERANT_ON_CUSTOM_DOWNLOADER_ERRORS):
+    def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs, free_space_reservation=None, fail_policy=FailPolicy.FAULT_TOLERANT_ON_CUSTOM_DOWNLOADER_ERRORS, logger=None):
         config = implicit_inputs.config
         file_system_factory = FileSystemFactory(state=implicit_inputs.file_system_state, config=config)
         return OnlineImporter(
@@ -146,7 +154,8 @@ class OnlineImporter(ProductionOnlineImporter):
             free_space_reservation=free_space_reservation,
             network_state=implicit_inputs.network_state,
             file_system_state=implicit_inputs.file_system_state,
-            fail_policy=fail_policy
+            fail_policy=fail_policy,
+            logger=logger
         )
 
     @property
@@ -171,14 +180,18 @@ class OnlineImporter(ProductionOnlineImporter):
     def download(self):
         db_pkgs: List[DbSectionPackage] = []
         for db, store, ini_description in self.dbs:
-            self._add_store(db.db_id, store)
+            self._add_store(db.db_id, store, store_sig=self._store_sigs.get(db.db_id, None))
             db_pkgs.append(DbSectionPackage(db_id=db.db_id, section=ini_description))
         self.download_dbs_contents(db_pkgs)
     
         return self
 
-    def add_db(self, db: DbEntity, store: StoreWrapper=None, description: ConfigDatabaseSection=None):
+    def add_db(self, db: DbEntity, store: StoreWrapper=None, description: ConfigDatabaseSection=None, store_sig=None, db_sig=None):
         self.dbs.append((db, store, {} if description is None else description))
+        if store_sig is not None:
+            self._store_sigs[db.db_id] = store_sig
+        if db_sig is not None:
+            self._db_sigs[db.db_id] = db_sig
         return self
 
     def download_db(self, db, store):
@@ -193,9 +206,12 @@ class OnlineImporter(ProductionOnlineImporter):
     def box(self) -> InstallationBox:
         return self._box
 
-    def _add_store(self, db_id: str, store=None):
+    def _add_store(self, db_id: str, store=None, store_sig=None):
         if self._local_store is None:
             self._local_store = local_store_wrapper({})
 
         if store is not None:
             self._local_store.unwrap_local_store()['dbs'][db_id] = store
+
+        if store_sig is not None:
+            self._local_store.unwrap_local_store()['db_sigs'][db_id] = store_sig

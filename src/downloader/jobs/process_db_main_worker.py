@@ -19,6 +19,7 @@
 from typing import Dict, Any, Optional, Tuple
 
 from downloader.config import FileChecking
+from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, DB_STATE_SIGNATURE_NO_TIMESTAMP
 from downloader.db_entity import check_zip, fix_folders, ZipIndexEntity
 from downloader.db_utils import build_db_config
 from downloader.job_system import WorkerResult, Job
@@ -29,6 +30,9 @@ from downloader.jobs.index import Index
 from downloader.jobs.worker_context import DownloaderWorkerBase, NilJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE, StoreFragmentZipSummary
+
+
+SKIPPING_DB_PROCESSING_LOG_MESSAGE = 'Skipping db process. No changes detected for: '
 
 
 class ProcessDbMainWorker(DownloaderWorkerBase):
@@ -63,11 +67,14 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
         sig = read_only_store.db_state_signature()
         if config['file_checking'] == FileChecking.ON_DB_CHANGES \
             and sig['hash'] == job.db_hash \
+            and sig['hash'] != DB_STATE_SIGNATURE_NO_HASH \
             and sig['size'] == job.db_size \
+            and sig['size'] != DB_STATE_SIGNATURE_NO_SIZE \
             and sig['timestamp'] == db.timestamp \
+            and sig['timestamp'] != DB_STATE_SIGNATURE_NO_TIMESTAMP \
             and sig['filter'] == config['filter']:
-                self._ctx.logger.debug('Skipping db process. No changes detected for: ', db.db_id)
-                return [], None  # @TODO: Cover this scenario in tests
+                self._ctx.logger.debug(SKIPPING_DB_PROCESSING_LOG_MESSAGE, db.db_id)  # This message is used in tests.
+                return [], None
 
         if not read_only_store.has_base_path():  # @TODO: should remove this from here at some point.
             store.write_only().set_base_path(config['base_path'])  # After that, all worker stores will be read-only.
