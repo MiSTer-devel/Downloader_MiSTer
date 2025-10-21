@@ -29,7 +29,7 @@ class TestOnlineImporterWithPriorityStorage(OnlineImporterWithPriorityStorageTes
         sut = OnlineImporter(fail_policy=FailPolicy.FAULT_TOLERANT)
         store = empty_test_store()
 
-        sut.add_db(self._db_with_smb1_and_nes_palettes(), store).download(False)
+        sut.add_db(self._db_with_smb1_and_nes_palettes(), store).download()
 
         self.assertEqual(fs_data(files={
             **files_smb1(),
@@ -68,5 +68,6 @@ class TestOnlineImporterWithPriorityStorage(OnlineImporterWithPriorityStorageTes
                         }
                     }
                 )
-            }
+            },
+            version=0
         )

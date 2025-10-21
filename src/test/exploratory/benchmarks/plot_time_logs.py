@@ -70,8 +70,8 @@ def plot_data(ax, data, color, label, outliers, y_max, y_min):
 
 def main(log_path):
     data = {
-        'improved': {'label': 'Downloader 2.2', 'short_label': 'v2.2'},
-        'baseline': {'label': 'Downloader 2.1', 'short_label': 'v2.1'}
+        'improved': {'label': 'Downloader 2.3', 'short_label': 'v2.3'},
+        'baseline': {'label': 'Downloader 2.2', 'short_label': 'v2.2'}
     }
     times = dict(zip(data, parse_times(log_path)))
     indices = np.arange(len(times['improved']))

@@ -18,8 +18,9 @@
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from downloader.db_entity import check_no_url_files, fix_folders, fix_files, fix_zip
+from downloader.db_entity import check_no_url_files, fix_zip
 from downloader.job_system import WorkerResult, Job
+from downloader.jobs.index import Index
 from downloader.jobs.jobs_factory import make_zip_kind, make_transfer_job
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
 from downloader.jobs.process_db_index_worker import create_fetch_jobs, process_index_job_main_sequence
@@ -36,18 +37,24 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: ProcessZipIndexJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
-        zip_id, zip_description, db, config, summary, full_resync = job.zip_id, job.zip_description, job.db, job.config, job.zip_index, job.full_resync
+        zip_id, zip_description, db, config, zip_index = job.zip_id, job.zip_description, job.db, job.config, job.zip_index
 
         logger.bench('ProcessZipIndexWorker start: ', db.db_id, zip_id)
         store = job.store.select(job.zip_index).read_only()
 
-        logger.bench('ProcessZipIndexWorker fix zips, files & folders: ', db.db_id, zip_id)
-        fix_folders(summary.folders)  # @TODO: Try to look for a better place to put this, while validating zip_index entity for example which we don't do yet.
-        fix_files(summary.files)
+        if zip_index.needs_migration():
+            logger.bench('ProcessZipIndexWorker migrating zip index entity: ', db.db_id, zip_id)
+            error = zip_index.migrate(db.db_id)
+            if error is not None:
+                return [], error
+
+        logger.bench('ProcessZipIndexWorker fix zips: ', db.db_id, zip_id)
         if fix_zip(zip_description):
             job.has_new_zip_summary = True
 
+        summary = Index(files=zip_index.files, folders=zip_index.folders)
         non_existing_pkgs, need_update_pkgs, created_folders, zip_data, error = process_index_job_main_sequence(self._ctx, job, summary, store)
+
         if error is not None:
             return [], error
 
@@ -60,7 +67,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             total_files_size += file_pkg.description['size']
 
         needs_extracting_single_files = 'kind' in zip_description and zip_description['kind'] == 'extract_single_files'
-        less_file_count = len(summary.files) < config['zip_file_count_threshold']
+        less_file_count = len(zip_index.files) < config['zip_file_count_threshold']
         less_accumulated_mbs = total_files_size < (1000 * 1000 * config['zip_accumulated_mb_threshold'])
 
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
@@ -104,7 +111,6 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
             store=store,
             ini_description=job.ini_description,
             config=job.config,
-            full_resync=job.full_resync,
 
             zip_id=job.zip_id,
             zip_kind=zip_kind,

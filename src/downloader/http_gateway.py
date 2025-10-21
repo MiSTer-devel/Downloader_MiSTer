@@ -264,6 +264,8 @@ def _redirect(input_arg: T, res_dict: Dict[T, _Redirect[T]], lock: threading.Loc
 
     return arg
 
+USER_AGENT = 'Downloader/2.0 (Linux; theypsilon@gmail.com)'
+DEFAULT_REQUEST_HEADERS = {'User-Agent': USER_AGENT}
 
 class _Connection:
     def __init__(self, conn_id: int, http: HTTPConnection, connection_queue: '_ConnectionQueue', logger: Optional[HttpLogger]) -> None:
@@ -283,6 +285,7 @@ class _Connection:
         return now_time > expire_time
 
     def do_request(self, method: str, url: str, body: Any, headers: Any) -> None:
+        headers = {**DEFAULT_REQUEST_HEADERS, **headers} if isinstance(headers, dict) else DEFAULT_REQUEST_HEADERS
         self._http.request(method, url, headers=headers, body=body)
         self._uses += 1
         self._response = self._http.getresponse()

@@ -29,7 +29,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_old
 from downloader.db_options import DbOptions
 from downloader.other import empty_store_without_base_path
-from downloader.db_entity import DbEntity, fix_files, fix_folders, fix_zip
+from downloader.db_entity import DbEntity, fix_folders, fix_zip
 import copy
 import tempfile
 
@@ -386,6 +386,10 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
     if header is not None:
         db_props['header'] = header
     entity = DbEntity(db_props, section if section is not None else db_id if db_id is not None else db_test)
+
+    if not entity.needs_migration():
+        raise Exception("The db_entity created does not need migration. How is this in *_old_pext then?")
+
     return entity
 
 

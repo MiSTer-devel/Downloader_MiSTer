@@ -25,12 +25,12 @@ from typing import Optional, TypeVar, Union, SupportsInt
 
 
 from downloader.config import Environment, Config, default_config, InvalidConfigParameter, AllowReboot, \
-    ConfigDatabaseSection, ConfigMisterSection, AllowDelete
+    ConfigDatabaseSection, ConfigMisterSection, AllowDelete, FileChecking
 from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, K_DEFAULT_DB_ID, K_BASE_PATH, \
     K_DB_URL, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER, K_BASE_SYSTEM_PATH, \
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, \
-    STORAGE_PRIORITY_PREFER_EXTERNAL, EXIT_ERROR_WRONG_SETUP
+    STORAGE_PRIORITY_PREFER_EXTERNAL, EXIT_ERROR_WRONG_SETUP, K_BENCH
 from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
 from downloader.logger import Logger, time_str
 
@@ -81,11 +81,13 @@ class ConfigReader:
                 result['verbose'] = False
             if 'debug' in self._env['LOGLEVEL']:
                 result['verbose'] = True
+            if 'bench' in self._env['LOGLEVEL']:
+                result['bench'] = True
             if 'http' in self._env['LOGLEVEL']:
                 result['http_logging'] = True
 
-        if result['verbose']: self._logger.print("Reading file: %s" % config_path)
-        if result['verbose']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read config start.')
+        if result['verbose']: self._logger.print("DEBUG| Reading file: %s" % config_path)
+        if result['bench']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read config start.')
 
         if self._env['DEFAULT_BASE_PATH'] is not None:
             result['base_path'] = self._env['DEFAULT_BASE_PATH']
@@ -93,7 +95,7 @@ class ConfigReader:
 
         ini_config = self._load_ini_config(config_path)
 
-        if result['verbose']: self._logger.print(f'BENCH {time_str(self._start_time)}| Load ini done.')
+        if result['bench']: self._logger.print(f'BENCH {time_str(self._start_time)}| Load ini done.')
 
         default_db = self._default_db_config()
 
@@ -108,13 +110,13 @@ class ConfigReader:
             elif section_id in result['databases']:
                 raise InvalidConfigParameter("Can't import db for section '%s' twice" % section_id)
 
-            if result['verbose']: self._logger.print("Reading '%s' db section" % section)
+            if result['verbose']: self._logger.print("DEBUG| Reading '%s' db section" % section)
             result['databases'][section_id] = self._parse_database_section(default_db, parser, section_id)
 
-        if result['verbose']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read sections done.')
+        if result['bench']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read sections done.')
 
         if len(result['databases']) == 0:
-            if result['verbose']: self._logger.print('Reading default db')
+            if result['verbose']: self._logger.print('DEBUG| Reading default db')
             self._add_default_database(ini_config, result)
 
         if self._env['ALLOW_REBOOT'] is not None:
@@ -160,7 +162,7 @@ class ConfigReader:
 
         result['environment'] = self._env
 
-        if result['verbose']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read config done.')
+        if result['bench']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read config done.')
         return result
 
     @staticmethod
@@ -230,7 +232,9 @@ class ConfigReader:
             'storage_priority': self._valid_storage_priority(parser.get_string(K_STORAGE_PRIORITY, result['storage_priority'])),
             'allow_delete': AllowDelete(parser.get_int(K_ALLOW_DELETE, result['allow_delete'].value)),
             'allow_reboot': AllowReboot(parser.get_int(K_ALLOW_REBOOT, result['allow_reboot'].value)),
+            'file_checking': FileChecking(parser.get_int('file_checking', result['file_checking'].value)),
             'verbose': parser.get_bool(K_VERBOSE, result['verbose']),
+            'bench': parser.get_bool(K_BENCH, result['bench']),
             'update_linux': parser.get_bool(K_UPDATE_LINUX, result['update_linux']),
             'downloader_threads_limit': parser.get_int(K_DOWNLOADER_THREADS_LIMIT, result['downloader_threads_limit']),
             'downloader_timeout': parser.get_int(K_DOWNLOADER_TIMEOUT, result['downloader_timeout']),

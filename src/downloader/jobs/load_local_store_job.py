@@ -18,6 +18,7 @@
 
 from typing import Optional
 
+from downloader.config import Config
 from downloader.db_utils import DbSectionPackage
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.abort_worker import AbortJob
@@ -27,11 +28,12 @@ local_store_tag = 'local_store'
 
 class LoadLocalStoreJob(Job):
     type_id: int = JobSystem.get_job_type_id()
-    def __init__(self, db_pkgs: list[DbSectionPackage], /) -> None:
+    def __init__(self, db_pkgs: list[DbSectionPackage], config: Config, /) -> None:
         self.db_pkgs = db_pkgs
+        self.config = config
 
         # Results
         self.local_store: Optional[LocalStoreWrapper] = None
-        self.full_resync: bool = False
+        # It will also write on config.file_checking if last_successful_run is not set, but this is deprecated and set to be removed in a future version
 
     def backup_job(self) -> Optional[Job]: return AbortJob()

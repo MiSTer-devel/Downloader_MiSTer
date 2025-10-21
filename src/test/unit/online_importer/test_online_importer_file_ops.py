@@ -138,23 +138,23 @@ class TestOnlineImporterFileOps(unittest.TestCase):
         ]), self.file_system.write_records)
 
     def download_nothing(self):
-        self.sut.download(False)
+        self.sut.download()
 
     def download_one(self):
         self.sut.add_db(db_entity(files={file_one: {'url': 'https://fake.com/bar', 'hash': hash_one, 'size': 1}}), empty_store(self.installed_path))
-        self.sut.download(False)
+        self.sut.download()
 
     def download_big_file(self, hash_value):
         self.sut.add_db(db_entity(files={file_big: {'url': 'https://fake.com/huge', 'hash': hash_value, 'size': big_size}}), empty_store(self.installed_path))
-        self.sut.download(False)
+        self.sut.download()
 
     def download_reboot(self):
         self.sut.add_db(db_entity(files={file_menu_rbf: {'url': 'https://fake.com/bar', 'hash': hash_menu_rbf, 'reboot': True, 'path': 'system', 'size': 23}}), empty_store(self.installed_path))
-        self.sut.download(False)
+        self.sut.download()
 
     def download_mister_binary(self):
         self.sut.add_db(db_entity(db_id=DISTRIBUTION_MISTER_DB_ID, files={FILE_MiSTer: file_mister_descr()}), empty_store(self.installed_path))
-        self.sut.download(False)
+        self.sut.download()
 
     def assertDownloaded(self, oks, run=None, errors=None):
         self.assertEqual(oks, self.sut.correctly_installed_files())

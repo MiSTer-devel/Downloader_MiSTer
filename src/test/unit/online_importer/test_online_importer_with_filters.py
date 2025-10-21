@@ -71,7 +71,7 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
         sut = OnlineImporter(config=config_with_filter('b'))
         sut.add_db(db_with_files_a_b_c(), first_store)
         sut.add_db(db_with_files_a_b_c_alt(), second_store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual([store_with_file_b(), store_with_file_b_alt()], [first_store, second_store])
 

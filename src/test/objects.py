@@ -24,7 +24,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     K_FILTER, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_ALLOW_REBOOT, KENV_DEBUG, MEDIA_FAT, MEDIA_USB0, MEDIA_USB1, \
     MEDIA_USB2, KENV_FAIL_ON_FILE_ERROR, KENV_UPDATE_LINUX, KENV_CURL_SSL, KENV_COMMIT, DEFAULT_CURL_SSL_OPTIONS, \
     MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, K_DB_URL, K_SECTION, K_OPTIONS, KENV_FORCED_BASE_PATH, \
-    FILE_MiSTer_old
+    FILE_MiSTer_old, DATABASE_LATEST_SUPPORTED_VERSION
 from downloader.db_options import DbOptions
 from downloader.other import empty_store_without_base_path
 from downloader.db_entity import DbEntity
@@ -366,7 +366,7 @@ def db_description(db_url: str = None, section: str = None, options: DbOptions =
     return description
 
 
-def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, default_options=None, timestamp=None, linux=None, header=None, section=None, tag_dictionary=None):
+def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, default_options=None, timestamp=None, linux=None, header=None, section=None, tag_dictionary=None, version=None):
     db_props = {
         'db_id': db_id if db_id is not None else db_test,
         'db_files': db_files if db_files is not None else [],
@@ -375,7 +375,8 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
         'base_files_url': base_files_url if base_files_url is not None else '',
         'zips': zips if zips is not None else {},
         'default_options': default_options if default_options is not None else {},
-        'timestamp': timestamp if timestamp is not None else 0
+        'timestamp': timestamp if timestamp is not None else 0,
+        'v': version if version is not None else DATABASE_LATEST_SUPPORTED_VERSION
     }
     if tag_dictionary is not None:
         db_props['tag_dictionary'] = tag_dictionary
@@ -384,6 +385,10 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
     if header is not None:
         db_props['header'] = header
     entity = DbEntity(db_props, section if section is not None else db_id if db_id is not None else db_test)
+
+    if version is None and entity.needs_migration():
+        raise Exception("db_entity() created database needing migration.")
+
     return entity
 
 

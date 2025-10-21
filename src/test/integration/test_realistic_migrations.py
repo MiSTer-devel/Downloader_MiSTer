@@ -68,6 +68,9 @@ class TestRealisticMigrations(unittest.TestCase):
     def test_migrate___on_vlast_with_zip_filled_store___returns_same_store(self):
         self.assert_versions_stay_the_same(self.filled_store_vlast_with_zip)
 
+    def test_migrate___from_v10_to_v11_with_old_pext_paths_and_filters_covering_zips_and_non_zips_scenarios___returns_expected_store(self):
+        self.assertTrue(False)
+
     def assert_versions_change_as_expected(self, initial_file, expected_file):
         store = load_file(initial_file)
         StoreMigrator().migrate(store)

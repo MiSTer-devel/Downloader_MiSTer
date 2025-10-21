@@ -16,6 +16,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import ipaddress
+from dataclasses import dataclass
 from typing import Dict, Any, Final, List, Optional
 from urllib.parse import urlparse
 
@@ -23,9 +24,10 @@ from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FI
     FILE_downloader_launcher_script, FILE_MiSTer_alt_3_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, \
     FILE_MiSTer_new, FOLDER_linux, FOLDER_saves, FOLDER_savestates, FOLDER_screenshots, FILE_PDFViewer, FILE_lesskey, \
     FILE_glow, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, DISTRIBUTION_MISTER_DB_ID, FILE_gamecontrollerdb_user, \
-    FILE_yc_txt
+    FILE_yc_txt, DATABASE_LATEST_SUPPORTED_VERSION
 from downloader.db_options import DbOptions
 from downloader.error import DownloaderError
+from downloader.jobs.index import Index
 from downloader.path_package import PathPackage
 
 
@@ -39,6 +41,8 @@ class DbEntity:
         if 'folders' not in db_props: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "folders" field. The database maintainer should fix this.')
         if 'timestamp' not in db_props: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "timestamp" field. The database maintainer should fix this.')
 
+        self.version: int = db_props.get('v', 0)
+        if not isinstance(self.version, int): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "v" field. The database maintainer should fix this.')
         self.db_id: str = db_props['db_id'].lower()
         if self.db_id != section.lower(): raise DbEntityValidationException(f'ERROR: Section "{section}" does not match database id "{self.db_id}". Fix your INI file.')
         self.timestamp: int = db_props['timestamp']
@@ -68,6 +72,33 @@ class DbEntity:
         if result['header'] is None:
             result.pop('header')
         return result
+
+    def needs_migration(self) -> bool:
+        return self.version < DATABASE_LATEST_SUPPORTED_VERSION
+
+    def migrate(self) -> Optional[Exception]:
+        if self.version == 0:
+            migrate_v0(self.files, self.folders)
+            for zip_desc in self.zips.values():
+                if 'internal_summary' not in zip_desc:
+                    continue
+
+                zip_index = zip_desc['internal_summary']
+                migrate_v0(zip_index.get('files', {}), zip_index.get('folders', {}))
+                zip_index['v'] = DATABASE_LATEST_SUPPORTED_VERSION
+
+            self.version += 1
+
+            if self.version == DATABASE_LATEST_SUPPORTED_VERSION:
+                return None
+
+            return None
+
+        return DbVersionUnsupportedException(
+            f'ERROR: Database "{self.db_id}" version {self.version} requires a newer Downloader'
+            f'(current one supports up to v{DATABASE_LATEST_SUPPORTED_VERSION}).'
+            'Update Downloader or configure "db_url" to point to a supported database version.'
+        )
 
 def check_zip(desc: dict[str, Any], db_id: str, zip_id: str) -> None:
     if 'kind' not in desc or desc['kind'] not in ('extract_all_contents', 'extract_single_files'):
@@ -155,28 +186,11 @@ def check_folder_paths(folders: list[str], db_id: str) -> None:
         _validate_and_extract_parts_from_path(db_id, folder_path)
 
 def fix_folders(folders: dict[str, Any]) -> None:
-    if len(folders) == 0: return
+    if not folders: return
 
-    for folder_path in [folder_path for folder_path, folder_description in folders.items() if folder_path.endswith('/')]:
-        folders[folder_path[:-1]] = folders[folder_path]
-        folders.pop(folder_path)
-
-    old_pext_folders = {f[1:]: add_pext(d) for f, d in folders.items() if f[0] == '|'}
-    if len(old_pext_folders) > 0:
-        non_old_pext_folders = {f: d for f, d in folders.items() if f[0] != '|'}
-        folders.clear()
-        folders.update(non_old_pext_folders)
-        folders.update(old_pext_folders)
-
-def fix_files(files: dict[str, Any]) -> None:
-    if len(files) == 0: return
-
-    old_pext_files = {f[1:]: add_pext(d) for f, d in files.items() if f[0] == '|'}
-    if len(old_pext_files) > 0:
-        non_old_pext_files = {f: d for f, d in files.items() if f[0] != '|'}
-        files.clear()
-        files.update(non_old_pext_files)
-        files.update(old_pext_files)
+    to_fix = [folder_path for folder_path in folders if folder_path.endswith('/')]
+    for folder_path in to_fix:
+        folders[folder_path[:-1]] = folders.pop(folder_path)
 
 def fix_zip(zip_desc: dict[str, Any]) -> bool:
     if 'target_folder_path' in zip_desc and zip_desc['target_folder_path'][0] == '|':
@@ -225,3 +239,40 @@ exceptional_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLD
 distribution_mister_exceptional_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow])
 
 class DbEntityValidationException(DownloaderError): pass
+class DbVersionUnsupportedException(DownloaderError): pass
+
+@dataclass
+class ZipIndexEntity:
+    files: Dict[str, Any]
+    folders: Dict[str, Any]
+    base_files_url: str
+    version: int
+
+    def needs_migration(self) -> bool:
+        return self.version < DATABASE_LATEST_SUPPORTED_VERSION
+
+    def migrate(self, db_id: str) -> Optional[Exception]:
+        if self.version == 0:
+            migrate_v0(self.files, self.folders)
+            self.version += 1
+
+        if self.version == DATABASE_LATEST_SUPPORTED_VERSION:
+            return None
+
+        return DbVersionUnsupportedException(
+            f'ERROR: Database "{db_id}" version {self.version} requires a newer Downloader'
+            f' (current one supports up to v{DATABASE_LATEST_SUPPORTED_VERSION}).'
+            ' Update Downloader or configure "db_url" to point to a supported database version.'
+        )
+
+def migrate_v0(files: dict[str, Any], folders: dict[str, Any]) -> None:
+    fix_old_pext(files)
+    fix_old_pext(folders)
+
+def fix_old_pext(entries: dict[str, Any]) -> None:
+    old_pext_entries = {f[1:]: add_pext(d) for f, d in entries.items() if f[0] == '|'}
+    if len(old_pext_entries) > 0:
+        non_old_pext_entries = {f: d for f, d in entries.items() if f[0] != '|'}
+        entries.clear()
+        entries.update(non_old_pext_entries)
+        entries.update(old_pext_entries)

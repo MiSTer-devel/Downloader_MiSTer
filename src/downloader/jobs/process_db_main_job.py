@@ -33,7 +33,6 @@ class ProcessDbMainJob(Job):
     db: DbEntity
     store: StoreWrapper
     ini_description: ConfigDatabaseSection
-    full_resync: bool
     db_hash: str = field(default=DB_STATE_SIGNATURE_NO_HASH)
     db_size: int = field(default=DB_STATE_SIGNATURE_NO_SIZE)
 

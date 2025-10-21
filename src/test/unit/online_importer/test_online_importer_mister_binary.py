@@ -35,7 +35,7 @@ class TestOnlineImporterMiSTerBinary(OnlineImporterTestBase):
         store = empty_test_store()
 
         sut.add_db(db_distribution_mister(files={FILE_MiSTer: file_mister_descr()}), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files={FILE_MiSTer: file_mister_descr()}), store)
         self.assertEqual(fs_data(
@@ -56,7 +56,7 @@ class TestOnlineImporterMiSTerBinary(OnlineImporterTestBase):
         store = empty_test_store()
 
         sut.add_db(db_distribution_mister(files={FILE_MiSTer: file_mister_descr()}), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files={FILE_MiSTer: file_mister_descr()}), store)
         self.assertEqual(fs_data(files={media_usb0(FILE_MiSTer): file_mister_descr()}), sut.fs_data)
@@ -70,7 +70,7 @@ class TestOnlineImporterMiSTerBinary(OnlineImporterTestBase):
         self.assertReports(OnlineImporter()
                            .add_db(db_distribution_mister(files={FILE_MiSTer: file_mister_descr()}), empty_test_store())
                            .add_db(db_test_being_empty_descr(), empty_test_store())
-                           .download(False), [FILE_MiSTer], needs_reboot=True)
+                           .download(), [FILE_MiSTer], needs_reboot=True)
 
 
 def fs(files=None, folders=None, base_path=None, config=None):

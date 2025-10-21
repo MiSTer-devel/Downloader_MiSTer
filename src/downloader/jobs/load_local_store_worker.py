@@ -19,6 +19,7 @@
 from downloader.job_system import WorkerResult
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob
 from downloader.jobs.worker_context import DownloaderWorkerBase
+from downloader.config import FileChecking
 
 
 class LoadLocalStoreWorker(DownloaderWorkerBase):
@@ -39,6 +40,8 @@ class LoadLocalStoreWorker(DownloaderWorkerBase):
                 continue
 
         job.local_store = local_store
-        job.full_resync = not self._ctx.local_repository.has_last_successful_run()
+        if not self._ctx.local_repository.has_last_successful_run():
+            job.config['file_checking'] = FileChecking.ALWAYS_HASH
+
         logger.bench('LoadLocalStoreWorker done.')
         return [], None

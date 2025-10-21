@@ -28,7 +28,11 @@ from downloader.db_options import DbOptionsValidationException
 from downloader.path_package import PathPackage, PathPackageKind, PathType
 from downloader.db_entity import DbEntity
 from test.objects import db_test, raw_db_empty_descr, db_empty, file_mister_descr, db_with_folders, file_a_descr, \
-    db_test_with_file, db_entity, file_save_psx_castlevania, file_save_psx_castlevania_descr, folder_save_psx, file_a
+    db_test_with_file, db_entity, file_save_psx_castlevania, file_save_psx_castlevania_descr, folder_save_psx, file_a, \
+    folder_a, file_nes_smb1, file_nes_smb1_descr, folder_games, folder_games_nes
+from test.objects_old_pext import file_nes_smb1 as file_nes_smb1_old_pext, \
+    db_entity as db_entity_old_pext, file_nes_smb1_descr as file_nes_smb1_descr_old_pext, \
+    folder_games as folder_games_old_pext, folder_games_nes as folder_games_nes_old_pext
 
 
 class TestDbEntity(unittest.TestCase):
@@ -129,6 +133,30 @@ class TestDbEntity(unittest.TestCase):
             with self.subTest(wrong_path):
                 self.assertIsNotNone(db_with_folders(DISTRIBUTION_MISTER_DB_ID, {wrong_path: {}}))
 
+    def test_migrate_db__on_db_from_v0_to_v1___returns_expected_db(self):
+        db_v0 = db_entity_old_pext(
+            files={file_nes_smb1_old_pext: file_nes_smb1_descr_old_pext(), file_a: file_a_descr()},
+            folders=[folder_games_old_pext, folder_games_nes_old_pext, folder_a]
+        )
+
+        self.assertTrue(db_v0.needs_migration())
+        error = db_v0.migrate()
+        self.assertIsNone(error)
+        self.assertFalse(db_v0.needs_migration())
+
+        expected = db_entity(
+            files={file_nes_smb1: file_nes_smb1_descr(), file_a: file_a_descr()},
+            folders={folder_games: {'path': 'pext'}, folder_games_nes: {'path': 'pext'}, folder_a: {}},
+            timestamp=0
+        )
+
+        self.assertEqual(expected.extract_props(), db_v0.extract_props())
+
+    def test_migrate_db__with_unsupported_version___raises_exception(self):
+        self.assertTrue(False)
+
+    def test_migrate_zip_index__on_db_from_v0_to_v1___returns_expected_db(self):
+        self.assertTrue(False)
 
 def pkg(path: str, description: Optional[dict[str, Any]] = None):
     return PathPackage(path, None, description or {}, PathType.FILE, PathPackageKind.STANDARD, None)

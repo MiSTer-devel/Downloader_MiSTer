@@ -56,7 +56,7 @@ class TestMiSTerFirmwareRealInstall(OnlineImporterWithPriorityStorageTestBase):
 
         actual_store = store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, base_path=base_path, files={FILE_MiSTer: file_mister_descr(hash_code=old_mister_hash)})
 
-        sut.add_db(db, actual_store).download(False)
+        sut.add_db(db, actual_store).download()
 
         self.assertNotEqual(new_mister_hash, old_mister_hash)
         self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, base_path=base_path, files={FILE_MiSTer: file_mister_descr(hash_code=new_mister_hash)}), actual_store)
