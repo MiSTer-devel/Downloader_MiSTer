@@ -142,9 +142,12 @@ def _make_zip_job(stored_index: Optional[StoreFragmentZipSummary], z: ZipJobCont
         else:
             job = make_open_zip_summary_job(z, z.zip_description['summary_file'], _make_it_from_store())
 
-    else:
-        zip_summary = z.zip_description['internal_summary']  # This is already validated in check_zip
+    elif 'internal_summary' in z.zip_description:
+        zip_summary = z.zip_description['internal_summary']
         job = _make_process_zip_job_from_ctx(z, zip_summary=zip_summary, has_new_zip_summary=True)
+    else:
+        # This should never happen as is already validated in check_zip
+        raise RuntimeError(f"Zip {z.zip_id} in db {z.job.db.db_id} has no summary_file or internal_summary")
 
     return job, None
 
