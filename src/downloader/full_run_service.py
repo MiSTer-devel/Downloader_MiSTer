@@ -138,6 +138,15 @@ class FullRunService:
             self._logger.print('WARNING! Store could not be saved because of a File System Error!')
             return EXIT_ERROR_STORE_NOT_SAVED
 
+        old_pext_paths = self._online_importer.old_pext_paths()
+        if old_pext_paths:
+            self._logger.print(
+                f'WARNING! {len(old_pext_paths)} paths were not handled correctly, like "{list(old_pext_paths)[0]}".'
+                '\nPlease report this issue on https://github.com/MiSTer-devel/Downloader_MiSTer or'
+                '\nsend an email to: theypsilon@gmail.com\nThank you!'
+            )
+            self._logger.debug('Old pext paths: ' + ', '.join(old_pext_paths))
+
         if self._config['update_linux']:
             self._linux_updater.update_linux(self._online_importer.correctly_downloaded_dbs())
 
