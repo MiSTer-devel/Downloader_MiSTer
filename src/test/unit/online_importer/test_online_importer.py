@@ -401,6 +401,17 @@ class TestOnlineImporter(OnlineImporterTestBase):
         sut = self.download_reboot_file(store_reboot_descr(custom_hash='other_hash'), fs(files={file_reboot: file_reboot_descr()}))
         self.assertReports(sut, [file_reboot], needs_reboot=True)
 
+    def test_removes_folder_slash_endings___on_empty_fs___registers_the_folder_without_the_ending_slash(self):
+        sut = OnlineImporter()
+        store = empty_test_store()
+
+        sut.add_db(db_entity(files={file_a: file_a_descr()}, folders={folder_a + '/': {}}), store)
+        sut.download()
+
+        self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
+        self.assertEqual(store_test_with_file_a_descr(), store)
+        self.assertReports(sut, [file_a])
+
     def test_download_db2_with_file_a_and_emtpy_db1___after_having_db1_with_file_a_and_empty_db2___updates_stores_but_no_changes_on_fs(self):
         store1 = empty_test_store()
         store2 = empty_test_store()

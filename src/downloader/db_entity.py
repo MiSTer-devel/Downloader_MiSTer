@@ -42,8 +42,8 @@ class DbEntity:
         if 'timestamp' not in db_props: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "timestamp" field. The database maintainer should fix this.')
 
         self.version: int = db_props.get('v', 0)
-        if not isinstance(self.version, int): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "v" field. The database maintainer should fix this.')
-        self.db_id: str = db_props['db_id'].lower()
+        if not isinstance(self.version, int) or self.version < 0: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "v" field. The database maintainer should fix this.')
+        self.db_id: str = str(db_props['db_id']).lower()
         if self.db_id != section.lower(): raise DbEntityValidationException(f'ERROR: Section "{section}" does not match database id "{self.db_id}". Fix your INI file.')
         self.timestamp: int = db_props['timestamp']
         if not isinstance(self.timestamp, int): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "timestamp" field. The database maintainer should fix this.')
@@ -74,24 +74,25 @@ class DbEntity:
         return result
 
     def needs_migration(self) -> bool:
-        return self.version < DATABASE_LATEST_SUPPORTED_VERSION
+        return self.version != DATABASE_LATEST_SUPPORTED_VERSION
 
     def migrate(self) -> Optional[Exception]:
         if self.version == 0:
             migrate_v0(self.files, self.folders)
             for zip_desc in self.zips.values():
+                if 'target_folder_path' in zip_desc and zip_desc['target_folder_path'][0] == '|':
+                    zip_desc['target_folder_path'] = zip_desc['target_folder_path'][1:]
+                    zip_desc['path'] = 'pext'
+
                 if 'internal_summary' not in zip_desc:
                     continue
 
                 zip_index = zip_desc['internal_summary']
                 migrate_v0(zip_index.get('files', {}), zip_index.get('folders', {}))
-                zip_index['v'] = DATABASE_LATEST_SUPPORTED_VERSION
 
             self.version += 1
 
-            if self.version == DATABASE_LATEST_SUPPORTED_VERSION:
-                return None
-
+        if self.version == DATABASE_LATEST_SUPPORTED_VERSION:
             return None
 
         return DbVersionUnsupportedException(
@@ -249,7 +250,7 @@ class ZipIndexEntity:
     version: int
 
     def needs_migration(self) -> bool:
-        return self.version < DATABASE_LATEST_SUPPORTED_VERSION
+        return self.version != DATABASE_LATEST_SUPPORTED_VERSION
 
     def migrate(self, db_id: str) -> Optional[Exception]:
         if self.version == 0:

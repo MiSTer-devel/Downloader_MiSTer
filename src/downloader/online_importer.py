@@ -51,16 +51,19 @@ from downloader.path_package import PathPackage
 
 
 class OnlineImporter:
-    def __init__(self, logger: Logger, job_system: JobSystem, worker_ctx: DownloaderWorkerContext, free_space_reservation: FreeSpaceReservation) -> None:
+    def __init__(self, logger: Logger, job_system: JobSystem, worker_ctx: DownloaderWorkerContext, free_space_reservation: FreeSpaceReservation, old_pext_paths: set[str]) -> None:
         self._logger = logger
         self._job_system = job_system
         self._worker_ctx = worker_ctx
         self._free_space_reservation = free_space_reservation
+        self._old_pext_paths = old_pext_paths
         self._box = InstallationBox()
         self._local_store: Optional[LocalStoreWrapper] = None
         self._needs_reboot = False
         self._needs_save = False
         self._first_time = True
+
+    def old_pext_paths(self) -> set[str]: return self._old_pext_paths
 
     def _make_workers(self) -> dict[int, Worker]:
         return {w.job_type_id(): w for w in make_workers(self._worker_ctx)}

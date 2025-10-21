@@ -72,7 +72,7 @@ class TestOnlineImporterWithZipsOldPext(OnlineImporterTestBase):
             cheats_folder_id_old_pext: cheats_folder_zip_desc_old_pext(zipped_files=zipped_files_from_cheats_folder_old_pext(), summary=summary_json_from_cheats_folder_old_pext()),
         }), store_descr(
             zips={
-                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/'),
+                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/', is_pext=True),
                 cheats_folder_id: cheats_folder_zip_desc()
             },
             files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},
@@ -88,7 +88,7 @@ class TestOnlineImporterWithZipsOldPext(OnlineImporterTestBase):
             folders={**cheats_folder_folders(), **folders_games_nes_palettes()}
         ), store)
 
-        self.assertSutReports([], save=True)
+        self.assertSutReports([], save=False)
 
     def assertSutReports(self, installed, errors=None, needs_reboot=False, save=True):
         return self.assertReports(self.sut, installed, errors, needs_reboot, save)

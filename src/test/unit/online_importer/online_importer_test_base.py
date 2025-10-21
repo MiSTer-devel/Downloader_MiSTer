@@ -51,6 +51,7 @@ class OnlineImporterTestBase(unittest.TestCase):
         self.assertEqual(sorted(remove_all_priority_paths(failed_zips)), sorted(sut.zips_that_failed()), 'failed zips')
         self.assertEqual(sorted(full_partitions), sorted(sut.full_partitions()), 'full partitions')
         self.assertEqual(save, sut.needs_save, 'needs save')
+        self.assertEqual([], list(sut.old_pext_paths()), 'should not have old pext paths even in _old_pext tests')
 
     def assertEverythingIsClean(self, sut, store, save=False):
         self.assertEqual(empty_test_store(), store)
