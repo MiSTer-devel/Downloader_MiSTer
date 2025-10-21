@@ -5,7 +5,15 @@
       "zips": {},
       "folders": {
         "Filters": {},
-        "Filters/Composite Blend": {}
+        "Filters/Composite Blend": {},
+        "games": {
+          "path": "pext"
+        },
+        "games/NES": {
+          "path": "pext"
+        },
+        "saves": {},
+        "saves/PSX": {}
       },
       "files": {
         "Filters/Composite Blend/Comp_Blend_HV_025.txt": {
@@ -13,13 +21,108 @@
           "hash": "11ab1dc79acf4ff1d8182d3b667e921c",
           "size": 792,
           "url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/aa97439b93f98294c51a098a08e8e59fedb3d969/Filters/Composite Blend/Comp_Blend_HV_025.txt"
+        },
+        "games/NES/contra.nes": {
+          "hash": "aaa111",
+          "size": 2915010,
+          "url": "https://contra.nes",
+          "path": "pext"
+        },
+        "saves/PSX/another.sav": {
+          "hash": "bbb222",
+          "size": 23053020,
+          "url": "https://another.sav"
         }
       },
       "internal_summary": {
-
+        "files": {
+          "games/NES/smb.nes": {
+            "hash": "abc123",
+            "size": 2915020,
+            "path": "pext"
+          },
+          "saves/PSX/castlevania.sav": {
+            "hash": "def456",
+            "size": 23053019
+          },
+          "docs/NES/nes.md": {
+            "hash": "ghi789",
+            "size": 22125020,
+            "path": "pext"
+          }
+        },
+        "folders": {
+          "games": {
+            "path": "pext"
+          },
+          "games/NES": {
+            "path": "pext"
+          },
+          "saves": {},
+          "saves/PSX": {},
+          "docs": {
+            "path": "pext"
+          },
+          "docs/NES": {
+            "path": "pext"
+          }
+        }
       },
       "filtered_zip_data": {
-
+        "palettes_nes": {
+          "files": {
+            "games/NES/Palette/a.pal": {
+              "hash": "jkl012",
+              "size": 2905020,
+              "path": "pext"
+            },
+            "games/NES/Palette/b.pal": {
+              "hash": "mno345",
+              "size": 2905021,
+              "path": "pext"
+            }
+          },
+          "folders": {
+            "games": {
+              "path": "pext"
+            },
+            "games/NES": {
+              "path": "pext"
+            },
+            "games/NES/Palette": {
+              "path": "pext"
+            }
+          }
+        },
+        "docs_neogeo": {
+          "files": {
+            "docs/NeoGeo/NeoGeo.md": {
+              "hash": "pqr678",
+              "size": 2905029,
+              "path": "pext"
+            }
+          },
+          "folders": {
+            "docs": {
+              "path": "pext"
+            },
+            "docs/NeoGeo": {
+              "path": "pext"
+            }
+          }
+        },
+        "saves_psx": {
+          "files": {
+            "saves/PSX/game.sav": {
+              "hash": "stu901",
+              "size": 23053025
+            }
+          },
+          "folders": {
+            "saves": {},
+            "saves/PSX": {}
+          }
+        }
       }
     }
   },

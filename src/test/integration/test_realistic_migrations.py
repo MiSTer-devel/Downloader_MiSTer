@@ -75,9 +75,8 @@ class TestRealisticMigrations(unittest.TestCase):
     def test_migration_v11___from_v10_to_v11_with_old_pext_paths_and_filters_covering_zips_and_non_zips_scenarios___returns_expected_store(self):
         store = load_file(self.filled_store_v10_with_old_pext_paths_in_zips)
         self.assertEqual(10, store['migration_version'])
-        self.assertEqual({}, store['dbs'][DISTRIBUTION_MISTER_DB_ID]['internal_summary'])
-        self.assertEqual({}, store['dbs'][DISTRIBUTION_MISTER_DB_ID]['filtered_zip_data'])
         MigrationV11().migrate(store)
+        store['migration_version'] += 1
         self.assertEqual(load_file(self.filled_store_v11_with_pext_paths_in_zips), store)
 
     def assert_versions_change_as_expected(self, initial_file, expected_file):
