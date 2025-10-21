@@ -51,7 +51,7 @@ class OpenDbWorker(DownloaderWorkerBase):
             self._ctx.job_ctx.wait_for_other_jobs(0.06)
 
         self._ctx.logger.bench('OpenDbWorker store received: ', job.section)
-        local_store, full_resync = job.load_local_store_job.local_store, job.load_local_store_job.full_resync
+        local_store = job.load_local_store_job.local_store
         if local_store is None:
             return [], Exception('OpenDbWorker must receive a LoadLocalStoreJob with local_store not null.')
 
@@ -65,7 +65,6 @@ class OpenDbWorker(DownloaderWorkerBase):
             db_size=calcs.get('size', DB_STATE_SIGNATURE_NO_SIZE),
             ini_description=ini_description,
             store=store,
-            full_resync=full_resync
         )], None
 
     def _open_db(self, section: str, source: str, transfer: Any, /) -> DbEntity:

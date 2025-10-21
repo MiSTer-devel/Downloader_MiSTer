@@ -24,4 +24,3 @@ from typing import Dict, Any, Optional
 class Index:
     files: Dict[str, Any]
     folders: Dict[str, Any]
-    base_files_url: Optional[str] = None

@@ -36,7 +36,6 @@ class OpenZipSummaryJob(Job):
     zip_id: str
     ini_description: ConfigDatabaseSection
     zip_description: Dict[str, Any]
-    full_resync: bool
     config: Config
     transfer_job: TransferJob # Job & Transferrer  @TODO: Python 3.10
     backup: Optional[ProcessZipIndexJob]

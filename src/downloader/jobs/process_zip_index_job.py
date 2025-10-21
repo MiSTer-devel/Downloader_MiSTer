@@ -20,7 +20,7 @@ from dataclasses import field, dataclass
 from typing import Any, Optional
 
 from downloader.config import Config, ConfigDatabaseSection
-from downloader.db_entity import DbEntity
+from downloader.db_entity import DbEntity, ZipIndexEntity
 from downloader.file_filter import FileFoldersHolder
 from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, JobSystem
@@ -40,9 +40,8 @@ class ProcessZipIndexJob(Job):
     zip_id: str
     ini_description: ConfigDatabaseSection
     zip_description: dict[str, Any]
-    zip_index: Index
+    zip_index: ZipIndexEntity
     has_new_zip_summary: bool
-    full_resync: bool
 
     def retry_job(self): return None
 

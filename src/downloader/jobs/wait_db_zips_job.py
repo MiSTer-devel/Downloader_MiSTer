@@ -32,7 +32,6 @@ class WaitDbZipsJob(Job):
     db: DbEntity
     store: StoreWrapper
     ini_description: ConfigDatabaseSection
-    full_resync: bool
     config: Config
     zip_job_tags: List[str]
 

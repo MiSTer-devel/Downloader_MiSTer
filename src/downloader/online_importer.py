@@ -67,7 +67,7 @@ class OnlineImporter:
 
     def _make_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]:
         jobs: list[Job] = []
-        load_local_store_job = LoadLocalStoreJob(db_pkgs).add_tag(local_store_tag)
+        load_local_store_job = LoadLocalStoreJob(db_pkgs, self._worker_ctx.config).add_tag(local_store_tag)
         for pkg in db_pkgs:
             transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
             transfer_job.after_job = OpenDbJob(  # type: ignore[union-attr]
