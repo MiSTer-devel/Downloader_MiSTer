@@ -43,7 +43,7 @@ class TestOnlineImporterMiSTerBinaryCrosslinkBug(OnlineImporterTestBase):
         store = store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files={FILE_MiSTer: file_mister_old_descr()}, base_path=MEDIA_USB0)
 
         sut.add_db(db_distribution_mister(files={FILE_MiSTer: file_mister_descr()}), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files={FILE_MiSTer: file_mister_descr()}, base_path=MEDIA_USB0), store)
         self.assertEqual(fs_data(

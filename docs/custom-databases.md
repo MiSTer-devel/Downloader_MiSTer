@@ -13,6 +13,13 @@ The format of the aforementioned JSON file should be as follow:
 ```js
 {
     /**
+     * [Mandatory] Version of the database format (int)
+     * - Must be set to 1 to match the spec in this document.
+     * - Versions >1 are rejected; the downloader will prompt a self-update.
+     * - Omitted defaults to version 0, which still works but is slower.
+     */
+    "v": 1,
+    /**
      * [Mandatory] It should match the corresponding section_id defined in the INI file (string)
      *  Important: This ID must identify unequivocally your collection in the whole MiSTer ecosystem.
      */

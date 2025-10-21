@@ -71,7 +71,6 @@ class OnlineImporter(ProductionOnlineImporter):
         fail_policy: Optional[FailPolicy] = None,
         job_fail_policy: Optional[JobFailPolicy] = None,
         start_on_db_processing: bool = True,
-        full_resync: bool = False
     ):
         self._config = config or config_with(base_system_path=MEDIA_USB0)
         if isinstance(file_system_factory, FileSystemFactory):
@@ -120,7 +119,6 @@ class OnlineImporter(ProductionOnlineImporter):
             free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation()
         )
 
-        self.full_resync = full_resync
         self.dbs = []
 
     def _make_workers(self) -> Dict[int, DownloaderWorker]:
@@ -135,7 +133,7 @@ class OnlineImporter(ProductionOnlineImporter):
 
         jobs = []
         for db, _store, ini_description in self.dbs:
-            jobs.append(ProcessDbMainJob(db=db, ini_description=ini_description, store=self._local_store.store_by_id(db.db_id), full_resync=self.full_resync))
+            jobs.append(ProcessDbMainJob(db=db, ini_description=ini_description, store=self._local_store.store_by_id(db.db_id)))
         return jobs
 
     @staticmethod
@@ -170,8 +168,7 @@ class OnlineImporter(ProductionOnlineImporter):
     def job_system(self):
         return self._job_system
 
-    def download(self, full_resync: bool):
-        self.full_resync = full_resync
+    def download(self):
         db_pkgs: List[DbSectionPackage] = []
         for db, store, ini_description in self.dbs:
             self._add_store(db.db_id, store)
@@ -184,9 +181,9 @@ class OnlineImporter(ProductionOnlineImporter):
         self.dbs.append((db, store, {} if description is None else description))
         return self
 
-    def download_db(self, db, store, full_resync=False):
+    def download_db(self, db, store):
         self.add_db(db, store)
-        self.download(full_resync)
+        self.download()
         self._clean_store(store)
         return store
 

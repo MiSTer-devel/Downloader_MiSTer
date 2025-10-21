@@ -61,7 +61,7 @@ class OnlineImporterTestBase(unittest.TestCase):
         return OnlineImporter\
             .from_implicit_inputs(inputs)\
             .add_db(db, store)\
-            .download(False)
+            .download()
 
     def _download_databases(self, fs_inputs, dbs, input_stores=None, free_space_reservation=None):
         sut = OnlineImporter.from_implicit_inputs(fs_inputs, free_space_reservation=free_space_reservation)
@@ -70,7 +70,7 @@ class OnlineImporterTestBase(unittest.TestCase):
         for db, store in zip(dbs, stores):
             sut.add_db(db, store)
 
-        sut.download(False)
+        sut.download()
 
         return sut, stores
 

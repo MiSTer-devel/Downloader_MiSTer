@@ -18,29 +18,36 @@
 
 import unittest
 from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_FILTER
+from objects import empty_test_store, store_descr, zipped_nes_palettes_id, folder_games, file_nes_palette_a, \
+    folder_games_nes_palettes, folder_games_nes
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data
 from test.fake_online_importer import OnlineImporter
-from test.objects_old_pext import db_test_descr, store_descr, empty_test_store, folder_games, folder_games_nes, \
-    file_nes_palette_a, fix_old_pext_store
-from test.zip_objects_old_pext import file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc, zipped_nes_palettes_id, folder_games_nes_palettes
+from test.objects_old_pext import db_test_descr as db_test_descr_old_pext, \
+    folder_games as folder_games_old_pext, folder_games_nes as folder_games_nes_old_pext, \
+    file_nes_palette_a as file_nes_palette_a_old_pext
+from test.zip_objects_old_pext import file_nes_palette_a_descr_zipped as file_nes_palette_a_descr_zipped_old_pext, \
+    zipped_nes_palettes_desc as zipped_nes_palettes_desc_old_pext, \
+    zipped_nes_palettes_id as zipped_nes_palettes_id_old_pext, \
+    folder_games_nes_palettes as folder_games_nes_palettes_old_pext
+from zip_objects import zipped_nes_palettes_desc, file_nes_palette_a_descr_zipped
 
 
 # @TODO: Remove this file when support for the old pext syntax '|' is removed
 class TestOnlineImporterWithFiltersAndZipsOldPext(unittest.TestCase):
     def test_download_zipped_nes_palettes_folder___with_empty_store_and_negative_nes_filter___installs_filtered_nes_zip_data_and_nothing_in_fs(self):
         actual_store = self.download_zipped_nes_palettes_folder(empty_test_store(), '!nes')
-        self.assertEqual(fix_old_pext_store(store_with_filtered_nes_palette_zip_data()), actual_store)
+        self.assertEqual(store_with_filtered_nes_palette_zip_data(), actual_store)
         self.assertNothingInstalled()
 
     def test_download_zipped_nes_palettes_folder___with_store_with_filtered_nes_palette_zip_data_and_no_filter___installs_nes_zip_data_and_palette_file(self):
         actual_store = self.download_zipped_nes_palettes_folder(store_with_filtered_nes_palette_zip_data(), '')
-        self.assertEqual(fix_old_pext_store(store_with_nes_palette_zip()), actual_store)
+        self.assertEqual(store_with_nes_palette_zip(), actual_store)
         self.assertNesPaletteIsInstalled()
 
     def test_download_zipped_nes_palettes_folder___with_store_with_nes_palette_zip_and_negative_nes_filter___installs_filtered_nes_zip_data_and_nothing_in_fs(self):
         actual_store = self.download_zipped_nes_palettes_folder(store_with_nes_palette_zip(), '!nes')
-        self.assertEqual(fix_old_pext_store(store_with_filtered_nes_palette_zip_data()), actual_store)
+        self.assertEqual(store_with_filtered_nes_palette_zip_data(), actual_store)
         self.assertNothingInstalled()
 
     def download_zipped_nes_palettes_folder(self, store, filter_value, implicit_inputs=None):
@@ -50,16 +57,16 @@ class TestOnlineImporterWithFiltersAndZipsOldPext(unittest.TestCase):
 
         self.sut = OnlineImporter.from_implicit_inputs(implicit_inputs)
 
-        self.sut.add_db(db_test_descr(zips={
-            zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False, tags=True)
-        }), store).download(False)
+        self.sut.add_db(db_test_descr_old_pext(zips={
+            zipped_nes_palettes_id_old_pext: zipped_nes_palettes_desc_old_pext(url=False, tags=True)
+        }), store).download()
 
         return store
 
     def assertNesPaletteIsInstalled(self):
         self.assertEqual(fs_data(
-            files={file_nes_palette_a: file_nes_palette_a_descr_zipped()},
-            folders=[folder_games, folder_games_nes, folder_games_nes_palettes]
+            files={file_nes_palette_a_old_pext: file_nes_palette_a_descr_zipped_old_pext()},
+            folders=[folder_games_old_pext, folder_games_nes_old_pext, folder_games_nes_palettes_old_pext]
         ), self.sut.fs_data)
 
     def assertNothingInstalled(self):
@@ -88,10 +95,10 @@ def store_with_nes_palette_zip():
         zips={
             zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False, zipped_files=False, summary=False),
         },
-        files={file_nes_palette_a[1:]: file_nes_palette_a_descr_zipped(tags=True, url=False)},
+        files={file_nes_palette_a: file_nes_palette_a_descr_zipped(tags=True, url=False)},
         folders={
-            folder_games[1:]: {"zip_id": zipped_nes_palettes_id, "tags": ["games"]},
-            folder_games_nes[1:]: {"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes"]},
-            folder_games_nes_palettes[1:]: {"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes", "palette"]},
+            folder_games: {"zip_id": zipped_nes_palettes_id, "tags": ["games"], "path": "pext"},
+            folder_games_nes: {"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes"], "path": "pext"},
+            folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes", "palette"], "path": "pext"},
         }
     )

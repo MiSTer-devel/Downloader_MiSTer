@@ -159,7 +159,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
 
         self.sut.add_db(db_test_descr(zips={
             cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files_from_cheats_folder(), summary=summary, summary_hash=summary_hash)
-        }, tag_dictionary=cheats_folder_tag_dictionary()), store).download(False)
+        }, tag_dictionary=cheats_folder_tag_dictionary()), store).download()
 
         return store
 
@@ -169,7 +169,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
             files=cheats_folder_files(zip_id=False),
             folders=cheats_folder_folders(zip_id=False),
             tag_dictionary=cheats_folder_tag_dictionary()),
-            store).download(False)
+            store).download()
         return store
 
     def assertOnlyCheatsNesFileIsInstalled(self):
@@ -217,7 +217,7 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
 
         self.sut.add_db(db_test_descr(zips={
             zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False, tags=True)
-        }), store).download(False)
+        }), store).download()
 
         return store
 
