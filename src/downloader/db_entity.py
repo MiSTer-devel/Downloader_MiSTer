@@ -120,7 +120,7 @@ def check_zip(desc: dict[str, Any], db_id: str, zip_id: str) -> None:
 
     if 'internal_summary' in desc:
         check_zip_summary(desc['internal_summary'], db_id, zip_id)
-    else:
+    if 'summary_file' in desc:
         if 'hash' not in desc['summary_file'] or not isinstance(desc['summary_file']['hash'], str):
             raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Summary file needs a valid hash. The database maintainer should fix this.')
         if 'size' not in desc['summary_file'] or not isinstance(desc['summary_file']['size'], int):
