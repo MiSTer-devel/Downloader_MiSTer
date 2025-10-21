@@ -37,7 +37,6 @@ class ProcessDbIndexJob(Job):
     store: StoreWrapper
     ini_description: ConfigDatabaseSection
     index: Index
-    full_resync: bool
     config: Config
     zip_id: Optional[str] = None
 

@@ -61,6 +61,11 @@ class AllowReboot(IntEnum):
     ALWAYS = 1
     ONLY_AFTER_LINUX_UPDATE = 2
 
+@unique
+class FileChecking(IntEnum):
+    ON_DB_CHANGES = 0
+    ALWAYS_PRESENCE = 1
+    ALWAYS_HASH = 2
 
 class ConfigDatabaseSectionRequired(TypedDict):
     section: str
@@ -78,7 +83,9 @@ class ConfigMisterSection(TypedDict):
     allow_delete: AllowDelete
     allow_reboot: AllowReboot
     verbose: bool
+    bench: bool
     update_linux: bool
+    file_checking: FileChecking
     downloader_threads_limit: int
     downloader_timeout: int
     downloader_retries: int
@@ -134,6 +141,7 @@ def default_config() -> Config:
         'zip_accumulated_mb_threshold': 100,
         'filter': '',
         'verbose': False,
+        'bench': False,
         'debug': False,
         'default_db_id': DISTRIBUTION_MISTER_DB_ID,
         'start_time': 0,
@@ -142,6 +150,7 @@ def default_config() -> Config:
         'user_defined_options': [],
         'commit': 'unknown',
         'fail_on_file_error': False,
+        'file_checking': FileChecking.ALWAYS_PRESENCE,
         'minimum_system_free_space_mb': DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB,
         'minimum_external_free_space_mb': DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB,
         'http_proxy': '',

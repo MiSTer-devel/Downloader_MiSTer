@@ -116,9 +116,9 @@ class TopLogger(Logger, ConfigLogManager):
         return TopLogger(PrintLogger(), FileLogger())
 
     def configure(self, config: Config) -> None:
-        if config['verbose']:
+        if config['bench']:
             self._start_time = config['start_time']
-        else:
+        if not config['verbose']:
             self._verbose_mode = False
 
     def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=False) -> None:

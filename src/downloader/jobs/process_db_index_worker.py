@@ -22,6 +22,7 @@ import threading
 import os
 from collections import defaultdict
 
+from downloader.config import FileChecking
 from downloader.db_entity import check_file_pkg, check_folder_paths
 from downloader.file_filter import BadFileFilterPartException, Config, ZipData
 from downloader.file_system import FileWriteError, FolderCreationError, FsError, ReadOnlyFileSystem
@@ -59,7 +60,7 @@ class ProcessDbIndexWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: ProcessDbIndexJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
-        zip_id, db, config, summary, full_resync = job.zip_id, job.db, job.config, job.index, job.full_resync
+        zip_id, db, config, summary = job.zip_id, job.db, job.config, job.index
         store = job.store.read_only()
 
         logger.bench('ProcessDbIndexWorker start: ', db.db_id, zip_id)
@@ -85,7 +86,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
     Optional[Exception]
 ]:
     logger = ctx.logger
-    config, db, zip_id, full_resync = job.config, job.db, job.zip_id, job.full_resync
+    config, db, zip_id, always_check_hash = job.config, job.db, job.zip_id, job.config['file_checking'] == FileChecking.ALWAYS_HASH
 
     bench_label = job.__class__.__name__
     logger.bench(bench_label, ' filter summary: ', db.db_id, zip_id)
@@ -101,7 +102,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
     ctx.file_system.precache_is_file_with_folders(create_folder_pkgs)
 
     logger.bench(bench_label, ' check pkgs: ', db.db_id, zip_id)
-    non_existing_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(ctx, job.non_duplicated_files, db.db_id, store, full_resync, bench_label)
+    non_existing_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(ctx, job.non_duplicated_files, db.db_id, store, always_check_hash, bench_label)
 
     logger.bench(bench_label, ' validate pkgs: ', db.db_id, zip_id)
     job.present_validated_files, job.skipped_updated_files, need_update_pkgs = process_validate_packages(ctx, validate_pkgs)
@@ -151,7 +152,7 @@ def _translate_items(ctx: DownloaderWorkerContext, calculator: TargetPathsCalcul
 
     return present, removed
 
-def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool, bench_label: str) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
+def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, always_check_hash: bool, bench_label: str) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
     if len(non_duplicated_pkgs) == 0:
         return [], [], []
 
@@ -163,8 +164,8 @@ def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkg
     ctx.logger.bench(bench_label, ' existing loop: ', db_id, len(non_duplicated_pkgs))
     already_installed_pkgs: List[_ValidateFilePackage]
     validate_pkgs: List[_ValidateFilePackage]
-    if full_resync:
-        validate_pkgs = existing
+    if always_check_hash:
+        validate_pkgs = existing  # @TODO: Cover this scenario in tests
         already_installed_pkgs = []
     else:
         ctx.logger.bench('invalid hashes start: ', db_id, len(non_duplicated_pkgs))

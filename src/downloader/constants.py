@@ -16,12 +16,15 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Final, Any, TypedDict
+from typing import Final, TypedDict
 
 class SafeFetchInfo(TypedDict):
     url: str
     hash: str
     size: int
+
+# Database constants
+DATABASE_LATEST_SUPPORTED_VERSION: Final[int] = 1
 
 # Pre-selected database
 DISTRIBUTION_MISTER_DB_URL: Final[str] = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'
@@ -142,6 +145,7 @@ K_ZIP_FILE_COUNT_THRESHOLD: Final[str] = 'zip_file_count_threshold'
 K_ZIP_ACCUMULATED_MB_THRESHOLD: Final[str] = 'zip_accumulated_mb_threshold'
 K_FILTER: Final[str] = 'filter'
 K_VERBOSE: Final[str] = 'verbose'
+K_BENCH: Final[str] = 'bench'
 K_CONFIG_PATH: Final[str] = 'config_path'
 K_USER_DEFINED_OPTIONS: Final[str] = 'user_defined_options'
 K_CURL_SSL: Final[str] = 'curl_ssl'

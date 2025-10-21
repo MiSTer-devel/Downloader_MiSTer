@@ -18,10 +18,13 @@
 
 from downloader.constants import K_BASE_PATH, DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, \
     DB_STATE_SIGNATURE_NO_TIMESTAMP, DB_STATE_SIGNATURE_NO_FILTER
+from downloader.db_entity import ZipIndexEntity
+
 from downloader.error import DownloaderError
 from downloader.jobs.index import Index
 from downloader.other import empty_store_without_base_path
 from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict, cast
+from types import MappingProxyType
 from collections import defaultdict, ChainMap
 
 from downloader.path_package import PathPackage, PathType, path_pext
@@ -122,8 +125,12 @@ class StoreWrapper:
 
     def read_only(self) -> 'ReadOnlyStoreAdapter':
         return self._read_only
-    
-    def select(self, index: Index) -> 'StoreWrapper':
+
+    @property
+    def version(self) -> int:
+        return self._store.get('v', 0)
+
+    def select(self, index: ZipIndexEntity) -> 'StoreWrapper':
         # @TODO: Remove this | handling after we change the pext path format in the stores
         norm_files = [fp[1:] if len(fp) > 0 and fp[0] == '|' else fp for fp in index.files]
         norm_folders = [dp[1:] if len(dp) > 0 and dp[0] == '|' else dp for dp in index.folders]
@@ -147,7 +154,7 @@ class StoreWrapper:
 
         return StoreWrapper(new_store, empty_db_state_signature(), self._local_store_wrapper, readonly=True)
 
-    def deselect_all(self, indexes: List[Index]) -> 'StoreWrapper':
+    def deselect_all(self, indexes: List[ZipIndexEntity]) -> 'StoreWrapper':
         # @TODO: Remove this | handling after we change the pext path format in the stores
         norm_files = {fp if (fp[0] != '|' or len(fp) == 0) else fp[1:] for index in indexes for fp in index.files}
         norm_folders = {dp if (dp[0] != '|' or len(dp) == 0) else dp[1:] for index in indexes for dp in index.folders}
@@ -474,6 +481,7 @@ class WriteOnlyStoreAdapter:
         if len(filtered_zip_data):
             if 'filtered_zip_data' in self._store and equal_dicts(self._store['filtered_zip_data'], filtered_zip_data):
                 return
+
             self._store['filtered_zip_data'] = filtered_zip_data
 
             self._top_wrapper.mark_force_save()
@@ -505,15 +513,18 @@ class WriteOnlyStoreAdapter:
                 self.add_external_folder(drive, folder_path, folder_description)
 
 class ReadOnlyStoreAdapter:
-    def __init__(self, store, db_state_signature) -> None:
+    def __init__(self, store, db_state_signature: DbStateSig) -> None:
         self._store = store
         self._db_state_signature = db_state_signature
+
+    def db_state_signature(self) -> DbStateSig:
+        return cast(DbStateSig, MappingProxyType(self._db_state_signature))
 
     def invalid_hashes(self, file_pkgs: List[PathPackage]) -> List[bool]:
         '''Returns a list of booleans indicating invalid hashes with the same order as the input.'''
         store_files = self._store['files']
         return [
-            (store_files[pkg.rel_path]['hash'] != pkg.description['hash'] if pkg.rel_path in store_files else True) 
+            (store_files[pkg.rel_path]['hash'] != pkg.description['hash'] if pkg.rel_path in store_files else True)
             if not pkg.is_pext_external() else
             (True if 'external' not in self._store \
                 else True if pkg.drive not in self._store['external'] \
@@ -522,7 +533,7 @@ class ReadOnlyStoreAdapter:
             for pkg in file_pkgs
         ]
 
-    def zip_summaries(self) -> dict[str, Any]:
+    def zip_summaries(self) -> dict[str, StoreFragmentZipSummary]:
         grouped: dict[str, StoreFragmentZipSummary] = defaultdict(lambda: {'files': {}, 'folders': {}})
 
         # @TODO: This if startswith('|') should be removed when we store all the zip information on the store
