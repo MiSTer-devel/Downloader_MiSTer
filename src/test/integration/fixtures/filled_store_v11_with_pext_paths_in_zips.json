@@ -2,125 +2,185 @@
   "dbs": {
     "distribution_mister": {
       "base_path": "/",
-      "zips": {},
-      "folders": {
-        "Filters": {},
-        "Filters/Composite Blend": {},
-        "games": {
+      "zips": {
+        "atari2600_palettes": {
+          "base_files_url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/f1dcd54cd03e06ed46cd288cf0add18ab49be14b/",
+          "contents": [
+            "Palettes"
+          ],
+          "contents_file": {
+            "hash": "03fd77be673cb79ff087643558327943",
+            "size": 74910,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/bcee370947fe2249854c3bd704a8d1cf9f36dcd5/atari2600_palettes.zip"
+          },
+          "description": "Unpacking Palettes at games/Atari2600/",
+          "kind": "extract_all_contents",
+          "raw_files_size": 63744,
+          "source": "games/Atari2600/Palettes",
+          "summary_file": {
+            "hash": "e423979857837db64f5271f7ce64169d",
+            "size": 2556,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/bcee370947fe2249854c3bd704a8d1cf9f36dcd5/atari2600_palettes_summary.json.zip"
+          },
+          "target_folder_path": "games/Atari2600/",
           "path": "pext"
         },
-        "games/NES": {
-          "path": "pext"
+        "cheats_folder_gba": {
+          "base_files_url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/f1dcd54cd03e06ed46cd288cf0add18ab49be14b/",
+          "contents": [
+            "GBA"
+          ],
+          "contents_file": {
+            "hash": "d252eb826e818e6a4bb45dd8915fba51",
+            "size": 5964742,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/bcee370947fe2249854c3bd704a8d1cf9f36dcd5/cheats_folder_gba.zip"
+          },
+          "description": "Unpacking GBA at Cheats/",
+          "kind": "extract_all_contents",
+          "path": "Cheats/",
+          "raw_files_size": 21968131,
+          "source": "Cheats/GBA",
+          "summary_file": {
+            "hash": "e61e00f0222a7c016c9937d11500b488",
+            "size": 72392,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/bcee370947fe2249854c3bd704a8d1cf9f36dcd5/cheats_folder_gba_summary.json.zip"
+          },
+          "target_folder_path": "Cheats/"
         },
-        "saves": {},
-        "saves/PSX": {}
+        "global_filters": {
+          "base_files_url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/f1dcd54cd03e06ed46cd288cf0add18ab49be14b/",
+          "contents": ["Filters",  "Filters_Audio",  "Gamma"],
+          "contents_file": {
+            "hash": "a6a99d4032381b3f19cefd199ae971fe",
+            "size": 357004,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/bcee370947fe2249854c3bd704a8d1cf9f36dcd5/global_filters.zip"
+          },
+          "description": "Unpacking Filters, Filters_Audio, Gamma at the root",
+          "kind": "extract_all_contents",
+          "mode": "multi",
+          "path": "./",
+          "raw_files_size": 1123883,
+          "summary_file": {
+            "hash": "f21b6592fd860419926b161cd06a9385",
+            "size": 11905,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/bcee370947fe2249854c3bd704a8d1cf9f36dcd5/global_filters_summary.json.zip"
+          },
+          "target_folder_path": "./"
+        },
+        "megaduck_palettes": {
+          "base_files_url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/f1dcd54cd03e06ed46cd288cf0add18ab49be14b/",
+          "contents": [
+            "Palettes"
+          ],
+          "contents_file": {
+            "hash": "cc62c49dbc35b1fe7a0751d8c322d6d0",
+            "size": 12788,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/bcee370947fe2249854c3bd704a8d1cf9f36dcd5/megaduck_palettes.zip"
+          },
+          "description": "Unpacking Palettes at games/MegaDuck/",
+          "kind": "extract_all_contents",
+          "raw_files_size": 1424,
+          "source": "games/MegaDuck/Palettes",
+          "internal_summary": {
+            "files": {
+              "games/MegaDuck/Palettes/SGB/4-H.gbp": {
+                "hash": "e1fd8951283afeda8e6c6aff3254f0e5",
+                "size": 16,
+                "tags": [],
+                "zip_id": "megaduck_palettes",
+                "path": "pext"
+              }
+            },
+            "folders": {
+              "games/MegaDuck/Palettes/SGB": {
+                "tags": [],
+                "zip_id": "megaduck_palettes",
+                "path": "pext"
+              },
+              "games/MegaDuck/Palettes": {
+                "tags": [],
+                "zip_id": "megaduck_palettes",
+                "path": "pext"
+              },
+              "games/MegaDuck": {
+                "tags": [],
+                "zip_id": "megaduck_palettes",
+                "path": "pext"
+              }
+            }
+          },
+          "target_folder_path": "games/MegaDuck/",
+          "path": "pext"
+        }
       },
       "files": {
-        "Filters/Composite Blend/Comp_Blend_HV_025.txt": {
-          "delete": [],
-          "hash": "11ab1dc79acf4ff1d8182d3b667e921c",
-          "size": 792,
-          "url": "https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/aa97439b93f98294c51a098a08e8e59fedb3d969/Filters/Composite Blend/Comp_Blend_HV_025.txt"
+        "Filters/CRT - Simulation/CRT Simulation (Composite)_H.txt": {
+          "hash": "6f07c28e2d8340b1b5dbb15da8430c19",
+          "size": 1409,
+          "tags": [],
+          "zip_id": "global_filters"
         },
-        "games/NES/contra.nes": {
-          "hash": "aaa111",
-          "size": 2915010,
-          "url": "https://contra.nes",
+        "docs/NES/README.md": {
+          "hash": "2b6568419fa2cb16348de585e10a6b49",
+          "size": 7804,
           "path": "pext"
-        },
-        "saves/PSX/another.sav": {
-          "hash": "bbb222",
-          "size": 23053020,
-          "url": "https://another.sav"
         }
       },
-      "internal_summary": {
-        "files": {
-          "games/NES/smb.nes": {
-            "hash": "abc123",
-            "size": 2915020,
-            "path": "pext"
-          },
-          "saves/PSX/castlevania.sav": {
-            "hash": "def456",
-            "size": 23053019
-          },
-          "docs/NES/nes.md": {
-            "hash": "ghi789",
-            "size": 22125020,
-            "path": "pext"
-          }
+      "folders": {
+        "Filters": {
+          "tags": [],
+          "zip_id": "global_filters"
         },
-        "folders": {
-          "games": {
-            "path": "pext"
-          },
-          "games/NES": {
-            "path": "pext"
-          },
-          "saves": {},
-          "saves/PSX": {},
-          "docs": {
-            "path": "pext"
-          },
-          "docs/NES": {
-            "path": "pext"
-          }
-        }
+        "Filters/CRT - Simulation": {
+          "tags": [],
+          "zip_id": "global_filters"
+        },
+        "docs": {"path": "pext"},
+        "docs/NES": {"path": "pext"}
       },
       "filtered_zip_data": {
-        "palettes_nes": {
+        "atari2600_palettes": {
           "files": {
-            "games/NES/Palette/a.pal": {
-              "hash": "jkl012",
-              "size": 2905020,
-              "path": "pext"
-            },
-            "games/NES/Palette/b.pal": {
-              "hash": "mno345",
-              "size": 2905021,
+            "games/Atari2600/Palettes/Atari 2600 Only/stella.pal": {
+              "hash": "e8e3bdaff7061cd9fbda8403a1d5fc34",
+              "size": 768,
+              "tags": [],
+              "zip_id": "atari2600_palettes",
               "path": "pext"
             }
           },
           "folders": {
-            "games": {
+            "games/Atari2600": {
+              "tags": [],
+              "zip_id": "atari2600_palettes",
               "path": "pext"
             },
-            "games/NES": {
+            "games/Atari2600/Palettes": {
+              "tags": [],
+              "zip_id": "atari2600_palettes",
               "path": "pext"
             },
-            "games/NES/Palette": {
+            "games/Atari2600/Palettes/Atari 2600 Only": {
+              "tags": [],
+              "zip_id": "atari2600_palettes",
               "path": "pext"
             }
           }
         },
-        "docs_neogeo": {
+        "cheats_folder_gba": {
           "files": {
-            "docs/NeoGeo/NeoGeo.md": {
-              "hash": "pqr678",
-              "size": 2905029,
-              "path": "pext"
+            "Cheats/GBA/007 - Everything or Nothing (USA, Europe) (En,Fr,De) [9D4F1E18].zip": {
+              "hash": "1e02569c2b9bf4bbf7655632738c8689",
+              "size": 2863,
+              "tags": [],
+              "zip_id": "cheats_folder_gba"
             }
           },
           "folders": {
-            "docs": {
-              "path": "pext"
-            },
-            "docs/NeoGeo": {
-              "path": "pext"
+            "Cheats/GBA": {
+              "tags": [],
+              "zip_id": "cheats_folder_gba"
             }
-          }
-        },
-        "saves_psx": {
-          "files": {
-            "saves/PSX/game.sav": {
-              "hash": "stu901",
-              "size": 23053025
-            }
-          },
-          "folders": {
-            "saves": {},
-            "saves/PSX": {}
           }
         }
       }
