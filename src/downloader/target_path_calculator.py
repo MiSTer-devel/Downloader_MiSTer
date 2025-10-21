@@ -32,21 +32,23 @@ from downloader.path_package import PATH_PACKAGE_KIND_PEXT, PATH_PACKAGE_KIND_ST
 
 
 class TargetPathsCalculatorFactory:
-    def __init__(self, file_system: FileSystem, external_drives_repository: ExternalDrivesRepository) -> None:
+    def __init__(self, file_system: FileSystem, external_drives_repository: ExternalDrivesRepository, old_pext_paths: set[str]) -> None:
         self._file_system = file_system
         self._external_drives_repository = external_drives_repository
+        self._old_pext_paths = old_pext_paths
         self._lock = threading.Lock()
 
     def target_paths_calculator(self, config: Config) -> 'TargetPathsCalculator':
         drives = list(self._external_drives_repository.connected_drives_except_base_path_drives(config))
-        return TargetPathsCalculator(self._file_system, config, drives, self._lock)
+        return TargetPathsCalculator(self._file_system, config, drives, self._old_pext_paths, self._lock)
 
 
 class TargetPathsCalculator:
-    def __init__(self, file_system: FileSystem, config: Config, drives: List[str], lock: threading.Lock) -> None:
+    def __init__(self, file_system: FileSystem, config: Config, drives: List[str], old_pext_paths: set[str], lock: threading.Lock) -> None:
         self._file_system = file_system
         self._config = config
         self._drives = drives
+        self._old_pext_paths = old_pext_paths
         self._lock = lock
         self._priority_top_folders: Dict[str, StoragePriorityRegistryEntry] = dict()
 
@@ -76,6 +78,12 @@ class TargetPathsCalculator:
                 pkg.kind = PATH_PACKAGE_KIND_STANDARD
                 pkg.pext_props = None
                 continue
+
+            # @TODO: Following condition should never happen. Remove once confidence in non-old-pext paths is 100%
+            if first_char == '|':
+                path = path[1:]
+                with self._lock:
+                    self._old_pext_paths.add(path)
 
             pkg._full_path = None
 
