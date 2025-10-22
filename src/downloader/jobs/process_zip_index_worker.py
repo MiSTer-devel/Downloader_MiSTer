@@ -18,7 +18,7 @@
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from downloader.db_entity import check_no_url_files, fix_zip
+from downloader.db_entity import check_no_url_files
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.index import Index
 from downloader.jobs.jobs_factory import make_zip_kind, make_transfer_job
@@ -42,19 +42,8 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         logger.bench('ProcessZipIndexWorker start: ', db.db_id, zip_id)
         store = job.store.select(job.zip_index).read_only()
 
-        if zip_index.needs_migration():
-            logger.bench('ProcessZipIndexWorker migrating zip index entity: ', db.db_id, zip_id)
-            error = zip_index.migrate(db.db_id)
-            if error is not None:
-                return [], error
-
-        logger.bench('ProcessZipIndexWorker fix zips: ', db.db_id, zip_id)
-        if fix_zip(zip_description):
-            job.has_new_zip_summary = True
-
         summary = Index(files=zip_index.files, folders=zip_index.folders)
         non_existing_pkgs, need_update_pkgs, created_folders, zip_data, error = process_index_job_main_sequence(self._ctx, job, summary, store)
-
         if error is not None:
             return [], error
 
@@ -71,9 +60,11 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         less_accumulated_mbs = total_files_size < (1000 * 1000 * config['zip_accumulated_mb_threshold'])
 
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
+            logger.debug('ProcessZipIndexWorker creating fetch jobs')
             next_jobs = create_fetch_jobs(self._ctx, db.db_id, non_existing_pkgs, need_update_pkgs, created_folders, zip_description.get('base_files_url', db.base_files_url))
 
         else:
+            logger.debug('ProcessZipIndexWorker make open zip contents jobs')
             next_jobs, error = self._make_open_zip_contents_job(job, non_existing_pkgs + need_update_pkgs, store)
             if error is not None:
                 return [], error

@@ -64,22 +64,22 @@ class FullRunService:
         self._logger.debug('config: ' + json.dumps(self._config, default=lambda o: str(o) if isinstance(o, Path) else o.__dict__, indent=4))
 
     def print_drives(self) -> int:
-        self._logger.bench('Print Drives start.')
+        self._logger.bench('FullRunService Print Drives start.')
 
         self._local_repository.set_logfile_path('/tmp/print_drives.log')
         self._logger.print('\nPrinting External Drives:')
         for drive in self._external_drives_repository.connected_drives():
             self._logger.print(drive)
 
-        self._logger.bench('Print Drives done.')
+        self._logger.bench('FullRunService Print Drives done.')
         self._remove_run_signal()
 
         return 0
 
     def full_run(self):
-        self._logger.bench('Full Run start.')
+        self._logger.bench('FullRunService Full Run start.')
         result = self._full_run_impl()
-        self._logger.bench('Full Run done.')
+        self._logger.bench('FullRunService Full Run done.')
         self._remove_run_signal()
 
         if not self._config['is_pc_launcher'] and self._needs_reboot():
@@ -186,7 +186,7 @@ class FullRunService:
         self._logger.print(f'Downloader 2.3 ({self._config["commit"][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
         self._logger.debug('Commit: %s', self._config["commit"])
         self._logger.print(f'Log: {self._local_repository.logfile_path}')
-        if len(box.unused_filter_tags()) > 0:
+        if len(box.skipped_dbs()) == 0 and len(box.unused_filter_tags()) > 0:
             self._logger.print()
             self._logger.print("Unused filter terms:")
             self._logger.print(format_files_message(box.unused_filter_tags()) + f" (Did you misspell {'it' if len(box.unused_filter_tags()) == 1 else 'them'}?)")

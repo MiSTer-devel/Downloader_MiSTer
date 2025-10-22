@@ -17,8 +17,6 @@
 
 from downloader.config import FileChecking, default_config
 from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, DB_STATE_SIGNATURE_NO_TIMESTAMP
-from downloader.jobs.process_db_main_worker import SKIPPING_DB_PROCESSING_LOG_MESSAGE
-from fake_logger import SpyLoggerDecorator, NoLogger
 from test.fake_online_importer import OnlineImporter
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
@@ -30,13 +28,11 @@ class TestOnlineImporterSkipDbProcessing(OnlineImporterTestBase):
 
     def test_download_db_process___when_file_checking_only_on_db_changes_and_signature_from_store_matches_downloaded_signature___does_nothing_and_ends_early(self):
         sut = self.download_db(db_sig=sig(), store_sig=sig(), config=config_with(file_checking=FileChecking.ON_DB_CHANGES))
-        self.assertReportsNothing(sut)
-        self.assertDbProcessingEndsEarly()
+        self.assertDoesNothingEndsEarly(sut)
 
     def test_download_db_process___when_default_file_checking_and_signature_from_store_matches_downloaded_signature___does_nothing_and_ends_normally(self):
         sut = self.download_db(db_sig=sig(), store_sig=sig(), config=default_config())
-        self.assertReportsNothing(sut)
-        self.assertDbProcessingEndsNormally()
+        self.assertDoesNothingEndsNormally(sut)
 
     def test_download_db_process___when_file_checking_only_on_db_but_signature_from_store_dont_match_db_signature___does_nothing_and_ends_normally_but_requires_save(self):
         for db_sig, store_sig in [
@@ -46,36 +42,32 @@ class TestOnlineImporterSkipDbProcessing(OnlineImporterTestBase):
         ]:
             with self.subTest(db_sig=db_sig, store_sig=store_sig):
                 sut = self.download_db(db_sig=db_sig, store_sig=store_sig, config=config_with(file_checking=FileChecking.ON_DB_CHANGES))
-                self.assertReportsNothing(sut, save=True)
-                self.assertDbProcessingEndsNormally()
+                self.assertDoesNothingEndsNormally(sut, save=True)
 
     def test_download_db_process___when_file_checking_only_on_db_but_config_filter_has_changed___does_nothing_and_ends_normally_but_requires_save(self):
         identical_sig = sig(filter_value='one')
         sut = self.download_db(db_sig=identical_sig, store_sig=identical_sig, config=config_with(file_checking=FileChecking.ON_DB_CHANGES, filter_value='two'))
-        self.assertReportsNothing(sut, save=True)
-        self.assertDbProcessingEndsNormally()
+        self.assertDoesNothingEndsNormally(sut, save=True)
 
     def test_download_db_process___when_file_checking_only_on_db_and_signatures_are_identical_but_invalid___does_nothing_and_ends_normally(self):
         for identical_sig in [sig(db_hash=DB_STATE_SIGNATURE_NO_HASH), sig(size=DB_STATE_SIGNATURE_NO_SIZE), sig(timestamp=DB_STATE_SIGNATURE_NO_TIMESTAMP)]:
             with self.subTest(identical_sig=identical_sig):
                 sut = self.download_db(db_sig=identical_sig, store_sig=identical_sig, config=config_with(file_checking=FileChecking.ON_DB_CHANGES))
-                self.assertReportsNothing(sut)
-                self.assertDbProcessingEndsNormally()
+                self.assertDoesNothingEndsNormally(sut)
 
     def download_db(self, db_sig: dict, store_sig: dict, config: dict) -> OnlineImporter:
-        self.logger = SpyLoggerDecorator(NoLogger())
         store = store_test_with_file_a_descr()
         sut = OnlineImporter\
-            .from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a], config=config), logger=self.logger)\
+            .from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a], config=config))\
             .add_db(db_test_with_file_a(timestamp=db_sig['timestamp']), store, store_sig=store_sig, db_sig=db_sig)\
             .download()
         return sut
 
-    def assertDbProcessingEndsEarly(self):
-        self.assertEqual([(SKIPPING_DB_PROCESSING_LOG_MESSAGE, db_test)], self.logger.debugCalls, 'Must include "skipping db process" when ends early.')
+    def assertDoesNothingEndsEarly(self, sut: OnlineImporter):
+        self.assertReportsNothing(sut, save=False, skipped_dbs=[db_test])
 
-    def assertDbProcessingEndsNormally(self):
-        self.assertEqual([], self.logger.debugCalls, 'Must not include "skipping db process" when ends normally.')
+    def assertDoesNothingEndsNormally(self, sut: OnlineImporter, save=False):
+        self.assertReportsNothing(sut, save=save, skipped_dbs=[])
 
 
 def sig(db_hash=None, size=None, timestamp=None, filter_value=None): return {
