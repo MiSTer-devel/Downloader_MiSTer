@@ -42,9 +42,9 @@ class LinuxUpdater:
         self._user_files: list[tuple[str, str]] = []
 
     def update_linux(self, dbs: List[DbEntity]) -> None:
-        self._logger.bench('Update Linux start.')
+        self._logger.bench('LinuxUpdater Update Linux start.')
         self._update_linux_impl(dbs)
-        self._logger.bench('Update Linux done.')
+        self._logger.bench('LinuxUpdater Update Linux done.')
 
     def _update_linux_impl(self, dbs: List[DbEntity]) -> None:
         for db in dbs:

@@ -22,7 +22,7 @@ import time
 import traceback
 from typing import Any, Optional, Protocol, TextIO, cast
 
-from downloader.config import Config
+from downloader.config import Config, Environment
 
 
 class Logger(Protocol):
@@ -104,26 +104,34 @@ class ConfigLogManager(Protocol):
     def configure(self, config: Config) -> None: pass
 
 class TopLogger(Logger, ConfigLogManager):
-    def __init__(self, print_logger: PrintLogger, file_logger: FileLogger) -> None:
+    def __init__(self, print_logger: PrintLogger, file_logger: FileLogger, verbose_mode: bool, bench_mode: bool, start_time: float) -> None:
         self.print_logger = print_logger
         self.file_logger = file_logger
-        self._verbose_mode = True
+        self._verbose_mode = verbose_mode
+        self._bench_mode = bench_mode
+        self._start_time = start_time
         self._received_exception = False
-        self._start_time: Optional[float] = None
 
     @staticmethod
-    def for_main() -> 'TopLogger':
-        return TopLogger(PrintLogger(), FileLogger())
+    def for_main(env: Environment, start_time: float) -> 'TopLogger':
+        verbose_mode = False
+        bench_mode = False
+        if env['LOGLEVEL'] != '':
+            if 'info' in env['LOGLEVEL']:
+                verbose_mode = False
+            if 'debug' in env['LOGLEVEL']:
+                verbose_mode = True
+            bench_mode = 'bench' in env['LOGLEVEL']
+        return TopLogger(PrintLogger(), FileLogger(), verbose_mode, bench_mode, start_time)
 
     def configure(self, config: Config) -> None:
-        if config['bench']:
-            self._start_time = config['start_time']
-        if not config['verbose']:
-            self._verbose_mode = False
+        self._bench_mode = config['bench']
+        self._verbose_mode = config['verbose']
 
     def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=False) -> None:
         self.print_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
         self.file_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
+
     def debug(self, *args: Any, sep: str='', end: str='\n', flush: bool=False) -> None:
         if self._verbose_mode is False and self._received_exception is False:
             if any(isinstance(a, BaseException) for a in args):
@@ -136,7 +144,7 @@ class TopLogger(Logger, ConfigLogManager):
             self.print_logger.debug(*trans_args, sep=sep, end=end, flush=flush)
         self.file_logger.debug(*trans_args, sep=sep, end=end, flush=flush)
     def bench(self, *args: Any) -> None:
-        if self._start_time is None:
+        if not self._bench_mode:
             return
 
         bench_header = f'BENCH {time_str(self._start_time)}| '

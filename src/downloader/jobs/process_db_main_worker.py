@@ -32,9 +32,6 @@ from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE, StoreFragmentZipSummary
 
 
-SKIPPING_DB_PROCESSING_LOG_MESSAGE = 'Skipping db process. No changes detected for: '
-
-
 class ProcessDbMainWorker(DownloaderWorkerBase):
     def job_type_id(self) -> int: return ProcessDbMainJob.type_id
     def reporter(self): return self._ctx.progress_reporter
@@ -52,17 +49,13 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
 
         read_only_store = store.read_only()
 
-        if db.needs_migration():
-            logger.bench('ProcessDbMainWorker migrating db: ', db.db_id)
-            error = db.migrate()
-            if error is not None:
-                return [], error
-
-        fix_folders(db.folders)
-
         self._ctx.file_download_session_logger.print_header(db)
         logger.bench("ProcessDbMainWorker Building db config: ", db.db_id)
         config = job.config = build_db_config(input_config=self._ctx.config, db=db, ini_description=ini_description)
+
+        ##################################
+        # HERE STARTS THE DB SETUP BLOCK #
+        ##################################
 
         sig = read_only_store.db_state_signature()
         if config['file_checking'] == FileChecking.ON_DB_CHANGES \
@@ -73,11 +66,26 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
             and sig['timestamp'] == db.timestamp \
             and sig['timestamp'] != DB_STATE_SIGNATURE_NO_TIMESTAMP \
             and sig['filter'] == config['filter']:
-                self._ctx.logger.debug(SKIPPING_DB_PROCESSING_LOG_MESSAGE, db.db_id)  # This message is used in tests.
+                job.skipped = True
+                self._ctx.logger.debug('Skipping db process. No changes detected for: ', db.db_id)  # This message is used in tests.
                 return [], None
+
+        if db.needs_migration():
+            logger.bench('ProcessDbMainWorker migrating db: ', db.db_id)
+            error = db.migrate()
+            if error is not None:
+                return [], error
+
+        fix_folders(db.folders)
 
         if not read_only_store.has_base_path():  # @TODO: should remove this from here at some point.
             store.write_only().set_base_path(config['base_path'])  # After that, all worker stores will be read-only.
+
+        # This whole DB SETUP BLOCK might go in another worker/part in the future.
+
+        ################################
+        # HERE ENDS THE DB SETUP BLOCK #
+        ################################
 
         for zip_id in list(read_only_store.zips):
             if zip_id in db.zips:
@@ -146,7 +154,7 @@ def _make_zip_job(stored_index: Optional[StoreFragmentZipSummary], z: ZipJobCont
         zip_summary = z.zip_description['internal_summary']
         job = _make_process_zip_job_from_ctx(z, zip_summary=zip_summary, has_new_zip_summary=True)
     else:
-        # This should never happen as is already validated in check_zip
+        # Unreachable: This should never happen as is already validated in check_zip
         raise RuntimeError(f"Zip {z.zip_id} in db {z.job.db.db_id} has no summary_file or internal_summary")
 
     return job, None
