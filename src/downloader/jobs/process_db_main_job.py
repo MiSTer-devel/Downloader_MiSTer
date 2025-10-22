@@ -42,3 +42,4 @@ class ProcessDbMainJob(Job):
     ignored_zips: List[str] = field(default_factory=list)
     removed_zips: List[str] = field(default_factory=list)
     config: Config = field(default_factory=default_config)
+    skipped: bool = field(default=False)

@@ -93,7 +93,7 @@ class LocalRepository(FilelogSaver):
             self._file_system.make_dirs(self._config['base_system_path'])
 
     def load_store(self):
-        self._logger.bench('Load store start.')
+        self._logger.bench('LocalRepository Load store start.')
         try:
             if self._file_system.is_file(self._storage_load_path):
                 local_store = self._file_system.load_dict_from_file(self._storage_load_path)
@@ -109,9 +109,9 @@ class LocalRepository(FilelogSaver):
                     continue
 
                 try:
-                    self._logger.bench('Open json start.')
+                    self._logger.bench('LocalRepository Open json start.')
                     external_store = self._file_system.load_dict_from_file(external_store_file)
-                    self._logger.bench('Open json done.')
+                    self._logger.bench('LocalRepository Open json done.')
                     self._store_migrator.migrate(external_store)  # not very strict with exceptions, because this file is easier to tweak
                 except Exception as e:
                     self._logger.debug(e)
@@ -133,7 +133,7 @@ class LocalRepository(FilelogSaver):
             self._logger.print('ERROR: Could not load store')
             return LocalStoreWrapper(make_new_local_store(self._store_migrator))
         finally:
-            self._logger.bench('Load store done.')
+            self._logger.bench('LocalRepository Load store done.')
 
     def has_last_successful_run(self):
         return self._file_system.is_file(self._last_successful_run)
@@ -146,7 +146,7 @@ class LocalRepository(FilelogSaver):
             self._logger.debug('Skipping local_store saving...')
             return None
 
-        self._logger.bench('Save store start.')
+        self._logger.bench('LocalRepository Save store start.')
         local_store = local_store_wrapper.unwrap_local_store()
         external_stores = {}
         for db_id, store in local_store['dbs'].items():
@@ -164,9 +164,9 @@ class LocalRepository(FilelogSaver):
 
         try:
             self._file_system.make_dirs_parent(self._storage_save_path)
-            self._logger.bench('Write main json start.')
+            self._logger.bench('LocalRepository Write main json start.')
             self._file_system.save_json(local_store, self._storage_save_path)
-            self._logger.bench('Write main json done.')
+            self._logger.bench('LocalRepository Write main json done.')
             if self._file_system.is_file(self._storage_old_path) and \
                     self._file_system.is_file(self._storage_save_path, use_cache=False):
                 self._file_system.unlink(self._storage_old_path)
@@ -174,9 +174,9 @@ class LocalRepository(FilelogSaver):
             external_drives = set(self._store_drives())
 
             for drive, store in external_stores.items():
-                self._logger.bench('Write external json start: ', drive)
+                self._logger.bench('LocalRepository Write external json start: ', drive)
                 self._file_system.save_json(store, os.path.join(drive, FILE_downloader_external_storage))
-                self._logger.bench('Write external json done: ', drive)
+                self._logger.bench('LocalRepository Write external json done: ', drive)
                 if drive in external_drives:
                     external_drives.remove(drive)
 
@@ -192,7 +192,7 @@ class LocalRepository(FilelogSaver):
         else:
             return None
         finally:
-            self._logger.bench('Save store end.')
+            self._logger.bench('LocalRepository Save store end.')
 
     def save_log_from_tmp(self, path) -> None:
         self._file_system.turn_off_logs()

@@ -17,7 +17,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import traceback
 import sys
 import os
 from pathlib import Path
@@ -34,7 +33,9 @@ def main(env: Environment, start_time: float) -> int:
     # This function should be called in __main__.py which just bootstraps the application.
     # It should receive an 'env' dictionary produced by calling the "read_env" function below.
 
-    logger = TopLogger.for_main()
+    logger = TopLogger.for_main(env, start_time)
+    logger.bench('MAIN start.')
+
     # noinspection PyBroadException
     try:
         exit_code = execute_full_run(
@@ -43,9 +44,11 @@ def main(env: Environment, start_time: float) -> int:
             sys.argv
         )
     except Exception as _:
+        import traceback
         logger.print(traceback.format_exc())
         exit_code = 1
 
+    logger.bench('MAIN end.')
     logger.file_logger.finalize()
     return exit_code
 

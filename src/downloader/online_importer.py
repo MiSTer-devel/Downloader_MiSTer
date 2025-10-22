@@ -125,6 +125,9 @@ class OnlineImporter:
             box.add_failed_db(open_db_job.section)
 
         for db_job in report.get_completed_jobs(ProcessDbMainJob):
+            if db_job.skipped:
+                box.add_skipped_db(db_job.db.db_id)
+
             box.add_installed_db(db_job.db, db_job.config, db_job.db_hash, db_job.db_size)
             for zip_id in db_job.ignored_zips:
                 box.add_failed_zip(db_job.db.db_id, zip_id)
@@ -497,6 +500,7 @@ class InstallationBox:
         self._duplicated_files: list[tuple[list[str], str]] = []
         self._non_duplicated_files: list[tuple[list[PathPackage], str]] = []
         self._unused_filter_tags: list[str] = []
+        self._skipped_dbs: list[str] = []
 
     def set_unused_filter_tags(self, tags: list[str]) -> None:
         self._unused_filter_tags = tags
@@ -532,6 +536,8 @@ class InstallationBox:
         if db_id not in self._skipped_updated_files:
             self._skipped_updated_files[db_id] = []
         self._skipped_updated_files[db_id].extend([p.rel_path for p in paths])
+    def add_skipped_db(self, db_id: str) -> None:
+        self._skipped_dbs.append(db_id)
     def add_file_fetch_started(self, path: str) -> None:
         self._fetch_started_files.append(path)
     def add_failed_file(self, path: str) -> None:
@@ -606,6 +612,7 @@ class InstallationBox:
     def updated_dbs(self) -> list[str]: return list(self._validated_files)
     def failed_dbs(self) -> list[str]: return list(self._failed_dbs)
     def unused_filter_tags(self): return self._unused_filter_tags
+    def skipped_dbs(self): return self._skipped_dbs
 
     def queue_directory_removal(self, dirs: list[PathPackage], db_id: str) -> None:
         if len(dirs) == 0: return

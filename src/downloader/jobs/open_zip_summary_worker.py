@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.db_entity import check_zip_summary, ZipIndexEntity
+from downloader.db_entity import check_zip_summary, ZipIndexEntity, fix_zip
 from downloader.jobs.worker_context import DownloaderWorkerBase
 from downloader.jobs.open_zip_summary_job import OpenZipSummaryJob
 from downloader.jobs.jobs_factory import make_process_zip_index_job
@@ -28,9 +28,13 @@ class OpenZipSummaryWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: OpenZipSummaryJob) -> WorkerResult:  # type: ignore[override]
         try:
+            logger = self._ctx.logger
+            db, zip_id = job.db, job.zip_id
+
+            logger.bench('OpenZipSummaryWorker load dict: ', db.db_id, zip_id)
             summary = self._ctx.file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())  # type: ignore[union-attr]
-            check_zip_summary(summary, job.db.db_id, job.zip_id)
-            base_files_url = job.db.base_files_url
+            check_zip_summary(summary, db.db_id, zip_id)
+            base_files_url = db.base_files_url
             if 'base_files_url' in job.zip_description:
                 base_files_url = job.zip_description['base_files_url']
 
@@ -39,12 +43,22 @@ class OpenZipSummaryWorker(DownloaderWorkerBase):
                                        base_files_url=summary.get('base_files_url', base_files_url),
                                        version=summary.get('v', 0))
 
+            if zip_index.needs_migration():
+                logger.bench('OpenZipSummaryWorker migrating zip index entity: ', db.db_id, zip_id)
+                error = zip_index.migrate(db.db_id)
+                if error is not None:
+                    return [], error
+
+            logger.bench('OpenZipSummaryWorker fix zips: ', db.db_id, zip_id)
+            fix_zip(job.zip_description, zip_index)
+            logger.bench('OpenZipSummaryWorker done: ', db.db_id, zip_id)
+
             return [make_process_zip_index_job(
-                zip_id=job.zip_id,
+                zip_id=zip_id,
                 zip_description=job.zip_description,
                 zip_index=zip_index,
                 config=job.config,
-                db=job.db,
+                db=db,
                 ini_description=job.ini_description,
                 store=job.store,
                 has_new_zip_summary=True

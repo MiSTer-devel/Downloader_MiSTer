@@ -123,7 +123,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
         job.repeated_store_presence = check_repeated_store_presence(ctx, store, chain(need_install_pkgs or [], job.present_validated_files))
 
     logger.bench(bench_label, ' Create folders: ', db.db_id, zip_id)
-    job.removed_folders, job.installed_folders, created_folders, job.failed_folders = process_create_folder_packages(ctx, create_folder_pkgs, db.db_id, filtered_summary.folders, store)
+    job.removed_folders, job.installed_folders, created_folders, job.failed_folders = process_create_folder_packages(ctx, create_folder_pkgs, db.db_id, filtered_summary.folders, store, bench_label)
     if len(job.failed_folders) > 0:
         return [], [], set(), {}, FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
 
@@ -168,9 +168,9 @@ def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkg
         validate_pkgs = existing  # @TODO: Cover this scenario in tests
         already_installed_pkgs = []
     else:
-        ctx.logger.bench('invalid hashes start: ', db_id, len(non_duplicated_pkgs))
+        ctx.logger.bench(bench_label, ' invalid hashes start: ', db_id, len(non_duplicated_pkgs))
         invalid_hashes = store.invalid_hashes(existing)
-        ctx.logger.bench('invalid hashes end: ', db_id, len(non_duplicated_pkgs))
+        ctx.logger.bench(bench_label, ' invalid hashes end: ', db_id, len(non_duplicated_pkgs))
         if any(invalid_hashes):
             validate_pkgs = [pkg for pkg, inv in zip(existing, invalid_hashes) if inv]
             already_installed_pkgs = [pkg for pkg, inv in zip(existing, invalid_hashes) if not inv]
@@ -235,7 +235,7 @@ def check_repeated_store_presence(ctx: DownloaderWorkerContext, store: ReadOnlyS
                 result.add(pkg.rel_path)  # @TODO: See if use_cache is needed, and if we should optimize this fs access
     return result
 
-def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter) -> Tuple[
+def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter, bench_label: str) -> Tuple[
     list[PathPackage],
     list[PathPackage],
     set[str],
@@ -296,9 +296,9 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
 
             folder_copies_to_be_removed.append(removed_pkg)
 
-    ctx.logger.bench('add_processed_folders start: ', db_id, len(processing_folders))
+    ctx.logger.bench(bench_label, ' add_processed_folders start: ', db_id, len(processing_folders))
     non_existing_folders = ctx.installation_report.add_processed_folders(processing_folders, db_id)
-    ctx.logger.bench('add_processed_folders done: ', db_id, len(processing_folders))
+    ctx.logger.bench(bench_label, ' add_processed_folders done: ', db_id, len(processing_folders))
 
     errors = []
     created_folders = set()
