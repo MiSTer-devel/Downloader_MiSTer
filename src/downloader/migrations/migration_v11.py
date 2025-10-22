@@ -26,27 +26,48 @@ class MigrationV11(MigrationBase):
 
     def migrate(self, local_store) -> None:
         for db_id, db_description in local_store.get('dbs', {}).items():
-            _migrate_v0(db_description.get('files', {}), db_description.get('folders', {}))
-            if 'zips' in db_description:
-                for zip_id, zip_description in db_description['zips'].items():
-                    if 'target_folder_path' in zip_description and len(zip_description['target_folder_path']) > 0 and zip_description['target_folder_path'][0] == '|':
-                        zip_description['target_folder_path'] = zip_description['target_folder_path'][1:]
-                        zip_description['path'] = 'pext'
+            pext_zips = set()
+            extract_all_zips = set()
+            for zip_id, zip_description in db_description.get('zips', {}).items():
+                is_extract_all = False
+                if zip_description.get('kind', '') == 'extract_all_contents':
+                    is_extract_all = True
+                    extract_all_zips.add(zip_id)
 
-                    if 'internal_summary' in zip_description:
-                        internal_summary = zip_description['internal_summary']
-                        _migrate_v0(internal_summary.get('files', {}), internal_summary.get('folders', {}))
+                is_pext = False
+                if 'target_folder_path' in zip_description and len(zip_description['target_folder_path']) > 0 and zip_description['target_folder_path'][0] == '|':
+                    zip_description['target_folder_path'] = zip_description['target_folder_path'][1:]
+                    zip_description['path'] = 'pext'
+                    is_pext = True
+                    pext_zips.add(zip_id)
 
-            if 'filtered_zip_data' in db_description:
-                for zip_id, data in db_description['filtered_zip_data'].items():
-                    _migrate_v0(data.get('files', {}), data.get('folders', {}))
+                if 'internal_summary' in zip_description:
+                    internal_summary = zip_description['internal_summary']
+                    _migrate_v0(internal_summary)
+                    if is_extract_all:
+                        if is_pext:
+                            _bulk_add_pext(internal_summary)
+                        else:
+                            _bulk_del_pext(internal_summary)
 
-def _migrate_v0(files: dict[str, Any], folders: dict[str, Any]) -> None:
-    _fix_old_pext(files)
-    _fix_old_pext(folders)
+            _migrate_v0(db_description)
+            _fix_pext_according_to_pext_zip(db_description.get('files', {}), pext_zips)
+            _fix_pext_according_to_pext_zip(db_description.get('folders', {}), pext_zips)
+
+            for zip_id, data in db_description.get('filtered_zip_data', {}).items():
+                _migrate_v0(data)
+                if zip_id in extract_all_zips:
+                    if zip_id in pext_zips:
+                        _bulk_add_pext(data)
+                    else:
+                        _bulk_del_pext(data)
 
 
-def _fix_old_pext(entries: dict[str, Any]) -> None:
+def _migrate_v0(entries: dict[str, Any]) -> None:
+    _bulk_fix_old_pext(entries.get('files', {}))
+    _bulk_fix_old_pext(entries.get('folders', {}))
+
+def _bulk_fix_old_pext(entries: dict[str, Any]) -> None:
     old_pext_entries = {f[1:]: _add_pext(d) for f, d in entries.items() if len(f) > 0 and f[0] == '|'}
     if len(old_pext_entries) > 0:
         non_old_pext_entries = {f: d for f, d in entries.items() if len(f) == 0 or f[0] != '|'}
@@ -57,3 +78,25 @@ def _fix_old_pext(entries: dict[str, Any]) -> None:
 def _add_pext(desc: dict[str, Any]) -> dict[str, Any]:
     desc['path'] = 'pext'
     return desc
+
+def _del_pext(desc: dict[str, Any]) -> dict[str, Any]:
+    if 'path' in desc and desc['path'] == 'pext':
+        del desc['path']
+    return desc
+
+def _bulk_add_pext(entries: dict[str, Any]) -> None:
+    entries['files'] = {f: _add_pext(d) for f, d in entries.get('files', {}).items()}
+    entries['folders'] = {f: _add_pext(d) for f, d in entries.get('folders', {}).items()}
+
+def _bulk_del_pext(entries: dict[str, Any]) -> None:
+    entries['files'] = {f: _del_pext(d) for f, d in entries.get('files', {}).items()}
+    entries['folders'] = {f: _del_pext(d) for f, d in entries.get('folders', {}).items()}
+
+def _fix_pext_according_to_pext_zip(col: dict[str, Any], pext_zips: set[str]) -> None:
+    for f, d in col.items():
+        if 'zip_id' in d:
+            zip_id = d['zip_id']
+            if zip_id in pext_zips:
+                _add_pext(d)
+            else:
+                _del_pext(d)

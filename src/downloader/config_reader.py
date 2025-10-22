@@ -86,8 +86,8 @@ class ConfigReader:
             if 'http' in self._env['LOGLEVEL']:
                 result['http_logging'] = True
 
-        if result['verbose']: self._logger.print("DEBUG| Reading file: %s" % config_path)
-        if result['bench']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read config start.')
+        self._logger.debug('Reading file:', config_path)
+        self._logger.bench('ConfigReader Read config start.')
 
         if self._env['DEFAULT_BASE_PATH'] is not None:
             result['base_path'] = self._env['DEFAULT_BASE_PATH']
@@ -95,7 +95,7 @@ class ConfigReader:
 
         ini_config = self._load_ini_config(config_path)
 
-        if result['bench']: self._logger.print(f'BENCH {time_str(self._start_time)}| Load ini done.')
+        self._logger.bench('ConfigReader Load ini done.')
 
         default_db = self._default_db_config()
 
@@ -110,13 +110,13 @@ class ConfigReader:
             elif section_id in result['databases']:
                 raise InvalidConfigParameter("Can't import db for section '%s' twice" % section_id)
 
-            if result['verbose']: self._logger.print("DEBUG| Reading '%s' db section" % section)
+            self._logger.debug("Reading db section:", section)
             result['databases'][section_id] = self._parse_database_section(default_db, parser, section_id)
 
-        if result['bench']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read sections done.')
+        self._logger.debug('Read sections done.')
 
         if len(result['databases']) == 0:
-            if result['verbose']: self._logger.print('DEBUG| Reading default db')
+            self._logger.debug('Reading default db')
             self._add_default_database(ini_config, result)
 
         if self._env['ALLOW_REBOOT'] is not None:
@@ -162,7 +162,7 @@ class ConfigReader:
 
         result['environment'] = self._env
 
-        if result['bench']: self._logger.print(f'BENCH {time_str(self._start_time)}| Read config done.')
+        self._logger.bench('ConfigReader Read config done.')
         return result
 
     @staticmethod

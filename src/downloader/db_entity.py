@@ -101,6 +101,30 @@ class DbEntity:
             'Update Downloader or configure "db_url" to point to a supported database version.'
         )
 
+@dataclass
+class ZipIndexEntity:
+    files: Dict[str, Any]
+    folders: Dict[str, Any]
+    base_files_url: str
+    version: int
+
+    def needs_migration(self) -> bool:
+        return self.version != DATABASE_LATEST_SUPPORTED_VERSION
+
+    def migrate(self, db_id: str) -> Optional[Exception]:
+        if self.version == 0:
+            migrate_v0(self.files, self.folders)
+            self.version += 1
+
+        if self.version == DATABASE_LATEST_SUPPORTED_VERSION:
+            return None
+
+        return DbVersionUnsupportedException(
+            f'ERROR: Database "{db_id}" version {self.version} requires a newer Downloader'
+            f' (current one supports up to v{DATABASE_LATEST_SUPPORTED_VERSION}).'
+            ' Update Downloader or configure "db_url" to point to a supported database version.'
+        )
+
 def check_zip(desc: dict[str, Any], db_id: str, zip_id: str) -> None:
     if 'kind' not in desc or desc['kind'] not in ('extract_all_contents', 'extract_single_files'):
         raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "kind" field. The database maintainer should fix this.')
@@ -127,6 +151,9 @@ def check_zip(desc: dict[str, Any], db_id: str, zip_id: str) -> None:
             raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Summary file needs a valid size. The database maintainer should fix this.')
         if 'url' not in desc['summary_file'] or not is_url_valid(desc['summary_file']['url']):
             raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Summary file needs a valid url. The database maintainer should fix this.')
+
+    if 'path' in desc and desc['path'] != 'pext':
+        del desc['path']
 
 def check_zip_summary(summary: dict[str, Any], db_id: str, zip_id: str) -> None:
     if 'files' not in summary or not isinstance(summary['files'], dict):
@@ -193,16 +220,27 @@ def fix_folders(folders: dict[str, Any]) -> None:
     for folder_path in to_fix:
         folders[folder_path[:-1]] = folders.pop(folder_path)
 
-def fix_zip(zip_desc: dict[str, Any]) -> bool:
-    if 'target_folder_path' in zip_desc and zip_desc['target_folder_path'][0] == '|':
+def fix_zip(zip_desc: dict[str, Any], zip_index: ZipIndexEntity) -> None:
+    if 'target_folder_path' in zip_desc and len(zip_desc['target_folder_path']) > 0 and zip_desc['target_folder_path'][0] == '|':
         zip_desc['target_folder_path'] = zip_desc['target_folder_path'][1:]
         zip_desc['path'] = 'pext'
-        return True
-    else:
-        return False
+
+    if zip_desc['kind'] == 'extract_all_contents':
+        if zip_desc.get('path', '') == 'pext':
+            for d in zip_index.files.values(): add_pext(d)
+            for d in zip_index.folders.values(): add_pext(d)
+        else:
+            for d in zip_index.files.values(): del_pext(d)
+            for d in zip_index.folders.values(): del_pext(d)
+
 
 def add_pext(desc: dict[str, Any]) -> dict[str, Any]:
     desc['path'] = 'pext'
+    return desc
+
+def del_pext(desc: dict[str, Any]) -> dict[str, Any]:
+    if 'path' in desc and desc['path'] == 'pext':
+        del desc['path']
     return desc
 
 def _validate_and_extract_parts_from_path(db_id: str, path: str) -> list[str]:
@@ -242,29 +280,6 @@ distribution_mister_exceptional_paths: Final[tuple[str, ...]] = tuple(item.lower
 class DbEntityValidationException(DownloaderError): pass
 class DbVersionUnsupportedException(DownloaderError): pass
 
-@dataclass
-class ZipIndexEntity:
-    files: Dict[str, Any]
-    folders: Dict[str, Any]
-    base_files_url: str
-    version: int
-
-    def needs_migration(self) -> bool:
-        return self.version != DATABASE_LATEST_SUPPORTED_VERSION
-
-    def migrate(self, db_id: str) -> Optional[Exception]:
-        if self.version == 0:
-            migrate_v0(self.files, self.folders)
-            self.version += 1
-
-        if self.version == DATABASE_LATEST_SUPPORTED_VERSION:
-            return None
-
-        return DbVersionUnsupportedException(
-            f'ERROR: Database "{db_id}" version {self.version} requires a newer Downloader'
-            f' (current one supports up to v{DATABASE_LATEST_SUPPORTED_VERSION}).'
-            ' Update Downloader or configure "db_url" to point to a supported database version.'
-        )
 
 def migrate_v0(files: dict[str, Any], folders: dict[str, Any]) -> None:
     fix_old_pext(files)
