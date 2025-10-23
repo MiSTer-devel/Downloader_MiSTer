@@ -137,7 +137,7 @@ class OnlineImporter(ProductionOnlineImporter):
 
         jobs = []
         for db, _store, ini_description in self.dbs:
-            process_main_db_job = ProcessDbMainJob(db=db, ini_description=ini_description, store=self._local_store.store_by_id(db.db_id))
+            process_main_db_job = ProcessDbMainJob(db=db, ini_description=ini_description, store=self._local_store.store_by_id(db.db_id), config=self._config)
             if db.db_id in self._db_sigs:
                 process_main_db_job.db_hash = self._db_sigs[db.db_id].get('hash', process_main_db_job.db_hash)
                 process_main_db_job.db_size = self._db_sigs[db.db_id].get('size', process_main_db_job.db_size)

@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import default_config
-from objects import store_descr, zipped_nes_palettes_id, zip_desc, folder_games_nes, empty_test_store
+from test.objects import store_descr, zipped_nes_palettes_id, zip_desc, folder_games_nes, empty_test_store
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.objects_old_pext import db_test_descr as db_test_descr_old_pext, zipped_nes_palettes_id as zipped_nes_palettes_id_old_pext
 from test.zip_objects_old_pext import files_nes_palettes as files_nes_palettes_old_pext, with_installed_nes_palettes_on_fs as with_installed_nes_palettes_on_fs_old_pext, \
@@ -26,7 +26,7 @@ from test.zip_objects_old_pext import files_nes_palettes as files_nes_palettes_o
     cheats_folder_id as cheats_folder_id_old_pext, cheats_folder_files as cheats_folder_files_old_pext, with_installed_cheats_folder_on_fs as with_installed_cheats_folder_on_fs_old_pext
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
-from zip_objects import cheats_folder_id, cheats_folder_zip_desc, cheats_folder_files, cheats_folder_folders, \
+from test.zip_objects import cheats_folder_id, cheats_folder_zip_desc, cheats_folder_files, cheats_folder_folders, \
     files_nes_palettes, folders_games_nes_palettes
 
 

@@ -16,25 +16,18 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import field, dataclass
-
-from downloader.config import ConfigDatabaseSection
-from downloader.job_system import Job, JobSystem
-from downloader.jobs.load_local_store_job import LoadLocalStoreJob
+from downloader.job_system import WorkerResult
 from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
-from downloader.jobs.transfer_job import TransferJob
+from downloader.jobs.worker_context import DownloaderWorkerBase
 
 
-@dataclass(eq=False, order=False)
-class OpenDbJob(Job):
-    type_id: int = field(init=False, default=JobSystem.get_job_type_id())
-    transfer_job: TransferJob # Job & Transferrer @TODO: Python 3.10
-    section: str
-    ini_description: ConfigDatabaseSection
-    load_local_store_sigs_job: LoadLocalStoreSigsJob
-    load_local_store_job: LoadLocalStoreJob
+class LoadLocalStoreSigsWorker(DownloaderWorkerBase):
+    def job_type_id(self) -> int: return LoadLocalStoreSigsJob.type_id
+    def reporter(self): return self._ctx.progress_reporter
 
-    def retry_job(self): return self.transfer_job
-
-    # Results
-    skipped: bool = field(default=False)
+    def operate_on(self, job: LoadLocalStoreSigsJob) -> WorkerResult:  # type: ignore[override]
+        logger = self._ctx.logger
+        logger.bench('LoadLocalStoreSigsWorker start.')
+        job.local_store_sigs = self._ctx.local_repository.load_store_sigs()
+        logger.bench('LoadLocalStoreSigsWorker done.')
+        return [], None

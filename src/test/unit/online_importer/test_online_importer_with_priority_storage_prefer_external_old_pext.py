@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from downloader.constants import MEDIA_FAT, MEDIA_USB0, MEDIA_USB1, STORAGE_PRIORITY_PREFER_EXTERNAL
-from objects import empty_test_store, store_descr, db_id_external_drives_1, db_id_external_drives_2
+from test.objects import empty_test_store, store_descr, db_id_external_drives_1, db_id_external_drives_2
 from test.fake_file_system_factory import fs_data
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.objects_old_pext import file_nes_smb1 as file_nes_smb1_old_pext, folder_games_nes as folder_games_nes_old_pext, \
@@ -54,7 +54,7 @@ from test.unit.online_importer.online_importer_with_priority_storage_test_base_o
     fs_files_smb1_on_fat as fs_files_smb1_on_fat_old_pext, \
     fs_files_smb1_and_contra_on_usb2 as fs_files_smb1_and_contra_on_usb2_old_pext, \
     fs_folders_nes_on_usb1 as fs_folders_nes_on_usb1_old_pext
-from unit.online_importer.online_importer_with_priority_storage_test_base import store_nes_zipped_palettes_on_usb1, \
+from test.unit.online_importer.online_importer_with_priority_storage_test_base import store_nes_zipped_palettes_on_usb1, \
     store_smb1_on_usb1, store_smb1, store_nes_zipped_palettes_on_fat, _store_files_foo, _store_files_s32x_md, \
     _store_files_smb1, _store_folders_docs_s32x, _store_folders_nes, _store_files_neogeo_md, _store_files_contra, \
     _store_folders_docs_neogeo

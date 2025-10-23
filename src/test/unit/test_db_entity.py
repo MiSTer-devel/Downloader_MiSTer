@@ -28,7 +28,7 @@ from downloader.db_entity import DbEntityValidationException, check_file_pkg, ch
 from downloader.db_options import DbOptionsValidationException
 from downloader.path_package import PathPackage, PathPackageKind, PathType
 from downloader.db_entity import DbEntity
-from objects import zipped_nes_palettes_id
+from test.objects import zipped_nes_palettes_id
 from test.objects import db_test, raw_db_empty_descr, db_empty, file_mister_descr, db_with_folders, file_a_descr, \
     db_test_with_file, db_entity, file_save_psx_castlevania, file_save_psx_castlevania_descr, folder_save_psx, file_a, \
     folder_a, file_nes_smb1, file_nes_smb1_descr, folder_games, folder_games_nes, zip_index_entity
@@ -36,7 +36,7 @@ from test.objects_old_pext import file_nes_smb1 as file_nes_smb1_old_pext, \
     db_entity as db_entity_old_pext, file_nes_smb1_descr as file_nes_smb1_descr_old_pext, \
     folder_games as folder_games_old_pext, folder_games_nes as folder_games_nes_old_pext
 from test.zip_objects_old_pext import zipped_nes_palettes_desc as zipped_nes_palettes_desc_old_pext, zipped_nes_palettes_id as zipped_nes_palettes_id_old_pext
-from zip_objects import zipped_nes_palettes_desc
+from test.zip_objects import zipped_nes_palettes_desc
 
 
 class TestDbEntity(unittest.TestCase):

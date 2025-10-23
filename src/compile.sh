@@ -9,8 +9,10 @@ TARGET_FILE="$(pwd)/${1}"
 
 cd src
 
-echo "default_commit = '$(git rev-parse --short HEAD)'" > "commit.py"
-
+NEW_COMMIT="default_commit = '$(git rev-parse --short HEAD)'"
+if [[ ! -f "commit.py" ]] || [[ "$(cat commit.py 2>/dev/null || echo '')" != "${NEW_COMMIT}" ]]; then
+  echo "${NEW_COMMIT}" > "commit.py"
+fi
 if [[ "${NUITKA_IMAGE:-}" == "" ]] ; then
   docker buildx build --platform=linux/arm/v7 --load -t arm32v7-nuitka -f Dockerfile.nuitka  .
 fi
