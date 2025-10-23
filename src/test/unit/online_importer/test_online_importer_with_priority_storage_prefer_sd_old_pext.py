@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.constants import FILE_PDFViewer, MEDIA_FAT, K_BASE_PATH
-from objects import empty_store, store_descr, store_test_with_file_a_descr, db_id_external_drives_1, \
+from test.objects import empty_store, store_descr, store_test_with_file_a_descr, db_id_external_drives_1, \
     db_id_external_drives_2
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data
@@ -70,7 +70,7 @@ from test.unit.online_importer.online_importer_with_priority_storage_test_base_o
     OnlineImporterWithPriorityStorageTestBaseOldPext as OnlineImporterWithPriorityStorageTestBaseOldPext, \
     fs_files_nes_palettes_on_usb1 as fs_files_nes_palettes_on_usb1_old_pext, \
     fs_files_sonic_on_usb1 as fs_files_sonic_on_usb1_old_pext
-from unit.online_importer.online_importer_with_priority_storage_test_base import store_smb1_on_usb1, \
+from test.unit.online_importer.online_importer_with_priority_storage_test_base import store_smb1_on_usb1, \
     store_nes_folder_on_usb1, store_smb1_on_usb2, store_smb1_on_usb1_and_usb2, store_nes_folder_on_usb1_and_usb2, \
     store_smb1, store_smb1_on_fat_and_usb1, store_smb1_on_delme, store_pdfviewer_on_base_system_path_hidden, \
     store_smb1_and_contra, store_smb1_and_contra_on_fat_and_usb1, store_smb1_on_fat_and_smb1_and_contra_on_usb1, \

@@ -18,7 +18,7 @@
 
 import unittest
 from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_FILTER
-from objects import empty_test_store, store_descr, zipped_nes_palettes_id, folder_games, file_nes_palette_a, \
+from test.objects import empty_test_store, store_descr, zipped_nes_palettes_id, folder_games, file_nes_palette_a, \
     folder_games_nes_palettes, folder_games_nes
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data
@@ -30,7 +30,7 @@ from test.zip_objects_old_pext import file_nes_palette_a_descr_zipped as file_ne
     zipped_nes_palettes_desc as zipped_nes_palettes_desc_old_pext, \
     zipped_nes_palettes_id as zipped_nes_palettes_id_old_pext, \
     folder_games_nes_palettes as folder_games_nes_palettes_old_pext
-from zip_objects import zipped_nes_palettes_desc, file_nes_palette_a_descr_zipped
+from test.zip_objects import zipped_nes_palettes_desc, file_nes_palette_a_descr_zipped
 
 
 # @TODO: Remove this file when support for the old pext syntax '|' is removed

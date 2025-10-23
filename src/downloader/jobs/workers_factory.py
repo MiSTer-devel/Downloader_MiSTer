@@ -22,6 +22,7 @@ from downloader.jobs.abort_worker import AbortWorker
 from downloader.jobs.copy_data_worker import CopyDataWorker
 from downloader.jobs.fetch_data_worker import FetchDataWorker
 from downloader.jobs.fetch_file_worker import FetchFileWorker
+from downloader.jobs.load_local_store_sigs_worker import LoadLocalStoreSigsWorker
 from downloader.jobs.load_local_store_worker import LoadLocalStoreWorker
 from downloader.jobs.open_db_worker import OpenDbWorker
 from downloader.jobs.open_zip_contents_worker import OpenZipContentsWorker
@@ -44,6 +45,7 @@ def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
         WaitDbZipsWorker(ctx),
         ProcessDbMainWorker(ctx),
         ProcessZipIndexWorker(ctx),
+        LoadLocalStoreSigsWorker(ctx),
         LoadLocalStoreWorker(ctx),
         OpenZipSummaryWorker(ctx),
         OpenZipContentsWorker(ctx),

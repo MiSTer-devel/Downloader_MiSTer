@@ -33,6 +33,7 @@ class ProcessDbMainJob(Job):
     db: DbEntity
     store: StoreWrapper
     ini_description: ConfigDatabaseSection
+    config: Config = field(default_factory=default_config)
     db_hash: str = field(default=DB_STATE_SIGNATURE_NO_HASH)
     db_size: int = field(default=DB_STATE_SIGNATURE_NO_SIZE)
 
@@ -41,5 +42,3 @@ class ProcessDbMainJob(Job):
     # Results
     ignored_zips: List[str] = field(default_factory=list)
     removed_zips: List[str] = field(default_factory=list)
-    config: Config = field(default_factory=default_config)
-    skipped: bool = field(default=False)

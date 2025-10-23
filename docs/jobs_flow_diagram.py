@@ -10,15 +10,17 @@ dot = Digraph(
         'fillcolor': 'lightgrey',
         'fontname': 'Helvetica'
     },
-    edge_attr={'color': 'black'}
+    edge_attr={'color': 'black', 'fontname': 'Helvetica-Narrow', 'fontsize': '10'}
 )
 
 # NON-ZIP NODES
 dot.node('START', 'START', shape='ellipse', fillcolor='black', fontcolor='white')
 dot.node('END', 'END', shape='ellipse', fillcolor='#77DD77')
+dot.node('SKIP', 'SKIP', shape='ellipse', fillcolor='#77DD77')
 dot.node('ABORT', 'ABORT', shape='ellipse', fillcolor='#ff8f8f')
 dot.node('A', 'FetchDataJob [db]')
-dot.node('B', 'LoadLocalStoreJob', fillcolor='#ffefd5')
+dot.node('B1', 'LoadLocalStoreSigsJob', fillcolor='#ffefd5')
+dot.node('B2', 'LoadLocalStoreJob', fillcolor='#ffefd5')
 dot.node('C', 'OpenDbJob', fillcolor='#B0E0E6')
 dot.node('D', 'ProcessDbMainJob', fillcolor='#B0E0E6')
 dot.node('E', 'ProcessDbIndexJob', fillcolor='#B0E0E6:#ffefd5')
@@ -30,7 +32,8 @@ dot.node('1', 'File System', fillcolor='#ffefd5')
 dot.node('2', 'Network')
 
 dot.edge('START', 'A', label='1:N')
-dot.edge('START', 'B')
+dot.edge('START', 'B1')
+dot.edge('START', 'B2')
 
 dot.edge('A', 'C', weight='10')
 dot.edge('C', 'D', weight='10', label=' db + store')
@@ -38,15 +41,31 @@ dot.edge('D', 'E', weight='10', label=' if no zips')
 
 dot.edge('E', 'M', label=' 1:N')
 
-dot.edge('B', 'C', style='dotted', constraint='true', label='wait\nstore', dir='back')
+dot.edge('B2', 'C', style='dotted', constraint='true', label='wait\nstore', dir='back')
+dot.edge('B1', 'C', style='dotted', constraint='true', label='wait\nstore sig', dir='back')
 
-dot.edge('B', 'B', label=' retry', style='dashed', constraint='false')
+# Keep B1 and B2 on same rank, with B1 to the left of B2
+dot.edge('B1', 'B2', style='invis')
+with dot.subgraph() as s:
+    s.attr(rank='same')
+    s.node('B1')
+    s.node('B2')
+
+with dot.subgraph() as s:
+    s.attr(rank='same')
+    s.node('SKIP')
+    s.node('ABORT')
+
+dot.edge('SKIP', 'ABORT', style='invis')
+
+dot.edge('B2', 'B2', label=' retry', style='dashed', constraint='false')
 dot.edge('A', 'A', label=' retry', style='dashed', constraint='false')
 dot.edge('C', 'A', label=' retry', style='dashed', constraint='true')
 dot.edge('M', 'M', label=' retry', style='dashed', constraint='false')
 
 dot.edge('M', 'END', weight='20', constraint='true')
-dot.edge('B', 'ABORT', weight='20', constraint='true', label=' if always fails', style='dashed')
+dot.edge('B2', 'ABORT', weight='20', constraint='true', label=' if always fails', style='dashed')
+dot.edge('C', 'SKIP', weight='1', constraint='false', label=' if db sig == store sig')
 
 dot.render('jobs_diagram', format='png', cleanup=True)
 

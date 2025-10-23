@@ -16,14 +16,15 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import os
-from typing import Optional
+from typing import Optional, Any
 
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
-    FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json
+    FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json, \
+    FILE_downloader_storage_sigs_json
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.fail_policy import FailPolicy
 from downloader.file_system import FileSystem, FsError
-from downloader.local_store_wrapper import LocalStoreWrapper
+from downloader.local_store_wrapper import LocalStoreWrapper, DbStateSig
 from downloader.logger import FilelogSaver, Logger
 from downloader.other import empty_store_without_base_path
 from downloader.store_migrator import make_new_local_store, StoreMigrator
@@ -41,23 +42,24 @@ class LocalRepository(FilelogSaver):
         self._storage_path_save_value: Optional[str] = None
         self._storage_path_old_value: Optional[str] = None
         self._storage_path_load_value: Optional[str] = None
+        self._store_sigs_path_value: Optional[str] = None
         self._last_successful_run_value: Optional[str] = None
         self._logfile_path_value: Optional[str] = None
 
     @property
-    def _storage_save_path(self):
+    def _storage_save_path(self) -> str:
         if self._storage_path_save_value is None:
             self._storage_path_save_value = os.path.join(self._config['base_system_path'], FILE_downloader_storage_json)
         return self._storage_path_save_value
 
     @property
-    def _storage_old_path(self):
+    def _storage_old_path(self) -> str:
         if self._storage_path_old_value is None:
             self._storage_path_old_value = os.path.join(self._config['base_system_path'], FILE_downloader_storage_zip)
         return self._storage_path_old_value
 
     @property
-    def _storage_load_path(self):
+    def _storage_load_path(self) -> str:
         if self._storage_path_load_value is None:
             if self._file_system.is_file(self._storage_old_path):
                 store_path = self._storage_old_path
@@ -67,13 +69,19 @@ class LocalRepository(FilelogSaver):
         return self._storage_path_load_value
 
     @property
-    def _last_successful_run(self):
+    def _store_sigs_path(self) -> str:
+        if self._store_sigs_path_value is None:
+            self._store_sigs_path_value = os.path.join(self._config['base_system_path'], FILE_downloader_storage_sigs_json)
+        return self._store_sigs_path_value
+
+    @property
+    def _last_successful_run(self) -> str:
         if self._last_successful_run_value is None:
             self._last_successful_run_value = os.path.join(self._config['base_system_path'], FILE_downloader_last_successful_run % self._config['config_path'].stem)
         return self._last_successful_run_value
 
     @property
-    def logfile_path(self):
+    def logfile_path(self) -> str:
         if self._logfile_path_value is None:
             if self._config['logfile'] is not None:
                 self._logfile_path_value = self._config['logfile']
@@ -135,6 +143,22 @@ class LocalRepository(FilelogSaver):
         finally:
             self._logger.bench('LocalRepository Load store done.')
 
+    def load_store_sigs(self) -> Optional[dict[str, DbStateSig]]:
+        self._logger.bench('LocalRepository Load store sigs start.')
+        try:
+            if self._file_system.is_file(self._store_sigs_path):
+                return self._file_system.load_dict_from_file(self._store_sigs_path)
+            else:
+                return None
+        except Exception as e:
+            if self._fail_policy == FailPolicy.FAIL_FAST:
+                raise e
+            self._logger.debug(e)
+            self._logger.print('WARNING: Could not load store sigs')
+            return None
+        finally:
+            self._logger.bench('LocalRepository Load store sigs done.')
+
     def has_last_successful_run(self):
         return self._file_system.is_file(self._last_successful_run)
 
@@ -164,9 +188,11 @@ class LocalRepository(FilelogSaver):
 
         try:
             self._file_system.make_dirs_parent(self._storage_save_path)
-            self._logger.bench('LocalRepository Write main json start.')
+            self._logger.bench('LocalRepository Write store json start.')
             self._file_system.save_json(local_store, self._storage_save_path)
-            self._logger.bench('LocalRepository Write main json done.')
+            self._logger.bench('LocalRepository Write store main end.')
+            self._file_system.save_json(local_store.get('db_sigs', {}), self._store_sigs_path)
+            self._logger.bench('LocalRepository Write store db_sigs end.')
             if self._file_system.is_file(self._storage_old_path) and \
                     self._file_system.is_file(self._storage_save_path, use_cache=False):
                 self._file_system.unlink(self._storage_old_path)
@@ -177,8 +203,7 @@ class LocalRepository(FilelogSaver):
                 self._logger.bench('LocalRepository Write external json start: ', drive)
                 self._file_system.save_json(store, os.path.join(drive, FILE_downloader_external_storage))
                 self._logger.bench('LocalRepository Write external json done: ', drive)
-                if drive in external_drives:
-                    external_drives.remove(drive)
+                external_drives.discard(drive)
 
             for drive in external_drives:
                 db_to_clean = os.path.join(drive, FILE_downloader_external_storage)
