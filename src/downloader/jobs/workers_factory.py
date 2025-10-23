@@ -24,6 +24,7 @@ from downloader.jobs.fetch_data_worker import FetchDataWorker
 from downloader.jobs.fetch_file_worker import FetchFileWorker
 from downloader.jobs.load_local_store_sigs_worker import LoadLocalStoreSigsWorker
 from downloader.jobs.load_local_store_worker import LoadLocalStoreWorker
+from downloader.jobs.mix_store_and_db_worker import MixStoreAndDbWorker
 from downloader.jobs.open_db_worker import OpenDbWorker
 from downloader.jobs.open_zip_contents_worker import OpenZipContentsWorker
 from downloader.jobs.open_zip_summary_worker import OpenZipSummaryWorker
@@ -41,6 +42,7 @@ def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
         FetchFileWorker(progress_reporter=ctx.progress_reporter, http_gateway=ctx.http_gateway, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout']),
         FetchDataWorker(ctx, timeout=ctx.config['downloader_timeout']),
         OpenDbWorker(ctx),
+        MixStoreAndDbWorker(ctx),
         ProcessDbIndexWorker(ctx),
         WaitDbZipsWorker(ctx),
         ProcessDbMainWorker(ctx),

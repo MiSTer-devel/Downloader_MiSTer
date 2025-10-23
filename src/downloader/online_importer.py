@@ -35,6 +35,7 @@ from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.jobs_factory import make_transfer_job
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob, local_store_tag
 from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
+from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.reporters import InstallationReport
@@ -83,8 +84,7 @@ class OnlineImporter:
                 load_local_store_job=load_local_store_job,
             )
             jobs.append(transfer_job)  # type: ignore[arg-type]
-        position = int(len(jobs) / 2) + 1
-        jobs[position:position] = [load_local_store_sigs_job, load_local_store_job]
+        jobs.insert(int(len(jobs) / 2) + 1, load_local_store_sigs_job)
         return jobs
 
     def download_dbs_contents(self, db_pkgs: list[DbSectionPackage]) -> Optional[BaseException]:
@@ -182,6 +182,13 @@ class OnlineImporter:
 
         for open_db_job, _e in report.get_failed_jobs(OpenDbJob):
             box.add_failed_db(open_db_job.section)
+
+        for mount_store_db_job in report.get_completed_jobs(MixStoreAndDbJob):
+            if mount_store_db_job.skipped is True:
+                box.add_skipped_db(mount_store_db_job.db.db_id)
+
+        for mount_store_db_job, _e in report.get_failed_jobs(MixStoreAndDbJob):
+            box.add_failed_db(mount_store_db_job.db.db_id)
 
         if len(box.skipped_dbs()) == len(db_pkgs):
             logger.bench('OnlineImporter early end.')
