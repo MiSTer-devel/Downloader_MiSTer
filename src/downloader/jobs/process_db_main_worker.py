@@ -48,26 +48,16 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
 
         read_only_store = store.read_only()
 
-        ##################################
-        # HERE STARTS THE DB SETUP BLOCK #
-        ##################################
-
-        if db.needs_migration():
+        if db.needs_migration():  # @TODO: Maybe this should be moved to OpenDbWorker
             logger.bench('ProcessDbMainWorker migrating db: ', db.db_id)
             error = db.migrate()
             if error is not None:
                 return [], error
 
-        fix_folders(db.folders)
+        fix_folders(db.folders)  # @TODO: Maybe this should be moved to OpenDbWorker
 
         if not read_only_store.has_base_path():  # @TODO: should remove this from here at some point.
             store.write_only().set_base_path(config['base_path'])  # After that, all worker stores will be read-only.
-
-        # This whole DB SETUP BLOCK might go in another worker/part in the future.
-
-        ################################
-        # HERE ENDS THE DB SETUP BLOCK #
-        ################################
 
         for zip_id in list(read_only_store.zips):
             if zip_id in db.zips:
