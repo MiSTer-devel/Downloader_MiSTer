@@ -42,7 +42,7 @@ class MixStoreAndDbWorker(DownloaderWorkerBase):
 
         store = local_store.store_by_id(job.db.db_id)
         sig = store.read_only().db_state_signature()
-        if can_skip_db(job.config, sig, job.db_hash, job.db_size, job.db):
+        if can_skip_db(job.config, sig, job.db_hash, job.db_size, job.db):  # @TODO: Eventually we can remove this check altogether and just rely in the one from the previous step
             self._ctx.logger.debug('Skipping db process. No changes detected for: ', job.db.db_id)
             job.skipped = True
             return [], None
