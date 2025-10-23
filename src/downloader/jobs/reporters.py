@@ -141,14 +141,12 @@ class JobTagTracking:
             return
 
         for tag in job.tags:
-            if job_id not in self.in_progress[tag]:
-                continue
-            self.in_progress[tag].remove(job_id)
+            self.in_progress[tag].discard(job_id)
 
     def _reset_lifecycle(self, job: Job) -> None:
         job_id = id(job)
-        if job_id in self._initiated: self._initiated.remove(job_id)
-        if job_id in self._ended: self._ended.remove(job_id)
+        self._initiated.discard(job_id)
+        self._ended.discard(job_id)
 
 T = TypeVar('T')
 class _WithLock(Generic[T]):
