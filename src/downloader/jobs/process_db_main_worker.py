@@ -21,7 +21,6 @@ from typing import Dict, Any, Optional, Tuple
 from downloader.config import FileChecking
 from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, DB_STATE_SIGNATURE_NO_TIMESTAMP
 from downloader.db_entity import check_zip, fix_folders, ZipIndexEntity
-from downloader.db_utils import build_db_config
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_process_zip_index_job, make_open_zip_summary_job, make_zip_tag, ZipJobContext
 from downloader.jobs.wait_db_zips_job import WaitDbZipsJob
@@ -49,26 +48,9 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
 
         read_only_store = store.read_only()
 
-        self._ctx.file_download_session_logger.print_header(db)
-        logger.bench("ProcessDbMainWorker Building db config: ", db.db_id)
-        config = job.config = build_db_config(input_config=self._ctx.config, db=db, ini_description=ini_description)
-
         ##################################
         # HERE STARTS THE DB SETUP BLOCK #
         ##################################
-
-        sig = read_only_store.db_state_signature()
-        if config['file_checking'] == FileChecking.ON_DB_CHANGES \
-            and sig['hash'] == job.db_hash \
-            and sig['hash'] != DB_STATE_SIGNATURE_NO_HASH \
-            and sig['size'] == job.db_size \
-            and sig['size'] != DB_STATE_SIGNATURE_NO_SIZE \
-            and sig['timestamp'] == db.timestamp \
-            and sig['timestamp'] != DB_STATE_SIGNATURE_NO_TIMESTAMP \
-            and sig['filter'] == config['filter']:
-                job.skipped = True
-                self._ctx.logger.debug('Skipping db process. No changes detected for: ', db.db_id)  # This message is used in tests.
-                return [], None
 
         if db.needs_migration():
             logger.bench('ProcessDbMainWorker migrating db: ', db.db_id)

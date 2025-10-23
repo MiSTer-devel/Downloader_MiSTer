@@ -65,6 +65,7 @@ def operations_dict(**kwargs):
         'run_compile': lambda: run_compile(**kwargs),
         'launcher': lambda: run_launcher(**kwargs),
         'copy': lambda: [scp_file(sys.argv[2], f'/media/fat/{sys.argv[2]}'), print('OK')],
+        'rcopy': lambda: [scp_file(f'/media/fat/{sys.argv[2]}', sys.argv[2]), print('OK')],
     }
 
 def _main():
