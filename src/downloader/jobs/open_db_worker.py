@@ -17,21 +17,24 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from typing import Any
+from threading import Lock
 
-from downloader.config import FileChecking, Config
-from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, DB_STATE_SIGNATURE_NO_TIMESTAMP
+from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
 from downloader.db_entity import DbEntity
-from downloader.db_utils import build_db_config
+from downloader.db_utils import build_db_config, can_skip_db
 from downloader.job_system import WorkerResult
-from downloader.jobs.load_local_store_job import local_store_tag
 from downloader.jobs.load_local_store_sigs_job import local_store_sigs_tag
+from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.open_db_job import OpenDbJob
-from downloader.jobs.process_db_main_job import ProcessDbMainJob
-from downloader.jobs.worker_context import DownloaderWorkerBase
-from downloader.local_store_wrapper import DbStateSig
+from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
 
 
 class OpenDbWorker(DownloaderWorkerBase):
+    def __init__(self, ctx: DownloaderWorkerContext):
+        super().__init__(ctx)
+        self._lock = Lock()
+        self._returned_load_local_store_job = False
+
     def job_type_id(self) -> int: return OpenDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
@@ -68,38 +71,28 @@ class OpenDbWorker(DownloaderWorkerBase):
         if sigs is not None:
             sig = sigs.get(job.section, None)
             if sig is not None:
-                if can_skip(config, sig, db_hash, db_size, db):
+                if can_skip_db(config, sig, db_hash, db_size, db):
                     self._ctx.logger.debug('Skipping db process. No changes detected for: ', db.db_id)
                     job.skipped = True
                     return [], None
 
-        # @TODO (critical): Instead of waiting for the local store here, we should return a LoadLocalStoreJob (just once, using a lock), and a new job that will wait for that to do this check and then call the db. Then the LoadLocalStoreJob should not be in the job system at the start.
-        # If all goes well, we could be at 2.3secs range.
-        while self._ctx.installation_report.any_in_progress_job_with_tags(_local_store_tags):
-            self._ctx.logger.bench('OpenDbWorker waiting for store: ', job.section)
-            self._ctx.job_ctx.wait_for_other_jobs(0.06)
+        jobs = []
+        with self._lock:
+            if not self._returned_load_local_store_job:
+                self._returned_load_local_store_job = True
+                jobs.append(job.load_local_store_job)
 
-        self._ctx.logger.bench('OpenDbWorker store received: ', job.section)
-        local_store = job.load_local_store_job.local_store
-        if local_store is None:
-            return [], Exception('OpenDbWorker must receive a LoadLocalStoreJob with local_store not null.')
-
-        store = local_store.store_by_id(job.section)
-        sig = store.read_only().db_state_signature()
-        if can_skip(config, sig, db_hash, db_size, db):
-            self._ctx.logger.debug('Skipping db process. No changes detected for: ', db.db_id)
-            job.skipped = True
-            return [], None
-
-        self._ctx.logger.bench('OpenDbWorker done: ', job.section)
-        return [ProcessDbMainJob(
+        jobs.append(MixStoreAndDbJob(
             db=db,
             db_hash=db_hash,
             db_size=db_size,
             ini_description=ini_description,
-            store=store,
             config=config,
-        )], None
+            load_local_store_job=job.load_local_store_job
+        ))
+
+        self._ctx.logger.bench('OpenDbWorker done: ', job.section)
+        return jobs, None
 
     def _open_db(self, section: str, source: str, transfer: Any, /) -> DbEntity:
         db_props = self._ctx.file_system.load_dict_from_transfer(source, transfer)
@@ -107,13 +100,5 @@ class OpenDbWorker(DownloaderWorkerBase):
         db_entity = DbEntity(db_props, section)
         return db_entity
 
-def can_skip(config: Config, sig: DbStateSig, db_hash: str, db_size: int, db: DbEntity) -> bool:
-    return config['file_checking'] == FileChecking.ON_DB_CHANGES \
-        and sig['hash'] == db_hash and sig['hash'] != DB_STATE_SIGNATURE_NO_HASH \
-        and sig['size'] == db_size and sig['size'] != DB_STATE_SIGNATURE_NO_SIZE \
-        and sig['timestamp'] == db.timestamp and sig['timestamp'] != DB_STATE_SIGNATURE_NO_TIMESTAMP \
-        and sig['filter'] == config['filter']
 
-
-_local_store_tags = [local_store_tag]
 _local_store_sigs_tags = [local_store_sigs_tag]

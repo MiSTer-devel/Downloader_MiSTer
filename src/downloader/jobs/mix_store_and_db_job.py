@@ -17,22 +17,21 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import List
 
 from downloader.config import Config, default_config, ConfigDatabaseSection
 from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.jobs.load_local_store_job import LoadLocalStoreJob
 
 
 @dataclass(eq=False, order=False)
-class ProcessDbMainJob(Job):
+class MixStoreAndDbJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
     db: DbEntity
-    store: StoreWrapper
     ini_description: ConfigDatabaseSection
+    load_local_store_job: LoadLocalStoreJob
     config: Config = field(default_factory=default_config)
     db_hash: str = field(default=DB_STATE_SIGNATURE_NO_HASH)
     db_size: int = field(default=DB_STATE_SIGNATURE_NO_SIZE)
@@ -40,5 +39,4 @@ class ProcessDbMainJob(Job):
     def retry_job(self): return None
 
     # Results
-    ignored_zips: List[str] = field(default_factory=list)
-    removed_zips: List[str] = field(default_factory=list)
+    skipped: bool = field(default=False)

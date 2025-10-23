@@ -20,9 +20,10 @@
 from dataclasses import dataclass
 from typing import List, Tuple
 
-from downloader.config import Config, ConfigDatabaseSection
+from downloader.config import Config, ConfigDatabaseSection, FileChecking
+from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, DB_STATE_SIGNATURE_NO_TIMESTAMP
 from downloader.db_entity import DbEntity
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.local_store_wrapper import DbStateSig
 
 
 @dataclass
@@ -63,3 +64,10 @@ def build_db_config(input_config: Config, db: DbEntity, ini_description: ConfigD
             result['filter'] = result['filter'].lower().replace('[mister]', mister_filter).strip()
 
     return result
+
+def can_skip_db(config: Config, sig: DbStateSig, db_hash: str, db_size: int, db: DbEntity) -> bool:
+    return config['file_checking'] == FileChecking.ON_DB_CHANGES \
+        and sig['hash'] == db_hash and sig['hash'] != DB_STATE_SIGNATURE_NO_HASH \
+        and sig['size'] == db_size and sig['size'] != DB_STATE_SIGNATURE_NO_SIZE \
+        and sig['filter'] == config['filter']
+# Not really needed because collisions are very improbable, but if we are paranoid we can add: and sig['timestamp'] == db.timestamp and sig['timestamp'] != DB_STATE_SIGNATURE_NO_TIMESTAMP \
