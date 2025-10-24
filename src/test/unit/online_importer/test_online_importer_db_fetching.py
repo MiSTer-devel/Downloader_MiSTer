@@ -29,7 +29,7 @@ from downloader.jobs.load_local_store_job import LoadLocalStoreJob
 from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
 from downloader.jobs.open_db_job import OpenDbJob
 from test.fake_importer_implicit_inputs import NetworkState
-from test.fake_online_importer import OnlineImporter
+from test.fake_online_importer import OnlineImporter, StartJobPolicy
 from test.objects import db_test_descr, db_test, media_usb0
 from test.fake_file_system_factory import FileSystemFactory
 
@@ -67,7 +67,7 @@ class TestOnlineImporterDbFetching(unittest.TestCase):
         sut = OnlineImporter(
             file_system_factory=file_system_factory,
             network_state=NetworkState(remote_files={http_db_url: db_description}),
-            start_on_db_processing=False,
+            start_job_policy=StartJobPolicy.FetchDb,
             job_fail_policy=JobFailPolicy.FAULT_TOLERANT
         )
 
@@ -87,7 +87,7 @@ class TestOnlineImporterDbFetching(unittest.TestCase):
 
 def fetch_all(db_url: str, file_system_factory: Optional[FileSystemFactory] = None, network_state: Optional[NetworkState] = None, fail: Optional[FailPolicy] = None, job_fail: Optional[JobFailPolicy] = None):
     file_system_factory = file_system_factory or FileSystemFactory()
-    sut = OnlineImporter(file_system_factory=file_system_factory, network_state=network_state, start_on_db_processing=False, fail_policy=fail, job_fail_policy=job_fail)
+    sut = OnlineImporter(file_system_factory=file_system_factory, network_state=network_state, start_job_policy=StartJobPolicy.FetchDb, fail_policy=fail, job_fail_policy=job_fail)
     db_pkg = DbSectionPackage(
         db_id=db_test,
         section={'db_url': db_url, 'section': db_test},
