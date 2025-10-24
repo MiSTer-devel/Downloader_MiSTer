@@ -27,14 +27,13 @@ from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.error import DownloaderError
 from downloader.job_system import Job, Worker
-from downloader.jobs.abort_worker import AbortJob
 from downloader.jobs.copy_data_job import CopyDataJob
 from downloader.jobs.errors import WrongDatabaseOptions, FileDownloadError
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.jobs_factory import make_transfer_job
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob, local_store_tag
-from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
+from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob, local_store_sigs_tag
 from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
@@ -72,7 +71,7 @@ class OnlineImporter:
 
     def _make_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]:
         jobs: list[Job] = []
-        load_local_store_sigs_job = LoadLocalStoreSigsJob()
+        load_local_store_sigs_job = LoadLocalStoreSigsJob().add_tag(local_store_sigs_tag)
         load_local_store_job = LoadLocalStoreJob(db_pkgs, self._worker_ctx.config).add_tag(local_store_tag)
         for pkg in db_pkgs:
             transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
