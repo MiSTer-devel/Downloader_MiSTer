@@ -24,7 +24,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     K_FILTER, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_ALLOW_REBOOT, KENV_DEBUG, MEDIA_FAT, MEDIA_USB0, MEDIA_USB1, \
     MEDIA_USB2, KENV_FAIL_ON_FILE_ERROR, KENV_UPDATE_LINUX, KENV_CURL_SSL, KENV_COMMIT, DEFAULT_CURL_SSL_OPTIONS, \
     MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, K_DB_URL, K_SECTION, K_OPTIONS, KENV_FORCED_BASE_PATH, \
-    FILE_MiSTer_old
+    FILE_MiSTer_old, KENV_HTTP_PROXY, KENV_HTTPS_PROXY
 from downloader.db_options import DbOptions
 from downloader.other import empty_store_without_base_path
 from downloader.db_entity import DbEntity
@@ -150,6 +150,8 @@ def config_with(
         default_db_id=None,
         user_defined_options=None,
         minimum_free_space=None,
+        file_checking=None,
+
         databases: Dict[str, Any] = None):
 
     config = default_config()
@@ -177,6 +179,8 @@ def config_with(
         config['user_defined_options'] = user_defined_options
     if minimum_free_space is not None:
         config['minimum_system_free_space_mb'] = minimum_free_space
+    if file_checking is not None:
+        config['file_checking'] = file_checking
     return config
 
 
@@ -782,6 +786,8 @@ def default_env() -> Environment:
         KENV_LOGFILE: None,
         KENV_LOGLEVEL: '',
         KENV_PC_LAUNCHER: None,
+        KENV_HTTP_PROXY: None,
+        KENV_HTTPS_PROXY: None
     }
 
 

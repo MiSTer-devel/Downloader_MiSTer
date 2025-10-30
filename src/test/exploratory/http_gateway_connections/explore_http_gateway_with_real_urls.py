@@ -27,7 +27,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from downloader.http_gateway import HttpGateway, HttpLogger
+from downloader.http_gateway import HttpGateway, HttpLogger, http_config
 
 urls = [
     'https://google.com',
@@ -69,7 +69,27 @@ def main() -> None:
     cancelled = 0
     dir_path = f'{os.path.dirname(os.path.realpath(__file__))}/delme'
 
-    with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gateway:
+    http_proxy_url = os.environ.get('HTTP_PROXY')
+    https_proxy_url = os.environ.get('HTTPS_PROXY')
+    config = http_config(http_proxy=http_proxy_url, https_proxy=https_proxy_url) if (http_proxy_url or https_proxy_url) else None
+
+    if config:
+        logger.print('PROXY CONFIGURATION:')
+        if config.get('http_proxy'):
+            scheme, host, port = config['http_proxy']
+            logger.print(f'  HTTP Proxy:  {scheme}://{host}:{port}')
+        else:
+            logger.print(f'  HTTP Proxy:  None (direct connection)')
+
+        if config.get('https_proxy'):
+            scheme, host, port = config['https_proxy']
+            logger.print(f'  HTTPS Proxy: {scheme}://{host}:{port}')
+        else:
+            logger.print(f'  HTTPS Proxy: None (direct connection)')
+    else:
+        logger.print('NO PROXY - Using direct connection')
+
+    with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger, config=config) as gateway:
         def fetch_url(input_url: str):
             nonlocal interrupted, gateway, dir_path
             with gateway.open(input_url) as (url, res):
