@@ -70,7 +70,7 @@ def plot_data(ax, data, color, label, outliers, y_max, y_min):
 
 def main(log_path):
     data = {
-        'improved': {'label': 'Downloader 2.2', 'short_label': 'v2.2'},
+        'improved': {'label': 'Downloader 2.2.1', 'short_label': 'v2.2'},
         'baseline': {'label': 'Downloader 2.1', 'short_label': 'v2.1'}
     }
     times = dict(zip(data, parse_times(log_path)))
