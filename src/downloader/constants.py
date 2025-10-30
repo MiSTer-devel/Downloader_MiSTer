@@ -156,6 +156,7 @@ K_START_TIME: Final[str] = 'start_time'
 K_IS_PC_LAUNCHER: Final[str] = 'is_pc_launcher'
 K_MINIMUM_SYSTEM_FREE_SPACE_MB: Final[str] = 'minimum_system_free_space_mb'
 K_MINIMUM_EXTERNAL_FREE_SPACE_MB: Final[str] = 'minimum_external_free_space_mb'
+K_HTTP_PROXY: Final[str] = 'http_proxy'
 
 # Default Config option
 DEFAULT_CACERT_FILE: Final[str] = '/etc/ssl/certs/cacert.pem'

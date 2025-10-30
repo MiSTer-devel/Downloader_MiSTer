@@ -30,7 +30,7 @@ from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, 
     K_DB_URL, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER, K_BASE_SYSTEM_PATH, \
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, \
-    STORAGE_PRIORITY_PREFER_EXTERNAL, EXIT_ERROR_WRONG_SETUP
+    STORAGE_PRIORITY_PREFER_EXTERNAL, EXIT_ERROR_WRONG_SETUP, K_HTTP_PROXY
 from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
 from downloader.http_gateway import http_config
 from downloader.logger import Logger, time_str
@@ -160,7 +160,9 @@ class ConfigReader:
             result['curl_ssl'] = ''
 
         if self._env['HTTP_PROXY'] or self._env['HTTPS_PROXY']:
-            result.update(http_config(http_proxy=self._env['HTTP_PROXY'], https_proxy=self._env['HTTPS_PROXY']))
+            result['http_config'] = http_config(http_proxy=self._env['HTTP_PROXY'], https_proxy=self._env['HTTPS_PROXY'])
+        elif result['http_proxy'] != '':
+            result['http_config'] = http_config(http_proxy=result['http_proxy'], https_proxy=None)
 
         result['environment'] = self._env
 
@@ -242,7 +244,8 @@ class ConfigReader:
             'filter': parser.get_string(K_FILTER, result['filter']).strip().lower(),
             'minimum_system_free_space_mb': parser.get_int(K_MINIMUM_SYSTEM_FREE_SPACE_MB, result['minimum_system_free_space_mb']),
             'minimum_external_free_space_mb': parser.get_int(K_MINIMUM_EXTERNAL_FREE_SPACE_MB, result['minimum_external_free_space_mb']),
-            'user_defined_options': []
+            'user_defined_options': [],
+            'http_proxy': parser.get_string(K_HTTP_PROXY, '').strip().lower()
         }
 
         for key in mister:
