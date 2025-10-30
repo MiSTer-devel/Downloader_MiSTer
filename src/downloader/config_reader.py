@@ -32,6 +32,7 @@ from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, 
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, \
     STORAGE_PRIORITY_PREFER_EXTERNAL, EXIT_ERROR_WRONG_SETUP
 from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
+from downloader.http_gateway import http_config
 from downloader.logger import Logger, time_str
 
 
@@ -157,6 +158,9 @@ class ConfigReader:
             result['update_linux'] = False
             result['logfile'] = str(launcher_path.with_suffix('.log'))
             result['curl_ssl'] = ''
+
+        if self._env['HTTP_PROXY'] or self._env['HTTPS_PROXY']:
+            result.update(http_config(http_proxy=self._env['HTTP_PROXY'], https_proxy=self._env['HTTPS_PROXY']))
 
         result['environment'] = self._env
 

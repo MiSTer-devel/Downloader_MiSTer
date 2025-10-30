@@ -22,7 +22,7 @@ import threading
 import time
 from contextlib import contextmanager
 from email.utils import parsedate_to_datetime
-from typing import Type, Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar, Generic
+from typing import Type, Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar, Generic, TypedDict
 from urllib.parse import urlparse, ParseResult, urlunparse
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
 from types import TracebackType
@@ -36,12 +36,18 @@ class HttpLogger(Protocol):
     def debug(self, *args: Any) -> None: ...
 
 
+class HttpConfig(TypedDict):
+    http_proxy: Optional[tuple[str, str, int]]  # (scheme, host, port)
+    https_proxy: Optional[tuple[str, str, int]]  # (scheme, host, port)
+
+
 class HttpGateway:
-    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: float, logger: Optional[HttpLogger] = None) -> None:
+    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: float, logger: Optional[HttpLogger] = None, config: Optional[dict[str, Any]] = None) -> None:
         now = time.monotonic()
         self._ssl_ctx = ssl_ctx
         self._timeout = timeout
         self._logger = logger
+        self._config = config
         self._connections: Dict[_QueueId, _ConnectionQueue] = {}
         self._connections_lock = threading.Lock()
         self._clean_timeout_connections_timer = now
@@ -79,7 +85,7 @@ class HttpGateway:
             parsed_url,
             method,
             body,
-            headers or _default_headers,
+            {**_default_headers, **headers} if isinstance(headers, dict) else _default_headers,
         )
         if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}: {final_url}\n'
                                                         f'1st byte @ {time.monotonic() - now:.3f}s\nvvvv\n')
@@ -166,7 +172,7 @@ class HttpGateway:
     def _take_connection(self, queue_id: '_QueueId') -> '_Connection':
         with self._connections_lock:
             if queue_id not in self._connections:
-                self._connections[queue_id] = _ConnectionQueue(queue_id, self._timeout, self._ssl_ctx, self._logger)
+                self._connections[queue_id] = _ConnectionQueue(queue_id, self._timeout, self._ssl_ctx, self._logger, self._config)
             return self._connections[queue_id].pull()
 
     def _clean_timeout_connections(self, now: float) -> None:
@@ -238,7 +244,26 @@ class HttpGateway:
 
         return size != len(self._redirects_swap)
 
-_default_headers = {'Connection': 'keep-alive', 'Keep-Alive': 'timeout=120'}
+
+def http_config(http_proxy: Optional[str], https_proxy: Optional[str]) -> HttpConfig:
+    config: HttpConfig = {"http_proxy": None, "https_proxy": None}
+    if http_proxy:
+        parsed = urlparse(http_proxy)
+        if parsed.hostname and parsed.scheme in ('http', 'https'):
+            config['http_proxy'] = (parsed.scheme, parsed.hostname, parsed.port or (443 if parsed.scheme == 'https' else 80))
+
+    if not https_proxy and http_proxy:
+        https_proxy = http_proxy
+
+    if https_proxy:
+        parsed = urlparse(https_proxy)
+        if parsed.hostname and parsed.scheme in ('http', 'https'):
+            config['https_proxy'] = (parsed.scheme, parsed.hostname, parsed.port or (443 if parsed.scheme == 'https' else 80))
+
+    return config
+
+USER_AGENT = 'Downloader/2.X (Linux; theypsilon@gmail.com)'
+_default_headers = {'User-Agent': USER_AGENT, 'Connection': 'keep-alive', 'Keep-Alive': 'timeout=120'}
 
 
 _QueueId = Tuple[str, str]
@@ -274,7 +299,7 @@ class _Connection:
         self._timeout: float = http.timeout if http.timeout is not None else 120.0
         self._last_use_time: float = 0.0
         self._uses: int = 0
-        self._max_uses: float = sys.float_info.max
+        self._max_uses: int = sys.maxsize
         self._response: Optional[Union[HTTPResponse, '_FinishedResponse']] = None
         self._response_headers = _ResponseHeaders(logger)
 
@@ -306,8 +331,11 @@ class _Connection:
         return self._response_headers
 
     def finish_response(self) -> None:
-        if self._close_response() and self._uses < self._max_uses:
-            self._connection_queue.push(self)
+        if self._close_response():
+            if self._uses < self._max_uses:
+                self._connection_queue.push(self)
+            else:
+                self._http.close()
 
     def _close_response(self) -> bool:
         if isinstance(self._response, _FinishedResponse):
@@ -340,11 +368,12 @@ class _FinishedResponse: pass
 
 
 class _ConnectionQueue:
-    def __init__(self, queue_id: _QueueId, timeout: float, ctx: ssl.SSLContext, logger: Optional[HttpLogger]) -> None:
+    def __init__(self, queue_id: _QueueId, timeout: float, ctx: ssl.SSLContext, logger: Optional[HttpLogger], config: Optional[dict[str, Any]]) -> None:
         self.id = queue_id
         self._timeout = timeout
         self._ctx = ctx
         self._logger = logger
+        self._config = config
         self._queue: List[_Connection] = []
         self._queue_swap: List[_Connection] = []
         self._lock = threading.Lock()
@@ -354,7 +383,7 @@ class _ConnectionQueue:
         with self._lock:
             if len(self._queue) == 0:
                 self._last_conn_id += 1
-                http_conn = create_http_connection(self.id[0], self.id[1], self._timeout, self._ctx)
+                http_conn = create_http_connection(self.id[0], self.id[1], self._timeout, self._ctx, self._config)
                 return _Connection(conn_id=self._last_conn_id, http=http_conn, connection_queue=self, logger=self._logger)
             return self._queue.pop()
 
@@ -388,10 +417,31 @@ class _ConnectionQueue:
             return expired_count
 
 
-def create_http_connection(scheme: str, netloc: str, timeout: float, ctx: ssl.SSLContext) -> HTTPConnection:
-    if scheme == 'http': return HTTPConnection(netloc, timeout=timeout)
-    elif scheme == 'https': return HTTPSConnection(netloc, timeout=timeout, context=ctx)
-    else: raise HttpGatewayException(f"Scheme {scheme} not supported")
+def create_http_connection(scheme: str, netloc: str, timeout: float, ctx: ssl.SSLContext, config: Optional[dict[str, Any]]) -> HTTPConnection:
+    if scheme == 'http':
+        if config and config['http_proxy']:
+            proxy_scheme, proxy_host, proxy_port = config['http_proxy']
+            if proxy_scheme == 'https':
+                return HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=ctx)
+            return HTTPConnection(proxy_host, proxy_port, timeout=timeout)
+        return HTTPConnection(netloc, timeout=timeout)
+
+    elif scheme == 'https':
+        if config and config['https_proxy']:
+            proxy_scheme, proxy_host, proxy_port = config['https_proxy']
+            parsed_netloc = urlparse(f'//{netloc}')
+            target_host = parsed_netloc.hostname
+            target_port = parsed_netloc.port or 443
+            if not target_host:
+                raise HttpGatewayException(f"Invalid netloc: {netloc}")
+
+            conn = HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=ctx)
+            conn.set_tunnel(target_host, target_port)
+            return conn
+        return HTTPSConnection(netloc, timeout=timeout, context=ctx)
+
+    else:
+        raise HttpGatewayException(f"Scheme {scheme} not supported")
 
 
 class _ResponseHeaders:
@@ -426,15 +476,14 @@ class _ResponseHeaders:
                     return new_url, None
 
                 age = self._headers.get('age', 0)
-                try:
-                    age = int(age)
-                except Exception as e:
-                    if self._logger is not None: self._logger.debug(f"Could not parse Age from {age}", e)
-                    age = 0
+                if age != 0:
+                    try:
+                        age = int(age)
+                    except Exception as e:
+                        if self._logger is not None: self._logger.debug(f"Could not parse Age from {age}", e)
+                        age = 0
 
                 return new_url, time.monotonic() + max_age - age
-
-            pass
 
         expires = self._headers.get('expires', None)
         if expires is not None:

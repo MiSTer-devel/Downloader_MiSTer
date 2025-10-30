@@ -25,6 +25,7 @@ from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_DOWNLOADER_
     DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB, DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB
 from downloader.db_options import DbOptions
 from downloader.error import DownloaderError
+from downloader.http_gateway import HttpConfig
 
 
 class Environment(TypedDict):
@@ -43,6 +44,8 @@ class Environment(TypedDict):
     PC_LAUNCHER: Optional[str]
     DEBUG: str
     FAIL_ON_FILE_ERROR: str
+    HTTP_PROXY: str
+    HTTPS_PROXY: str
 
 
 @unique
@@ -85,7 +88,7 @@ class ConfigMisterSection(TypedDict):
     user_defined_options: List[str]
 
 
-class ConfigRequired(ConfigMisterSection):
+class ConfigRequired(ConfigMisterSection, HttpConfig):
     zip_file_count_threshold: int
     zip_accumulated_mb_threshold: int
     debug: bool
@@ -138,7 +141,9 @@ def default_config() -> Config:
         'commit': 'unknown',
         'fail_on_file_error': False,
         'minimum_system_free_space_mb': DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB,
-        'minimum_external_free_space_mb': DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB
+        'minimum_external_free_space_mb': DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB,
+        'http_proxy': None,
+        'https_proxy': None
     }
 
 
