@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Version 2.2.1 - 2025-10-30
+
+### Added
+- Built-in support for custom HTTP Proxy. Add the `http_proxy` entry to downloader.ini as explained in the [README.md file](README.md#options). The environment variables `http_proxy` and `https_proxy` are also supported and take precedence, but `no_proxy` is not yet supported.
+
 ## Version 2.2 - 2025-06-06
 
 ### Added
