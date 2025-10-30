@@ -86,9 +86,10 @@ class ConfigMisterSection(TypedDict):
     minimum_system_free_space_mb: int
     minimum_external_free_space_mb: int
     user_defined_options: List[str]
+    http_proxy: Optional[str]
 
 
-class ConfigRequired(ConfigMisterSection, HttpConfig):
+class ConfigRequired(ConfigMisterSection):
     zip_file_count_threshold: int
     zip_accumulated_mb_threshold: int
     debug: bool
@@ -102,6 +103,7 @@ class ConfigRequired(ConfigMisterSection, HttpConfig):
     fail_on_file_error: bool
     curl_ssl: str
     http_logging: bool
+    http_config: HttpConfig
 
 class Config(ConfigRequired, total=False):
     environment: Environment  # This should never be used. It's there just to be debug-logged.
@@ -142,8 +144,8 @@ def default_config() -> Config:
         'fail_on_file_error': False,
         'minimum_system_free_space_mb': DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB,
         'minimum_external_free_space_mb': DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB,
-        'http_proxy': None,
-        'https_proxy': None
+        'http_proxy': '',
+        'http_config': None
     }
 
 

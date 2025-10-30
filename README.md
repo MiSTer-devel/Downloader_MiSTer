@@ -73,6 +73,10 @@ downloader_retries = 3
 ; verbose: when true, will make Downloader output to display additional debug information
 ;   This is also necessary to be active to display benchmark information.
 verbose = false
+
+; http_proxy: Routes all downloads through a proxy server (advanced, rarely needed)
+;   Format: 'http://proxy-server:port'
+http_proxy = ''
 ```
 
 ### Feature Roadmap
