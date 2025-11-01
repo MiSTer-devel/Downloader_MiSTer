@@ -71,23 +71,20 @@ def main() -> None:
 
     http_proxy_url = os.environ.get('HTTP_PROXY')
     https_proxy_url = os.environ.get('HTTPS_PROXY')
-    config = http_config(http_proxy=http_proxy_url, https_proxy=https_proxy_url) if (http_proxy_url or https_proxy_url) else None
+    config = http_config(http_proxy=http_proxy_url, https_proxy=https_proxy_url)
 
-    if config:
-        logger.print('PROXY CONFIGURATION:')
-        if config.get('http_proxy'):
-            scheme, host, port = config['http_proxy']
-            logger.print(f'  HTTP Proxy:  {scheme}://{host}:{port}')
-        else:
-            logger.print(f'  HTTP Proxy:  None (direct connection)')
-
-        if config.get('https_proxy'):
-            scheme, host, port = config['https_proxy']
-            logger.print(f'  HTTPS Proxy: {scheme}://{host}:{port}')
-        else:
-            logger.print(f'  HTTPS Proxy: None (direct connection)')
+    logger.print('PROXY CONFIGURATION:')
+    if config.get('http_proxy'):
+        scheme, host, port = config['http_proxy'].scheme, config['http_proxy'].hostname, config['http_proxy'].port
+        logger.print(f'  HTTP Proxy:  {scheme}://{host}:{port}')
     else:
-        logger.print('NO PROXY - Using direct connection')
+        logger.print(f'  HTTP Proxy:  None (direct connection)')
+
+    if config.get('https_proxy'):
+        scheme, host, port = config['http_proxy'].scheme, config['http_proxy'].hostname, config['http_proxy'].port
+        logger.print(f'  HTTPS Proxy: {scheme}://{host}:{port}')
+    else:
+        logger.print(f'  HTTPS Proxy: None (direct connection)')
 
     with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger, config=config) as gateway:
         def fetch_url(input_url: str):

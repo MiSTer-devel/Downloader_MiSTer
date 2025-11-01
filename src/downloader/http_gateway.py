@@ -37,8 +37,10 @@ class HttpLogger(Protocol):
 
 
 class HttpConfig(TypedDict):
-    http_proxy: Optional[tuple[str, str, int]]  # (scheme, host, port)
-    https_proxy: Optional[tuple[str, str, int]]  # (scheme, host, port)
+    http_proxy: Optional[ParseResult]
+    https_proxy: Optional[ParseResult]
+    http_proxy_headers: Optional[Dict[str, str]]
+    https_proxy_headers: Optional[Dict[str, str]]
 
 
 class HttpGateway:
@@ -79,13 +81,14 @@ class HttpGateway:
         if self._logger is not None: self._logger.debug(f'^^^^ {method} {url}')
         url = self._process_url(url)
         parsed_url = urlparse(url)
-        if parsed_url.scheme not in {'http', 'https'}: raise HttpGatewayException(f"URL '{url}' has wrong scheme '{parsed_url.scheme}'.")
+        scheme_code = _scheme_dict.get(parsed_url.scheme, -1)
+        if scheme_code == -1: raise HttpGatewayException(f"URL '{url}' has wrong scheme '{parsed_url.scheme}'.")
         final_url, conn = self._request(
             url,
             parsed_url,
             method,
             body,
-            {**_default_headers, **headers} if isinstance(headers, dict) else _default_headers,
+            self._make_headers(headers, is_http=scheme_code==0),
         )
         if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}: {final_url}\n'
                                                         f'1st byte @ {time.monotonic() - now:.3f}s\nvvvv\n')
@@ -94,6 +97,13 @@ class HttpGateway:
         finally:
             conn.finish_response()
             if self._logger is not None: self._logger.print(f'|||| Done: {final_url} ({time.monotonic() - now:.3f}s)')
+
+    def _make_headers(self, headers: Any, is_http: bool) -> dict[str, str]:
+        if is_http and self._config and self._config['http_proxy_headers']:
+            headers = headers if isinstance(headers, dict) else {}
+            return {**_default_headers, **headers, **self._config['http_proxy_headers']}
+        else:
+            return {**_default_headers, **headers} if isinstance(headers, dict) else _default_headers
 
     def cleanup(self) -> None:
         self._out_of_service = True
@@ -245,12 +255,28 @@ class HttpGateway:
         return size != len(self._redirects_swap)
 
 
+_scheme_dict = {
+    'http': 0,
+    'https': 1
+}
+
 def http_config(http_proxy: Optional[str], https_proxy: Optional[str]) -> HttpConfig:
-    config: HttpConfig = {"http_proxy": None, "https_proxy": None}
+    config: HttpConfig = {
+        "http_proxy": None,
+        "https_proxy": None,
+        "http_proxy_headers": None,
+        "https_proxy_headers": None
+    }
+
+    if not http_proxy and not https_proxy: return config
+
     if http_proxy:
         parsed = urlparse(http_proxy)
         if parsed.hostname and parsed.scheme in ('http', 'https'):
-            config['http_proxy'] = (parsed.scheme, parsed.hostname, parsed.port or (443 if parsed.scheme == 'https' else 80))
+            config['http_proxy'] = parsed
+            auth_header = _make_proxy_auth_header(parsed)
+            if auth_header:
+                config['http_proxy_headers'] = {'Proxy-Authorization': auth_header}
 
     if not https_proxy and http_proxy:
         https_proxy = http_proxy
@@ -258,9 +284,21 @@ def http_config(http_proxy: Optional[str], https_proxy: Optional[str]) -> HttpCo
     if https_proxy:
         parsed = urlparse(https_proxy)
         if parsed.hostname and parsed.scheme in ('http', 'https'):
-            config['https_proxy'] = (parsed.scheme, parsed.hostname, parsed.port or (443 if parsed.scheme == 'https' else 80))
+            config['https_proxy'] = parsed
+            auth_header = _make_proxy_auth_header(parsed)
+            if auth_header:
+                config['https_proxy_headers'] = {'Proxy-Authorization': auth_header}
 
     return config
+
+
+def _make_proxy_auth_header(proxy: ParseResult) -> Optional[str]:
+    if proxy.username and proxy.password:
+        import base64
+        credentials = f"{proxy.username}:{proxy.password}"
+        encoded = base64.b64encode(credentials.encode()).decode('ascii')
+        return f"Basic {encoded}"
+    return None
 
 USER_AGENT = 'Downloader/2.X (Linux; theypsilon@gmail.com)'
 _default_headers = {'User-Agent': USER_AGENT, 'Connection': 'keep-alive', 'Keep-Alive': 'timeout=120'}
@@ -420,15 +458,19 @@ class _ConnectionQueue:
 def create_http_connection(scheme: str, netloc: str, timeout: float, ctx: ssl.SSLContext, config: Optional[dict[str, Any]]) -> HTTPConnection:
     if scheme == 'http':
         if config and config['http_proxy']:
-            proxy_scheme, proxy_host, proxy_port = config['http_proxy']
-            if proxy_scheme == 'https':
+            proxy = config['http_proxy']
+            proxy_host = proxy.hostname
+            proxy_port = proxy.port or (443 if proxy.scheme == 'https' else 80)
+            if proxy.scheme == 'https':
                 return HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=ctx)
             return HTTPConnection(proxy_host, proxy_port, timeout=timeout)
         return HTTPConnection(netloc, timeout=timeout)
 
     elif scheme == 'https':
         if config and config['https_proxy']:
-            proxy_scheme, proxy_host, proxy_port = config['https_proxy']
+            proxy = config['https_proxy']
+            proxy_host = proxy.hostname
+            proxy_port = proxy.port or (443 if proxy.scheme == 'https' else 80)
             parsed_netloc = urlparse(f'//{netloc}')
             target_host = parsed_netloc.hostname
             target_port = parsed_netloc.port or 443
@@ -436,7 +478,7 @@ def create_http_connection(scheme: str, netloc: str, timeout: float, ctx: ssl.SS
                 raise HttpGatewayException(f"Invalid netloc: {netloc}")
 
             conn = HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=ctx)
-            conn.set_tunnel(target_host, target_port)
+            conn.set_tunnel(target_host, target_port, headers=config.get('https_proxy_headers'))
             return conn
         return HTTPSConnection(netloc, timeout=timeout, context=ctx)
 
