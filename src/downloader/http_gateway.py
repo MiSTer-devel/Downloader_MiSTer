@@ -16,7 +16,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import socket
 import ssl
 import sys
 import threading
@@ -466,6 +465,7 @@ class _ConnectionQueue:
 
             return expired_count
 
+
 def create_http_connection(scheme: str, netloc: str, timeout: float, ctx: ssl.SSLContext, config: Optional[dict[str, Any]]) -> HTTPConnection:
     if scheme == 'http':
         if config and config['http_proxy']:
@@ -473,29 +473,28 @@ def create_http_connection(scheme: str, netloc: str, timeout: float, ctx: ssl.SS
             proxy_host = proxy.hostname
             proxy_port = proxy.port or (443 if proxy.scheme == 'https' else 80)
             if proxy.scheme == 'https':
-                return _add_socket(HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=ctx), proxy_host, proxy_port, timeout, ssl_ctx=ctx)
-            return _add_socket(HTTPConnection(proxy_host, proxy_port, timeout=timeout), proxy_host, proxy_port, timeout)
-        return _add_socket(HTTPConnection(netloc, timeout=timeout), netloc, 80, timeout)
+                return HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=ctx)
+            return HTTPConnection(proxy_host, proxy_port, timeout=timeout)
+        return HTTPConnection(netloc, timeout=timeout)
 
     elif scheme == 'https':
         if config and config['https_proxy']:
             proxy = config['https_proxy']
             proxy_host = proxy.hostname
             proxy_port = proxy.port or (443 if proxy.scheme == 'https' else 80)
+            parsed_netloc = urlparse(f'//{netloc}')
+            target_host = parsed_netloc.hostname
+            target_port = parsed_netloc.port or 443
+            if not target_host:
+                raise HttpGatewayException(f"Invalid netloc: {netloc}")
+
             conn = HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=ctx)
-            conn.set_tunnel(netloc, 443, headers=config.get('https_proxy_headers'))
-            return _add_socket(conn, proxy_host, proxy_port, timeout, ssl_ctx=(ctx if proxy.scheme == 'https' else None))
-        return _add_socket(HTTPSConnection(netloc, timeout=timeout, context=ctx), netloc, 443, timeout, ssl_ctx=ctx)
+            conn.set_tunnel(target_host, target_port, headers=config.get('https_proxy_headers'))
+            return conn
+        return HTTPSConnection(netloc, timeout=timeout, context=ctx)
 
-    raise HttpGatewayException(f"Scheme {scheme} not supported")
-
-def _add_socket(conn: HTTPConnection, host: str, port: int, timeout: float, ssl_ctx: Optional[ssl.SSLContext] = None) -> HTTPConnection:
-    sock = socket.create_connection((host, port), timeout=15)
-    sock.settimeout(timeout)
-    if ssl_ctx:
-        sock = ssl_ctx.wrap_socket(sock, server_hostname=host)
-    conn.sock = sock
-    return conn
+    else:
+        raise HttpGatewayException(f"Scheme {scheme} not supported")
 
 
 class _ResponseHeaders:
