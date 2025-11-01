@@ -1,5 +1,5 @@
 # Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
-
+import socket
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -123,6 +123,9 @@ class HttpGateway:
             if self._out_of_service: raise HttpGatewayException(f'{HttpGateway.__name__} out of service.')
             try:
                 conn.do_request(method, str(urlunparse(parsed_url)), body, headers)
+            except (TimeoutError, socket.timeout) as e:
+                conn.kill()
+                raise e
             except (HTTPException, OSError) as e:
                 conn.kill()
                 if retry >= 10: raise e
@@ -330,12 +333,12 @@ def _redirect(input_arg: T, res_dict: Dict[T, _Redirect[T]], lock: threading.Loc
 
 
 class _Connection:
-    def __init__(self, conn_id: int, http: HTTPConnection, connection_queue: '_ConnectionQueue', logger: Optional[HttpLogger]) -> None:
+    def __init__(self, conn_id: int, http: HTTPConnection, connection_queue: '_ConnectionQueue', logger: Optional[HttpLogger], timeout: float) -> None:
         self.id = conn_id
         self._http = http
         self._connection_queue = connection_queue
         self._logger = logger
-        self._timeout: float = http.timeout if http.timeout is not None else 120.0
+        self._timeout: float = timeout
         self._last_use_time: float = 0.0
         self._uses: int = 0
         self._max_uses: int = sys.maxsize
@@ -348,6 +351,7 @@ class _Connection:
 
     def do_request(self, method: str, url: str, body: Any, headers: Any) -> None:
         self._http.request(method, url, headers=headers, body=body)
+        self._http.sock.settimeout(self._timeout)
         self._uses += 1
         self._response = self._http.getresponse()
         self._response_headers.set_headers(self._response.getheaders(), self._response.version)
@@ -427,13 +431,13 @@ class _ConnectionQueue:
                 self._last_conn_id += 1
                 conn_id = self._last_conn_id
 
-        http_conn = create_http_connection(self.id[0], self.id[1], self._timeout, self._ctx, self._config)
+        http_conn = create_http_connection(self.id[0], self.id[1], self._ctx, self._config)
         with self._lock:
             if self._queue_cleared:
                 http_conn.close()
                 raise HttpGatewayException('Connection queue is already cleared.')
 
-        return _Connection(conn_id=conn_id, http=http_conn, connection_queue=self, logger=self._logger)
+        return _Connection(conn_id=conn_id, http=http_conn, connection_queue=self, logger=self._logger, timeout=self._timeout)
 
     def push(self, connection: _Connection) -> None:
         with self._lock:
@@ -466,32 +470,26 @@ class _ConnectionQueue:
             return expired_count
 
 
-def create_http_connection(scheme: str, netloc: str, timeout: float, ctx: ssl.SSLContext, config: Optional[dict[str, Any]]) -> HTTPConnection:
+def create_http_connection(scheme: str, netloc: str, ctx: ssl.SSLContext, config: Optional[dict[str, Any]]) -> HTTPConnection:
     if scheme == 'http':
         if config and config['http_proxy']:
             proxy = config['http_proxy']
             proxy_host = proxy.hostname
-            proxy_port = proxy.port or (443 if proxy.scheme == 'https' else 80)
+            proxy_port = proxy.port or 80
             if proxy.scheme == 'https':
-                return HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=ctx)
-            return HTTPConnection(proxy_host, proxy_port, timeout=timeout)
-        return HTTPConnection(netloc, timeout=timeout)
+                return HTTPSConnection(proxy_host, proxy_port, timeout=15, context=ctx)
+            return HTTPConnection(proxy_host, proxy_port, timeout=15)
+        return HTTPConnection(netloc, timeout=15)
 
     elif scheme == 'https':
         if config and config['https_proxy']:
             proxy = config['https_proxy']
             proxy_host = proxy.hostname
             proxy_port = proxy.port or (443 if proxy.scheme == 'https' else 80)
-            parsed_netloc = urlparse(f'//{netloc}')
-            target_host = parsed_netloc.hostname
-            target_port = parsed_netloc.port or 443
-            if not target_host:
-                raise HttpGatewayException(f"Invalid netloc: {netloc}")
-
-            conn = HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=ctx)
-            conn.set_tunnel(target_host, target_port, headers=config.get('https_proxy_headers'))
+            conn = HTTPSConnection(proxy_host, proxy_port, timeout=15, context=ctx)
+            conn.set_tunnel(netloc, 443, headers=config.get('https_proxy_headers'))
             return conn
-        return HTTPSConnection(netloc, timeout=timeout, context=ctx)
+        return HTTPSConnection(netloc, timeout=15, context=ctx)
 
     else:
         raise HttpGatewayException(f"Scheme {scheme} not supported")
