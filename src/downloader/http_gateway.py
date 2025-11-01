@@ -16,6 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+import socket
 import ssl
 import sys
 import threading
@@ -183,7 +184,8 @@ class HttpGateway:
         with self._connections_lock:
             if queue_id not in self._connections:
                 self._connections[queue_id] = _ConnectionQueue(queue_id, self._timeout, self._ssl_ctx, self._logger, self._config)
-            return self._connections[queue_id].pull()
+            queue = self._connections[queue_id]
+        return queue.pull()
 
     def _clean_timeout_connections(self, now: float) -> None:
         if now - self._clean_timeout_connections_timer < 30.0:
@@ -416,14 +418,23 @@ class _ConnectionQueue:
         self._queue_swap: List[_Connection] = []
         self._lock = threading.Lock()
         self._last_conn_id = -1
+        self._queue_cleared = False
 
     def pull(self) -> _Connection:
         with self._lock:
-            if len(self._queue) == 0:
+            if len(self._queue) > 0:
+                return self._queue.pop()
+            else:
                 self._last_conn_id += 1
-                http_conn = create_http_connection(self.id[0], self.id[1], self._timeout, self._ctx, self._config)
-                return _Connection(conn_id=self._last_conn_id, http=http_conn, connection_queue=self, logger=self._logger)
-            return self._queue.pop()
+                conn_id = self._last_conn_id
+
+        http_conn = create_http_connection(self.id[0], self.id[1], self._timeout, self._ctx, self._config)
+        with self._lock:
+            if self._queue_cleared:
+                http_conn.close()
+                raise HttpGatewayException('Connection queue is already cleared.')
+
+        return _Connection(conn_id=conn_id, http=http_conn, connection_queue=self, logger=self._logger)
 
     def push(self, connection: _Connection) -> None:
         with self._lock:
@@ -431,6 +442,7 @@ class _ConnectionQueue:
 
     def clear_all(self) -> int:
         with self._lock:
+            self._queue_cleared = True
             size = len(self._queue)
             for connection in self._queue:
                 connection.kill()
@@ -454,7 +466,6 @@ class _ConnectionQueue:
 
             return expired_count
 
-
 def create_http_connection(scheme: str, netloc: str, timeout: float, ctx: ssl.SSLContext, config: Optional[dict[str, Any]]) -> HTTPConnection:
     if scheme == 'http':
         if config and config['http_proxy']:
@@ -462,28 +473,29 @@ def create_http_connection(scheme: str, netloc: str, timeout: float, ctx: ssl.SS
             proxy_host = proxy.hostname
             proxy_port = proxy.port or (443 if proxy.scheme == 'https' else 80)
             if proxy.scheme == 'https':
-                return HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=ctx)
-            return HTTPConnection(proxy_host, proxy_port, timeout=timeout)
-        return HTTPConnection(netloc, timeout=timeout)
+                return _add_socket(HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=ctx), proxy_host, proxy_port, timeout, ssl_ctx=ctx)
+            return _add_socket(HTTPConnection(proxy_host, proxy_port, timeout=timeout), proxy_host, proxy_port, timeout)
+        return _add_socket(HTTPConnection(netloc, timeout=timeout), netloc, 80, timeout)
 
     elif scheme == 'https':
         if config and config['https_proxy']:
             proxy = config['https_proxy']
             proxy_host = proxy.hostname
             proxy_port = proxy.port or (443 if proxy.scheme == 'https' else 80)
-            parsed_netloc = urlparse(f'//{netloc}')
-            target_host = parsed_netloc.hostname
-            target_port = parsed_netloc.port or 443
-            if not target_host:
-                raise HttpGatewayException(f"Invalid netloc: {netloc}")
-
             conn = HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=ctx)
-            conn.set_tunnel(target_host, target_port, headers=config.get('https_proxy_headers'))
-            return conn
-        return HTTPSConnection(netloc, timeout=timeout, context=ctx)
+            conn.set_tunnel(netloc, 443, headers=config.get('https_proxy_headers'))
+            return _add_socket(conn, proxy_host, proxy_port, timeout, ssl_ctx=(ctx if proxy.scheme == 'https' else None))
+        return _add_socket(HTTPSConnection(netloc, timeout=timeout, context=ctx), netloc, 443, timeout, ssl_ctx=ctx)
 
-    else:
-        raise HttpGatewayException(f"Scheme {scheme} not supported")
+    raise HttpGatewayException(f"Scheme {scheme} not supported")
+
+def _add_socket(conn: HTTPConnection, host: str, port: int, timeout: float, ssl_ctx: Optional[ssl.SSLContext] = None) -> HTTPConnection:
+    sock = socket.create_connection((host, port), timeout=15)
+    sock.settimeout(timeout)
+    if ssl_ctx:
+        sock = ssl_ctx.wrap_socket(sock, server_hostname=host)
+    conn.sock = sock
+    return conn
 
 
 class _ResponseHeaders:
