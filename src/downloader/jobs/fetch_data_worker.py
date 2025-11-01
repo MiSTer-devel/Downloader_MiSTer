@@ -66,6 +66,7 @@ class FetchDataWorker(DownloaderWorker):
                 return buf, None
 
         except socket.gaierror as e: return None, FileDownloadError(f'Socket Address Error! {url}: {str(e)}', e)
+        except socket.timeout as e: return None, FileDownloadError(f'Socket Connection Timed Out! {url}: {str(e)}', e)
         except URLError as e: return None, FileDownloadError(f'URL Error! {url}: {e.reason}', e)
         except HTTPException as e: return None, FileDownloadError(f'HTTP Error! {url}: {str(e)}', e)
         except ConnectionResetError as e: return None, FileDownloadError(f'Connection reset error! {url}: {str(e)}', e)
