@@ -170,7 +170,7 @@ class FullRunService:
         return False
 
     def _display_summary(self, box: InstallationBox, start_time) -> None:
-        run_time = str(datetime.timedelta(seconds=time.monotonic() - start_time))[0:-4]
+        run_time = str(datetime.timedelta(seconds=time.monotonic() - start_time))[2:-4]
 
         self._logger.print()
         self._logger.print('===========================')
