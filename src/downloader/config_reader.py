@@ -245,7 +245,7 @@ class ConfigReader:
             'minimum_system_free_space_mb': parser.get_int(K_MINIMUM_SYSTEM_FREE_SPACE_MB, result['minimum_system_free_space_mb']),
             'minimum_external_free_space_mb': parser.get_int(K_MINIMUM_EXTERNAL_FREE_SPACE_MB, result['minimum_external_free_space_mb']),
             'user_defined_options': [],
-            'http_proxy': parser.get_string(K_HTTP_PROXY, '').strip().lower()
+            'http_proxy': parser.get_string(K_HTTP_PROXY, '').strip()
         }
 
         for key in mister:
