@@ -21,6 +21,6 @@ set -euo pipefail
 
 your_http_proxy_url="http://your-proxy-server-url-goes-here.com"
 
-rm -f /media/fat/Scripts/.config/downloader_bin /media/fat/Scripts/.config/downloader_latest.zip
+rm -f /media/fat/Scripts/.config/downloader/downloader_bin /media/fat/Scripts/.config/downloader/downloader_latest.zip
 export http_proxy="${http_proxy:-${your_http_proxy_url}}"
 /media/fat/Scripts/downloader.sh
