@@ -36,7 +36,7 @@ from downloader.logger import Logger, OffLogger
 from downloader.path_package import PathPackage
 
 is_windows: Final = os.name == 'nt'
-COPY_BUFSIZE: Final = 1024 * 1024 if is_windows else 64 * 1024
+COPY_BUFSIZE: Final = 256 * 1024 if is_windows else 128 * 1024
 JSON_READ_BUFSIZE: Final = 128 * 1024  # 128KB buffer for JSON file reading
 
 # OPTIMIZATION:

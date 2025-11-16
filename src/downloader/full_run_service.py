@@ -123,6 +123,7 @@ class FullRunService:
                     self._waiter.sleep(50)
                     return EXIT_ERROR_NO_CERTS
 
+                self._logger.print('Retrying all connections...')
                 download_dbs_err = self._online_importer.download_dbs_contents(db_pkgs)
 
             if download_dbs_err is not None:

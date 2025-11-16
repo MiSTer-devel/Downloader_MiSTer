@@ -110,7 +110,7 @@ class ConfigRequired(ConfigMisterSection):
     fail_on_file_error: bool
     curl_ssl: str
     http_logging: bool
-    http_config: HttpConfig
+    http_config: Optional[HttpConfig]
 
 class Config(ConfigRequired, total=False):
     environment: Environment  # This should never be used. It's there just to be debug-logged.
