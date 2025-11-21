@@ -32,7 +32,7 @@ from test.fake_file_system_factory import FileSystemFactory
 from test.fake_linux_updater import LinuxUpdater
 from test.fake_local_repository import LocalRepository
 from test.fake_logger import NoLogger
-from test.fake_online_importer import OnlineImporter
+from test.fake_online_importer import OnlineImporter, StartJobPolicy
 from test.fake_reboot_calculator import RebootCalculator
 from test.objects import db_empty
 from test.fake_certificates_fix import CertificatesFix
@@ -48,7 +48,7 @@ class FullRunService(ProductionFullRunService):
             certificates_fix=None,
             external_drives_repository=None,
             local_repository=None,
-            start_on_db_processing: bool = False,
+            start_job_policy: StartJobPolicy = StartJobPolicy.FetchDb,
             network_state: Optional[NetworkState] = None,
             fail_policy: FailPolicy = FailPolicy.FAULT_TOLERANT_ON_CUSTOM_DOWNLOADER_ERRORS,
             job_fail_policy: JobFailPolicy = None,
@@ -64,7 +64,7 @@ class FullRunService(ProductionFullRunService):
                          NoLogger(),
                          NoLogger(),
                          local_repository,
-                         OnlineImporter(job_fail_policy=job_fail_policy, network_state=network_state, file_system_factory=file_system_factory, start_on_db_processing=start_on_db_processing, fail_policy=fail_policy, local_repository=local_repository),
+                         OnlineImporter(job_fail_policy=job_fail_policy, network_state=network_state, file_system_factory=file_system_factory, start_job_policy=start_job_policy, fail_policy=fail_policy, local_repository=local_repository),
                          linux_updater,
                          RebootCalculator(file_system=system_file_system),
                          BasePathRelocator(),

@@ -39,7 +39,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
 
     def download(self, db, store):
         self.sut.add_db(db, store)
-        self.sut.download(False)
+        self.sut.download()
         return store
 
     def test_download_zipped_cheats_folder___on_empty_store_from_summary_and_contents_files_when_file_count_threshold_is_surpassed___installs_from_zip_content(self):
@@ -193,7 +193,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         sut = OnlineImporter()
         store = empty_test_store()
 
-        sut.add_db(db_with_unibios_from_official_url(), store).download(False)
+        sut.add_db(db_with_unibios_from_official_url(), store).download()
 
         self.assertEqual(store_with_unibios_from_zip(), store)
         self.assertEqual(fs_data(files=fs_files_neogeo_bios(), folders=fs_folders_neogeo_bios()), sut.fs_data)
@@ -203,7 +203,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files=fs_files_neogeo_bios(), folders=fs_folders_neogeo_bios()))
         store = store_with_unibios_from_zip()
 
-        sut.add_db(db_with_unibios_from_official_url(), store).download(False)
+        sut.add_db(db_with_unibios_from_official_url(), store).download()
 
         self.assertEqual(store_with_unibios_from_zip(), store)
         self.assertEqual(fs_data(files=fs_files_neogeo_bios(), folders=fs_folders_neogeo_bios()), sut.fs_data)
@@ -213,7 +213,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files=fs_files_neogeo_bios(), folders=fs_folders_neogeo_bios()))
         store = store_with_unibios_from_zip()
 
-        sut.add_db(db_entity(), store).download(False)
+        sut.add_db(db_entity(), store).download()
 
         self.assertEverythingIsClean(sut, store, save=True)
 
@@ -222,7 +222,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         sut.fs_factory.set_unzip_will_error()
         store = empty_test_store()
 
-        sut.add_db(db_with_unibios_from_official_url(), store).download(False)
+        sut.add_db(db_with_unibios_from_official_url(), store).download()
 
         self.assertEqual(store_with_unibios_from_zip(), store)
         self.assertEqual(fs_data(files={file_neogeo_000lo: file_neogeo_000lo_descr()}, folders=fs_folders_neogeo_bios()), sut.fs_data)
@@ -232,7 +232,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_neogeo_000lo: file_neogeo_000lo_descr()}, folders=fs_folders_neogeo_bios()))
         store = store_with_unibios_from_zip()
 
-        sut.add_db(db_with_unibios_from_official_url(), store).download(False)
+        sut.add_db(db_with_unibios_from_official_url(), store).download()
 
         self.assertEqual(store_with_unibios_from_zip(), store)
         self.assertEqual(fs_data(files=fs_files_neogeo_bios(), folders=fs_folders_neogeo_bios()), sut.fs_data)
@@ -246,7 +246,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         sut.fs_factory.set_unzip_will_error()
         store = store_with_unibios_from_zip()
 
-        sut.add_db(db_with_unibios_from_official_url(), store).download(False)
+        sut.add_db(db_with_unibios_from_official_url(), store).download()
 
         self.assertEqual(store_with_unibios_from_zip(), store)
         self.assertEqual(fs_data(files={file_neogeo_000lo: file_neogeo_000lo_descr()}, folders=fs_folders_neogeo_bios()), sut.fs_data)
@@ -256,7 +256,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_neogeo_000lo: file_neogeo_000lo_descr()}, folders=fs_folders_neogeo_bios()))
         store = store_with_unibios_from_zip()
 
-        sut.add_db(db_entity(), store).download(False)
+        sut.add_db(db_entity(), store).download()
 
         self.assertEverythingIsClean(sut, store, save=True)
 

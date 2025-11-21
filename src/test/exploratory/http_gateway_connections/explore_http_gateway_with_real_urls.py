@@ -69,8 +69,8 @@ def main() -> None:
     cancelled = 0
     dir_path = f'{os.path.dirname(os.path.realpath(__file__))}/delme'
 
-    http_proxy_url = os.environ.get('HTTP_PROXY')
-    https_proxy_url = os.environ.get('HTTPS_PROXY')
+    http_proxy_url = os.environ.get('HTTP_PROXY') or os.environ.get('http_proxy')
+    https_proxy_url = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
     config = http_config(http_proxy=http_proxy_url, https_proxy=https_proxy_url)
 
     logger.print('PROXY CONFIGURATION:')
@@ -81,7 +81,7 @@ def main() -> None:
         logger.print(f'  HTTP Proxy:  None (direct connection)')
 
     if config.get('https_proxy'):
-        scheme, host, port = config['http_proxy'].scheme, config['http_proxy'].hostname, config['http_proxy'].port
+        scheme, host, port = config['https_proxy'].scheme, config['https_proxy'].hostname, config['https_proxy'].port
         logger.print(f'  HTTPS Proxy: {scheme}://{host}:{port}')
     else:
         logger.print(f'  HTTPS Proxy: None (direct connection)')

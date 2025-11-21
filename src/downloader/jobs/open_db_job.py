@@ -21,8 +21,8 @@ from dataclasses import field, dataclass
 from downloader.config import ConfigDatabaseSection
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob
+from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
 from downloader.jobs.transfer_job import TransferJob
-from downloader.local_store_wrapper import StoreWrapper
 
 
 @dataclass(eq=False, order=False)
@@ -31,6 +31,10 @@ class OpenDbJob(Job):
     transfer_job: TransferJob # Job & Transferrer @TODO: Python 3.10
     section: str
     ini_description: ConfigDatabaseSection
+    load_local_store_sigs_job: LoadLocalStoreSigsJob
     load_local_store_job: LoadLocalStoreJob
 
     def retry_job(self): return self.transfer_job
+
+    # Results
+    skipped: bool = field(default=False)

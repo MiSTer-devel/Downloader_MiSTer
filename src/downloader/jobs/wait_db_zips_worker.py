@@ -40,7 +40,7 @@ class WaitDbZipsWorker(DownloaderWorkerBase):
             self._ctx.job_ctx.wait_for_other_jobs(0.1)
 
         logger.bench('WaitDbZipsWorker wait done: ', job.db.db_id)
-        index = Index(files=job.db.files, folders=job.db.folders, base_files_url=job.db.base_files_url)
+        index = Index(files=job.db.files, folders=job.db.folders)
 
         zip_indexes = []
         for tag in job.zip_job_tags:
@@ -62,7 +62,6 @@ class WaitDbZipsWorker(DownloaderWorkerBase):
             config=job.config,
             index=index,
             store=store,
-            full_resync=job.full_resync,
         )
         logger.bench('WaitDbZipsWorker done: ', job.db.db_id)
         return [resulting_job], None

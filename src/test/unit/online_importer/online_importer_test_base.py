@@ -24,10 +24,10 @@ from test.objects import remove_all_priority_paths, db_reboot_descr, empty_test_
 
 
 class OnlineImporterTestBase(unittest.TestCase):
-    def assertReportsNothing(self, sut, save=False, failed_folders=None, failed_zips=None):
-        self.assertReports(sut, [], save=save, failed_folders=failed_folders, failed_zips=failed_zips)
+    def assertReportsNothing(self, sut, save=False, failed_folders=None, failed_zips=None, skipped_dbs=None):
+        self.assertReports(sut, [], save=save, failed_folders=failed_folders, failed_zips=failed_zips, skipped_dbs=skipped_dbs)
 
-    def assertReports(self, sut, installed=None, errors=None, needs_reboot=False, save=True, failed_folders=None, failed_zips=None, full_partitions=None, validated=None, downloaded=None):
+    def assertReports(self, sut, installed=None, errors=None, needs_reboot=False, save=True, failed_folders=None, failed_zips=None, full_partitions=None, validated=None, downloaded=None, skipped_dbs=None):
         box = sut.box()
         if installed is None and validated is None and downloaded is None:
             installed = []
@@ -39,6 +39,8 @@ class OnlineImporterTestBase(unittest.TestCase):
             failed_zips = []
         if full_partitions is None:
             full_partitions = []
+        if skipped_dbs is None:
+            skipped_dbs = []
         if downloaded is not None:
             self.assertEqual(sorted(remove_all_priority_paths(downloaded)), sorted(box.downloaded_files()), 'downloaded')
         if validated is not None:
@@ -50,7 +52,9 @@ class OnlineImporterTestBase(unittest.TestCase):
         self.assertEqual(sorted(remove_all_priority_paths(failed_folders)), sorted(sut.folders_that_failed()), 'failed folders')
         self.assertEqual(sorted(remove_all_priority_paths(failed_zips)), sorted(sut.zips_that_failed()), 'failed zips')
         self.assertEqual(sorted(full_partitions), sorted(sut.full_partitions()), 'full partitions')
+        self.assertEqual(sorted(skipped_dbs), sorted(box.skipped_dbs()), 'skipped dbs')
         self.assertEqual(save, sut.needs_save, 'needs save')
+        self.assertEqual([], list(sut.old_pext_paths()), 'should not have old pext paths even in _old_pext tests')
 
     def assertEverythingIsClean(self, sut, store, save=False):
         self.assertEqual(empty_test_store(), store)
@@ -61,7 +65,7 @@ class OnlineImporterTestBase(unittest.TestCase):
         return OnlineImporter\
             .from_implicit_inputs(inputs)\
             .add_db(db, store)\
-            .download(False)
+            .download()
 
     def _download_databases(self, fs_inputs, dbs, input_stores=None, free_space_reservation=None):
         sut = OnlineImporter.from_implicit_inputs(fs_inputs, free_space_reservation=free_space_reservation)
@@ -70,7 +74,7 @@ class OnlineImporterTestBase(unittest.TestCase):
         for db, store in zip(dbs, stores):
             sut.add_db(db, store)
 
-        sut.download(False)
+        sut.download()
 
         return sut, stores
 

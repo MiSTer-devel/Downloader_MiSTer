@@ -36,19 +36,19 @@ from test.objects import raw_db_empty_descr, raw_db_empty_with_linux_descr, raw_
 class TestFullRunService(unittest.TestCase):
     def test_full_run___no_databases___returns_0(self):
         exit_code = FullRunService.with_no_dbs().full_run()
-        self.assertEqual(exit_code, 0)
+        self.assertEqual(0, exit_code)
 
     def test_full_run___empty_databases___returns_0(self):
         exit_code = FullRunService.with_single_db(db_empty, raw_db_empty_descr()).full_run()
-        self.assertEqual(exit_code, 0)
+        self.assertEqual(0, exit_code)
 
     def test_full_run___database_with_wrong_id___returns_exit_code_error_failed_dbs(self):
         exit_code = FullRunService.with_single_db(db_empty, raw_db_wrong_descr()).full_run()
-        self.assertEqual(exit_code, EXIT_ERROR_FAILED_DBS)
+        self.assertEqual(EXIT_ERROR_FAILED_DBS, exit_code)
 
     def test_full_run___database_not_fetched___returns_exit_code_error_failed_dbs(self):
         exit_code = FullRunService.with_single_empty_db().full_run()
-        self.assertEqual(exit_code, EXIT_ERROR_FAILED_DBS)
+        self.assertEqual(EXIT_ERROR_FAILED_DBS, exit_code)
 
     def test_full_run___database_with_old_linux___calls_update_linux_and_returns_0(self):
         os_utils = SpyOsUtils()
@@ -56,7 +56,7 @@ class TestFullRunService(unittest.TestCase):
 
         exit_code = FullRunService.with_single_db(db_empty, raw_db_empty_with_linux_descr(), linux_updater=linux_updater, os_utils=os_utils).full_run()
 
-        self.assertEqual(exit_code, 0)
+        self.assertEqual(0, exit_code)
         linux_updater.update_linux.assert_called()
         self.assertEqual(0, os_utils.calls_to_reboot)
 

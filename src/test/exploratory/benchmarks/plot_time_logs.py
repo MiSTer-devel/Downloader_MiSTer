@@ -28,6 +28,8 @@ from pathlib import Path
 from src.debug import chdir_root
 from src.test.exploratory.benchmarks.time_multiple_runs import percent_faster
 
+run_cmd = 'run_compile2' # 'run'
+control_cmd = 'launcher2' # 'launcher'
 
 def parse_times(log_path):
     log_data = open(log_path, 'r').read()
@@ -35,7 +37,7 @@ def parse_times(log_path):
     run_seconds = []
     launcher_seconds = []
 
-    seconds_pattern = re.compile(r'\[\d+\s+(run|launcher)\]\s+([\d\.]+) seconds')
+    seconds_pattern = re.compile(f'\[\d+\s+({run_cmd}|{control_cmd})\]\s+([\d\.]+) seconds')
 
     for line in log_data.split('\n'):
         match = seconds_pattern.search(line)
@@ -43,9 +45,9 @@ def parse_times(log_path):
             type_ = match.group(1)
             seconds = float(match.group(2))
 
-            if type_ == 'run':
+            if type_ == run_cmd:
                 run_seconds.append(seconds)
-            elif type_ == 'launcher':
+            elif type_ == control_cmd:
                 launcher_seconds.append(seconds)
 
     print("Run iterations:", len(run_seconds))
@@ -70,8 +72,8 @@ def plot_data(ax, data, color, label, outliers, y_max, y_min):
 
 def main(log_path):
     data = {
-        'improved': {'label': 'Downloader 2.2.1', 'short_label': 'v2.2'},
-        'baseline': {'label': 'Downloader 2.1', 'short_label': 'v2.1'}
+        'improved': {'label': 'Downloader 2.3', 'short_label': 'v2.3'},
+        'baseline': {'label': 'Downloader 2.2.1', 'short_label': 'v2.2.1'}
     }
     times = dict(zip(data, parse_times(log_path)))
     indices = np.arange(len(times['improved']))

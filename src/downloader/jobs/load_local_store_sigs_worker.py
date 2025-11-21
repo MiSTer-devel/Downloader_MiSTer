@@ -16,11 +16,18 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from downloader.job_system import WorkerResult
+from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
+from downloader.jobs.worker_context import DownloaderWorkerBase
 
 
-@dataclass
-class Index:
-    files: Dict[str, Any]
-    folders: Dict[str, Any]
+class LoadLocalStoreSigsWorker(DownloaderWorkerBase):
+    def job_type_id(self) -> int: return LoadLocalStoreSigsJob.type_id
+    def reporter(self): return self._ctx.progress_reporter
+
+    def operate_on(self, job: LoadLocalStoreSigsJob) -> WorkerResult:  # type: ignore[override]
+        logger = self._ctx.logger
+        logger.bench('LoadLocalStoreSigsWorker start.')
+        job.local_store_sigs = self._ctx.local_repository.load_store_sigs()
+        logger.bench('LoadLocalStoreSigsWorker done.')
+        return [], None

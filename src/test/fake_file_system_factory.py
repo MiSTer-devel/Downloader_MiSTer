@@ -21,7 +21,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from downloader.constants import STORAGE_PATHS_PRIORITY_SEQUENCE, HASH_file_does_not_exist
+from downloader.constants import HASH_file_does_not_exist, STORAGE_PATHS_SET
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
     FsError, UnzipError, \
     absolute_parent_folder, FolderCreationError, FsSharedState, FileCopyError, FileReadError
@@ -107,6 +107,7 @@ class FakeFileSystem(ProductionFileSystem):
         self._write_records = write_records
         self._current_temp_file_index = 0
         self._fs_cache = fs_cache
+        self._partition_sizes = {}
 
     @property
     def write_records(self):
@@ -130,6 +131,9 @@ class FakeFileSystem(ProductionFileSystem):
 
     def resolve(self, path):
         return self._path(path)
+
+    def free_spaces(self) -> dict[str, int]:
+        return self._partition_sizes
 
     def is_file(self, path, use_cache: bool = True):
         full_path = self._path(path)
@@ -160,7 +164,7 @@ class FakeFileSystem(ProductionFileSystem):
 
         entries = tuple(self.state.files) + tuple(self.state.folders)
 
-        return path in STORAGE_PATHS_PRIORITY_SEQUENCE and any(entry.lower().startswith(path) for entry in entries)
+        return path in STORAGE_PATHS_SET and any(entry.lower().startswith(path) for entry in entries)
 
     def read_file_contents(self, path):
         return self.state.files[self._path(path)]['content']
@@ -188,6 +192,9 @@ class FakeFileSystem(ProductionFileSystem):
 
     def set_read_error(self):
         self._fake_failures['read_error'] = True
+
+    def set_free_spaces(self, partition_sizes: dict[str, int]):
+        self._partition_sizes = partition_sizes
 
     def move(self, source, target):
         source_file = self._path(source)

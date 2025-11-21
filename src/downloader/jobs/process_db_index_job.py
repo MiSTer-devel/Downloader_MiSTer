@@ -17,14 +17,14 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Optional
 
 from downloader.config import Config, ConfigDatabaseSection
 from downloader.db_entity import DbEntity
 from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.index import Index
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 from downloader.path_package import PathPackage
 
 
@@ -34,10 +34,9 @@ class ProcessDbIndexJob(Job):
 
     # Inputs
     db: DbEntity
-    store: StoreWrapper
+    store: ReadOnlyStoreAdapter
     ini_description: ConfigDatabaseSection
     index: Index
-    full_resync: bool
     config: Config
     zip_id: Optional[str] = None
 

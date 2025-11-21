@@ -17,12 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import Any, Dict, List
+from typing import List
 
 from downloader.config import Config, ConfigDatabaseSection
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 
 
 @dataclass(eq=False, order=False)
@@ -30,9 +30,8 @@ class WaitDbZipsJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
     db: DbEntity
-    store: StoreWrapper
+    store: ReadOnlyStoreAdapter
     ini_description: ConfigDatabaseSection
-    full_resync: bool
     config: Config
     zip_job_tags: List[str]
 

@@ -18,7 +18,7 @@
 import json
 import unittest
 
-from downloader.constants import MEDIA_FAT, MEDIA_USB0, FILE_downloader_storage_zip, FILE_downloader_external_storage, FILE_downloader_storage_json
+from downloader.constants import MEDIA_FAT, MEDIA_USB0, FILE_downloader_storage_zip, FILE_downloader_external_storage, FILE_downloader_storage_json, FILE_downloader_storage_sigs_json
 from downloader.fail_policy import FailPolicy
 from downloader.local_store_wrapper import LocalStoreWrapper
 from downloader.store_migrator import make_new_local_store
@@ -33,6 +33,7 @@ from test.fake_local_repository import LocalRepository
 
 internal_db_fat_zip_file = media_fat(FILE_downloader_storage_zip).lower()
 internal_db_fat_json_file = media_fat(FILE_downloader_storage_json).lower()
+internal_db_fat_sigs_file = media_fat(FILE_downloader_storage_sigs_json).lower()
 usb0_db_json_file = media_usb0(FILE_downloader_external_storage).lower()
 
 
@@ -126,16 +127,52 @@ class TestLocalRepository(unittest.TestCase):
         self.assertEqual(birdy_store_with_fixed_files_and_folders(), store)
 
     def test_load_store___when_there_is_an_error_on_internal_store___returns_an_empty_store(self):
-        files_system = fs(files=db_files_internal_empty())
-        files_system[0].set_read_error()
-        store = load_store(files_system, fail_policy=FailPolicy.FAULT_TOLERANT)
+        fs_objects = fs(files=db_files_internal_empty())
+        fs_objects[0].set_read_error()
+        store = load_store(fs_objects, fail_policy=FailPolicy.FAULT_TOLERANT)
         self.assertEqual({}, store)
 
     def test_load_store___when_there_is_no_internal_store_and_an_error_on_external_store___ignores_the_external_store_and_returns_an_empty_store(self):
-        files_system = fs(files={usb0_db_json_file: birdy_cifs_json_db()})
-        files_system[0].set_read_error()
-        store = load_store(files_system)
+        fs_objects = fs(files={usb0_db_json_file: birdy_cifs_json_db()})
+        fs_objects[0].set_read_error()
+        store = load_store(fs_objects)
         self.assertEqual({}, store)
+
+    def test_save_store_sigs___on_empty_fs___saves_the_data_on_the_fs(self):
+        actual = save_store_with_sigs(fs(), LocalStoreWrapper({**local_store(), 'db_sigs': some_store_sigs()}))
+        self.assertEqual(some_store_sigs(), actual)
+
+    def test_load_store_sigs___on_an_empty_drive___returns_none(self):
+        sigs = load_store_sigs(fs())
+        self.assertIsNone(sigs)
+
+    def test_load_store_sigs___after_saving_a_store___returns_some_store_sigs(self):
+        sigs = load_store_sigs(fs(files={internal_db_fat_sigs_file: some_store_sigs()}))
+        self.assertEqual(some_store_sigs(), sigs)
+
+
+def save_store_with_sigs(fs_objects, local_store_wrapper):
+    file_system, fs_state = fs_objects
+    sut = LocalRepository(config=fs_state.config, file_system=file_system)
+    local_store_wrapper.mark_force_save()
+    sut.save_store(local_store_wrapper)
+    return file_system.load_dict_from_file(internal_db_fat_sigs_file)
+
+def load_store_sigs(fs_objects):
+    file_system, fs_state = fs_objects
+    sut = LocalRepository(config=fs_state.config, file_system=file_system)
+    return sut.load_store_sigs()
+
+
+def some_store_sigs():
+    return {
+        db_test: {
+            'hash': 'test_hash_123',
+            'size': 1024,
+            'timestamp': 1234567890,
+            'filter': ''
+        }
+    }
 
 
 def save_store(fs_objects, input_local_store):
@@ -146,7 +183,7 @@ def save_store(fs_objects, input_local_store):
     sut.save_store(local_store_wrapper)
     files = {}
     for file_path, file_description in file_system.data['files'].items():
-        if 'last_successful_run' in file_path:
+        if 'last_successful_run' in file_path or file_path.endswith(internal_db_fat_sigs_file):
             continue
 
         files[file_path] = file_system.load_dict_from_file(file_path)['dbs']
@@ -164,12 +201,17 @@ def fs(files=None, folders=None):
     fs_state = FileSystemState(files={file_path: file_descr(hash_code=file_path) for file_path in files}, folders=folders, base_system_path=MEDIA_FAT)
     file_system = FileSystemFactory(state=fs_state).create_for_system_scope()
 
-    for file_path, dbs in files.items():
-        store = local_store(dbs, internal=not file_path.startswith('/media/usb'))
-        if FILE_downloader_storage_zip.lower() in file_path:
+    for file_path, content in files.items():
+        if file_path == internal_db_fat_sigs_file:
+            file_system.save_json(content, file_path)
+            continue
+
+        store = local_store(content, internal=not file_path.startswith('/media/usb'))
+        if internal_db_fat_zip_file == file_path:
             file_system.save_json_on_zip(store, file_path)
-        else:
-            file_system.save_json(store, file_path)
+            continue
+
+        file_system.save_json(store, file_path)
 
     return [file_system, fs_state]
 

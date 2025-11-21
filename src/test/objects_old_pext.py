@@ -29,7 +29,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_old
 from downloader.db_options import DbOptions
 from downloader.other import empty_store_without_base_path
-from downloader.db_entity import DbEntity, fix_files, fix_folders, fix_zip
+from downloader.db_entity import DbEntity, fix_folders, fix_zip
 import copy
 import tempfile
 
@@ -386,6 +386,10 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
     if header is not None:
         db_props['header'] = header
     entity = DbEntity(db_props, section if section is not None else db_id if db_id is not None else db_test)
+
+    if not entity.needs_migration():
+        raise Exception("The db_entity created does not need migration. How is this in *_old_pext then?")
+
     return entity
 
 
@@ -608,37 +612,6 @@ def file_neogeo_md_descr():
         "size": 2905029,
         "url": "https://neogeo.md"
     }
-
-
-def fix_old_pext_store(store, base_path=True, ignore: list[str] = None):
-    if ignore is None:
-        ignore = []
-    if base_path:
-        for file_path, file_description in store['files'].items():
-            if file_path in ignore: continue
-            if file_path.startswith('games') or file_path.startswith('docs'):
-                file_description['path'] = 'pext'
-        for folder_path, folder_description in store['folders'].items():
-            if folder_path.startswith('games') or folder_path.startswith('docs'):
-                folder_description['path'] = 'pext'
-    if 'zips' in store:
-        for zip_id, zip_desc in store['zips'].items():
-            fix_zip(zip_desc)
-    if 'filtered_zip_data' in store:
-        for zip_id, zip_summary in store['filtered_zip_data'].items():
-            fix_files(zip_summary['files'])
-            fix_folders(zip_summary['folders'])
-    if 'external' in store:
-        for drive, external in store['external'].items():
-            if drive in ignore: continue
-            for file_path, file_description in external['files'].items():
-                if file_path in ignore: continue
-                if file_path.startswith('games') or file_path.startswith('docs'):
-                    file_description['path'] = 'pext'
-            for folder_path, folder_description in external['folders'].items():
-                if folder_path.startswith('games') or folder_path.startswith('docs'):
-                    folder_description['path'] = 'pext'
-    return store
 
 def file_s32x_md_descr():
     return {

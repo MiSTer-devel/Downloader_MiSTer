@@ -16,11 +16,15 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from downloader.full_run_service import FileCheckingService as ProductionFileCheckingService
+from test.fake_file_system_factory import FileSystemFactory
+from test.fake_local_repository import LocalRepository
+from test.fake_logger import NoLogger
 
 
-@dataclass
-class Index:
-    files: Dict[str, Any]
-    folders: Dict[str, Any]
+class FileCheckingService(ProductionFileCheckingService):
+    def __init__(self, local_repository=None, file_system=None, logger=None):
+        self.file_system = FileSystemFactory().create_for_system_scope() if file_system is None else file_system
+        self.local_repository = LocalRepository(file_system=self.file_system) if local_repository is None else local_repository
+        self.logger = NoLogger() if logger is None else logger
+        super().__init__(self.local_repository, self.file_system, self.logger)

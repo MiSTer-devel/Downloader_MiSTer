@@ -58,7 +58,7 @@ class OnlineImporterWithPriorityStorageTestBaseOldPext(OnlineImporterTestBase):
             .from_implicit_inputs(inputs)\
             .add_db(db_with_smb1(), local_store_dbs[db_test]) \
             .add_db(db_demo_with_nes_manual(), local_store_dbs[db_demo]) \
-            .download(False), local_store_dbs
+            .download(), local_store_dbs
 
     def download_external_drives_1_and_2(self, inputs, store=None):
         local_store_dbs = store if store is not None else {
@@ -69,7 +69,7 @@ class OnlineImporterWithPriorityStorageTestBaseOldPext(OnlineImporterTestBase):
             .from_implicit_inputs(inputs)\
             .add_db(db_external_drives_1(), local_store_dbs[db_id_external_drives_1]) \
             .add_db(db_external_drives_2(), local_store_dbs[db_id_external_drives_2]) \
-            .download(False), local_store_dbs
+            .download(), local_store_dbs
 
     # Note: These following "just ... file" dbs are buggy, but could show up in real life
     def download_just_smb1_file_db(self, store, inputs):

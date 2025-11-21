@@ -20,6 +20,7 @@ import unittest
 import json
 
 from downloader.constants import K_BASE_PATH, DISTRIBUTION_MISTER_DB_ID
+from downloader.migrations import MigrationV11
 from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_file_system_factory import fs_data, FileSystemFactory
 from test.objects import file_descr
@@ -39,6 +40,9 @@ class TestRealisticMigrations(unittest.TestCase):
 
     empty_store_external_v9 = 'test/integration/fixtures/empty_store_external_v9.json'
     empty_store_external_vlast = 'test/integration/fixtures/empty_store_external_vlast.json'
+
+    filled_store_v10_with_old_pext_paths_in_zips = 'test/integration/fixtures/filled_store_v10_with_old_pext_paths_in_zips.json'
+    filled_store_v11_with_pext_paths_in_zips = 'test/integration/fixtures/filled_store_v11_with_pext_paths_in_zips.json'
 
     def test_migrate___on_v0_filled_store___returns_expected_store(self):
         self.assert_versions_change_as_expected(self.filled_store_v0, self.filled_store_vlast)
@@ -67,6 +71,13 @@ class TestRealisticMigrations(unittest.TestCase):
 
     def test_migrate___on_vlast_with_zip_filled_store___returns_same_store(self):
         self.assert_versions_stay_the_same(self.filled_store_vlast_with_zip)
+
+    def test_migration_v11___from_v10_to_v11_with_old_pext_paths_and_filters_covering_zips_and_non_zips_scenarios___returns_expected_store(self):
+        store = load_file(self.filled_store_v10_with_old_pext_paths_in_zips)
+        self.assertEqual(10, store['migration_version'])
+        MigrationV11().migrate(store)
+        store['migration_version'] += 1
+        self.assertEqual(load_file(self.filled_store_v11_with_pext_paths_in_zips), store)
 
     def assert_versions_change_as_expected(self, initial_file, expected_file):
         store = load_file(initial_file)

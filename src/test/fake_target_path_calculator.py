@@ -26,8 +26,8 @@ from test.fake_file_system_factory import FileSystemFactory as FakeFileSystem
 
 
 class TargetPathCalculatorFactory(ProductionTargetPathCalculatorFactory):
-    def __init__(self, file_system: Optional[FileSystem] = None, external_drives_repository: Optional[ExternalDrivesRepository] = None, config: Optional[Config] = None):
+    def __init__(self, file_system: Optional[FileSystem] = None, external_drives_repository: Optional[ExternalDrivesRepository] = None, config: Optional[Config] = None, old_pext_paths: set[str] = None):
         config = config or default_config()
         file_system = file_system or FakeFileSystem(config=config).create_for_config(config)
         external_drives_repository = external_drives_repository or FakeExternalDrivesRepository(file_system=file_system)
-        super().__init__(file_system, external_drives_repository)
+        super().__init__(file_system, external_drives_repository, old_pext_paths or set())

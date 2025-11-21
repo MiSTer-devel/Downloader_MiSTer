@@ -135,6 +135,8 @@ def _clean_description(description):
         result['size'] = description['size']
     if 'unzipped_json' in description:
         result['unzipped_json'] = description['unzipped_json']
+    if 'json' in description:
+        result['json'] = description['json']
     if 'zipped_files' in description:
         result['zipped_files'] = description['zipped_files']
     if 'content' in description:

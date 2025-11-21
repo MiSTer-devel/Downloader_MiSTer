@@ -41,21 +41,21 @@ class TestOnlineImporter(OnlineImporterTestBase):
         sut = OnlineImporter()
         store = empty_test_store()
 
-        sut.add_db(db_test_being_empty_descr(), store).download(False)
+        sut.add_db(db_test_being_empty_descr(), store).download()
 
         self.assertEqual(fs_data(), sut.fs_data)
         self.assertEqual(empty_test_store(), store)
         self.assertReportsNothing(sut)
 
     def test_download_dbs_contents___being_empty___does_nothing(self):
-        self.assertReportsNothing(OnlineImporter().download(False))
+        self.assertReportsNothing(OnlineImporter().download())
 
     def test_download_dbs_contents___with_one_file___fills_store_with_that_file(self):
         store = empty_test_store()
 
         sut = OnlineImporter()\
             .add_db(db_test_with_file_a(), store)\
-            .download(False)
+            .download()
 
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_test_with_file_a_descr(), store)
@@ -67,7 +67,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         sut = OnlineImporter\
             .from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))\
             .add_db(db_test_with_file_a(), store)\
-            .download(False)
+            .download()
 
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_test_with_file_a_descr(), store)
@@ -78,7 +78,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
 
         sut = OnlineImporter()\
             .add_db(db_test_with_file_a(), store)\
-            .download(False)
+            .download()
 
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_test_with_file_a_descr(), store)
@@ -90,7 +90,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         sut = OnlineImporter \
             .from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))\
             .add_db(db_test_with_file_a(), store)\
-            .download(False)
+            .download()
 
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_test_with_file_a_descr(), store)
@@ -101,7 +101,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
 
         sut = OnlineImporter()\
             .add_db(db_entity(), store)\
-            .download(False)
+            .download()
 
         self.assertEqual(fs_data(), sut.fs_data)
         self.assertEqual(empty_test_store(), store)
@@ -112,7 +112,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a(), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(fs_data(files={file_a: {'hash': 'does_not_match'}}, folders={folder_a: {}}), sut.fs_data)
         self.assertEqual(store_test_with_file_a_descr(), store)
@@ -123,7 +123,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = store_test_with_file(file_a, {'hash': 'does_not_match', 'size': 0})
 
         sut.add_db(db_test_with_file_a(), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_test_with_file_a_descr(), store)
@@ -134,7 +134,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a(), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_test_with_file_a_descr(), store)
@@ -145,7 +145,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = empty_test_store()
 
         sut.add_db(db_test_with_file_a(), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(fs_data(folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_with_folders([folder_a]), store)
@@ -156,7 +156,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = empty_test_store()
 
         sut.add_db(db_test_with_file_a(), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_with_folders([folder_a]), store)
         self.assertEqual(fs_data(folders=[folder_a]), sut.fs_data)
@@ -166,8 +166,8 @@ class TestOnlineImporter(OnlineImporterTestBase):
         sut = OnlineImporter()
         store = empty_test_store()
 
-        sut.add_db(db_test_being_empty_descr(), store).download(False)
-        sut.add_db(db_test_being_empty_descr(), store).download(False)
+        sut.add_db(db_test_being_empty_descr(), store).download()
+        sut.add_db(db_test_being_empty_descr(), store).download()
 
         self.assertEqual(fs_data(), sut.fs_data)
         self.assertEqual(empty_test_store(), store)
@@ -178,7 +178,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = empty_test_store()
 
         sut.add_db(db_distribution_mister(files={FILE_PDFViewer: file_pdfviewer_descr()}, folders={FOLDER_linux: {'path': 'system'}}), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files={
             FILE_PDFViewer: file_pdfviewer_descr()
@@ -196,7 +196,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a(descr=file_a_updated_descr()), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_test_with_file_a_descr(), store)
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.file_system.data)
@@ -209,7 +209,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
 
         sut.add_db(db_with_file('test', file_a, file_a_descr()), store_test)
         sut.add_db(db_with_file('bar', file_a, file_a_updated_descr()), store_bar)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_test_with_file(file_a, file_a_descr()), store_test)
         self.assertEqual(empty_test_store(), store_bar)
@@ -221,7 +221,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = empty_test_store()
 
         sut.add_db(db_with_file(db_test, file_a, file_a_descr()), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_test_with_file(file_a, file_a_descr()), store)
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders={folder_a: {}}), sut.fs_data)
@@ -232,7 +232,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = empty_test_store()
 
         sut.add_db(db_with_folders(db_test, [folder_ab]), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_with_folders([folder_ab], db_test), store)
         self.assertEqual(fs_data(folders={folder_a: {}, folder_ab: {}}), sut.fs_data)
@@ -243,7 +243,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_being_empty_descr(), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(empty_test_store(), store)
         self.assertEqual(fs_data(), sut.fs_data)
@@ -254,7 +254,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a(), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders={folder_a: {}}), sut.fs_data)
         self.assertEqual(store_test_with_file_a_descr(), store)
@@ -265,7 +265,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = store_test_with_file_a_descr()
 
         sut.add_db(db_test_with_file_a(), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_test_with_file_a_descr(), store)
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders={folder_a: {}}), sut.fs_data)
@@ -276,7 +276,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = empty_test_store()
 
         sut.add_db(db_test_with_file(file_boot_rom, boot_rom_descr()), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(empty_test_store(), store)
         self.assertEqual(fs_data(files={file_boot_rom: {"hash": "something_else"}}), sut.fs_data)
@@ -288,7 +288,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = empty_test_store()
 
         sut.add_db(db_test_with_file(file_boot_rom.lower(), boot_rom_descr()), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(empty_test_store(), store)
         self.assertEqual(fs_data(files={file_boot_rom: {"hash": "something_else"}}), sut.fs_data)
@@ -300,7 +300,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = empty_test_store()
 
         sut.add_db(db_test_with_file(file_a, with_overwrite(file_a_updated_descr(), True)), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(fs_data(files={file_a: file_a_updated_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_descr(files={file_a: with_overwrite(file_a_updated_descr(), True)}), store)
@@ -312,7 +312,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = empty_test_store()
 
         sut.add_db(db_test_with_file(file_a, with_overwrite(file_a_updated_descr(), False)), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(empty_test_store(), store)
@@ -324,7 +324,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store = empty_test_store()
 
         sut.add_db(db_test_with_file(file_a, file_a_updated_descr()), store)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_test_with_file(file_a, file_a_updated_descr()), store)
         self.assertEqual(fs_data(files={file_a: file_a_updated_descr()}, folders=[folder_a]), sut.fs_data)
@@ -336,7 +336,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         store1 = store_with_folders(['a', 'b', 'c'])
 
         sut.add_db(db_with_folders('db1', ['a', 'x', 'y']), store1)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_with_folders(['a', 'x', 'y']), store1)
         self.assertEqual(fs_data(folders=['a', 'x', 'y']), sut.fs_data)
@@ -351,7 +351,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         sut.add_db(db_with_folders('db1', ['a', 'x']), store1)
         sut.add_db(db_with_folders('db2', ['b']), store2)
         sut.add_db(db_with_folders('db3', []), store3)
-        sut.download(False)
+        sut.download()
 
         self.assertEqual(store_with_folders(['a', 'x']), store1)
         self.assertEqual(store_with_folders(['b']), store2)
@@ -370,7 +370,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         db.header.append(expected_log)
         db.header.append(expected_wait)
 
-        OnlineImporter(waiter=waiter, logger=logger).add_db(db, empty_test_store()).download(False)
+        OnlineImporter(waiter=waiter, logger=logger).add_db(db, empty_test_store()).download()
 
         self.assertIn(expected_wait, waiter.registeredWaits)
         self.assertIn(expected_log, [line for call in logger.printCalls for line in call[0].split('\n') if line])
@@ -401,6 +401,17 @@ class TestOnlineImporter(OnlineImporterTestBase):
         sut = self.download_reboot_file(store_reboot_descr(custom_hash='other_hash'), fs(files={file_reboot: file_reboot_descr()}))
         self.assertReports(sut, [file_reboot], needs_reboot=True)
 
+    def test_removes_folder_slash_endings___on_empty_fs___registers_the_folder_without_the_ending_slash(self):
+        sut = OnlineImporter()
+        store = empty_test_store()
+
+        sut.add_db(db_entity(files={file_a: file_a_descr()}, folders={folder_a + '/': {}}), store)
+        sut.download()
+
+        self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
+        self.assertEqual(store_test_with_file_a_descr(), store)
+        self.assertReports(sut, [file_a])
+
     def test_download_db2_with_file_a_and_emtpy_db1___after_having_db1_with_file_a_and_empty_db2___updates_stores_but_no_changes_on_fs(self):
         store1 = empty_test_store()
         store2 = empty_test_store()
@@ -408,7 +419,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         sut = OnlineImporter()\
             .add_db(db_test_with_file_a(db_id='1'), store1)\
             .add_db(db_entity(db_id='2'), store2)\
-            .download(False)
+            .download()
 
         self.assertEqual([
             {'data': '/media/fat/a', 'scope': 'make_dirs'},
@@ -424,7 +435,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         sut = OnlineImporter().from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))\
             .add_db(db_entity(db_id='1'), store1)\
             .add_db(db_test_with_file_a(db_id='2'), store2)\
-            .download(False)
+            .download()
 
         self.assertEqual([{'data': '/media/fat/a', 'scope': 'make_dirs'}], sut.fs_records)
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
@@ -439,7 +450,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         sut = OnlineImporter()\
             .add_db(db_entity(db_id='1'), store1)\
             .add_db(db_test_with_file_a(db_id='2'), store2)\
-            .download(False)
+            .download()
 
         self.assertEqual([
             {'data': '/media/fat/a', 'scope': 'make_dirs'},
@@ -453,7 +464,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
         sut = OnlineImporter().from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))\
             .add_db(db_test_with_file_a(db_id='1'), store1)\
             .add_db(db_entity(db_id='2'), store2)\
-            .download(False)
+            .download()
 
         self.assertEqual([{'data': '/media/fat/a', 'scope': 'make_dirs'}], sut.fs_records)
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)

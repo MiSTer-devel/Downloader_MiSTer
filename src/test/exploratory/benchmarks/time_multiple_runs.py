@@ -51,7 +51,7 @@ def iterate(op, target, results):
     try:
         operations_dict(env={
             'DEBUG': 'false', 'FAIL_ON_FILE_ERROR': 'true', 'LOGFILE': log_file,
-            'ALLOW_REBOOT': '0', 'UPDATE_LINUX': 'false',
+            'ALLOW_REBOOT': '0', 'UPDATE_LINUX': 'false', 'LANG': 'en_US.UTF-8', 'LC_ALL': 'en_US.UTF-8', 'LC_CTYPE': 'en_US.UTF-8'
         }, retries=False)[op]()
     except CalledProcessError: log(f'[{cur_i:0>2} {op:>8}] ERRORED! See {log_file} for details.')
     duration = time.monotonic() - before
@@ -81,7 +81,7 @@ def log(msg):
 
 
 def distribute(op, iterations, samples, controls):
-    if op == 'control': return shuffled_list(iterations, ('run', samples), ('launcher', controls))
+    if op == 'control': return shuffled_list(iterations, ('run_compile2', samples), ('launcher2', controls))
     else: return [(op, samples)] * iterations
 
 

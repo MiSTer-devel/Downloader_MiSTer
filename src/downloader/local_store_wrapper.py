@@ -18,10 +18,12 @@
 
 from downloader.constants import K_BASE_PATH, DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, \
     DB_STATE_SIGNATURE_NO_TIMESTAMP, DB_STATE_SIGNATURE_NO_FILTER
+from downloader.db_entity import ZipIndexEntity
+
 from downloader.error import DownloaderError
-from downloader.jobs.index import Index
 from downloader.other import empty_store_without_base_path
 from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict, cast
+from types import MappingProxyType
 from collections import defaultdict, ChainMap
 
 from downloader.path_package import PathPackage, PathType, path_pext
@@ -88,7 +90,7 @@ class ReadOnlyStoreException(DownloaderError): pass
 
 
 class StoreWrapper:
-    def __init__(self, store: Dict[str, Any], db_state_signature: DbStateSig, local_store_wrapper: LocalStoreWrapper, readonly: bool = False) -> None:
+    def __init__(self, store: Dict[str, Any], db_state_signature: DbStateSig, local_store_wrapper: Optional[LocalStoreWrapper], readonly: bool = False) -> None:
         self._external_additions: StoreFragmentPaths = {'files': defaultdict(list), 'folders': defaultdict(list)}
         if 'external' in store:
             for drive, external in store['external'].items():
@@ -108,72 +110,28 @@ class StoreWrapper:
 
         self._store = store
         self._db_state_signature = db_state_signature
-        self._local_store_wrapper = local_store_wrapper
         self._read_only = ReadOnlyStoreAdapter(self._store, self._db_state_signature)
-        self._write_only = WriteOnlyStoreAdapter(self._store, self._db_state_signature, self._local_store_wrapper, self._external_additions)
-        self._readonly = readonly
+        self._write_only = None if readonly else WriteOnlyStoreAdapter(self._store, self._db_state_signature, local_store_wrapper, self._external_additions)
 
     def unwrap_store(self) -> Dict[str, Any]:
         return self._store
 
     def write_only(self) -> 'WriteOnlyStoreAdapter':
-        if self._readonly: raise ReadOnlyStoreException('Cannot get write only store adapter from read only store wrapper')
+        if self._write_only is None: raise ReadOnlyStoreException('Cannot get write only store adapter from read only store wrapper')
         return self._write_only
 
     def read_only(self) -> 'ReadOnlyStoreAdapter':
         return self._read_only
-    
-    def select(self, index: Index) -> 'StoreWrapper':
-        # @TODO: Remove this | handling after we change the pext path format in the stores
-        norm_files = [fp[1:] if len(fp) > 0 and fp[0] == '|' else fp for fp in index.files]
-        norm_folders = [dp[1:] if len(dp) > 0 and dp[0] == '|' else dp for dp in index.folders]
 
-        new_store = {
-            'files': {fp: self._store['files'][fp] for fp in norm_files if fp in self._store['files']},
-            'folders': {fp: self._store['folders'][fp] for fp in norm_folders if fp in self._store['folders']},
-        }
-
-        if 'base_path' in self._store:
-            new_store['base_path'] = self._store['base_path']
-
-        if 'external' in self._store:
-            new_store['external'] = {
-                drive: {
-                    'files': {fp: summary['files'][fp] for fp in norm_files if fp in summary['files']},
-                    'folders': {dp: summary['folders'][dp] for dp in norm_folders if dp in summary['folders']}
-                }
-                for drive, summary in self._store['external'].items()
-            }
-
-        return StoreWrapper(new_store, empty_db_state_signature(), self._local_store_wrapper, readonly=True)
-
-    def deselect_all(self, indexes: List[Index]) -> 'StoreWrapper':
-        # @TODO: Remove this | handling after we change the pext path format in the stores
-        norm_files = {fp if (fp[0] != '|' or len(fp) == 0) else fp[1:] for index in indexes for fp in index.files}
-        norm_folders = {dp if (dp[0] != '|' or len(dp) == 0) else dp[1:] for index in indexes for dp in index.folders}
-
-        new_store = {
-            'files': {fp: fd for fp, fd in self._store['files'].items() if fp not in norm_files},
-            'folders': {dp: dd for dp, dd in self._store['folders'].items() if dp not in norm_folders},
-        }
-
-        if 'base_path' in self._store:
-            new_store['base_path'] = self._store['base_path']
-
-        if 'external' in self._store:
-            new_store['external'] = {
-                drive: {
-                    'files': {fp: fd for fp, fd in summary['files'].items() if fp not in norm_files},
-                    'folders': {dp: dd for dp, dd in summary['folders'].items() if dp not in norm_folders}
-                }
-                for drive, summary in self._store['external'].items()
-            }
-
-        return StoreWrapper(new_store, empty_db_state_signature(), self._local_store_wrapper, readonly=True)
+    @property
+    def version(self) -> int:
+        return self._store.get('v', 0)
 
 
 class WriteOnlyStoreAdapter:
     def __init__(self, store, db_state_signature, top_wrapper, external_additions) -> None:
+        if top_wrapper is None:
+            raise ReadOnlyStoreException('Cannot create write only store adapter without a top wrapper')
         self._store = store
         self._db_state_signature = db_state_signature
         self._top_wrapper = top_wrapper
@@ -474,6 +432,7 @@ class WriteOnlyStoreAdapter:
         if len(filtered_zip_data):
             if 'filtered_zip_data' in self._store and equal_dicts(self._store['filtered_zip_data'], filtered_zip_data):
                 return
+
             self._store['filtered_zip_data'] = filtered_zip_data
 
             self._top_wrapper.mark_force_save()
@@ -505,24 +464,27 @@ class WriteOnlyStoreAdapter:
                 self.add_external_folder(drive, folder_path, folder_description)
 
 class ReadOnlyStoreAdapter:
-    def __init__(self, store, db_state_signature) -> None:
+    def __init__(self, store, db_state_signature: DbStateSig) -> None:
         self._store = store
         self._db_state_signature = db_state_signature
+
+    def db_state_signature(self) -> DbStateSig:
+        return cast(DbStateSig, MappingProxyType(self._db_state_signature))
 
     def invalid_hashes(self, file_pkgs: List[PathPackage]) -> List[bool]:
         '''Returns a list of booleans indicating invalid hashes with the same order as the input.'''
         store_files = self._store['files']
         return [
-            (store_files[pkg.rel_path]['hash'] != pkg.description['hash'] if pkg.rel_path in store_files else True) 
+            (store_files[pkg.rel_path]['hash'] != pkg.description['hash'] if pkg.rel_path in store_files else True)
             if not pkg.is_pext_external() else
-            (True if 'external' not in self._store \
-                else True if pkg.drive not in self._store['external'] \
-                    else True if pkg.rel_path not in self._store['external'][pkg.drive]['files'] \
+            (True if 'external' not in self._store
+                else True if pkg.drive not in self._store['external']
+                    else True if pkg.rel_path not in self._store['external'][pkg.drive]['files']
                         else self._store['external'][pkg.drive]['files'][pkg.rel_path]['hash'] != pkg.description['hash'])
             for pkg in file_pkgs
         ]
 
-    def zip_summaries(self) -> dict[str, Any]:
+    def zip_summaries(self) -> dict[str, StoreFragmentZipSummary]:
         grouped: dict[str, StoreFragmentZipSummary] = defaultdict(lambda: {'files': {}, 'folders': {}})
 
         # @TODO: This if startswith('|') should be removed when we store all the zip information on the store
@@ -562,6 +524,54 @@ class ReadOnlyStoreAdapter:
             data['folders'] = {path_pext(f, d): d for f, d in data['folders'].items()}
 
         return grouped
+
+    def select(self, index: ZipIndexEntity) -> 'ReadOnlyStoreAdapter':
+        # @TODO: Remove this | handling after we change the pext path format in the stores
+        norm_files = [fp[1:] if len(fp) > 0 and fp[0] == '|' else fp for fp in index.files]
+        norm_folders = [dp[1:] if len(dp) > 0 and dp[0] == '|' else dp for dp in index.folders]
+
+        new_store = {
+            'files': {fp: self._store['files'][fp] for fp in norm_files if fp in self._store['files']},
+            'folders': {fp: self._store['folders'][fp] for fp in norm_folders if fp in self._store['folders']},
+        }
+
+        if 'base_path' in self._store:
+            new_store['base_path'] = self._store['base_path']
+
+        if 'external' in self._store:
+            new_store['external'] = {
+                drive: {
+                    'files': {fp: summary['files'][fp] for fp in norm_files if fp in summary['files']},
+                    'folders': {dp: summary['folders'][dp] for dp in norm_folders if dp in summary['folders']}
+                }
+                for drive, summary in self._store['external'].items()
+            }
+
+        return StoreWrapper(new_store, empty_db_state_signature(), None, readonly=True).read_only()
+
+    def deselect_all(self, indexes: List[ZipIndexEntity]) -> 'ReadOnlyStoreAdapter':
+        # @TODO: Remove this | handling after we change the pext path format in the stores
+        norm_files = {fp if (fp[0] != '|' or len(fp) == 0) else fp[1:] for index in indexes for fp in index.files}
+        norm_folders = {dp if (dp[0] != '|' or len(dp) == 0) else dp[1:] for index in indexes for dp in index.folders}
+
+        new_store = {
+            'files': {fp: fd for fp, fd in self._store['files'].items() if fp not in norm_files},
+            'folders': {dp: dd for dp, dd in self._store['folders'].items() if dp not in norm_folders},
+        }
+
+        if 'base_path' in self._store:
+            new_store['base_path'] = self._store['base_path']
+
+        if 'external' in self._store:
+            new_store['external'] = {
+                drive: {
+                    'files': {fp: fd for fp, fd in summary['files'].items() if fp not in norm_files},
+                    'folders': {dp: dd for dp, dd in summary['folders'].items() if dp not in norm_folders}
+                }
+                for drive, summary in self._store['external'].items()
+            }
+
+        return StoreWrapper(new_store, empty_db_state_signature(), None, readonly=True).read_only()
 
     @property
     def zips(self) -> Dict[str, Dict[str, Any]]:

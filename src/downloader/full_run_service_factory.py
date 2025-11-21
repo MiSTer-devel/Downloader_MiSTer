@@ -98,6 +98,7 @@ class FullRunServiceFactory:
         linux_updater = LinuxUpdater(self._logger, waiter, config, system_file_system, safe_file_fetcher)
         base_path_relocator = BasePathRelocator(config, file_system_factory, waiter, self._logger)
 
+        old_pext_paths = set()  # @TODO: Should end up empty. Remove when we have 100% in not having pext paths anymore.
         workers_ctx = DownloaderWorkerContext(
             job_ctx=job_system,
             waiter=waiter,
@@ -112,10 +113,10 @@ class FullRunServiceFactory:
             free_space_reservation=free_space_reservation,
             external_drives_repository=external_drives_repository,
             file_filter_factory=file_filter_factory,
-            target_paths_calculator_factory=TargetPathsCalculatorFactory(system_file_system, external_drives_repository),
+            target_paths_calculator_factory=TargetPathsCalculatorFactory(system_file_system, external_drives_repository, old_pext_paths),
             config=config
         )
-        online_importer = OnlineImporter(logger=self._logger, job_system=job_system, worker_ctx=workers_ctx, free_space_reservation=free_space_reservation)
+        online_importer = OnlineImporter(logger=self._logger, job_system=job_system, worker_ctx=workers_ctx, free_space_reservation=free_space_reservation, old_pext_paths=old_pext_paths)
 
         instance = FullRunService(
             config,

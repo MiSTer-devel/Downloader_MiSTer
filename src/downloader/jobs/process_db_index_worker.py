@@ -22,6 +22,7 @@ import threading
 import os
 from collections import defaultdict
 
+from downloader.config import FileChecking
 from downloader.db_entity import check_file_pkg, check_folder_paths
 from downloader.file_filter import BadFileFilterPartException, Config, ZipData
 from downloader.file_system import FileWriteError, FolderCreationError, FsError, ReadOnlyFileSystem
@@ -59,8 +60,7 @@ class ProcessDbIndexWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: ProcessDbIndexJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
-        zip_id, db, config, summary, full_resync = job.zip_id, job.db, job.config, job.index, job.full_resync
-        store = job.store.read_only()
+        zip_id, db, config, summary, store = job.zip_id, job.db, job.config, job.index, job.store
 
         logger.bench('ProcessDbIndexWorker start: ', db.db_id, zip_id)
         try:
@@ -85,7 +85,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
     Optional[Exception]
 ]:
     logger = ctx.logger
-    config, db, zip_id, full_resync = job.config, job.db, job.zip_id, job.full_resync
+    config, db, zip_id, always_check_hash = job.config, job.db, job.zip_id, job.config['file_checking'] == FileChecking.VERIFY_INTEGRITY
 
     bench_label = job.__class__.__name__
     logger.bench(bench_label, ' filter summary: ', db.db_id, zip_id)
@@ -101,7 +101,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
     ctx.file_system.precache_is_file_with_folders(create_folder_pkgs)
 
     logger.bench(bench_label, ' check pkgs: ', db.db_id, zip_id)
-    non_existing_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(ctx, job.non_duplicated_files, db.db_id, store, full_resync, bench_label)
+    non_existing_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(ctx, job.non_duplicated_files, db.db_id, store, always_check_hash, bench_label)
 
     logger.bench(bench_label, ' validate pkgs: ', db.db_id, zip_id)
     job.present_validated_files, job.skipped_updated_files, need_update_pkgs = process_validate_packages(ctx, validate_pkgs)
@@ -122,7 +122,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
         job.repeated_store_presence = check_repeated_store_presence(ctx, store, chain(need_install_pkgs or [], job.present_validated_files))
 
     logger.bench(bench_label, ' Create folders: ', db.db_id, zip_id)
-    job.removed_folders, job.installed_folders, created_folders, job.failed_folders = process_create_folder_packages(ctx, create_folder_pkgs, db.db_id, filtered_summary.folders, store)
+    job.removed_folders, job.installed_folders, created_folders, job.failed_folders = process_create_folder_packages(ctx, create_folder_pkgs, db.db_id, filtered_summary.folders, store, bench_label)
     if len(job.failed_folders) > 0:
         return [], [], set(), {}, FolderCreationError(f"Could not create {len(job.failed_folders)} folders.")
 
@@ -151,7 +151,7 @@ def _translate_items(ctx: DownloaderWorkerContext, calculator: TargetPathsCalcul
 
     return present, removed
 
-def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, full_resync: bool, bench_label: str) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
+def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, always_check_hash: bool, bench_label: str) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
     if len(non_duplicated_pkgs) == 0:
         return [], [], []
 
@@ -163,13 +163,13 @@ def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkg
     ctx.logger.bench(bench_label, ' existing loop: ', db_id, len(non_duplicated_pkgs))
     already_installed_pkgs: List[_ValidateFilePackage]
     validate_pkgs: List[_ValidateFilePackage]
-    if full_resync:
-        validate_pkgs = existing
+    if always_check_hash:
+        validate_pkgs = existing  # @TODO: Cover this scenario in tests
         already_installed_pkgs = []
     else:
-        ctx.logger.bench('invalid hashes start: ', db_id, len(non_duplicated_pkgs))
+        ctx.logger.bench(bench_label, ' invalid hashes start: ', db_id, len(non_duplicated_pkgs))
         invalid_hashes = store.invalid_hashes(existing)
-        ctx.logger.bench('invalid hashes end: ', db_id, len(non_duplicated_pkgs))
+        ctx.logger.bench(bench_label, ' invalid hashes end: ', db_id, len(non_duplicated_pkgs))
         if any(invalid_hashes):
             validate_pkgs = [pkg for pkg, inv in zip(existing, invalid_hashes) if inv]
             already_installed_pkgs = [pkg for pkg, inv in zip(existing, invalid_hashes) if not inv]
@@ -234,7 +234,7 @@ def check_repeated_store_presence(ctx: DownloaderWorkerContext, store: ReadOnlyS
                 result.add(pkg.rel_path)  # @TODO: See if use_cache is needed, and if we should optimize this fs access
     return result
 
-def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter) -> Tuple[
+def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter, bench_label: str) -> Tuple[
     list[PathPackage],
     list[PathPackage],
     set[str],
@@ -295,9 +295,9 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
 
             folder_copies_to_be_removed.append(removed_pkg)
 
-    ctx.logger.bench('add_processed_folders start: ', db_id, len(processing_folders))
+    ctx.logger.bench(bench_label, ' add_processed_folders start: ', db_id, len(processing_folders))
     non_existing_folders = ctx.installation_report.add_processed_folders(processing_folders, db_id)
-    ctx.logger.bench('add_processed_folders done: ', db_id, len(processing_folders))
+    ctx.logger.bench(bench_label, ' add_processed_folders done: ', db_id, len(processing_folders))
 
     errors = []
     created_folders = set()

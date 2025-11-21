@@ -23,12 +23,20 @@ from downloader.config import default_config
 from downloader.constants import FILE_MiSTer, FOLDER_gamecontrollerdb, FOLDER_linux, FILE_gamecontrollerdb, \
     FILE_gamecontrollerdb_user, DISTRIBUTION_MISTER_DB_ID
 from downloader.db_entity import DbEntityValidationException, check_file_pkg, check_folder_paths, invalid_paths, \
-    no_distribution_mister_invalid_paths, invalid_root_folders, distribution_mister_exceptional_paths
+    no_distribution_mister_invalid_paths, invalid_root_folders, distribution_mister_exceptional_paths, \
+    DbVersionUnsupportedException
 from downloader.db_options import DbOptionsValidationException
 from downloader.path_package import PathPackage, PathPackageKind, PathType
 from downloader.db_entity import DbEntity
+from test.objects import zipped_nes_palettes_id
 from test.objects import db_test, raw_db_empty_descr, db_empty, file_mister_descr, db_with_folders, file_a_descr, \
-    db_test_with_file, db_entity, file_save_psx_castlevania, file_save_psx_castlevania_descr, folder_save_psx, file_a
+    db_test_with_file, db_entity, file_save_psx_castlevania, file_save_psx_castlevania_descr, folder_save_psx, file_a, \
+    folder_a, file_nes_smb1, file_nes_smb1_descr, folder_games, folder_games_nes, zip_index_entity
+from test.objects_old_pext import file_nes_smb1 as file_nes_smb1_old_pext, \
+    db_entity as db_entity_old_pext, file_nes_smb1_descr as file_nes_smb1_descr_old_pext, \
+    folder_games as folder_games_old_pext, folder_games_nes as folder_games_nes_old_pext
+from test.zip_objects_old_pext import zipped_nes_palettes_desc as zipped_nes_palettes_desc_old_pext, zipped_nes_palettes_id as zipped_nes_palettes_id_old_pext
+from test.zip_objects import zipped_nes_palettes_desc
 
 
 class TestDbEntity(unittest.TestCase):
@@ -88,6 +96,20 @@ class TestDbEntity(unittest.TestCase):
     def test_construct_db_entity___with_saves_folders___returns_db(self):
         self.assertIsNotNone(db_entity(folders={folder_save_psx: {}}))
 
+    def test_construct_db_entity___with_some_incorrect_prop___raises_db_entity_validation_exception(self):
+        wrong_props = [
+            ('v', -1),
+            ('v', 0.0),
+            ('files', 'not_a_dict'),
+            ('folders', 'not_a_dict'),
+            ('timestamp', 'not_an_int'),
+        ]
+        for prop, value in wrong_props:
+            with self.subTest(prop):
+                raw_db = raw_db_empty_descr()
+                raw_db[prop] = value
+                self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
+
     def test_construct_db_entity___with_wrong_options___raises_db_entity_validation_exception(self):
         raw_db = raw_db_empty_descr()
         raw_db['default_options'] = {'allow_delete': default_config()['allow_delete']}
@@ -128,6 +150,64 @@ class TestDbEntity(unittest.TestCase):
         for wrong_path in distribution_mister_exceptional_paths:
             with self.subTest(wrong_path):
                 self.assertIsNotNone(db_with_folders(DISTRIBUTION_MISTER_DB_ID, {wrong_path: {}}))
+
+    def test_migrate_db___on_db_from_v0_to_v1___returns_expected_db(self):
+        db_v0 = db_entity_old_pext(
+            files={file_nes_smb1_old_pext: file_nes_smb1_descr_old_pext(), file_a: file_a_descr()},
+            folders=[folder_games_old_pext, folder_games_nes_old_pext, folder_a]
+        )
+
+        self.assertTrue(db_v0.needs_migration())
+        error = db_v0.migrate()
+        self.assertIsNone(error)
+        self.assertFalse(db_v0.needs_migration())
+
+        self.assertEqual(db_entity(
+            files={file_nes_smb1: file_nes_smb1_descr(), file_a: file_a_descr()},
+            folders={folder_games: {'path': 'pext'}, folder_games_nes: {'path': 'pext'}, folder_a: {}},
+            timestamp=0
+        ).extract_props(), db_v0.extract_props())
+
+    def test_migrate_db___with_unsupported_version___returns_exception(self):
+        db = db_entity(files={file_a: file_a_descr()}, folders={folder_a: {}}, version=999)
+        self.assertTrue(db.needs_migration())
+        self.assertIsInstance(db.migrate(), DbVersionUnsupportedException)
+
+    def test_migrate_zip_index___on_db_from_v0_to_v1___returns_expected_db(self):
+        zip_index = zip_index_entity(
+            files={file_nes_smb1_old_pext: file_nes_smb1_descr_old_pext(), file_a: file_a_descr()},
+            folders={folder_games_old_pext: {}, folder_games_nes_old_pext: {}, folder_a: {}},
+            version=0
+        )
+        self.assertTrue(zip_index.needs_migration())
+        error = zip_index.migrate(db_test)
+        self.assertIsNone(error)
+        self.assertFalse(zip_index.needs_migration())
+
+        self.assertEqual(zip_index_entity(
+            files={file_nes_smb1: file_nes_smb1_descr(), file_a: file_a_descr()},
+            folders={folder_games: {'path': 'pext'}, folder_games_nes: {'path': 'pext'}, folder_a: {}},
+            version=1
+        ), zip_index)
+
+    def test_migrate_zip_index___with_unsupported_Version___returns_exception(self):
+        zip_index = zip_index_entity(files={file_a: file_a_descr()}, folders={folder_a: {}}, version=999)
+        self.assertTrue(zip_index.needs_migration())
+        self.assertIsInstance(zip_index.migrate(db_test), DbVersionUnsupportedException)
+
+    def test_migrate_db_with_internal_zip_summary___on_db_from_v0_to_v1___returns_expected_db(self):
+        db_v0 = db_entity_old_pext(zips={zipped_nes_palettes_id_old_pext: zipped_nes_palettes_desc_old_pext(summary_internal_zip_id=zipped_nes_palettes_id_old_pext)})
+
+        self.assertTrue(db_v0.needs_migration())
+        error = db_v0.migrate()
+        self.assertIsNone(error)
+        self.assertFalse(db_v0.needs_migration())
+
+        actual = db_v0.extract_props()
+        expected = db_entity(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc(summary_internal_zip_id=zipped_nes_palettes_id)}).extract_props()
+        del actual['zips'][zipped_nes_palettes_id]['contents_file']['zipped_files']
+        del expected['zips'][zipped_nes_palettes_id]['contents_file']['zipped_files']
+        self.assertEqual(expected, actual)
 
 
 def pkg(path: str, description: Optional[dict[str, Any]] = None):

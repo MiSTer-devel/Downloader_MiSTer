@@ -5,12 +5,18 @@ WORKDIR /app
 COPY downloader /app/downloader/
 COPY __main__.py commit.py /app/
 
+# OPTIMIZATION:
+# Passing additional --standalone flag, and removing --nofollow-import-to=orjson can save around 150-400ms, at the cost of multiplying binary size x5-x10
+# As an upside, it will make the downloader_bin setup more robust in the event of a linux update. Keep in mind, there is a fallback in the downloader_bin setup fails.
 RUN nuitka --lto=yes --follow-imports \
     --python-flag=no_site \
     --python-flag=-OO \
     --jobs=$(nproc) \
-    --include-package=downloader __main__.py
+    --include-package=downloader \
+    --nofollow-import-to=orjson \
+    __main__.py
 
+# OPTIMIZATION: Commenting out the following line has the potential of saving around 150ms, at the cost of making the binary size weight 50% more.
 RUN upx --best __main__.bin
 
 CMD ["cat", "__main__.bin"]

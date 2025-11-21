@@ -45,7 +45,7 @@ class SandboxTestBase(unittest.TestCase):
     def assertExecutesCorrectly(self, ini_path, expected=None, external_drives_repository_factory=None):
         external_drives_repository_factory = external_drives_repository_factory or ExternalDrivesRepositoryFactory()
         self.maxDiff = None
-        logger = TopLogger(PrintLogger(), NoLogger())
+        logger = TopLogger(PrintLogger(), NoLogger(), False, False, 0.0)
         logger_spy = SpyLoggerDecorator(logger)
         exit_code = self.run_execute_full_run(ini_path, external_drives_repository_factory, logger_spy, logger)
         self.assertEqual(exit_code, 0)
