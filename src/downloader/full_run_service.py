@@ -111,6 +111,7 @@ class FullRunService:
 
         self._local_repository.ensure_base_paths()
 
+        is_file_checking_fastest = self._config['file_checking'] == FileChecking.ON_DB_CHANGES
         new_file_checking = self._file_checking_service.collapse_balanced_file_checking(self._config['file_checking'])
         if new_file_checking is not None:
             self._logger.debug(f'File checking changed from "{self._config["file_checking"]}" to "{new_file_checking}".')
@@ -150,7 +151,9 @@ class FullRunService:
                 self._logger.print("Please, reboot your system and try again.")
                 return EXIT_ERROR_STORE_NOT_LOADED
 
-        self._local_repository.save_free_spaces(self._file_system.free_spaces())
+        if not is_file_checking_fastest:
+            self._local_repository.save_free_spaces(self._file_system.free_spaces())
+
         save_store_err = self._online_importer.save_local_store()
 
         install_box = self._online_importer.box()
