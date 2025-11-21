@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Final, List, Optional, Set, Dict, Any, Tuple, Union, IO, BinaryIO
 
 from downloader.config import AllowDelete, Config
-from downloader.constants import HASH_file_does_not_exist
+from downloader.constants import HASH_file_does_not_exist, STORAGE_PATHS_SET
 from downloader.error import DownloaderError
 from downloader.logger import Logger, OffLogger
 from downloader.path_package import PathPackage
@@ -87,6 +87,10 @@ class FileSystemFactory:
 
 
 class FileSystem(ABC):
+
+    @abstractmethod
+    def free_spaces(self) -> dict[str, int]:
+        """interface"""
 
     @abstractmethod
     def resolve(self, path: str) -> str:
@@ -272,6 +276,23 @@ class _FileSystem(FileSystem):
         self._shared_state = shared_state
         self._quick_hit = 0
         self._slow_hit = 0
+
+    def free_spaces(self) -> dict[str, int]:
+        mounts = {}
+        with open("/proc/mounts") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) < 2:
+                    continue
+
+                mountpoint = parts[1]
+                if mountpoint not in mounts and mountpoint in STORAGE_PATHS_SET:
+                    try:
+                        mounts[mountpoint] = shutil.disk_usage(mountpoint).free
+                    except OSError:
+                        pass
+
+        return mounts
 
     def resolve(self, path: str) -> str:
         return str(Path(path).resolve())

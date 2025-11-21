@@ -20,7 +20,7 @@ from typing import Optional, Any
 
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
     FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json, \
-    FILE_downloader_storage_sigs_json
+    FILE_downloader_storage_sigs_json, FILE_downloader_previous_free_space_json
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.fail_policy import FailPolicy
 from downloader.file_system import FileSystem, FsError
@@ -43,6 +43,7 @@ class LocalRepository(FilelogSaver):
         self._storage_path_old_value: Optional[str] = None
         self._storage_path_load_value: Optional[str] = None
         self._store_sigs_path_value: Optional[str] = None
+        self._previous_free_spaces_path_value: Optional[str] = None
         self._last_successful_run_value: Optional[str] = None
         self._logfile_path_value: Optional[str] = None
 
@@ -73,6 +74,12 @@ class LocalRepository(FilelogSaver):
         if self._store_sigs_path_value is None:
             self._store_sigs_path_value = os.path.join(self._config['base_system_path'], FILE_downloader_storage_sigs_json)
         return self._store_sigs_path_value
+
+    @property
+    def _previous_free_spaces_path(self) -> str:
+        if self._previous_free_spaces_path_value is None:
+            self._previous_free_spaces_path_value = os.path.join(self._config['base_system_path'], FILE_downloader_previous_free_space_json)
+        return self._previous_free_spaces_path_value
 
     @property
     def _last_successful_run(self) -> str:
@@ -159,6 +166,35 @@ class LocalRepository(FilelogSaver):
         finally:
             self._logger.bench('LocalRepository Load store sigs done.')
 
+    def load_previous_free_spaces(self) -> dict[str, int]:
+        self._logger.bench('LocalRepository Load previous free spaces start.')
+        try:
+            if self._file_system.is_file(self._previous_free_spaces_path):
+                return self._file_system.load_dict_from_file(self._previous_free_spaces_path)
+            else:
+                return {}
+        except Exception as e:
+            if self._fail_policy == FailPolicy.FAIL_FAST:
+                raise e
+
+            self._logger.debug(e)
+            self._logger.print('WARNING: Could not load previous free spaces')
+            return {}
+        finally:
+            self._logger.bench('LocalRepository Load previous free spaces done.')
+
+    def save_free_spaces(self, free_spaces: dict[str, int]) -> Optional[Exception]:
+        self._logger.bench('LocalRepository Save free spaces start.')
+        try:
+            self._file_system.make_dirs_parent(self._previous_free_spaces_path)
+            self._file_system.save_json(free_spaces, self._previous_free_spaces_path)
+        except Exception as e:
+            self._logger.debug(e)
+            return e
+
+        self._logger.bench('LocalRepository Save free spaces done.')
+        return None
+
     def has_last_successful_run(self):
         return self._file_system.is_file(self._last_successful_run)
 
@@ -220,6 +256,11 @@ class LocalRepository(FilelogSaver):
             self._logger.bench('LocalRepository Save store end.')
 
     def save_log_from_tmp(self, path) -> None:
-        self._file_system.turn_off_logs()
-        self._file_system.make_dirs_parent(self.logfile_path)
-        self._file_system.copy(path, self.logfile_path)
+        try:
+            self._file_system.turn_off_logs()
+            self._file_system.make_dirs_parent(self.logfile_path)
+            self._file_system.copy(path, self.logfile_path)
+        except Exception:
+            import traceback
+            print(f'ERROR: Could not copy log file from "{path}" to "{self.logfile_path}"')
+            traceback.print_exc()

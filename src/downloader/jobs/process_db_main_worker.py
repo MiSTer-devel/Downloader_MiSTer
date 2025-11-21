@@ -18,9 +18,7 @@
 
 from typing import Dict, Any, Optional, Tuple
 
-from downloader.config import FileChecking
-from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, DB_STATE_SIGNATURE_NO_TIMESTAMP
-from downloader.db_entity import check_zip, fix_folders, ZipIndexEntity
+from downloader.db_entity import check_zip, ZipIndexEntity
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_process_zip_index_job, make_open_zip_summary_job, make_zip_tag, ZipJobContext
 from downloader.jobs.wait_db_zips_job import WaitDbZipsJob
@@ -44,22 +42,7 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
     def _operate_on_impl(self, job: ProcessDbMainJob) -> WorkerResult:
         db, config, store, ini_description = job.db, job.config, job.store, job.ini_description
 
-        logger = self._ctx.logger
-
-        read_only_store = store.read_only()
-
-        if db.needs_migration():  # @TODO: Maybe this should be moved to OpenDbWorker
-            logger.bench('ProcessDbMainWorker migrating db: ', db.db_id)
-            error = db.migrate()
-            if error is not None:
-                return [], error
-
-        fix_folders(db.folders)  # @TODO: Maybe this should be moved to OpenDbWorker
-
-        if not read_only_store.has_base_path():  # @TODO: should remove this from here at some point.
-            store.write_only().set_base_path(config['base_path'])  # After that, all worker stores will be read-only.
-
-        for zip_id in list(read_only_store.zips):
+        for zip_id in list(store.zips):
             if zip_id in db.zips:
                 continue
 
@@ -69,10 +52,10 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
             zip_jobs = []
             zip_job_tags = []
 
-            logger.bench('ProcessDbMainWorker ZIP summaries calc: ', db.db_id)
-            zip_summaries = read_only_store.zip_summaries()
+            self._ctx.logger.bench('ProcessDbMainWorker ZIP summaries calc: ', db.db_id)
+            zip_summaries = store.zip_summaries()
 
-            logger.bench('ProcessDbMainWorker ZIP make jobs: ', db.db_id)
+            self._ctx.logger.bench('ProcessDbMainWorker ZIP make jobs: ', db.db_id)
             for zip_id, zip_description in db.zips.items():
                 #if zip_id != 'cheats_folder_psx': continue
                 zip_job, err = _make_zip_job(zip_summaries.get(zip_id, None), ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))

@@ -47,6 +47,7 @@ class OpenZipSummaryWorker(DownloaderWorkerBase):
                 logger.bench('OpenZipSummaryWorker migrating zip index entity: ', db.db_id, zip_id)
                 error = zip_index.migrate(db.db_id)
                 if error is not None:
+                    self._ctx.swallow_error(error)
                     return [], error
 
             logger.bench('OpenZipSummaryWorker fix zips: ', db.db_id, zip_id)

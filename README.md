@@ -21,10 +21,11 @@ Here you can see the default parameters and the options that you may change:
 verbose = false
 
 ; file_checking options:
-;   0 -> Only check file presences when there are database changes. Recommended for most users.
-;   1 -> Always check file presences. Option for users who remove/add cores manually.
-;   2 -> Always check file presences and hashes (much slower).
-file_checking = 1
+;   'fastest' -> Only check file presences when there are database changes. Fastest.
+;   'balanced' -> Check file presences when there are database changes or the free space in the storages have increased noticeably. Recommended for most users.
+;   'exhaustive' -> Always check file presences. Option for users who remove/add cores manually.
+;   'verify_integrity' -> Always check file presences and hashes (much slower). Useful to verify that installed files are not corrupted (ExFAT partitions can become corrupt in rare cases).
+file_checking = 'balanced'
 
 ; storage_priority defines how this tool will use external storage during the installation
 ;         of files that are designed for external locations (usually games & docs files).
@@ -95,7 +96,7 @@ http_proxy = ''
 - [x] Configurable custom download filters
 - [x] Storage Priority Resolution for automatically detecting connected drives
 - [x] Free space checks
-- [ ] Opt-in parameter to bypass strict file checks
+- [x] Opt-in parameter to bypass strict file checks
 - [ ] Fast check for update availability (without triggering an actual update)
 - [ ] HTTP cookie support
 - [ ] Uninstall database feature

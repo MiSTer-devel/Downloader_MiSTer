@@ -63,9 +63,10 @@ class AllowReboot(IntEnum):
 
 @unique
 class FileChecking(IntEnum):
-    ON_DB_CHANGES = 0
-    ALWAYS_PRESENCE = 1
-    ALWAYS_HASH = 2
+    ON_DB_CHANGES = 0  # FASTEST on the documentation
+    BALANCED = 1
+    EXHAUSTIVE = 2
+    VERIFY_INTEGRITY = 3
 
 class ConfigDatabaseSectionRequired(TypedDict):
     section: str
@@ -150,7 +151,7 @@ def default_config() -> Config:
         'user_defined_options': [],
         'commit': 'unknown',
         'fail_on_file_error': False,
-        'file_checking': FileChecking.ALWAYS_PRESENCE,
+        'file_checking': FileChecking.BALANCED,
         'minimum_system_free_space_mb': DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB,
         'minimum_external_free_space_mb': DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB,
         'http_proxy': '',

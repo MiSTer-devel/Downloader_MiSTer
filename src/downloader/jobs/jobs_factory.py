@@ -30,7 +30,7 @@ from downloader.jobs.open_zip_summary_job import OpenZipSummaryJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.jobs.transfer_job import TransferJob
-from downloader.local_store_wrapper import StoreWrapper, new_store_fragment_drive_paths
+from downloader.local_store_wrapper import new_store_fragment_drive_paths, ReadOnlyStoreAdapter
 
 
 def make_transfer_job(source: str, description: dict[str, Any], do_calcs: bool, db_id: Optional[str], /) -> TransferJob:
@@ -69,7 +69,7 @@ def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any]
     return transfer_job
 
 
-def make_process_zip_index_job(zip_id: str, zip_description: Dict[str, Any], zip_index: ZipIndexEntity, config: Config, db: DbEntity, ini_description: ConfigDatabaseSection, store: StoreWrapper, has_new_zip_summary: bool) -> ProcessZipIndexJob:
+def make_process_zip_index_job(zip_id: str, zip_description: Dict[str, Any], zip_index: ZipIndexEntity, config: Config, db: DbEntity, ini_description: ConfigDatabaseSection, store: ReadOnlyStoreAdapter, has_new_zip_summary: bool) -> ProcessZipIndexJob:
     job = ProcessZipIndexJob(
         zip_id=zip_id,
         zip_description=zip_description,

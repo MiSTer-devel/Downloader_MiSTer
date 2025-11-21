@@ -196,6 +196,12 @@ class OnlineImporter:
 
         logger.bench('OnlineImporter applying changes on stores...')
 
+        # There is a totally legit case of not loading the store, and that not being an error
+        # That happens when all DBs are skipped due to non strict file checking
+        # Also, when the dbs error (for example for db_props failed validation), we don't ever launch
+        # the load store job, so that's also normal. And in that case, the error is failed db, and
+        # not failed store load.
+
         local_store_err: Optional[BaseException] = None
         load_local_store_jobs = report.get_completed_jobs(LoadLocalStoreJob)
         if len(load_local_store_jobs) >= 1:
@@ -204,7 +210,7 @@ class OnlineImporter:
             load_local_store_job_errors = report.get_failed_jobs(LoadLocalStoreJob)
             if len(load_local_store_job_errors) > 0:
                 local_store_err = load_local_store_job_errors[0][1]
-            else:
+            elif len(report.get_started_jobs(LoadLocalStoreJob)) > 0:
                 local_store_err = DownloaderError('Local Store was not loaded.')
 
         for db_job in report.get_completed_jobs(ProcessDbMainJob):
