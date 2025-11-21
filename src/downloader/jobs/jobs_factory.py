@@ -21,17 +21,16 @@ from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 
 from downloader.config import Config, ConfigDatabaseSection
-from downloader.db_entity import DbEntity
+from downloader.db_entity import DbEntity, ZipIndexEntity
 
 from downloader.jobs.copy_data_job import CopyDataJob
 from downloader.jobs.fetch_data_job import FetchDataJob
-from downloader.jobs.index import Index
 from downloader.jobs.open_zip_contents_job import ZipKind
 from downloader.jobs.open_zip_summary_job import OpenZipSummaryJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.jobs.transfer_job import TransferJob
-from downloader.local_store_wrapper import StoreWrapper, new_store_fragment_drive_paths
+from downloader.local_store_wrapper import new_store_fragment_drive_paths, ReadOnlyStoreAdapter
 
 
 def make_transfer_job(source: str, description: dict[str, Any], do_calcs: bool, db_id: Optional[str], /) -> TransferJob:
@@ -59,7 +58,6 @@ def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any]
         db=z.job.db,
         ini_description=z.job.ini_description,
         store=z.job.store,
-        full_resync=z.job.full_resync,
         transfer_job=transfer_job,
         config=z.config,
         backup=process_zip_backup
@@ -71,20 +69,15 @@ def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any]
     return transfer_job
 
 
-def make_process_zip_index_job(zip_id: str, zip_description: Dict[str, Any], zip_summary: Dict[str, Any], config: Config, db: DbEntity, ini_description: ConfigDatabaseSection, store: StoreWrapper, full_resync: bool, has_new_zip_summary: bool) -> ProcessZipIndexJob:
-    base_files_url = db.base_files_url
-    if 'base_files_url' in zip_description:
-        base_files_url = zip_description['base_files_url']
-
+def make_process_zip_index_job(zip_id: str, zip_description: Dict[str, Any], zip_index: ZipIndexEntity, config: Config, db: DbEntity, ini_description: ConfigDatabaseSection, store: ReadOnlyStoreAdapter, has_new_zip_summary: bool) -> ProcessZipIndexJob:
     job = ProcessZipIndexJob(
         zip_id=zip_id,
         zip_description=zip_description,
-        zip_index=Index(files=zip_summary['files'], folders=zip_summary['folders'], base_files_url=base_files_url),
+        zip_index=zip_index,
         config=config,
         db=db,
         ini_description=ini_description,
         store=store,
-        full_resync=full_resync,
         has_new_zip_summary=has_new_zip_summary,
         result_zip_index = new_store_fragment_drive_paths()
     )

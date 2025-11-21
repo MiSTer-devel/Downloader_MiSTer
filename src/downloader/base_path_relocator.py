@@ -63,12 +63,12 @@ class BasePathRelocator:
         return result
 
     def relocate_non_system_files(self, package: 'BasePathRelocatorPackage') -> None:
-        self._logger.bench('Base Path Relocator start: ', package.db_id)
+        self._logger.bench('BasePathRelocator relocate non system files start: ', package.db_id)
 
         package.relocate_non_system_files()
         package.update_store()
 
-        self._logger.bench('Base Path Relocator done: ', package.db_id)
+        self._logger.bench('BasePathRelocator relocate non system files done: ', package.db_id)
 
 
 class BasePathRelocatorPackage:

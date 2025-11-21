@@ -24,7 +24,7 @@ from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.jobs.transfer_job import TransferJob
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 
 
 @dataclass(eq=False, order=False)
@@ -32,11 +32,10 @@ class OpenZipSummaryJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
     db: DbEntity
-    store: StoreWrapper
+    store: ReadOnlyStoreAdapter
     zip_id: str
     ini_description: ConfigDatabaseSection
     zip_description: Dict[str, Any]
-    full_resync: bool
     config: Config
     transfer_job: TransferJob # Job & Transferrer  @TODO: Python 3.10
     backup: Optional[ProcessZipIndexJob]

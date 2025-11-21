@@ -16,12 +16,15 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Final, Any, TypedDict
+from typing import Final, TypedDict
 
 class SafeFetchInfo(TypedDict):
     url: str
     hash: str
     size: int
+
+# Database constants
+DATABASE_LATEST_SUPPORTED_VERSION: Final[int] = 1
 
 # Pre-selected database
 DISTRIBUTION_MISTER_DB_URL: Final[str] = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'
@@ -30,6 +33,9 @@ DISTRIBUTION_MISTER_DB_ID: Final[str] = 'distribution_mister'
 # Reboot wait times
 REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE: Final[int] = 30
 REBOOT_WAIT_TIME_STANDARD: Final[int] = 5
+
+# File Checking minimal check parameters:
+FILE_CHECKING_SPACE_CHECK_TOLERANCE = 2 * 1024 * 1024  # 2MB
 
 # File System affixes
 SUFFIX_file_in_progress: Final[str] = '._downloader_in_progress'
@@ -63,6 +69,8 @@ FILE_yc_txt: Final[str] = 'yc.txt'
 # Downloader files
 FILE_downloader_storage_zip: Final[str] = 'Scripts/.config/downloader/downloader.json.zip'
 FILE_downloader_storage_json: Final[str] = 'Scripts/.config/downloader/downloader.json'
+FILE_downloader_storage_sigs_json: Final[str] = 'Scripts/.config/downloader/downloader_sigs.json'
+FILE_downloader_previous_free_space_json: Final[str] = 'Scripts/.config/downloader/previous_free_space.json'
 FILE_downloader_external_storage: Final[str] = '.downloader_db.json'
 FILE_downloader_last_successful_run: Final[str] = 'Scripts/.config/downloader/%s.last_successful_run'
 FILE_downloader_log: Final[str] = 'Scripts/.config/downloader/%s.log'
@@ -102,6 +110,12 @@ STORAGE_PRIORITY_PREFER_SD: Final[str] = 'prefer_sd'
 STORAGE_PRIORITY_PREFER_EXTERNAL: Final[str] = 'prefer_external'
 STORAGE_PRIORITY_OFF: Final[str] = 'off'
 
+# File Checking
+FILE_CHECKING_FASTEST: Final[str] = 'fastest'
+FILE_CHECKING_BALANCED: Final[str] = 'balanced'
+FILE_CHECKING_EXHAUSTIVE: Final[str] = 'exhaustive'
+FILE_CHECKING_VERIFY_INTEGRITY: Final[str] = 'verify_integrity'
+
 # Standard Drives
 MEDIA_USB0: Final[str] = '/media/usb0'
 MEDIA_USB1: Final[str] = '/media/usb1'
@@ -123,6 +137,7 @@ STORAGE_PATHS_PRIORITY_SEQUENCE: Final[list[str]] = [
     MEDIA_FAT_CIFS,
     MEDIA_FAT
 ]
+STORAGE_PATHS_SET: Final[set[str]] = set(STORAGE_PATHS_PRIORITY_SEQUENCE)
 
 # Filters
 ESSENTIAL_TERM: Final[str] = 'essential'
@@ -142,6 +157,7 @@ K_ZIP_FILE_COUNT_THRESHOLD: Final[str] = 'zip_file_count_threshold'
 K_ZIP_ACCUMULATED_MB_THRESHOLD: Final[str] = 'zip_accumulated_mb_threshold'
 K_FILTER: Final[str] = 'filter'
 K_VERBOSE: Final[str] = 'verbose'
+K_BENCH: Final[str] = 'bench'
 K_CONFIG_PATH: Final[str] = 'config_path'
 K_USER_DEFINED_OPTIONS: Final[str] = 'user_defined_options'
 K_CURL_SSL: Final[str] = 'curl_ssl'

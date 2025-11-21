@@ -16,6 +16,17 @@ Here you can see the default parameters and the options that you may change:
 
 ```ini
 [MiSTer]
+; verbose: when true, will make Downloader output to display additional debug information
+;   This is also necessary to be active to display benchmark information.
+verbose = false
+
+; file_checking options:
+;   'fastest' -> Only check file presences when there are database changes. Fastest.
+;   'balanced' -> Check file presences when there are database changes or the free space in the storages have increased noticeably. Recommended for most users.
+;   'exhaustive' -> Always check file presences. Option for users who remove/add cores manually.
+;   'verify_integrity' -> Always check file presences and hashes (much slower). Useful to verify that installed files are not corrupted (ExFAT partitions can become corrupt in rare cases).
+file_checking = 'balanced'
+
 ; storage_priority defines how this tool will use external storage during the installation
 ;         of files that are designed for external locations (usually games & docs files).
 ;         
@@ -35,47 +46,45 @@ Here you can see the default parameters and the options that you may change:
 ;   'off' -> Disables this feature. Affected files will always be installed in your SD.
 storage_priority = 'prefer_sd'
 
-; update_linux options:
-;   true -> Updates Linux when there is a new update (very recommended).
-;   false -> Doesn't update Linux.
-update_linux = true
-
-; allow_reboot options:
-;   0 -> Don't allow this tool to ever reboot automatically.
-;   1 -> Allow this tool to reboot the system after any system file has been updated.
-;   2 -> Allow this tool to reboot the system only after Linux has been updated.
-allow_reboot = 1
-
-; allow_delete options:
-;   0 -> Don't allow this tool to delete anything at all.
-;   1 -> Allow this tool to delete any old file from previous updates.
-;   2 -> Allow this tool to delete only old cores that receive a new version.
-allow_delete = 1
-
 ; minimum_system_free_space_mb: Fee space needed to install files with Downloader
 ;   This minimum applies solely to the system partition (SD card).
-;   Reducing this value is not advised.
+;   Reducing this value is highly discouraged.
 minimum_system_free_space_mb = 512
 
 ; minimum_external_free_space_mb: Free space needed to install files in external storages
 ;   This minimum applies to all external storages (USBs & CIFS).
-;   Reducing this value is not advised.
+;   Reducing this value is highly discouraged.
 minimum_external_free_space_mb = 128
 
 ; downloader_timeout: Can be tweaked to increase the timeout time in seconds
 ;   It is useful to increase this value for users with slow connections.
+;   Reducing this value is highly discouraged.
 downloader_timeout = 300
 
 ; downloader_retries: Can be tweaked to increase the retries per failed download
 ;   It is useful to increase this value for users with very unstable connections.
+;   Reducing this value is highly discouraged.
 downloader_retries = 3
 
-; verbose: when true, will make Downloader output to display additional debug information
-;   This is also necessary to be active to display benchmark information.
-verbose = false
+; update_linux options:
+;   true -> Updates Linux when there is a new update.
+;   false -> Doesn't update Linux (highly discouraged).
+update_linux = true
+
+; allow_reboot options:
+;   0 -> Don't allow this tool to ever reboot automatically (highly discouraged).
+;   1 -> Allow this tool to reboot the system after any system file has been updated.
+;   2 -> Allow this tool to reboot the system only after Linux has been updated (highly discouraged).
+allow_reboot = 1
+
+; allow_delete options:
+;   0 -> Don't allow this tool to delete anything at all (highly discouraged).
+;   1 -> Allow this tool to delete any old file from previous updates.
+;   2 -> Allow this tool to delete only old cores that receive a new version (highly discouraged).
+allow_delete = 1
 
 ; http_proxy: Routes all downloads through a proxy server (advanced, rarely needed)
-;   Format: 'http://proxy-server:port'
+;   Format: 'http://proxy-server:port' (it also supports basic auth)
 http_proxy = ''
 ```
 
@@ -87,7 +96,7 @@ http_proxy = ''
 - [x] Configurable custom download filters
 - [x] Storage Priority Resolution for automatically detecting connected drives
 - [x] Free space checks
-- [ ] Opt-in parameter to bypass strict file checks
+- [x] Opt-in parameter to bypass strict file checks
 - [ ] Fast check for update availability (without triggering an actual update)
 - [ ] HTTP cookie support
 - [ ] Uninstall database feature

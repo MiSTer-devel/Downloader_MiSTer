@@ -33,3 +33,4 @@ class LinuxOsUtils(OsUtils):
 
     def reboot(self) -> None:
         subprocess.run(['reboot', 'now'], shell=False, stderr=subprocess.STDOUT)
+

@@ -16,11 +16,18 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from typing import Optional
 
+from downloader.job_system import Job, JobSystem
+from downloader.local_store_wrapper import DbStateSig
 
-@dataclass
-class Index:
-    files: Dict[str, Any]
-    folders: Dict[str, Any]
+local_store_sigs_tag = 'local_store_sigs'
+
+class LoadLocalStoreSigsJob(Job):
+    type_id: int = JobSystem.get_job_type_id()
+    def __init__(self, /) -> None:
+        # Results
+        self.local_store_sigs: Optional[dict[str, DbStateSig]] = None
+
+    def backup_job(self) -> Optional[Job]: return None
+    def retry_job(self) -> Optional['Job']: return None

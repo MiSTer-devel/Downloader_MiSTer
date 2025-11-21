@@ -42,7 +42,6 @@ class OpenZipContentsJob(Job):
     db: DbEntity
     store: ReadOnlyStoreAdapter
     ini_description: ConfigDatabaseSection
-    full_resync: bool
     config: Config
 
     zip_id: str

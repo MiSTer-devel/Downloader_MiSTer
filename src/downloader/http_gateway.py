@@ -423,6 +423,7 @@ class _ConnectionQueue:
         self._lock = threading.Lock()
         self._last_conn_id = -1
         self._queue_cleared = False
+        self._all_connections: List[_Connection] = []  # Track all connections (idle and active)
 
     def pull(self) -> _Connection:
         with self._lock:
@@ -433,12 +434,13 @@ class _ConnectionQueue:
                 conn_id = self._last_conn_id
 
         http_conn = create_http_connection(self.id[0], self.id[1], self._ctx, self._config)
+        conn = _Connection(conn_id=conn_id, http=http_conn, connection_queue=self, logger=self._logger, timeout=self._timeout)
         with self._lock:
             if self._queue_cleared:
                 http_conn.close()
                 raise HttpGatewayException('Connection queue is already cleared.')
-
-        return _Connection(conn_id=conn_id, http=http_conn, connection_queue=self, logger=self._logger, timeout=self._timeout)
+            self._all_connections.append(conn)
+        return conn
 
     def push(self, connection: _Connection) -> None:
         with self._lock:
@@ -447,11 +449,11 @@ class _ConnectionQueue:
     def clear_all(self) -> int:
         with self._lock:
             self._queue_cleared = True
-            size = len(self._queue)
-            for connection in self._queue:
+            size = len(self._all_connections)
+            for connection in self._all_connections:
                 connection.kill()
 
-            self._queue, self._queue_swap = self._queue_swap, self._queue
+            self._all_connections.clear()
             self._queue.clear()
             return size
 

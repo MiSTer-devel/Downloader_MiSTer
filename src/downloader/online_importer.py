@@ -27,13 +27,14 @@ from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.error import DownloaderError
 from downloader.job_system import Job, Worker
-from downloader.jobs.abort_worker import AbortJob
 from downloader.jobs.copy_data_job import CopyDataJob
 from downloader.jobs.errors import WrongDatabaseOptions, FileDownloadError
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.jobs_factory import make_transfer_job
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob, local_store_tag
+from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob, local_store_sigs_tag
+from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.reporters import InstallationReport
@@ -51,33 +52,38 @@ from downloader.path_package import PathPackage
 
 
 class OnlineImporter:
-    def __init__(self, logger: Logger, job_system: JobSystem, worker_ctx: DownloaderWorkerContext, free_space_reservation: FreeSpaceReservation) -> None:
+    def __init__(self, logger: Logger, job_system: JobSystem, worker_ctx: DownloaderWorkerContext, free_space_reservation: FreeSpaceReservation, old_pext_paths: set[str]) -> None:
         self._logger = logger
         self._job_system = job_system
         self._worker_ctx = worker_ctx
         self._free_space_reservation = free_space_reservation
+        self._old_pext_paths = old_pext_paths
         self._box = InstallationBox()
         self._local_store: Optional[LocalStoreWrapper] = None
         self._needs_reboot = False
         self._needs_save = False
         self._first_time = True
 
+    def old_pext_paths(self) -> set[str]: return self._old_pext_paths
+
     def _make_workers(self) -> dict[int, Worker]:
         return {w.job_type_id(): w for w in make_workers(self._worker_ctx)}
 
     def _make_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]:
         jobs: list[Job] = []
-        load_local_store_job = LoadLocalStoreJob(db_pkgs).add_tag(local_store_tag)
+        load_local_store_sigs_job = LoadLocalStoreSigsJob().add_tag(local_store_sigs_tag)
+        load_local_store_job = LoadLocalStoreJob(db_pkgs, self._worker_ctx.config).add_tag(local_store_tag)
         for pkg in db_pkgs:
             transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
             transfer_job.after_job = OpenDbJob(  # type: ignore[union-attr]
                 transfer_job=transfer_job,
                 section=pkg.db_id,
                 ini_description=pkg.section,
+                load_local_store_sigs_job=load_local_store_sigs_job,
                 load_local_store_job=load_local_store_job,
             )
             jobs.append(transfer_job)  # type: ignore[arg-type]
-        jobs.insert(int(len(jobs) / 2) + 1, load_local_store_job)
+        jobs.insert(int(len(jobs) / 2) + 1, load_local_store_sigs_job)
         return jobs
 
     def download_dbs_contents(self, db_pkgs: list[DbSectionPackage]) -> Optional[BaseException]:
@@ -107,6 +113,95 @@ class OnlineImporter:
 
         box.set_unused_filter_tags(self._worker_ctx.file_filter_factory.unused_filter_parts())
 
+        for fetch_file_job in report.get_started_jobs(FetchFileJob):
+            box.add_file_fetch_started(fetch_file_job.pkg.rel_path)
+
+        for fetch_file_job in report.get_completed_jobs(FetchFileJob):
+            if fetch_file_job.db_id is None or fetch_file_job.pkg is None: continue
+            box.add_downloaded_file(fetch_file_job.pkg.rel_path)
+            box.add_validated_file(fetch_file_job.pkg, fetch_file_job.db_id)
+
+        for fetch_file_job, e in report.get_failed_jobs(FetchFileJob):
+            box.add_failed_file(fetch_file_job.pkg.rel_path)
+            if fetch_file_job.pkg.rel_path != FILE_MiSTer or not file_mister_present:
+                continue
+
+            self._logger.debug(e)
+            fs = self._worker_ctx.file_system
+            full_path = fetch_file_job.pkg.full_path
+            if fs.is_file(full_path, use_cache=False):
+                continue
+
+            backup_path = fetch_file_job.pkg.backup_path()
+            temp_path = fetch_file_job.pkg.temp_path(fetch_file_job.already_exists)
+            if backup_path is not None and fs.is_file(backup_path, use_cache=False):
+                fs.move(backup_path, full_path)
+            elif temp_path is not None and fs.is_file(temp_path, use_cache=False) and fs.hash(temp_path) == fetch_file_job.pkg.description['hash']:
+                fs.move(temp_path, full_path)
+
+            if fs.is_file(full_path, use_cache=False):
+                continue
+
+            # This error message should never happen.
+            # If it happens it would be an unexpected case where file_system is not moving files correctly
+            self._logger.print('CRITICAL ERROR!!! Could not restore the MiSTer binary!')
+            self._logger.print('Please manually rename the file MiSTer.new as MiSTer')
+            self._logger.print('Your system won\'nt be able to boot until you do so!')
+            sys.exit(EXIT_ERROR_BAD_NEW_BINARY)
+
+        db_fetch_success = 0
+        for fetch_data_job in report.get_completed_jobs(FetchDataJob):
+            if isinstance(fetch_data_job.after_job, OpenDbJob):
+                db_fetch_success += 1
+
+        db_fetch_errors = 0
+        for transfer_job, e in report.get_failed_jobs(FetchDataJob) + report.get_failed_jobs(CopyDataJob):
+            if isinstance(transfer_job, FetchDataJob) and isinstance(e, FileDownloadError) and isinstance(transfer_job.after_job, OpenDbJob):
+                db_fetch_errors += 1
+
+            box.add_failed_file(transfer_job.source)  # @TODO: This should not count as a file, but as a "source".
+            if transfer_job.db_id is None:
+                continue
+
+            if any(':zip:' in tag for tag in transfer_job.tags):
+                continue
+
+            box.add_failed_db(transfer_job.db_id)
+
+        logger.bench('OnlineImporter determining network problems...')
+
+        network_problems = db_fetch_success == 0 and db_fetch_errors > 0
+        if network_problems:
+            logger.bench('OnlineImporter could not progress with network problems.')
+            return NetworkProblems(f'Network problems detected. db_fetch_success == {db_fetch_success} and db_fetch_errors == {db_fetch_errors}')
+
+        for open_db_job in report.get_completed_jobs(OpenDbJob):
+            if open_db_job.skipped is True:
+                box.add_skipped_db(open_db_job.section)
+
+        for open_db_job, _e in report.get_failed_jobs(OpenDbJob):
+            box.add_failed_db(open_db_job.section)
+
+        for mount_store_db_job in report.get_completed_jobs(MixStoreAndDbJob):
+            if mount_store_db_job.skipped is True:
+                box.add_skipped_db(mount_store_db_job.db.db_id)
+
+        for mount_store_db_job, _e in report.get_failed_jobs(MixStoreAndDbJob):
+            box.add_failed_db(mount_store_db_job.db.db_id)
+
+        if len(box.skipped_dbs()) == len(db_pkgs):
+            logger.bench('OnlineImporter early end.')
+            logger.debug('Skipping all dbs!')
+            return None
+
+        logger.bench('OnlineImporter applying changes on stores...')
+
+        # There is a totally legit case of not loading the store, and that not being an error
+        # That happens when all DBs are skipped due to non strict file checking
+        # Also, when the dbs error (for example for db_props failed validation), we don't ever launch
+        # the load store job, so that's also normal. And in that case, the error is failed db, and
+        # not failed store load.
+
         local_store_err: Optional[BaseException] = None
         load_local_store_jobs = report.get_completed_jobs(LoadLocalStoreJob)
         if len(load_local_store_jobs) >= 1:
@@ -115,11 +210,8 @@ class OnlineImporter:
             load_local_store_job_errors = report.get_failed_jobs(LoadLocalStoreJob)
             if len(load_local_store_job_errors) > 0:
                 local_store_err = load_local_store_job_errors[0][1]
-            else:
+            elif len(report.get_started_jobs(LoadLocalStoreJob)) > 0:
                 local_store_err = DownloaderError('Local Store was not loaded.')
-
-        for open_db_job, _e in report.get_failed_jobs(OpenDbJob):
-            box.add_failed_db(open_db_job.section)
 
         for db_job in report.get_completed_jobs(ProcessDbMainJob):
             box.add_installed_db(db_job.db, db_job.config, db_job.db_hash, db_job.db_size)
@@ -188,68 +280,6 @@ class OnlineImporter:
         for open_zip_job, _e in report.get_failed_jobs(OpenZipContentsJob):
             box.add_failed_files(open_zip_job.files_to_unzip)
 
-        for fetch_file_job in report.get_started_jobs(FetchFileJob):
-            box.add_file_fetch_started(fetch_file_job.pkg.rel_path)
-
-        for fetch_file_job in report.get_completed_jobs(FetchFileJob):
-            if fetch_file_job.db_id is None or fetch_file_job.pkg is None: continue
-            box.add_downloaded_file(fetch_file_job.pkg.rel_path)
-            box.add_validated_file(fetch_file_job.pkg, fetch_file_job.db_id)
-
-        for fetch_file_job, e in report.get_failed_jobs(FetchFileJob):
-            box.add_failed_file(fetch_file_job.pkg.rel_path)
-            if fetch_file_job.pkg.rel_path != FILE_MiSTer or not file_mister_present:
-                continue
-
-            self._logger.debug(e)
-            fs = self._worker_ctx.file_system
-            full_path = fetch_file_job.pkg.full_path
-            if fs.is_file(full_path, use_cache=False):
-                continue
-
-            backup_path = fetch_file_job.pkg.backup_path()
-            temp_path = fetch_file_job.pkg.temp_path(fetch_file_job.already_exists)
-            if backup_path is not None and fs.is_file(backup_path, use_cache=False):
-                fs.move(backup_path, full_path)
-            elif temp_path is not None and fs.is_file(temp_path, use_cache=False) and fs.hash(temp_path) == fetch_file_job.pkg.description['hash']:
-                fs.move(temp_path, full_path)
-
-            if fs.is_file(full_path, use_cache=False):
-                continue
-
-            # This error message should never happen.
-            # If it happens it would be an unexpected case where file_system is not moving files correctly
-            self._logger.print('CRITICAL ERROR!!! Could not restore the MiSTer binary!')
-            self._logger.print('Please manually rename the file MiSTer.new as MiSTer')
-            self._logger.print('Your system won\'nt be able to boot until you do so!')
-            sys.exit(EXIT_ERROR_BAD_NEW_BINARY)
-
-        db_fetch_success = 0
-        for fetch_data_job in report.get_completed_jobs(FetchDataJob):
-            if isinstance(fetch_data_job.after_job, OpenDbJob):
-                db_fetch_success += 1
-
-        db_fetch_errors = 0
-        for transfer_job, e in report.get_failed_jobs(FetchDataJob) + report.get_failed_jobs(CopyDataJob):
-            if isinstance(transfer_job, FetchDataJob) and isinstance(e, FileDownloadError) and isinstance(transfer_job.after_job, OpenDbJob):
-                db_fetch_errors += 1
-
-            box.add_failed_file(transfer_job.source)  # @TODO: This should not count as a file, but as a "source".
-            if transfer_job.db_id is None:
-                continue
-
-            if any(':zip:' in tag for tag in transfer_job.tags):
-                continue
-
-            box.add_failed_db(transfer_job.db_id)
-
-        logger.bench('OnlineImporter applying changes on stores...')
-
-        network_problems = db_fetch_success == 0 and db_fetch_errors > 0
-        if network_problems:
-            logger.bench('OnlineImporter could not progress with network problems.')
-            return NetworkProblems(f'Network problems detected. db_fetch_success == {db_fetch_success} and db_fetch_errors == {db_fetch_errors}')
-
         if self._local_store is None:
             logger.bench('OnlineImporter could not progress without loaded store.')
             return local_store_err
@@ -314,9 +344,9 @@ class OnlineImporter:
             logger.bench('OnlineImporter calculating db_id_by_rel_path done.')
 
             for duplicates, db_id in duplicated_files:
-                self._logger.print(f'Warning! {len(duplicates)} duplicates found in [{db_id}]:')
+                logger.print(f'Warning! {len(duplicates)} duplicates found in [{db_id}]:')
                 for file in duplicates:
-                    self._logger.print(f'DUPLICATED: {file} [using {db_id_by_rel_path[file]} instead]')
+                    logger.print(f'DUPLICATED: {file} [using {db_id_by_rel_path[file]} instead]')
 
         for pkg, dbs in sorted(box.consume_directories(), key=lambda x: len(x[0].full_path), reverse=True):
             if box.is_folder_installed(pkg.rel_path):
@@ -393,13 +423,15 @@ class OnlineImporter:
         for wrong_db_opts_err in box.wrong_db_options():
             self._worker_ctx.swallow_error(wrong_db_opts_err)
 
-        logger.bench('OnlineImporter saving store...')
+        logger.bench('OnlineImporter end.')
 
     def save_local_store(self) -> Optional[Exception]:
         if self._local_store is None:
             return None
-        self._worker_ctx.logger.bench('OnlineImporter saving store...')
-        return self._worker_ctx.local_repository.save_store(self._local_store)
+        self._worker_ctx.logger.bench('OnlineImporter saving local store start.')
+        err = self._worker_ctx.local_repository.save_store(self._local_store)
+        self._worker_ctx.logger.bench('OnlineImporter saving local store end.')
+        return err
 
     @staticmethod
     def _clean_store(store) -> None:
@@ -494,6 +526,7 @@ class InstallationBox:
         self._duplicated_files: list[tuple[list[str], str]] = []
         self._non_duplicated_files: list[tuple[list[PathPackage], str]] = []
         self._unused_filter_tags: list[str] = []
+        self._skipped_dbs: list[str] = []
 
     def set_unused_filter_tags(self, tags: list[str]) -> None:
         self._unused_filter_tags = tags
@@ -529,6 +562,8 @@ class InstallationBox:
         if db_id not in self._skipped_updated_files:
             self._skipped_updated_files[db_id] = []
         self._skipped_updated_files[db_id].extend([p.rel_path for p in paths])
+    def add_skipped_db(self, db_id: str) -> None:
+        self._skipped_dbs.append(db_id)
     def add_file_fetch_started(self, path: str) -> None:
         self._fetch_started_files.append(path)
     def add_failed_file(self, path: str) -> None:
@@ -603,6 +638,7 @@ class InstallationBox:
     def updated_dbs(self) -> list[str]: return list(self._validated_files)
     def failed_dbs(self) -> list[str]: return list(self._failed_dbs)
     def unused_filter_tags(self): return self._unused_filter_tags
+    def skipped_dbs(self): return self._skipped_dbs
 
     def queue_directory_removal(self, dirs: list[PathPackage], db_id: str) -> None:
         if len(dirs) == 0: return

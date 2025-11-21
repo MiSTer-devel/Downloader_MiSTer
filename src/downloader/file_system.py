@@ -24,19 +24,27 @@ import json
 import threading
 import time
 import zipfile
+import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Final, List, Optional, Set, Dict, Any, Tuple, Union
+from typing import Final, List, Optional, Set, Dict, Any, Tuple, Union, IO, BinaryIO
 
 from downloader.config import AllowDelete, Config
-from downloader.constants import HASH_file_does_not_exist
+from downloader.constants import HASH_file_does_not_exist, STORAGE_PATHS_SET
 from downloader.error import DownloaderError
 from downloader.logger import Logger, OffLogger
 from downloader.path_package import PathPackage
 
-
 is_windows: Final = os.name == 'nt'
-COPY_BUFSIZE: Final = 1024 * 1024 if is_windows else 64 * 1024
+COPY_BUFSIZE: Final = 256 * 1024 if is_windows else 128 * 1024
+JSON_READ_BUFSIZE: Final = 128 * 1024  # 128KB buffer for JSON file reading
+
+# OPTIMIZATION:
+# Uncommenting all the HAS_ORJSON blocks has the potential of saving around 200ms
+# The drawback is we need to install the following files:
+#  - /media/fat/Scripts/.config/downloader/orjson/orjson.cpython-39-arm-linux-gnueabihf.so
+#  - /media/fat/Scripts/.config/downloader/orjson/__init__.py
+#HAS_ORJSON = False
 
 
 class FileSystemFactory:
@@ -47,11 +55,31 @@ class FileSystemFactory:
         self._unique_temp_filenames: Set[Optional[str]] = set()
         self._unique_temp_filenames.add(None)
         self._shared_state = FsSharedState()
+        self._lazy_json_init = False
 
     def create_for_system_scope(self) -> 'FileSystem':
         return self.create_for_config(self._config)
 
     def create_for_config(self, config) -> 'FileSystem':
+        # if self._lazy_json_init is False:
+        #     self._lazy_json_init = True
+        #
+        #     self._logger.bench('FileSystemFactory trying to load ORJSON start.')
+        #     global HAS_ORJSON
+        #     if os.path.exists('/media/fat/Scripts/.config/downloader/orjson'):
+        #         try:
+        #             sys.path.insert(0, '/media/fat/Scripts/.config/downloader')
+        #             import orjson as _orjson
+        #             globals()['orjson'] = _orjson
+        #             #HAS_ORJSON = True
+        #         except ImportError:
+        #             pass
+        #     if HAS_ORJSON:
+        #         self._logger.debug('Using ORJSON!')
+        #     else:
+        #         self._logger.debug('Using standard JSON library.')
+        #     self._logger.bench('FileSystemFactory trying to load ORJSON end.')
+
         return _FileSystem(config, self._path_dictionary, self._logger, self._unique_temp_filenames, self._shared_state)
 
     def cancel_ongoing_operations(self) -> None:
@@ -59,6 +87,10 @@ class FileSystemFactory:
 
 
 class FileSystem(ABC):
+
+    @abstractmethod
+    def free_spaces(self) -> dict[str, int]:
+        """interface"""
 
     @abstractmethod
     def resolve(self, path: str) -> str:
@@ -244,6 +276,23 @@ class _FileSystem(FileSystem):
         self._shared_state = shared_state
         self._quick_hit = 0
         self._slow_hit = 0
+
+    def free_spaces(self) -> dict[str, int]:
+        mounts = {}
+        with open("/proc/mounts") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) < 2:
+                    continue
+
+                mountpoint = parts[1]
+                if mountpoint not in mounts and mountpoint in STORAGE_PATHS_SET:
+                    try:
+                        mounts[mountpoint] = shutil.disk_usage(mountpoint).free
+                    except OSError:
+                        pass
+
+        return mounts
 
     def resolve(self, path: str) -> str:
         return str(Path(path).resolve())
@@ -480,7 +529,8 @@ class _FileSystem(FileSystem):
 
         suffix = Path(full_path).suffix.lower()
         if suffix == '.json':
-            return _load_json(full_path)
+            with open(full_path, "rb", buffering=JSON_READ_BUFSIZE) as f:
+                return _json_loads_from_binaryio(f)
         elif suffix == '.zip':
             return load_json_from_zip(full_path)
         else:
@@ -491,7 +541,7 @@ class _FileSystem(FileSystem):
 
         suffix = Path(source).suffix.lower()
         if suffix == '.json':
-            return json.loads(data.read().decode())
+            return _json_load_from_bytesio(data)
         elif suffix == '.zip':
             return load_json_from_zip(data)
         else:
@@ -505,13 +555,13 @@ class _FileSystem(FileSystem):
         self._debug_log('Saving json on zip', (path, full_path))
 
         with zipfile.ZipFile(zip_path, 'w') as zipf:
-            zipf.writestr(json_name, json.dumps(db))
+            zipf.writestr(json_name, _json_dump_binary(db))
 
     def save_json(self, db: Dict[str, Any], path: str) -> None:
         full_path = self._path(path)
-        self._debug_log('Saving json on zip', (path, full_path))
-        with open(full_path, 'w') as f:
-            json.dump(db, f)
+        self._debug_log('Saving json', (path, full_path))
+        with open(full_path, 'wb', buffering=JSON_READ_BUFSIZE) as f:
+            _json_dump_to_file(db, f)
 
     def unzip_contents(self, zip_file: Union[str, io.BytesIO], target_path: Union[str, Dict[str, str]], test_info: Any, /) -> None:
         if not isinstance(zip_file, str):
@@ -607,12 +657,7 @@ def load_json_from_zip(input: Union[str, io.BytesIO]) -> Dict[str, Any]:
         if len(namelist) != 1:
             raise FileReadError('Could not load zipped json, because it has %s elements!' % len(namelist))
         with jsonzipf.open(namelist[0]) as store_json_file:
-            return json.loads(store_json_file.read())
-
-
-def _load_json(file_path: str) -> Dict[str, Any]:
-    with open(file_path, "r", buffering=8192) as f:
-        return json.loads(f.read())
+            return _json_loads_from_iobytes(store_json_file)
 
 
 class FsSharedState:
@@ -660,4 +705,24 @@ class FsSharedState:
 
     def remove_file(self, path: str) -> None:
         with self._files_lock:
-            if path in self._files: self._files.remove(path)
+            self._files.discard(path)
+
+def _json_load_from_bytesio(data: io.BytesIO) -> Dict[str, Any]:
+    #if HAS_ORJSON: return orjson.loads(data.getvalue())
+    return json.loads(data.getvalue().decode("utf-8"))
+
+def _json_loads_from_iobytes(data: IO[bytes]) -> Dict[str, Any]:
+    #if HAS_ORJSON: return orjson.loads(data.read())
+    return json.loads(data.read().decode("utf-8"))
+
+def _json_loads_from_binaryio(data: BinaryIO) -> Dict[str, Any]:
+    #if HAS_ORJSON: return orjson.loads(data.read())
+    return json.loads(data.read().decode("utf-8"))
+
+def _json_dump_binary(obj: Dict[str, Any]) -> bytes:
+    #if HAS_ORJSON: return orjson.dumps(obj)
+    return json.dumps(obj).encode()
+
+def _json_dump_to_file(obj: Dict[str, Any], f: BinaryIO) -> int:
+    #if HAS_ORJSON: return f.write(orjson.dumps(obj))
+    return f.write(json.dumps(obj).encode())

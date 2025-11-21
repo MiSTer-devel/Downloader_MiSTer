@@ -34,11 +34,11 @@ class CertificatesFix:
         self._logger = logger
 
     def fix_certificates_if_needed(self) -> bool:
-        self._logger.bench('Fix certificates start.')
+        self._logger.bench('CertificatesFix Fix certificates start.')
 
         result = self._fix_certificates_if_needed_impl()
 
-        self._logger.bench('Fix certificates done.')
+        self._logger.bench('CertificatesFix Fix certificates done.')
 
         return result
 

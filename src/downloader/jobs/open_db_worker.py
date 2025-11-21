@@ -16,63 +16,99 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Any
+from threading import Lock
 
 from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
-from downloader.db_entity import DbEntity
+from downloader.db_entity import DbEntity, fix_folders
+from downloader.db_utils import build_db_config, can_skip_db
 from downloader.job_system import WorkerResult
-from downloader.jobs.load_local_store_job import local_store_tag
+from downloader.jobs.load_local_store_sigs_job import local_store_sigs_tag
+from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.open_db_job import OpenDbJob
-from downloader.jobs.process_db_main_job import ProcessDbMainJob
-from downloader.jobs.worker_context import DownloaderWorkerBase
+from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
 
 
 class OpenDbWorker(DownloaderWorkerBase):
+    def __init__(self, ctx: DownloaderWorkerContext):
+        super().__init__(ctx)
+        self._lock = Lock()
+        self._returned_load_local_store_job = False
+
     def job_type_id(self) -> int: return OpenDbJob.type_id
     def reporter(self): return self._ctx.progress_reporter
 
     def operate_on(self, job: OpenDbJob) -> WorkerResult:  # type: ignore[override]
         self._ctx.logger.bench('OpenDbWorker Loading database: ', job.section)
         try:
-            db = self._open_db(job.section, job.transfer_job.source, job.transfer_job.transfer())  # type: ignore[union-attr]
+            db_props = self._ctx.file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())
+        except Exception as e:
+            self._ctx.swallow_error(e)
+            return [], e
+
+        self._ctx.logger.bench('OpenDbWorker Validating database: ', job.section)
+        try:
+            db = DbEntity(db_props, job.section)
         except Exception as e:
             self._ctx.swallow_error(e)
             return [], e
 
         self._ctx.logger.bench('OpenDbWorker database opened: ', job.section)
 
+        if db.needs_migration():
+            self._ctx.logger.bench('OpenDbWorker migrating db: ', db.db_id)
+            error = db.migrate()
+            if error is not None:
+                self._ctx.swallow_error(error)
+                return [], error
+
+        fix_folders(db.folders)
+
+        self._ctx.file_download_session_logger.print_header(db)
+
         calcs = job.transfer_job.calcs  # type: ignore[union-attr]
         if calcs is None:
             self._ctx.swallow_error(Exception(f'OpenDbWorker [{db.db_id}] must receive a transfer_job with calcs not null.'))
             calcs = {}
 
-        while self._ctx.installation_report.any_in_progress_job_with_tags(_local_store_tags):
-            self._ctx.logger.bench('OpenDbWorker waiting for store: ', job.section)
+        db_hash = calcs.get('hash', DB_STATE_SIGNATURE_NO_HASH)
+        db_size = calcs.get('size', DB_STATE_SIGNATURE_NO_SIZE)
+
+        while self._ctx.installation_report.any_in_progress_job_with_tags(_local_store_sigs_tags):
+            self._ctx.logger.bench('OpenDbWorker waiting for store sigs: ', job.section)
             self._ctx.job_ctx.wait_for_other_jobs(0.06)
 
-        self._ctx.logger.bench('OpenDbWorker store received: ', job.section)
-        local_store, full_resync = job.load_local_store_job.local_store, job.load_local_store_job.full_resync
-        if local_store is None:
-            return [], Exception('OpenDbWorker must receive a LoadLocalStoreJob with local_store not null.')
-
-        store = local_store.store_by_id(job.section)
         ini_description = job.ini_description
 
-        self._ctx.logger.bench('OpenDbWorker done: ', job.section)
-        return [ProcessDbMainJob(
+        self._ctx.logger.bench("OpenDbWorker Building db config: ", db.db_id)
+        config = build_db_config(input_config=self._ctx.config, db=db, ini_description=ini_description)
+
+        sigs = job.load_local_store_sigs_job.local_store_sigs
+        if sigs is not None:
+            sig = sigs.get(job.section, None)
+            if sig is not None:
+                if can_skip_db(config, sig, db_hash, db_size, db):
+                    self._ctx.logger.debug('Skipping db process. No changes detected for: ', db.db_id)
+                    job.skipped = True
+                    return [], None
+
+        jobs = []
+        if not job.load_local_store_job.local_store and not self._returned_load_local_store_job:
+            with self._lock:
+                if not self._returned_load_local_store_job:
+                    self._returned_load_local_store_job = True
+                    jobs.append(job.load_local_store_job)
+
+        jobs.append(MixStoreAndDbJob(
             db=db,
-            db_hash=calcs.get('hash', DB_STATE_SIGNATURE_NO_HASH),
-            db_size=calcs.get('size', DB_STATE_SIGNATURE_NO_SIZE),
+            db_hash=db_hash,
+            db_size=db_size,
             ini_description=ini_description,
-            store=store,
-            full_resync=full_resync
-        )], None
+            config=config,
+            load_local_store_job=job.load_local_store_job
+        ))
 
-    def _open_db(self, section: str, source: str, transfer: Any, /) -> DbEntity:
-        db_props = self._ctx.file_system.load_dict_from_transfer(source, transfer)
-        self._ctx.logger.bench('OpenDbWorker Validating database: ', section)
-        db_entity = DbEntity(db_props, section)
-        return db_entity
+        self._ctx.logger.bench('OpenDbWorker done: ', job.section)
+        return jobs, None
 
 
-_local_store_tags = [local_store_tag]
+_local_store_sigs_tags = [local_store_sigs_tag]

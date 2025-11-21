@@ -141,14 +141,12 @@ class JobTagTracking:
             return
 
         for tag in job.tags:
-            if job_id not in self.in_progress[tag]:
-                continue
-            self.in_progress[tag].remove(job_id)
+            self.in_progress[tag].discard(job_id)
 
     def _reset_lifecycle(self, job: Job) -> None:
         job_id = id(job)
-        if job_id in self._initiated: self._initiated.remove(job_id)
-        if job_id in self._ended: self._ended.remove(job_id)
+        self._initiated.discard(job_id)
+        self._ended.discard(job_id)
 
 T = TypeVar('T')
 class _WithLock(Generic[T]):
@@ -309,7 +307,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         if isinstance(job, FetchFileJob) and job.db_id is not None:
             self._print_line(job.pkg.rel_path)
         if isinstance(job, FetchDataJob):
-            self._logger.bench('FetchDataJob started: ', job.source)
+            self._logger.bench('FileDownloadSessionLoggerImpl FetchDataJob started: ', job.source)
         self._check_time = time.monotonic() + 2.0
 
     def print_work_in_progress(self) -> None:
@@ -329,7 +327,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
             if self._needs_newline or self._check_time < time.monotonic():
                 self._print_symbols()
         if isinstance(job, FetchDataJob):
-            self._logger.bench('FetchDataJob completed: ', job.source)
+            self._logger.bench('FileDownloadSessionLoggerImpl FetchDataJob completed: ', job.source)
 
     def _print_symbols(self) -> None:
         if len(self._symbols) == 0:
