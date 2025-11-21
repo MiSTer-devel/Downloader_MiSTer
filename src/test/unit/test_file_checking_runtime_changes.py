@@ -1,0 +1,121 @@
+# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# You can download the latest version of this tool from:
+# https://github.com/MiSTer-devel/Downloader_MiSTer
+
+import unittest
+
+from downloader.config import FileChecking
+from downloader.constants import FILE_CHECKING_SPACE_CHECK_TOLERANCE, MEDIA_FAT, \
+    FILE_downloader_previous_free_space_json, \
+    FILE_downloader_last_successful_run, MEDIA_USB0, MEDIA_USB1
+from test.fake_file_checking_service import FileCheckingService
+from test.fake_file_system_factory import FileSystemFactory
+
+one_mb = 1000000
+two_mb = 2000000
+five_mb = 5000000
+half_mb = 500000
+small_increase = 1000
+
+
+class TestFileCheckingRuntimeChanges(unittest.TestCase):
+
+    def test_collapse_balanced_file_checking___when_last_successful_run_missing___returns_verify_integrity(self):
+        for file_checking_value in [
+            FileChecking.ON_DB_CHANGES,
+            FileChecking.BALANCED,
+            FileChecking.EXHAUSTIVE,
+            FileChecking.VERIFY_INTEGRITY,
+        ]:
+            with self.subTest(file_checking=file_checking_value):
+                self.assertEqual(FileChecking.VERIFY_INTEGRITY, file_checking(has_last_run=False).collapse_balanced_file_checking(file_checking_value))
+
+    def test_collapse_balanced_file_checking___when_file_checking_not_balanced___returns_none(self):
+        for file_checking_value in [
+            FileChecking.ON_DB_CHANGES,
+            FileChecking.EXHAUSTIVE,
+            FileChecking.VERIFY_INTEGRITY,
+        ]:
+            with self.subTest(file_checking=file_checking_value):
+                self.assertIsNone(file_checking().collapse_balanced_file_checking(file_checking_value))
+
+    def test_collapse_balanced_file_checking___when_media_fat_missing_from_previous_spaces___returns_exhaustive(self):
+        sut = file_checking(previous_free={MEDIA_USB0: one_mb}, actual_free={MEDIA_FAT: one_mb})
+        self.assertEqual(FileChecking.EXHAUSTIVE, sut.collapse_balanced_file_checking(FileChecking.BALANCED))
+
+    def test_collapse_balanced_file_checking___when_media_fat_missing_from_actual_spaces___returns_exhaustive(self):
+        sut = file_checking(previous_free={MEDIA_FAT: one_mb}, actual_free={MEDIA_USB0: one_mb})
+        self.assertEqual(FileChecking.EXHAUSTIVE, sut.collapse_balanced_file_checking(FileChecking.BALANCED))
+
+    def test_collapse_balanced_file_checking___when_free_space_increased_over_tolerance___returns_exhaustive(self):
+        for prev_free, current_free in [
+            (one_mb, one_mb + FILE_CHECKING_SPACE_CHECK_TOLERANCE + small_increase),
+            (one_mb, five_mb),
+            (0, five_mb),
+            (five_mb, five_mb * 1000)
+        ]:
+            with self.subTest(prev_free=prev_free, current_free=current_free):
+                sut = file_checking(previous_free={MEDIA_FAT: prev_free}, actual_free={MEDIA_FAT: current_free})
+                self.assertEqual(FileChecking.EXHAUSTIVE, sut.collapse_balanced_file_checking(FileChecking.BALANCED))
+
+    def test_collapse_balanced_file_checking___when_free_space_stable___returns_on_db_changes(self):
+        for prev_free, current_free in [
+            (one_mb, one_mb + FILE_CHECKING_SPACE_CHECK_TOLERANCE),
+            (one_mb, one_mb),
+            (five_mb, one_mb),
+            (0, 0),
+        ]:
+            with self.subTest(prev_free=prev_free, current_free=current_free):
+                sut = file_checking(previous_free={MEDIA_FAT: prev_free}, actual_free={MEDIA_FAT: current_free})
+                self.assertEqual(FileChecking.ON_DB_CHANGES, sut.collapse_balanced_file_checking(FileChecking.BALANCED))
+
+    def test_collapse_balanced_file_checking___when_multiple_partitions_and_one_increased___returns_exhaustive(self):
+        for prev, current in [
+            ({MEDIA_FAT: one_mb, MEDIA_USB0: two_mb}, {MEDIA_FAT: one_mb + small_increase, MEDIA_USB0: two_mb + FILE_CHECKING_SPACE_CHECK_TOLERANCE + small_increase}),
+            ({MEDIA_FAT: one_mb, MEDIA_USB0: two_mb}, {MEDIA_FAT: one_mb, MEDIA_USB0: two_mb + FILE_CHECKING_SPACE_CHECK_TOLERANCE + small_increase}),
+            ({MEDIA_FAT: one_mb, MEDIA_USB0: 0}, {MEDIA_FAT: one_mb, MEDIA_USB0: five_mb}),
+            ({MEDIA_FAT: one_mb, MEDIA_USB0: one_mb, MEDIA_USB1: one_mb}, {MEDIA_FAT: one_mb, MEDIA_USB0: one_mb, MEDIA_USB1: one_mb + FILE_CHECKING_SPACE_CHECK_TOLERANCE + small_increase}),
+            ({MEDIA_FAT: one_mb, MEDIA_USB1: one_mb}, {MEDIA_FAT: one_mb, MEDIA_USB0: one_mb, MEDIA_USB1: one_mb + FILE_CHECKING_SPACE_CHECK_TOLERANCE + small_increase})
+        ]:
+            with self.subTest(prev=prev, current=current):
+                sut = file_checking(previous_free=prev, actual_free=current)
+                self.assertEqual(FileChecking.EXHAUSTIVE, sut.collapse_balanced_file_checking(FileChecking.BALANCED))
+
+    def test_collapse_balanced_file_checking___when_new_partition_appears___skips_it_and_returns_on_db_changes(self):
+        for prev, current in [
+            ({MEDIA_FAT: one_mb, MEDIA_USB0: two_mb}, {MEDIA_FAT: one_mb + small_increase, MEDIA_USB0: two_mb + FILE_CHECKING_SPACE_CHECK_TOLERANCE}),
+            ({MEDIA_FAT: one_mb, MEDIA_USB0: two_mb}, {MEDIA_FAT: one_mb, MEDIA_USB0: two_mb + FILE_CHECKING_SPACE_CHECK_TOLERANCE}),
+            ({MEDIA_FAT: one_mb, MEDIA_USB0: 0}, {MEDIA_FAT: one_mb, MEDIA_USB0: 0}),
+            ({MEDIA_FAT: one_mb, MEDIA_USB0: 0}, {MEDIA_FAT: one_mb + FILE_CHECKING_SPACE_CHECK_TOLERANCE, MEDIA_USB0: 0}),
+        ]:
+            with self.subTest(prev=prev, current=current):
+                sut = file_checking(previous_free=prev, actual_free=current)
+                self.assertEqual(FileChecking.ON_DB_CHANGES, sut.collapse_balanced_file_checking(FileChecking.BALANCED))
+
+
+def file_checking(previous_free=None, actual_free=None, has_last_run=True):
+    files = {}
+    if has_last_run:
+        files[f'{MEDIA_FAT}/{FILE_downloader_last_successful_run % ""}'] = {}
+    if previous_free is not None:
+        files[f'{MEDIA_FAT}/{FILE_downloader_previous_free_space_json}'] = {'json': previous_free}
+
+    fs_factory = FileSystemFactory.from_state(files=files)
+    fake_fs = fs_factory.create_for_system_scope()
+    if actual_free is not None:
+        fake_fs.set_free_spaces(actual_free)
+    return FileCheckingService(file_system=fake_fs)

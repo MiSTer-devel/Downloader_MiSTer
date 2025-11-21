@@ -19,7 +19,6 @@
 
 import configparser
 import re
-import time
 from pathlib import Path
 from typing import Optional, TypeVar, Union, SupportsInt
 
@@ -30,7 +29,8 @@ from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, 
     K_DB_URL, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER, K_BASE_SYSTEM_PATH, \
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, \
-    STORAGE_PRIORITY_PREFER_EXTERNAL, EXIT_ERROR_WRONG_SETUP, K_BENCH, K_HTTP_PROXY
+    STORAGE_PRIORITY_PREFER_EXTERNAL, EXIT_ERROR_WRONG_SETUP, K_BENCH, K_HTTP_PROXY, FILE_CHECKING_FASTEST, \
+    FILE_CHECKING_BALANCED, FILE_CHECKING_EXHAUSTIVE, FILE_CHECKING_VERIFY_INTEGRITY
 from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
 from downloader.http_gateway import http_config
 from downloader.logger import Logger, time_str
@@ -238,7 +238,7 @@ class ConfigReader:
             'storage_priority': self._valid_storage_priority(parser.get_string(K_STORAGE_PRIORITY, result['storage_priority'])),
             'allow_delete': AllowDelete(parser.get_int(K_ALLOW_DELETE, result['allow_delete'].value)),
             'allow_reboot': AllowReboot(parser.get_int(K_ALLOW_REBOOT, result['allow_reboot'].value)),
-            'file_checking': FileChecking(parser.get_int('file_checking', result['file_checking'].value)),
+            'file_checking': self._validate_file_checking(parser.get_string('file_checking', None) or result['file_checking']),
             'verbose': parser.get_bool(K_VERBOSE, result['verbose']),
             'bench': parser.get_bool(K_BENCH, result['bench']),
             'update_linux': parser.get_bool(K_UPDATE_LINUX, result['update_linux']),
@@ -302,6 +302,18 @@ class ConfigReader:
         else:
             return self._valid_base_path(parameter, K_STORAGE_PRIORITY)
 
+    def _validate_file_checking(self, parameter: Union[str, FileChecking]) -> FileChecking:
+        if isinstance(parameter, FileChecking):
+            return parameter
+
+        lower_parameter = parameter.lower()
+        if lower_parameter == FILE_CHECKING_FASTEST: return FileChecking.ON_DB_CHANGES
+        elif lower_parameter == FILE_CHECKING_BALANCED: return FileChecking.BALANCED
+        elif lower_parameter == FILE_CHECKING_EXHAUSTIVE: return FileChecking.EXHAUSTIVE
+        elif lower_parameter == FILE_CHECKING_VERIFY_INTEGRITY: return FileChecking.VERIFY_INTEGRITY
+        else:
+            self._logger.print(f'WARNING: file_checking value "{parameter}" is not recognized. Defaulting to "balanced".\n      See the documentation for valid options.')
+            return FileChecking.BALANCED
 
 TOptStr = TypeVar('TOptStr', str, Optional[str])
 TOptInt = TypeVar('TOptInt', int, Optional[int])

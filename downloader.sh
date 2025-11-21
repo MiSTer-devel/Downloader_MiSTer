@@ -25,13 +25,41 @@ LATEST_BIN_PATH="/media/fat/Scripts/.config/downloader/downloader_bin"
 CACERT_PEM_0="/etc/ssl/certs/cacert.pem"
 CACERT_PEM_1="/media/fat/Scripts/.config/downloader/cacert.pem"
 
-if (( $(date +%Y) < 2000 )) ; then
-    NTP_SERVER="0.pool.ntp.org"
-    echo "Syncing date and time with $NTP_SERVER"
-    echo
-    if ntpdate -s -b -u $NTP_SERVER ; then
+# NTP SETUP
+if (( 10#$(date +%Y) < 2000 )) ; then
+    NTP_SERVERS=(
+        "time.apple.com"
+        "time.amazonaws.cn"
+        "ntp.ntsc.ac.cn"
+        "cn.pool.ntp.org"
+        "ntp.aliyun.com"
+        "ntp.tencent.com"
+        "ntp.rt.ru"
+    )
+    NTP_CONF="/etc/ntp.conf"
+    for server in "${NTP_SERVERS[@]}"; do
+        if ! grep -qF "${server}" "${NTP_CONF}"; then
+            echo "server $server iburst" >> "${NTP_CONF}"
+        fi
+    done
+    NTP_PID="/var/run/ntpd.pid"
+    start-stop-daemon -K -p "${NTP_PID}"
+    rm -f "${NTP_PID}"
+    start-stop-daemon -S -q -p "${NTP_PID}" -x "/usr/sbin/ntpd" -- -g -p "${NTP_PID}"
+    connected=0
+    for ((i=1; i<=10; i++)); do
+        if ntpq -c "rv 0" 2>&1 | grep -qiE "connection refused|sync_unspec" ; then
+            printf "."
+            sleep 3
+        else
+            connected=1
+            break
+        fi
+    done
+    printf "\n"
+    if (( connected )); then
         echo "Date and time is:"
-        echo "$(date)"
+        date
         echo
     elif [[ "${CURL_SSL:-}" != "--insecure" ]] ; then
         echo "Unable to sync."
@@ -40,6 +68,7 @@ if (( $(date +%Y) < 2000 )) ; then
     fi
 fi
 
+# CERTS SETUP
 if [ -s "${CACERT_PEM_1}" ] ; then
     export SSL_CERT_FILE="${CACERT_PEM_1}"
 elif [ -s "${CACERT_PEM_0}" ] ; then
@@ -101,6 +130,7 @@ elif [[ "${CURL_SSL:-}" != "--insecure" ]] ; then
     esac
 fi
 
+# LAUNCHER
 download_file() {
     local DOWNLOAD_PATH="${1}"
     local DOWNLOAD_URL="${2}"

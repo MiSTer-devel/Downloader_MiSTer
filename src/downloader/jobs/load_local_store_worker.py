@@ -19,7 +19,6 @@
 from downloader.job_system import WorkerResult
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob
 from downloader.jobs.worker_context import DownloaderWorkerBase
-from downloader.config import FileChecking
 
 
 class LoadLocalStoreWorker(DownloaderWorkerBase):
@@ -29,19 +28,21 @@ class LoadLocalStoreWorker(DownloaderWorkerBase):
     def operate_on(self, job: LoadLocalStoreJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
         logger.bench('LoadLocalStoreWorker start.')
-        local_store = self._ctx.local_repository.load_store()
+        try:
+            local_store = self._ctx.local_repository.load_store()
 
-        logger.bench('LoadLocalStoreWorker relocating base paths')
-        for relocation_package in self._ctx.base_path_relocator.relocating_base_paths(job.db_pkgs, local_store):
-            self._ctx.base_path_relocator.relocate_non_system_files(relocation_package)
-            err = self._ctx.local_repository.save_store(local_store)
-            if err is not None:
-                logger.debug('WARNING! Base path relocation could not be saved in the store!')
-                continue
+            logger.bench('LoadLocalStoreWorker relocating base paths')
+            # @TODO: Remove this 1-2 years after the 2.0 release, which deprecated date base scoped base_paths
+            for relocation_package in self._ctx.base_path_relocator.relocating_base_paths(job.db_pkgs, local_store):
+                self._ctx.base_path_relocator.relocate_non_system_files(relocation_package)
+                err = self._ctx.local_repository.save_store(local_store)
+                if err is not None:
+                    logger.debug('WARNING! Base path relocation could not be saved in the store!')
+                    continue
+        except Exception as e:
+            self._ctx.swallow_error(e)
+            return [], e
 
         job.local_store = local_store
-        if not self._ctx.local_repository.has_last_successful_run():
-            job.config['file_checking'] = FileChecking.ALWAYS_HASH
-
         logger.bench('LoadLocalStoreWorker done.')
         return [], None

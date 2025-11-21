@@ -23,7 +23,7 @@ from downloader.config import Config, default_config, ConfigDatabaseSection
 from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
-from downloader.local_store_wrapper import StoreWrapper
+from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 
 
 @dataclass(eq=False, order=False)
@@ -31,7 +31,7 @@ class ProcessDbMainJob(Job):
     type_id: int = field(init=False, default=JobSystem.get_job_type_id())
 
     db: DbEntity
-    store: StoreWrapper
+    store: ReadOnlyStoreAdapter
     ini_description: ConfigDatabaseSection
     config: Config = field(default_factory=default_config)
     db_hash: str = field(default=DB_STATE_SIGNATURE_NO_HASH)

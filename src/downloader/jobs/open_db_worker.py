@@ -16,11 +16,10 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Any
 from threading import Lock
 
 from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
-from downloader.db_entity import DbEntity
+from downloader.db_entity import DbEntity, fix_folders
 from downloader.db_utils import build_db_config, can_skip_db
 from downloader.job_system import WorkerResult
 from downloader.jobs.load_local_store_sigs_job import local_store_sigs_tag
@@ -41,12 +40,28 @@ class OpenDbWorker(DownloaderWorkerBase):
     def operate_on(self, job: OpenDbJob) -> WorkerResult:  # type: ignore[override]
         self._ctx.logger.bench('OpenDbWorker Loading database: ', job.section)
         try:
-            db = self._open_db(job.section, job.transfer_job.source, job.transfer_job.transfer())  # type: ignore[union-attr]
+            db_props = self._ctx.file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())
+        except Exception as e:
+            self._ctx.swallow_error(e)
+            return [], e
+
+        self._ctx.logger.bench('OpenDbWorker Validating database: ', job.section)
+        try:
+            db = DbEntity(db_props, job.section)
         except Exception as e:
             self._ctx.swallow_error(e)
             return [], e
 
         self._ctx.logger.bench('OpenDbWorker database opened: ', job.section)
+
+        if db.needs_migration():
+            self._ctx.logger.bench('OpenDbWorker migrating db: ', db.db_id)
+            error = db.migrate()
+            if error is not None:
+                self._ctx.swallow_error(error)
+                return [], error
+
+        fix_folders(db.folders)
 
         self._ctx.file_download_session_logger.print_header(db)
 
@@ -77,10 +92,11 @@ class OpenDbWorker(DownloaderWorkerBase):
                     return [], None
 
         jobs = []
-        with self._lock:
-            if not self._returned_load_local_store_job:
-                self._returned_load_local_store_job = True
-                jobs.append(job.load_local_store_job)
+        if not job.load_local_store_job.local_store and not self._returned_load_local_store_job:
+            with self._lock:
+                if not self._returned_load_local_store_job:
+                    self._returned_load_local_store_job = True
+                    jobs.append(job.load_local_store_job)
 
         jobs.append(MixStoreAndDbJob(
             db=db,
@@ -93,12 +109,6 @@ class OpenDbWorker(DownloaderWorkerBase):
 
         self._ctx.logger.bench('OpenDbWorker done: ', job.section)
         return jobs, None
-
-    def _open_db(self, section: str, source: str, transfer: Any, /) -> DbEntity:
-        db_props = self._ctx.file_system.load_dict_from_transfer(source, transfer)
-        self._ctx.logger.bench('OpenDbWorker Validating database: ', section)
-        db_entity = DbEntity(db_props, section)
-        return db_entity
 
 
 _local_store_sigs_tags = [local_store_sigs_tag]

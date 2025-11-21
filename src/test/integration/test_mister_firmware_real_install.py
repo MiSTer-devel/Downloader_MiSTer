@@ -21,7 +21,7 @@ from pathlib import Path
 from downloader.constants import FILE_MiSTer, DISTRIBUTION_MISTER_DB_ID, STORAGE_PRIORITY_PREFER_EXTERNAL, \
     FILE_MiSTer_old
 from test.fake_file_system_factory import make_production_filesystem_factory
-from test.fake_online_importer import OnlineImporter
+from test.fake_online_importer import OnlineImporter, StartJobPolicy
 from test.objects import config_with, file_mister_descr, db_entity, store_descr
 from test.unit.online_importer.online_importer_with_priority_storage_test_base import OnlineImporterWithPriorityStorageTestBase
 
@@ -69,4 +69,4 @@ class TestMiSTerFirmwareRealInstall(OnlineImporterWithPriorityStorageTestBase):
 def online_importer(config):
     path_dictionary = {'asdf': 3}
     file_system_factory = make_production_filesystem_factory(config, path_dictionary=path_dictionary)
-    return OnlineImporter(config=config, file_system_factory=file_system_factory), file_system_factory.create_for_config(config)
+    return OnlineImporter(config=config, file_system_factory=file_system_factory, start_job_policy=StartJobPolicy.ProcessDb), file_system_factory.create_for_config(config)

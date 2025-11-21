@@ -41,7 +41,11 @@ class MixStoreAndDbWorker(DownloaderWorkerBase):
             return [], Exception('MixStoreAndDbWorker must receive a LoadLocalStoreJob with local_store not null.')
 
         store = local_store.store_by_id(job.db.db_id)
-        sig = store.read_only().db_state_signature()
+        read_only_store = store.read_only()
+        if not read_only_store.has_base_path():  # @TODO: should remove this from here at some point.
+            store.write_only().set_base_path(job.config['base_path'])  # After that, all worker stores will be read-only.
+
+        sig = read_only_store.db_state_signature()
         if can_skip_db(job.config, sig, job.db_hash, job.db_size, job.db):  # @TODO: Eventually we can remove this check altogether and just rely in the one from the previous step
             self._ctx.logger.debug('Skipping db process. No changes detected for: ', job.db.db_id)
             job.skipped = True
@@ -53,7 +57,7 @@ class MixStoreAndDbWorker(DownloaderWorkerBase):
             db_hash=job.db_hash,
             db_size=job.db_size,
             ini_description=job.ini_description,
-            store=store,
+            store=read_only_store,
             config=job.config,
         )], None
 

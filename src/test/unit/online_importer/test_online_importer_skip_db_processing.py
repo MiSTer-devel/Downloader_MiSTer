@@ -16,7 +16,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import FileChecking, default_config
-from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, DB_STATE_SIGNATURE_NO_TIMESTAMP
+from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
 from test.fake_online_importer import OnlineImporter
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
@@ -37,7 +37,7 @@ class TestOnlineImporterSkipDbProcessing(OnlineImporterTestBase):
     def test_download_db_process___when_file_checking_only_on_db_but_signature_from_store_dont_match_db_signature___does_nothing_and_ends_normally_but_requires_save(self):
         for db_sig, store_sig in [
             (sig(size=123), sig(size=456)),
-            (sig(timestamp=42), sig(timestamp=30)),
+#            (sig(timestamp=42), sig(timestamp=30)),
             (sig(db_hash='hash1'), sig(db_hash='hash2'))
         ]:
             with self.subTest(db_sig=db_sig, store_sig=store_sig):
@@ -50,7 +50,7 @@ class TestOnlineImporterSkipDbProcessing(OnlineImporterTestBase):
         self.assertDoesNothingEndsNormally(sut, save=True)
 
     def test_download_db_process___when_file_checking_only_on_db_and_signatures_are_identical_but_invalid___does_nothing_and_ends_normally(self):
-        for identical_sig in [sig(db_hash=DB_STATE_SIGNATURE_NO_HASH), sig(size=DB_STATE_SIGNATURE_NO_SIZE), sig(timestamp=DB_STATE_SIGNATURE_NO_TIMESTAMP)]:
+        for identical_sig in [sig(db_hash=DB_STATE_SIGNATURE_NO_HASH), sig(size=DB_STATE_SIGNATURE_NO_SIZE)]:
             with self.subTest(identical_sig=identical_sig):
                 sut = self.download_db(db_sig=identical_sig, store_sig=identical_sig, config=config_with(file_checking=FileChecking.ON_DB_CHANGES))
                 self.assertDoesNothingEndsNormally(sut)

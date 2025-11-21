@@ -4,7 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## Version 2.3 - 2025-XX-XX
+## Version 2.3 - 2025-11-XX
+
+TODO:
+Get proper number of threads
+
+### Added
+- New `file_checking` configuration option, that will tell Downloader whether to verify the presence of installed files or not. By default it will take the value `balanced`, which is the recommended option. The option `balanced` is a new behavior that skips file presence checking when the free space in the storages (like the SD) haven't been increased, making the updating process much quicker as result. With option `exhaustive` you get the old behavior, it will always check file presence, which is useful for advanced users that usually manipulate installed files. There are more options documented in the [README.md file](README.md#options).
+
+### Changed
+- Reworked NTP logic in launcher. It now adds a few extra NTP servers that are helpful to avoid connectivity issues in users from China.
+- Adjusted timeouts in HTTP gateway to be more responsive when a HTTP Proxy is not working and in other scenarios.
+- Fixed locale errors in native builds.
+- Fixed launcher for headless runs.
+- Default `downloader_threads_limit` value changed to X.
+- Documentation now reflects the latest architectural changes introduced with the `file_checking` feature.
+- Improved logs during connectivity issues.
+
+### Removed
+- The legacy *"force check"* flag triggered by removing the file `Scripts/.config/downloader/downloader.last_successful_run` is now **DEPRECATED** and will be removed in **May 2026**. To get the same behavior (verifying all file hashes), use `file_checking` with the option `verify_integrity`.
 
 ## Version 2.2.1 - 2025-10-30
 

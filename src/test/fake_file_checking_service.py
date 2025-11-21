@@ -15,22 +15,16 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
-import subprocess
-from abc import ABC
+
+from downloader.full_run_service import FileCheckingService as ProductionFileCheckingService
+from test.fake_file_system_factory import FileSystemFactory
+from test.fake_local_repository import LocalRepository
+from test.fake_logger import NoLogger
 
 
-class OsUtils(ABC):
-    def sync(self) -> None:
-        """send sync signal to the OS"""
-
-    def reboot(self) -> None:
-        """send reboot signal to the OS"""
-
-
-class LinuxOsUtils(OsUtils):
-    def sync(self) -> None:
-        subprocess.run(['sync'], shell=False, stderr=subprocess.STDOUT)
-
-    def reboot(self) -> None:
-        subprocess.run(['reboot', 'now'], shell=False, stderr=subprocess.STDOUT)
-
+class FileCheckingService(ProductionFileCheckingService):
+    def __init__(self, local_repository=None, file_system=None, logger=None):
+        self.file_system = FileSystemFactory().create_for_system_scope() if file_system is None else file_system
+        self.local_repository = LocalRepository(file_system=self.file_system) if local_repository is None else local_repository
+        self.logger = NoLogger() if logger is None else logger
+        super().__init__(self.local_repository, self.file_system, self.logger)

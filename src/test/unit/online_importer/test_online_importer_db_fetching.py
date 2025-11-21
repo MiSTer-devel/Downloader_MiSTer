@@ -27,6 +27,7 @@ from downloader.jobs.abort_worker import AbortJob
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob
 from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
+from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.open_db_job import OpenDbJob
 from test.fake_importer_implicit_inputs import NetworkState
 from test.fake_online_importer import OnlineImporter, StartJobPolicy
@@ -79,10 +80,10 @@ class TestOnlineImporterDbFetching(unittest.TestCase):
 
         self.assertTrue(sut.job_system.are_jobs_cancelled())
         self.assertEqual({
-            "job_started": {FetchDataJob.__name__: 1, LoadLocalStoreSigsJob.__name__: 1, LoadLocalStoreJob.__name__: 4, AbortJob.__name__: 1, OpenDbJob.__name__: 1},
-            "job_completed": {AbortJob.__name__: 1, FetchDataJob.__name__: 1, LoadLocalStoreSigsJob.__name__: 1},
-            "job_retried": {LoadLocalStoreJob.__name__: 4, OpenDbJob.__name__: 1},
-            "job_cancelled": {FetchDataJob.__name__: 1}
+            "job_started": {FetchDataJob.__name__: 1, LoadLocalStoreSigsJob.__name__: 1, LoadLocalStoreJob.__name__: 4, AbortJob.__name__: 1, OpenDbJob.__name__: 1, MixStoreAndDbJob.__name__: 1},
+            "job_completed": {AbortJob.__name__: 1, FetchDataJob.__name__: 1, LoadLocalStoreSigsJob.__name__: 1, OpenDbJob.__name__: 1},
+            "job_retried": {LoadLocalStoreJob.__name__: 4},
+            "job_failed": {MixStoreAndDbJob.__name__: 1}
         }, sut.jobs_tracks())
 
 def fetch_all(db_url: str, file_system_factory: Optional[FileSystemFactory] = None, network_state: Optional[NetworkState] = None, fail: Optional[FailPolicy] = None, job_fail: Optional[JobFailPolicy] = None):

@@ -1,5 +1,7 @@
 from graphviz import Digraph
 
+BACKUP_COLOR = '#888888'
+
 # Initialize the Digraph
 dot = Digraph(
     comment='Workflow Diagram',
@@ -73,7 +75,7 @@ dot.edge('D', 'A', label=' retry', style='dashed', constraint='true')
 dot.edge('H', 'H', label=' retry', style='dashed', constraint='false')
 
 dot.edge('H', 'END', weight='20', constraint='true')
-dot.edge('C', 'ABORT', weight='20', constraint='true', label=' if always fails', style='dashed')
+dot.edge('C', 'ABORT', weight='20', constraint='true', label=' if always fails', style='dashed', color=BACKUP_COLOR, fontcolor=BACKUP_COLOR)
 dot.edge('D', 'SKIP1', weight='1', constraint='false', label=' if db sig == store sig')
 dot.edge('E', 'SKIP2', weight='1', constraint='false', label=' if db sig == store sig')
 
@@ -126,9 +128,9 @@ dot.edge('M', 'M', label=' retry', style='dashed', constraint='false')
 dot.edge('N', 'M', label=' retry', style='dashed', constraint='false')
 
 # "Backup" edges
-dot.edge('K', 'DOT0', style='dashed', constraint='true', dir='none')
-dot.edge('L', 'DOT0', style='dashed', constraint='true', dir='none')
-dot.edge('DOT0', 'J', label='backup:\nstored summary', style='dashed', constraint='false')
+dot.edge('K', 'DOT0', style='dashed', constraint='true', dir='none', color=BACKUP_COLOR)
+dot.edge('L', 'DOT0', style='dashed', constraint='true', dir='none', color=BACKUP_COLOR)
+dot.edge('DOT0', 'J', label='backup:\nstored summary', style='dashed', constraint='false', color=BACKUP_COLOR, fontcolor=BACKUP_COLOR)
 #dot.edge('H', 'I', label='b', style='dashed', constraint='false', dir='none')
 #dot.edge('I', 'F', label='b', style='dashed', constraint='false')
 #dot.edge('J', 'E', label='b', style='dashed', constraint='false')

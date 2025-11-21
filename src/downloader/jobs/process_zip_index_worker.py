@@ -40,7 +40,7 @@ class ProcessZipIndexWorker(DownloaderWorkerBase):
         zip_id, zip_description, db, config, zip_index = job.zip_id, job.zip_description, job.db, job.config, job.zip_index
 
         logger.bench('ProcessZipIndexWorker start: ', db.db_id, zip_id)
-        store = job.store.select(job.zip_index).read_only()
+        store = job.store.select(job.zip_index)
 
         summary = Index(files=zip_index.files, folders=zip_index.folders)
         non_existing_pkgs, need_update_pkgs, created_folders, zip_data, error = process_index_job_main_sequence(self._ctx, job, summary, store)

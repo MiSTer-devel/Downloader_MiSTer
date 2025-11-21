@@ -24,8 +24,7 @@ from downloader.db_entity import DbEntity, ZipIndexEntity
 from downloader.file_filter import FileFoldersHolder
 from downloader.free_space_reservation import Partition
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.index import Index
-from downloader.local_store_wrapper import StoreWrapper, StoreFragmentDrivePaths
+from downloader.local_store_wrapper import StoreFragmentDrivePaths, ReadOnlyStoreAdapter
 from downloader.path_package import PathPackage
 
 
@@ -35,7 +34,7 @@ class ProcessZipIndexJob(Job):
 
     # Inputs
     db: DbEntity
-    store: StoreWrapper
+    store: ReadOnlyStoreAdapter
     config: Config
     zip_id: str
     ini_description: ConfigDatabaseSection

@@ -60,8 +60,7 @@ class ProcessDbIndexWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: ProcessDbIndexJob) -> WorkerResult:  # type: ignore[override]
         logger = self._ctx.logger
-        zip_id, db, config, summary = job.zip_id, job.db, job.config, job.index
-        store = job.store.read_only()
+        zip_id, db, config, summary, store = job.zip_id, job.db, job.config, job.index, job.store
 
         logger.bench('ProcessDbIndexWorker start: ', db.db_id, zip_id)
         try:
@@ -86,7 +85,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
     Optional[Exception]
 ]:
     logger = ctx.logger
-    config, db, zip_id, always_check_hash = job.config, job.db, job.zip_id, job.config['file_checking'] == FileChecking.ALWAYS_HASH
+    config, db, zip_id, always_check_hash = job.config, job.db, job.zip_id, job.config['file_checking'] == FileChecking.VERIFY_INTEGRITY
 
     bench_label = job.__class__.__name__
     logger.bench(bench_label, ' filter summary: ', db.db_id, zip_id)
