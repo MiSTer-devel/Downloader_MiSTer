@@ -36,7 +36,7 @@ class TestFileCheckingRuntimeChanges(unittest.TestCase):
 
     def test_collapse_balanced_file_checking___when_last_successful_run_missing___returns_verify_integrity(self):
         for file_checking_value in [
-            FileChecking.ON_DB_CHANGES,
+            FileChecking.FASTEST,
             FileChecking.BALANCED,
             FileChecking.EXHAUSTIVE,
             FileChecking.VERIFY_INTEGRITY,
@@ -46,7 +46,7 @@ class TestFileCheckingRuntimeChanges(unittest.TestCase):
 
     def test_collapse_balanced_file_checking___when_file_checking_not_balanced___returns_none(self):
         for file_checking_value in [
-            FileChecking.ON_DB_CHANGES,
+            FileChecking.FASTEST,
             FileChecking.EXHAUSTIVE,
             FileChecking.VERIFY_INTEGRITY,
         ]:
@@ -72,7 +72,7 @@ class TestFileCheckingRuntimeChanges(unittest.TestCase):
                 sut = file_checking(previous_free={MEDIA_FAT: prev_free}, actual_free={MEDIA_FAT: current_free})
                 self.assertEqual(FileChecking.EXHAUSTIVE, sut.collapse_balanced_file_checking(FileChecking.BALANCED))
 
-    def test_collapse_balanced_file_checking___when_free_space_stable___returns_on_db_changes(self):
+    def test_collapse_balanced_file_checking___when_free_space_stable___returns_fastest(self):
         for prev_free, current_free in [
             (one_mb, one_mb + FILE_CHECKING_SPACE_CHECK_TOLERANCE),
             (one_mb, one_mb),
@@ -81,7 +81,7 @@ class TestFileCheckingRuntimeChanges(unittest.TestCase):
         ]:
             with self.subTest(prev_free=prev_free, current_free=current_free):
                 sut = file_checking(previous_free={MEDIA_FAT: prev_free}, actual_free={MEDIA_FAT: current_free})
-                self.assertEqual(FileChecking.ON_DB_CHANGES, sut.collapse_balanced_file_checking(FileChecking.BALANCED))
+                self.assertEqual(FileChecking.FASTEST, sut.collapse_balanced_file_checking(FileChecking.BALANCED))
 
     def test_collapse_balanced_file_checking___when_multiple_partitions_and_one_increased___returns_exhaustive(self):
         for prev, current in [
@@ -95,7 +95,7 @@ class TestFileCheckingRuntimeChanges(unittest.TestCase):
                 sut = file_checking(previous_free=prev, actual_free=current)
                 self.assertEqual(FileChecking.EXHAUSTIVE, sut.collapse_balanced_file_checking(FileChecking.BALANCED))
 
-    def test_collapse_balanced_file_checking___when_new_partition_appears___skips_it_and_returns_on_db_changes(self):
+    def test_collapse_balanced_file_checking___when_new_partition_appears___skips_it_and_returns_fastest(self):
         for prev, current in [
             ({MEDIA_FAT: one_mb, MEDIA_USB0: two_mb}, {MEDIA_FAT: one_mb + small_increase, MEDIA_USB0: two_mb + FILE_CHECKING_SPACE_CHECK_TOLERANCE}),
             ({MEDIA_FAT: one_mb, MEDIA_USB0: two_mb}, {MEDIA_FAT: one_mb, MEDIA_USB0: two_mb + FILE_CHECKING_SPACE_CHECK_TOLERANCE}),
@@ -104,7 +104,7 @@ class TestFileCheckingRuntimeChanges(unittest.TestCase):
         ]:
             with self.subTest(prev=prev, current=current):
                 sut = file_checking(previous_free=prev, actual_free=current)
-                self.assertEqual(FileChecking.ON_DB_CHANGES, sut.collapse_balanced_file_checking(FileChecking.BALANCED))
+                self.assertEqual(FileChecking.FASTEST, sut.collapse_balanced_file_checking(FileChecking.BALANCED))
 
 
 def file_checking(previous_free=None, actual_free=None, has_last_run=True):

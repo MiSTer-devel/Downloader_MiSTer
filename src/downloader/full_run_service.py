@@ -111,7 +111,7 @@ class FullRunService:
 
         self._local_repository.ensure_base_paths()
 
-        is_file_checking_fastest = self._config['file_checking'] == FileChecking.ON_DB_CHANGES
+        not_file_checking_fastest = self._config['file_checking'] != FileChecking.FASTEST
         new_file_checking = self._file_checking_service.collapse_balanced_file_checking(self._config['file_checking'])
         if new_file_checking is not None:
             self._logger.debug(f'File checking changed from "{self._config["file_checking"]}" to "{new_file_checking}".')
@@ -151,7 +151,7 @@ class FullRunService:
                 self._logger.print("Please, reboot your system and try again.")
                 return EXIT_ERROR_STORE_NOT_LOADED
 
-        if not is_file_checking_fastest:
+        if not_file_checking_fastest:
             self._local_repository.save_free_spaces(self._file_system.free_spaces())
 
         save_store_err = self._online_importer.save_local_store()
@@ -292,6 +292,6 @@ class FileCheckingService:
                 if cur_free_space > (prev_free_spaces[partition] + FILE_CHECKING_SPACE_CHECK_TOLERANCE):
                     return FileChecking.EXHAUSTIVE  # Free space as increased substantially... Did the user remove installed files? Assume yes.
 
-            return FileChecking.ON_DB_CHANGES
+            return FileChecking.FASTEST
 
         return None

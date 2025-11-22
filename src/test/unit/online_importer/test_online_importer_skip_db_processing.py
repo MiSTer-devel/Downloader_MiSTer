@@ -26,8 +26,8 @@ from test.objects import store_test_with_file_a_descr, db_test_with_file_a, file
 
 class TestOnlineImporterSkipDbProcessing(OnlineImporterTestBase):
 
-    def test_download_db_process___when_file_checking_only_on_db_changes_and_signature_from_store_matches_downloaded_signature___does_nothing_and_ends_early(self):
-        sut = self.download_db(db_sig=sig(), store_sig=sig(), config=config_with(file_checking=FileChecking.ON_DB_CHANGES))
+    def test_download_db_process___when_file_checking_fastest_and_signature_from_store_matches_downloaded_signature___does_nothing_and_ends_early(self):
+        sut = self.download_db(db_sig=sig(), store_sig=sig(), config=config_with(file_checking=FileChecking.FASTEST))
         self.assertDoesNothingEndsEarly(sut)
 
     def test_download_db_process___when_default_file_checking_and_signature_from_store_matches_downloaded_signature___does_nothing_and_ends_normally(self):
@@ -41,18 +41,18 @@ class TestOnlineImporterSkipDbProcessing(OnlineImporterTestBase):
             (sig(db_hash='hash1'), sig(db_hash='hash2'))
         ]:
             with self.subTest(db_sig=db_sig, store_sig=store_sig):
-                sut = self.download_db(db_sig=db_sig, store_sig=store_sig, config=config_with(file_checking=FileChecking.ON_DB_CHANGES))
+                sut = self.download_db(db_sig=db_sig, store_sig=store_sig, config=config_with(file_checking=FileChecking.FASTEST))
                 self.assertDoesNothingEndsNormally(sut, save=True)
 
     def test_download_db_process___when_file_checking_only_on_db_but_config_filter_has_changed___does_nothing_and_ends_normally_but_requires_save(self):
         identical_sig = sig(filter_value='one')
-        sut = self.download_db(db_sig=identical_sig, store_sig=identical_sig, config=config_with(file_checking=FileChecking.ON_DB_CHANGES, filter_value='two'))
+        sut = self.download_db(db_sig=identical_sig, store_sig=identical_sig, config=config_with(file_checking=FileChecking.FASTEST, filter_value='two'))
         self.assertDoesNothingEndsNormally(sut, save=True)
 
     def test_download_db_process___when_file_checking_only_on_db_and_signatures_are_identical_but_invalid___does_nothing_and_ends_normally(self):
         for identical_sig in [sig(db_hash=DB_STATE_SIGNATURE_NO_HASH), sig(size=DB_STATE_SIGNATURE_NO_SIZE)]:
             with self.subTest(identical_sig=identical_sig):
-                sut = self.download_db(db_sig=identical_sig, store_sig=identical_sig, config=config_with(file_checking=FileChecking.ON_DB_CHANGES))
+                sut = self.download_db(db_sig=identical_sig, store_sig=identical_sig, config=config_with(file_checking=FileChecking.FASTEST))
                 self.assertDoesNothingEndsNormally(sut)
 
     def download_db(self, db_sig: dict, store_sig: dict, config: dict) -> OnlineImporter:

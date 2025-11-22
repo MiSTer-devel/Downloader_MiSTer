@@ -66,7 +66,7 @@ def build_db_config(input_config: Config, db: DbEntity, ini_description: ConfigD
     return result
 
 def can_skip_db(config: Config, sig: DbStateSig, db_hash: str, db_size: int, db: DbEntity) -> bool:
-    return config['file_checking'] == FileChecking.ON_DB_CHANGES \
+    return config['file_checking'] == FileChecking.FASTEST \
         and sig['hash'] == db_hash and sig['hash'] != DB_STATE_SIGNATURE_NO_HASH \
         and sig['size'] == db_size and sig['size'] != DB_STATE_SIGNATURE_NO_SIZE \
         and sig['filter'] == config['filter']
