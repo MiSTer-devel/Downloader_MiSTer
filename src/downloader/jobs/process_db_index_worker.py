@@ -85,7 +85,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
     Optional[Exception]
 ]:
     logger = ctx.logger
-    config, db, zip_id, always_check_hash = job.config, job.db, job.zip_id, job.config['file_checking'] == FileChecking.VERIFY_INTEGRITY
+    config, db, zip_id = job.config, job.db, job.zip_id
 
     bench_label = job.__class__.__name__
     logger.bench(bench_label, ' filter summary: ', db.db_id, zip_id)
@@ -101,10 +101,15 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
     ctx.file_system.precache_is_file_with_folders(create_folder_pkgs)
 
     logger.bench(bench_label, ' check pkgs: ', db.db_id, zip_id)
-    non_existing_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(ctx, job.non_duplicated_files, db.db_id, store, always_check_hash, bench_label)
+    non_existing_pkgs, validate_pkgs, job.present_not_validated_files = process_check_file_packages(ctx, job.non_duplicated_files, db.db_id, store, bench_label)
 
     logger.bench(bench_label, ' validate pkgs: ', db.db_id, zip_id)
     job.present_validated_files, job.skipped_updated_files, need_update_pkgs = process_validate_packages(ctx, validate_pkgs)
+
+    if config['file_checking'] == FileChecking.VERIFY_INTEGRITY:
+        logger.bench(bench_label, ' verify not validated files: ', db.db_id, zip_id)
+        failed_verification_pkgs = verify_present_not_validated_files_hashes(ctx, job.present_not_validated_files)
+        need_update_pkgs.extend(failed_verification_pkgs)
 
     if non_existing_pkgs or need_update_pkgs:
         logger.bench(bench_label, ' Reserve space: ', db.db_id, zip_id)
@@ -151,7 +156,7 @@ def _translate_items(ctx: DownloaderWorkerContext, calculator: TargetPathsCalcul
 
     return present, removed
 
-def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, always_check_hash: bool, bench_label: str) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
+def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, bench_label: str) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
     if len(non_duplicated_pkgs) == 0:
         return [], [], []
 
@@ -163,19 +168,16 @@ def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkg
     ctx.logger.bench(bench_label, ' existing loop: ', db_id, len(non_duplicated_pkgs))
     already_installed_pkgs: List[_ValidateFilePackage]
     validate_pkgs: List[_ValidateFilePackage]
-    if always_check_hash:
-        validate_pkgs = existing  # @TODO: Cover this scenario in tests
-        already_installed_pkgs = []
+
+    ctx.logger.bench(bench_label, ' invalid hashes start: ', db_id, len(non_duplicated_pkgs))
+    invalid_hashes = store.invalid_hashes(existing)
+    ctx.logger.bench(bench_label, ' invalid hashes end: ', db_id, len(non_duplicated_pkgs))
+    if any(invalid_hashes):
+        validate_pkgs = [pkg for pkg, inv in zip(existing, invalid_hashes) if inv]
+        already_installed_pkgs = [pkg for pkg, inv in zip(existing, invalid_hashes) if not inv]
     else:
-        ctx.logger.bench(bench_label, ' invalid hashes start: ', db_id, len(non_duplicated_pkgs))
-        invalid_hashes = store.invalid_hashes(existing)
-        ctx.logger.bench(bench_label, ' invalid hashes end: ', db_id, len(non_duplicated_pkgs))
-        if any(invalid_hashes):
-            validate_pkgs = [pkg for pkg, inv in zip(existing, invalid_hashes) if inv]
-            already_installed_pkgs = [pkg for pkg, inv in zip(existing, invalid_hashes) if not inv]
-        else:
-            validate_pkgs = []
-            already_installed_pkgs = existing
+        validate_pkgs = []
+        already_installed_pkgs = existing
 
     return non_existing_pkgs, validate_pkgs, already_installed_pkgs
 
@@ -193,6 +195,7 @@ def process_validate_packages(ctx: DownloaderWorkerContext, validate_pkgs: List[
     for pkg in validate_pkgs:
         # @TODO: Parallelize the slow hash calculations
         if file_system.hash(pkg.full_path) == pkg.description['hash']:
+            # @TODO: Check for interrupted operations flag to be on and end early in that case.
             ctx.file_download_session_logger.print_progress_line(f'No changes: {pkg.rel_path}')
             present_validated_files.append(pkg)
             continue
@@ -208,6 +211,23 @@ def process_validate_packages(ctx: DownloaderWorkerContext, validate_pkgs: List[
         more_fetch_pkgs.append(pkg)
 
     return present_validated_files, skipped_updated_files, more_fetch_pkgs
+
+def verify_present_not_validated_files_hashes(ctx: DownloaderWorkerContext, already_installed_pkgs: list[PathPackage]) -> list[PathPackage]:
+    if len(already_installed_pkgs) == 0:
+        return []
+
+    file_system = ReadOnlyFileSystem(ctx.file_system)
+    failed_verification_pkgs: List[_FetchFilePackage] = []
+
+    for pkg in already_installed_pkgs:
+        # @TODO: Parallelize the slow hash calculations
+        if file_system.hash(pkg.full_path) == pkg.description['hash']:
+            ctx.file_download_session_logger.print_progress_line(f'OK: {pkg.rel_path}')
+        else:
+            ctx.file_download_session_logger.print_progress_line(f'FAILED VERIFICATION: {pkg.rel_path}')
+            failed_verification_pkgs.append(pkg)
+
+    return failed_verification_pkgs
 
 def _url(file_path: str, file_description: Dict[str, Any], base_files_url: str) -> Any:
     return file_description['url'] if 'url' in file_description else calculate_url(base_files_url, file_path if file_path[0] != '|' else file_path[1:])
