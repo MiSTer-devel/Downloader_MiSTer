@@ -307,7 +307,7 @@ class ConfigReader:
             return parameter
 
         lower_parameter = parameter.lower()
-        if lower_parameter == FILE_CHECKING_FASTEST: return FileChecking.ON_DB_CHANGES
+        if lower_parameter == FILE_CHECKING_FASTEST: return FileChecking.FASTEST
         elif lower_parameter == FILE_CHECKING_BALANCED: return FileChecking.BALANCED
         elif lower_parameter == FILE_CHECKING_EXHAUSTIVE: return FileChecking.EXHAUSTIVE
         elif lower_parameter == FILE_CHECKING_VERIFY_INTEGRITY: return FileChecking.VERIFY_INTEGRITY

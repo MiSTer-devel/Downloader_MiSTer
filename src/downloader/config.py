@@ -63,7 +63,7 @@ class AllowReboot(IntEnum):
 
 @unique
 class FileChecking(IntEnum):
-    ON_DB_CHANGES = 0  # FASTEST on the documentation
+    FASTEST = 0
     BALANCED = 1
     EXHAUSTIVE = 2
     VERIFY_INTEGRITY = 3

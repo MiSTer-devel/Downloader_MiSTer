@@ -213,9 +213,6 @@ def process_validate_packages(ctx: DownloaderWorkerContext, validate_pkgs: List[
     return present_validated_files, skipped_updated_files, more_fetch_pkgs
 
 def verify_present_not_validated_files_hashes(ctx: DownloaderWorkerContext, already_installed_pkgs: list[PathPackage]) -> list[PathPackage]:
-    if len(already_installed_pkgs) == 0:
-        return []
-
     file_system = ReadOnlyFileSystem(ctx.file_system)
     failed_verification_pkgs: List[_FetchFilePackage] = []
 
