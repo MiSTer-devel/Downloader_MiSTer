@@ -14,6 +14,8 @@ jobs:
 
   main-test:
     runs-on: ubuntu-latest
+    outputs:
+      NEW_RELEASE: ${{ steps.check-changes.outputs.NEW_RELEASE }}
 
     steps:
     - uses: actions/setup-python@v2
@@ -31,45 +33,12 @@ jobs:
     - name: System Quick Tests
       run: cd src && python3 -m unittest discover -s test/system/quick
 
-    - name: System Slow Tests
-      run: cd src && python3 -m unittest discover -s test/system/slow
-
-  windows-test:
-    runs-on: windows-latest
-    needs: main-test
-
-    steps:
-    - uses: actions/checkout@v2
-
-    - uses: actions/setup-python@v2
-      with:
-        python-version: '3.9'
-
-    - name: Test PC Launcher on Windows
-      run: cd src && python pc_launcher.py
-
-  build-release:
-    runs-on: ubuntu-latest
-    needs: [main-test, windows-test]
-
-    steps:
-    - run: echo "owner_lc=$(echo "${GITHUB_REPOSITORY_OWNER,,}")" >> "$GITHUB_OUTPUT"
-      id: vars
-
-    - uses: actions/setup-python@v2
-      with:
-        python-version: '3.9'
-
-    - uses: actions/checkout@v2
-
-    - name: Build
-      id: build
+    - name: Check for changes
+      id: check-changes
       run: |
         set -euo pipefail
-        IFS=$'\n\t'
 
         SKIP_COMMIT=true ./src/build.sh | sha256sum > latest.id
-        ZIP_FILE="$(pwd)/dont_download.zip" ./src/build.sh > dont_download.sh
 
         git fetch origin main
 
@@ -85,23 +54,62 @@ jobs:
           echo "NEW_RELEASE=no" >> "$GITHUB_OUTPUT"
         fi
 
+    - name: System Slow Tests
+      if: steps.check-changes.outputs.NEW_RELEASE == 'yes'
+      run: cd src && python3 -m unittest discover -s test/system/slow
+
+  windows-test:
+    runs-on: windows-latest
+    needs: main-test
+    if: needs.main-test.outputs.NEW_RELEASE == 'yes'
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+
+    - name: Test PC Launcher on Windows
+      run: cd src && python pc_launcher.py
+      env:
+        PC_LAUNCHER_NO_WAIT: '1'
+
+  build-release:
+    runs-on: ubuntu-latest
+    needs: [main-test, windows-test]
+    if: needs.main-test.outputs.NEW_RELEASE == 'yes'
+
+    steps:
+    - run: echo "owner_lc=$(echo "${GITHUB_REPOSITORY_OWNER,,}")" >> "$GITHUB_OUTPUT"
+      id: vars
+
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+
+    - uses: actions/checkout@v2
+
+    - name: Build
+      run: |
+        set -euo pipefail
+
+        SKIP_COMMIT=true ./src/build.sh | sha256sum > latest.id
+        ZIP_FILE="$(pwd)/dont_download.zip" ./src/build.sh > dont_download.sh
+
     - uses: docker/setup-qemu-action@v2
-      if: steps.build.outputs.NEW_RELEASE == 'yes'
       with:
         platforms: arm/v7
 
     - uses: docker/setup-buildx-action@v2
-      if: steps.build.outputs.NEW_RELEASE == 'yes'
 
     - uses: docker/login-action@v2
-      if: steps.build.outputs.NEW_RELEASE == 'yes'
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Nuitka
-      if: steps.build.outputs.NEW_RELEASE == 'yes'
       uses: docker/build-push-action@v4
       with:
         context: .
@@ -113,13 +121,11 @@ jobs:
         cache-to: type=registry,ref=ghcr.io/${{ steps.vars.outputs.owner_lc }}/arm32v7-nuitka:cache,mode=max
 
     - name: Compile
-      if: steps.build.outputs.NEW_RELEASE == 'yes'
       run: ./src/compile.sh downloader_bin
       env:
         NUITKA_IMAGE: ghcr.io/${{ steps.vars.outputs.owner_lc }}/arm32v7-nuitka:latest
 
     - name: Release
-      if: steps.build.outputs.NEW_RELEASE == 'yes'
       id: release
       run: |
         git config --global user.email "theypsilon@gmail.com"

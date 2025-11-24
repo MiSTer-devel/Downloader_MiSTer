@@ -55,7 +55,8 @@ def main():
         except FileNotFoundError:
             pass
 
-    input("Press Enter to continue...")
+    if os.environ.get('PC_LAUNCHER_NO_WAIT') != '1':
+        input("Press Enter to continue...")
 
     return result
 
