@@ -65,9 +65,9 @@ def build_db_config(input_config: Config, db: DbEntity, ini_description: ConfigD
 
     return result
 
-def can_skip_db(config: Config, sig: DbStateSig, db_hash: str, db_size: int, db: DbEntity) -> bool:
-    return config['file_checking'] == FileChecking.FASTEST \
+def can_skip_db(file_checking: FileChecking, sig: DbStateSig, db_hash: str, db_size: int, user_filter: str) -> bool:
+    return file_checking == FileChecking.FASTEST \
         and sig['hash'] == db_hash and sig['hash'] != DB_STATE_SIGNATURE_NO_HASH \
         and sig['size'] == db_size and sig['size'] != DB_STATE_SIGNATURE_NO_SIZE \
-        and sig['filter'] == config['filter']
+        and sig['filter'] == user_filter
 # Not really needed because collisions are very improbable, but if we are paranoid we can add: and sig['timestamp'] == db.timestamp and sig['timestamp'] != DB_STATE_SIGNATURE_NO_TIMESTAMP \

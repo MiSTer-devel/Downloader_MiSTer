@@ -39,6 +39,9 @@ class OpenDbWorker(DownloaderWorkerBase):
 
     def operate_on(self, job: OpenDbJob) -> WorkerResult:  # type: ignore[override]
         self._ctx.logger.bench('OpenDbWorker Loading database: ', job.section)
+
+        # @TODO: Skip db before opening it, need to calculate the filter in other way for that and that's it. Around 300ms savings
+
         try:
             db_props = self._ctx.file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())
         except Exception as e:
@@ -86,7 +89,7 @@ class OpenDbWorker(DownloaderWorkerBase):
         if sigs is not None:
             sig = sigs.get(job.section, None)
             if sig is not None:
-                if can_skip_db(config, sig, db_hash, db_size, db):
+                if can_skip_db(config['file_checking'], sig, db_hash, db_size, config['filter']):
                     self._ctx.logger.debug('Skipping db process. No changes detected for: ', db.db_id)
                     job.skipped = True
                     return [], None
