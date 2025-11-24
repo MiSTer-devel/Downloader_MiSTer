@@ -505,9 +505,9 @@ def file_mister_old_descr():
     }
 
 
-def file_a_descr(size=None):
+def file_a_descr(size=None, file_hash=None):
     return {
-        "hash": file_a,
+        "hash": file_a if file_hash is None else file_hash,
         "size": file_size_a if size is None else size,
         "url": "https://one.rbf"
     }

@@ -191,8 +191,19 @@ class LocalRepository(FilelogSaver):
         except Exception as e:
             self._logger.debug(e)
             return e
+        finally:
+            self._logger.bench('LocalRepository Save free spaces done.')
+        return None
 
-        self._logger.bench('LocalRepository Save free spaces done.')
+    def remove_free_spaces(self) -> Optional[Exception]:
+        self._logger.bench('LocalRepository Remove free spaces start.')
+        try:
+            self._file_system.unlink(self._previous_free_spaces_path, verbose=False)
+        except Exception as e:
+            self._logger.debug(e)
+            return e
+        finally:
+            self._logger.bench('LocalRepository Remove free spaces done.')
         return None
 
     def has_last_successful_run(self):

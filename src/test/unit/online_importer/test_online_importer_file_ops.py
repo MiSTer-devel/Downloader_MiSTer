@@ -157,6 +157,7 @@ class TestOnlineImporterFileOps(unittest.TestCase):
         self.sut.download()
 
     def assertDownloaded(self, oks, run=None, errors=None):
-        self.assertEqual(oks, self.sut.correctly_installed_files())
-        self.assertEqual(errors if errors is not None else [], self.sut.files_that_failed())
-        self.assertEqual(run if run is not None else [], self.sut.run_files())
+        box = self.sut.box()
+        self.assertEqual(oks, box.installed_file_names())
+        self.assertEqual(errors if errors is not None else [], box.failed_files())
+        self.assertEqual(run if run is not None else [], box.fetch_started_files())

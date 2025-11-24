@@ -18,7 +18,6 @@
 
 from downloader.constants import FILE_PDFViewer, FOLDER_linux, \
     DISTRIBUTION_MISTER_DB_ID
-from downloader.file_system import FileSystemFactory
 from test.fake_logger import NoLogger
 from test.fake_logger import SpyLoggerDecorator
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
@@ -280,8 +279,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
 
         self.assertEqual(empty_test_store(), store)
         self.assertEqual(fs_data(files={file_boot_rom: {"hash": "something_else"}}), sut.fs_data)
-        self.assertEqual([file_boot_rom], sut.new_files_not_overwritten()['test'])
-        self.assertReportsNothing(sut)
+        self.assertReportsNothing(sut, skipped_updated_files={'test': [file_boot_rom]})
 
     def test_overwrite___when_boot_rom_present_but_with_different_case___should_not_overwrite_it(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_boot_rom.upper(): {"hash": "something_else"}}))
@@ -292,8 +290,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
 
         self.assertEqual(empty_test_store(), store)
         self.assertEqual(fs_data(files={file_boot_rom: {"hash": "something_else"}}), sut.fs_data)
-        self.assertEqual([file_boot_rom], sut.new_files_not_overwritten()['test'])
-        self.assertReportsNothing(sut)
+        self.assertReportsNothing(sut, skipped_updated_files={'test': [file_boot_rom]})
 
     def test_overwrite___when_overwrite_yes_file_a_is_present___should_not_overwrite_it(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}))
@@ -304,8 +301,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
 
         self.assertEqual(fs_data(files={file_a: file_a_updated_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_descr(files={file_a: with_overwrite(file_a_updated_descr(), True)}), store)
-        self.assertReports(sut, [file_a])
-        self.assertEqual({}, sut.new_files_not_overwritten())
+        self.assertReports(sut, [file_a], skipped_updated_files={})
 
     def test_overwrite___when_on_empty_store_overwrite_no_file_a_is_present___should_not_overwrite_it_and_neither_fill_the_store(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))
@@ -316,8 +312,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
 
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(empty_test_store(), store)
-        self.assertReportsNothing(sut)
-        self.assertEqual([file_a], sut.new_files_not_overwritten()['test'])
+        self.assertReportsNothing(sut, skipped_updated_files={'test': [file_a]})
 
     def test_overwrite___when_file_a_without_overwrite_is_present___should_overwrite_it(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}))
@@ -328,8 +323,7 @@ class TestOnlineImporter(OnlineImporterTestBase):
 
         self.assertEqual(store_test_with_file(file_a, file_a_updated_descr()), store)
         self.assertEqual(fs_data(files={file_a: file_a_updated_descr()}, folders=[folder_a]), sut.fs_data)
-        self.assertEqual({}, sut.new_files_not_overwritten())
-        self.assertReports(sut, [file_a])
+        self.assertReports(sut, [file_a], skipped_updated_files={})
 
     def test_deleted_folders___when_db_1_has_a_b_c_and_store_1_has_a_x_y___should_delete_b_c_and_store_x_y(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(folders=['a', 'b', 'c']))

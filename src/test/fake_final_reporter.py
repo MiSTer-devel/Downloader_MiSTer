@@ -16,15 +16,16 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.full_run_service import FileCheckingService as ProductionFileCheckingService
+from downloader.config import default_config
+from downloader.full_run_service import FinalReporter as ProductionFinalReporter
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_local_repository import LocalRepository
 from test.fake_logger import NoLogger
+from test.fake_waiter import NoWaiter
 
 
-class FileCheckingService(ProductionFileCheckingService):
-    def __init__(self, local_repository=None, file_system=None, logger=None):
-        self.file_system = FileSystemFactory().create_for_system_scope() if file_system is None else file_system
-        self.local_repository = LocalRepository(file_system=self.file_system) if local_repository is None else local_repository
-        self.logger = NoLogger() if logger is None else logger
-        super().__init__(self.local_repository, self.file_system, self.logger)
+class FinalReporter(ProductionFinalReporter):
+    def __init__(self, local_repository=None, config=None):
+        config = default_config() if config is None else config
+        local_repository = LocalRepository(file_system=FileSystemFactory(config=config).create_for_system_scope(), config=config) if local_repository is None else local_repository
+        super().__init__(local_repository, config, NoLogger(), NoWaiter())

@@ -17,14 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from collections import Counter
-import json
 from enum import unique, Enum
 from itertools import groupby
 from operator import itemgetter
 from typing import Any, Dict, List, Optional
 from downloader.config import Config, ConfigDatabaseSection
-from downloader.constants import MEDIA_USB0, FILE_downloader_storage_json, DB_STATE_SIGNATURE_NO_HASH, \
-    DB_STATE_SIGNATURE_NO_SIZE
+from downloader.constants import MEDIA_USB0, DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.file_filter import FileFilterFactory
@@ -32,23 +30,18 @@ from downloader.free_space_reservation import FreeSpaceReservation, UnlimitedFre
 from downloader.interruptions import Interruptions
 from downloader.job_system import Job, JobFailPolicy, JobSystem, ProgressReporter
 from downloader.jobs.copy_data_job import CopyDataJob
-from downloader.jobs.fetch_data_job import FetchDataJob
-from downloader.jobs.load_local_store_job import LoadLocalStoreJob, local_store_tag
-from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob, local_store_sigs_tag
+from downloader.jobs.load_local_store_job import LoadLocalStoreJob
+from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
-from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl, InstallationReport
-from downloader.jobs.transfer_job import TransferJob
+from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
 from downloader.fail_policy import FailPolicy
 from downloader.local_store_wrapper import StoreWrapper, empty_db_state_signature
-from downloader.online_importer import InstallationBox, OnlineImporter as ProductionOnlineImporter
-from downloader.store_migrator import make_new_local_store
+from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.logger import Logger
-
 from downloader.waiter import Waiter
-from test.fake_store_migrator import StoreMigrator
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_http_gateway import FakeHttpGateway, FakeBuf
 from test.fake_job_system import ProgressReporterTracker
@@ -270,12 +263,6 @@ class OnlineImporter(ProductionOnlineImporter):
         self._clean_store(store)
         return store
 
-    def report(self) -> InstallationReport:
-        return self._worker_ctx.installation_report
-
-    def box(self) -> InstallationBox:
-        return self._box
-
     def _add_store(self, db_id: str, store=None, store_sig=None):
         if self._local_store is None:
             self._local_store = local_store_wrapper({})
@@ -285,3 +272,9 @@ class OnlineImporter(ProductionOnlineImporter):
 
         if store_sig is not None:
             self._local_store.unwrap_local_store()['db_sigs'][db_id] = store_sig
+
+    def free_space(self):
+        actual_remaining_space = dict(self._free_space_reservation.free_space())
+        for p, reservation in self.box().full_partitions().items():
+            actual_remaining_space[p] -= reservation
+        return actual_remaining_space

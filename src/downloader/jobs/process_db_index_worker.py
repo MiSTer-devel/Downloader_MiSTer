@@ -108,7 +108,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
 
     if config['file_checking'] == FileChecking.VERIFY_INTEGRITY:
         logger.bench(bench_label, ' verify not validated files: ', db.db_id, zip_id)
-        failed_verification_pkgs = verify_present_not_validated_files_hashes(ctx, job.present_not_validated_files)
+        job.verified_integrity_pkgs, failed_verification_pkgs = verify_present_not_validated_files_hashes(ctx, job.present_not_validated_files)
         need_update_pkgs.extend(failed_verification_pkgs)
 
     if non_existing_pkgs or need_update_pkgs:
@@ -212,19 +212,23 @@ def process_validate_packages(ctx: DownloaderWorkerContext, validate_pkgs: List[
 
     return present_validated_files, skipped_updated_files, more_fetch_pkgs
 
-def verify_present_not_validated_files_hashes(ctx: DownloaderWorkerContext, already_installed_pkgs: list[PathPackage]) -> list[PathPackage]:
+def verify_present_not_validated_files_hashes(ctx: DownloaderWorkerContext, already_installed_pkgs: list[PathPackage]) -> tuple[list[PathPackage], list[PathPackage]]:
     file_system = ReadOnlyFileSystem(ctx.file_system)
+    verified_integrity_pkgs: List[PathPackage] = []
     failed_verification_pkgs: List[_FetchFilePackage] = []
 
     for pkg in already_installed_pkgs:
         # @TODO: Parallelize the slow hash calculations
-        if file_system.hash(pkg.full_path) == pkg.description['hash']:
+        fs_hash = file_system.hash(pkg.full_path)
+        if fs_hash == pkg.description['hash']:
             ctx.file_download_session_logger.print_progress_line(f'OK: {pkg.rel_path}')
+            verified_integrity_pkgs.append(pkg)
         else:
             ctx.file_download_session_logger.print_progress_line(f'FAILED VERIFICATION: {pkg.rel_path}')
+            ctx.logger.debug('fs_hash: ', fs_hash, ' != desc_hash: ', pkg.description['hash'])
             failed_verification_pkgs.append(pkg)
 
-    return failed_verification_pkgs
+    return verified_integrity_pkgs, failed_verification_pkgs
 
 def _url(file_path: str, file_description: Dict[str, Any], base_files_url: str) -> Any:
     return file_description['url'] if 'url' in file_description else calculate_url(base_files_url, file_path if file_path[0] != '|' else file_path[1:])

@@ -24,7 +24,6 @@ import json
 import threading
 import time
 import zipfile
-import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Final, List, Optional, Set, Dict, Any, Tuple, Union, IO, BinaryIO
@@ -36,8 +35,8 @@ from downloader.logger import Logger, OffLogger
 from downloader.path_package import PathPackage
 
 is_windows: Final = os.name == 'nt'
-COPY_BUFSIZE: Final = 256 * 1024 if is_windows else 128 * 1024
-JSON_READ_BUFSIZE: Final = 128 * 1024  # 128KB buffer for JSON file reading
+COPY_BUFSIZE: Final = 256 * 1024
+JSON_READ_BUFSIZE: Final = 256 * 1024  # 128KB buffer for JSON file reading
 
 # OPTIMIZATION:
 # Uncommenting all the HAS_ORJSON blocks has the potential of saving around 200ms
@@ -45,6 +44,7 @@ JSON_READ_BUFSIZE: Final = 128 * 1024  # 128KB buffer for JSON file reading
 #  - /media/fat/Scripts/.config/downloader/orjson/orjson.cpython-39-arm-linux-gnueabihf.so
 #  - /media/fat/Scripts/.config/downloader/orjson/__init__.py
 #HAS_ORJSON = False
+#import sys
 
 
 class FileSystemFactory:
@@ -379,9 +379,12 @@ class _FileSystem(FileSystem):
         self._debug_log('Copying', (source, full_source), (target, full_target))
         try:
             # Use manual file handling with a larger buffer for better performance on embedded systems
-            with open(full_source, 'rb') as fsource:
-                with open(full_target, 'wb') as ftarget:
-                    shutil.copyfileobj(fsource, ftarget, length=1024 * 1024 * 4)
+            with open(full_source, 'rb') as fsource, open(full_target, 'wb') as ftarget:
+                while True:
+                    data = fsource.read(COPY_BUFSIZE)
+                    if not data:
+                        break
+                    ftarget.write(data)
             self._shared_state.add_file(full_target)
         except Exception as e:
             self._logger.debug(e)
@@ -640,10 +643,10 @@ class InvalidFileResolution(DownloaderError):
 def hash_file(path: str) -> str:
     with open(path, "rb") as f:
         file_hash = hashlib.md5()
-        chunk = f.read(8192)
+        chunk = f.read(COPY_BUFSIZE)
         while chunk:
             file_hash.update(chunk)
-            chunk = f.read(8192)
+            chunk = f.read(COPY_BUFSIZE)
         return file_hash.hexdigest()
 
 
