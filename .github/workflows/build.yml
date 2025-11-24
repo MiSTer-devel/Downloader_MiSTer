@@ -12,13 +12,10 @@ permissions:
 
 jobs:
 
-  build:
+  main-test:
     runs-on: ubuntu-latest
 
     steps:
-    - run: echo "owner_lc=$(echo "${GITHUB_REPOSITORY_OWNER,,}")" >> "$GITHUB_OUTPUT"
-      id: vars
-
     - uses: actions/setup-python@v2
       with:
         python-version: '3.9'
@@ -33,6 +30,37 @@ jobs:
 
     - name: System Quick Tests
       run: cd src && python3 -m unittest discover -s test/system/quick
+
+    - name: System Slow Tests
+      run: cd src && python3 -m unittest discover -s test/system/slow
+
+  windows-test:
+    runs-on: windows-latest
+    needs: main-test
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+
+    - name: Test PC Launcher on Windows
+      run: cd src && python pc_launcher.py
+
+  build-release:
+    runs-on: ubuntu-latest
+    needs: [main-test, windows-test]
+
+    steps:
+    - run: echo "owner_lc=$(echo "${GITHUB_REPOSITORY_OWNER,,}")" >> "$GITHUB_OUTPUT"
+      id: vars
+
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+
+    - uses: actions/checkout@v2
 
     - name: Build
       id: build
@@ -56,10 +84,6 @@ jobs:
           echo "Skipping build, no changes detected." >> $GITHUB_STEP_SUMMARY
           echo "NEW_RELEASE=no" >> "$GITHUB_OUTPUT"
         fi
-
-    - name: System Slow Tests
-      if: steps.build.outputs.NEW_RELEASE == 'yes'
-      run: cd src && python3 -m unittest discover -s test/system/slow
 
     - uses: docker/setup-qemu-action@v2
       if: steps.build.outputs.NEW_RELEASE == 'yes'
