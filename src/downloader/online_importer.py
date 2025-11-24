@@ -60,11 +60,7 @@ class OnlineImporter:
         self._old_pext_paths = old_pext_paths
         self._box = InstallationBox()
         self._local_store: Optional[LocalStoreWrapper] = None
-        self._needs_reboot = False
-        self._needs_save = False
         self._first_time = True
-
-    def old_pext_paths(self) -> set[str]: return self._old_pext_paths
 
     def _make_workers(self) -> dict[int, Worker]:
         return {w.job_type_id(): w for w in make_workers(self._worker_ctx)}
@@ -112,6 +108,7 @@ class OnlineImporter:
         report: InstallationReport = self._worker_ctx.installation_report
 
         box.set_unused_filter_tags(self._worker_ctx.file_filter_factory.unused_filter_parts())
+        box.set_old_pext_paths(self._old_pext_paths)
 
         for fetch_file_job in report.get_started_jobs(FetchFileJob):
             box.add_file_fetch_started(fetch_file_job.pkg.rel_path)
@@ -225,6 +222,7 @@ class OnlineImporter:
 
         for index_job in report.get_completed_jobs(ProcessDbIndexJob):
             box.add_present_not_validated_files(index_job.present_not_validated_files)
+            box.add_verified_integrity_files(index_job.verified_integrity_pkgs, index_job.db.db_id)
             box.add_duplicated_files(index_job.duplicated_files, index_job.db.db_id)
             box.add_non_duplicated_files(index_job.non_duplicated_files, index_job.db.db_id)
             box.add_present_validated_files(index_job.present_validated_files, index_job.db.db_id)
@@ -245,6 +243,7 @@ class OnlineImporter:
 
         for zindex_job in report.get_completed_jobs(ProcessZipIndexJob):
             box.add_present_not_validated_files(zindex_job.present_not_validated_files)
+            box.add_verified_integrity_files(zindex_job.verified_integrity_pkgs, zindex_job.db.db_id)
             box.add_duplicated_files(zindex_job.duplicated_files, zindex_job.db.db_id)
             box.add_non_duplicated_files(zindex_job.non_duplicated_files, zindex_job.db.db_id)
             box.add_present_validated_files(zindex_job.present_validated_files, zindex_job.db.db_id)
@@ -393,7 +392,7 @@ class OnlineImporter:
         for db_id, file_pkgs in box.installed_file_pkgs().items():
             for file_pkg in file_pkgs:
                 if 'reboot' in file_pkg.description and file_pkg.description['reboot'] == True:
-                    self._needs_reboot = True
+                    self._box.set_needs_reboot(True)
                 write_stores[db_id].add_file_pkg(file_pkg, file_pkg.rel_path in box.repeated_store_presence()[db_id])
 
         for db_id, folder_pkg in box.installed_folders():
@@ -415,7 +414,7 @@ class OnlineImporter:
         for w_store in write_stores.values():
             w_store.cleanup_externals()
 
-        self._needs_save = local_store.needs_save()
+        self._box.set_needs_save(local_store.needs_save())
 
         for store in stores:
             self._clean_store(store.unwrap_store())
@@ -447,48 +446,8 @@ class OnlineImporter:
             if 'internal_summary' in zip_description:
                 zip_description.pop('internal_summary')
 
-    def folders_that_failed(self) -> list[str]:
-        return self._box.failed_folders()
-
-    def zips_that_failed(self) -> list[str]:
-        return [f'{db_id}:{zip_id}' for db_id, zip_id in self._box.failed_zips()]
-
-    def files_that_failed(self):
-        return self._box.failed_files()
-
     def box(self) -> 'InstallationBox':
         return self._box
-
-    def dbs_that_failed(self):
-        return self._box.failed_dbs()
-
-    def new_files_not_overwritten(self):
-        return self._box.skipped_updated_files()
-
-    def needs_reboot(self):
-        return self._needs_reboot
-
-    def full_partitions(self):
-        return [p for p, s in self._box.full_partitions().items()]
-
-    def free_space(self):
-        actual_remaining_space = dict(self._free_space_reservation.free_space())
-        for p, reservation in self._box.full_partitions().items():
-            actual_remaining_space[p] -= reservation
-        return actual_remaining_space
-
-    def correctly_downloaded_dbs(self) -> list[DbEntity]:
-        return self._box.installed_dbs()
-
-    def correctly_installed_files(self):
-        return self._box.installed_file_names()
-
-    def run_files(self):
-        return self._box.fetch_started_files()
-
-    @property
-    def needs_save(self) -> bool:
-        return self._needs_save
 
 
 def is_system_path(description: dict[str, str]) -> bool:
@@ -500,6 +459,7 @@ class InstallationBox:
         self._downloaded_files: list[str] = []
         self._validated_files: dict[str, list[PathPackage]] = defaultdict(list)  # @TODO: Remove this?
         self._present_validated_files: dict[str, list[PathPackage]] = defaultdict(list)
+        self._verified_integrity_file_names: list[str] = []
         self._installed_file_pkgs: dict[str, list[PathPackage]] = defaultdict(list)
         self._installed_file_names: list[str] = []
         self._present_not_validated_files: list[str] = []
@@ -527,9 +487,18 @@ class InstallationBox:
         self._non_duplicated_files: list[tuple[list[PathPackage], str]] = []
         self._unused_filter_tags: list[str] = []
         self._skipped_dbs: list[str] = []
+        self._old_pext_paths: set[str] = set()
+        self._needs_save: bool = False
+        self._needs_reboot: bool = False
 
     def set_unused_filter_tags(self, tags: list[str]) -> None:
         self._unused_filter_tags = tags
+    def set_old_pext_paths(self, paths: set[str]) -> None:
+        self._old_pext_paths = paths
+    def set_needs_save(self, needs_save: bool) -> None:
+        self._needs_save = needs_save
+    def set_needs_reboot(self, needs_reboot: bool) -> None:
+        self._needs_reboot = needs_reboot
     def add_downloaded_file(self, path: str) -> None:
         self._downloaded_files.append(path)
     def add_downloaded_files(self, files: list[PathPackage]) -> None:
@@ -554,6 +523,9 @@ class InstallationBox:
         self._present_validated_files[db_id].extend(paths)
         self._installed_file_pkgs[db_id].extend(paths)
         self._installed_file_names.extend(pkg.rel_path for pkg in paths)
+    def add_verified_integrity_files(self, pkgs: list[PathPackage], _db_id: str) -> None:
+        if len(pkgs) == 0: return
+        self._verified_integrity_file_names.extend(pkg.rel_path for pkg in pkgs)
     def add_present_not_validated_files(self, paths: list[PathPackage]) -> None:
         if len(paths) == 0: return
         self._present_not_validated_files.extend([p.rel_path for p in paths])
@@ -614,6 +586,7 @@ class InstallationBox:
     def is_folder_installed(self, path: str) -> bool:  return path in self._installed_folders_set
     def downloaded_files(self): return self._downloaded_files
     def present_validated_files(self) -> list[str]: return [pkg.rel_path for path_pkgs in self._present_validated_files.values() for pkg in path_pkgs]
+    def verified_integrity_files(self) -> list[str]: return self._verified_integrity_file_names
     def present_not_validated_files(self): return self._present_not_validated_files
     def fetch_started_files(self): return self._fetch_started_files
     def failed_files(self): return self._failed_files
@@ -639,6 +612,9 @@ class InstallationBox:
     def failed_dbs(self) -> list[str]: return list(self._failed_dbs)
     def unused_filter_tags(self): return self._unused_filter_tags
     def skipped_dbs(self): return self._skipped_dbs
+    def old_pext_paths(self) -> set[str]: return self._old_pext_paths
+    def needs_save(self) -> bool: return self._needs_save
+    def needs_reboot(self) -> bool: return self._needs_reboot
 
     def queue_directory_removal(self, dirs: list[PathPackage], db_id: str) -> None:
         if len(dirs) == 0: return

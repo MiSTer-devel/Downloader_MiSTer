@@ -28,7 +28,7 @@ from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config, FileChecking
 from downloader.constants import EXIT_ERROR_NO_CERTS, EXIT_ERROR_STORE_NOT_SAVED, EXIT_ERROR_FAILED_FILES, \
     EXIT_ERROR_FAILED_DBS, EXIT_ERROR_STORE_NOT_LOADED, FILE_downloader_run_signal, REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE, \
-    REBOOT_WAIT_TIME_STANDARD, FILE_CHECKING_SPACE_CHECK_TOLERANCE, MEDIA_FAT
+    REBOOT_WAIT_TIME_STANDARD, FILE_CHECKING_SPACE_CHECK_TOLERANCE, MEDIA_FAT, EXIT_ERROR_NETWORK_PROBLEMS
 from downloader.db_utils import DbSectionPackage, sorted_db_sections
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
@@ -58,7 +58,8 @@ class FullRunService:
         self._printlog_manager = printlog_manager
         self._config = config
         self._file_system = file_system
-        self._file_checking_service = FileCheckingService(local_repository, file_system, logger)
+        self._file_checking_mode_resolver = FileCheckingModeResolver(local_repository, file_system, logger)
+        self._final_reporter = FinalReporter(local_repository, config, logger, waiter)
 
     def configure_components(self) -> None:
         self._printlog_manager.configure(self._config)
@@ -111,10 +112,10 @@ class FullRunService:
 
         self._local_repository.ensure_base_paths()
 
-        not_file_checking_fastest = self._config['file_checking'] != FileChecking.FASTEST
-        new_file_checking = self._file_checking_service.collapse_balanced_file_checking(self._config['file_checking'])
+        file_checking_opt = self._config['file_checking']
+        new_file_checking = self._file_checking_mode_resolver.calc_file_checking_changes(file_checking_opt)
         if new_file_checking is not None:
-            self._logger.debug(f'File checking changed from "{self._config["file_checking"]}" to "{new_file_checking}".')
+            self._logger.debug(f'File checking changed from "{file_checking_opt}" to "{new_file_checking}".')
             self._config['file_checking'] = new_file_checking
 
         db_pkgs = [DbSectionPackage(db_id, section) for db_id, section in sorted_db_sections(self._config)]
@@ -125,63 +126,40 @@ class FullRunService:
             self._logger.debug(download_dbs_err)
             if isinstance(download_dbs_err, NetworkProblems):
                 if not self._check_certificates():
-                    self._logger.print("ERROR: Couldn't load certificates.")
-                    self._logger.print()
-                    self._logger.print("Please, reboot your system and try again.")
-                    self._waiter.sleep(50)
+                    self._final_reporter.display_no_certs_msg()
                     return EXIT_ERROR_NO_CERTS
 
                 self._logger.print('Retrying all connections...')
                 download_dbs_err = self._online_importer.download_dbs_contents(db_pkgs)
 
             if isinstance(download_dbs_err, NetworkProblems):
-                self._logger.print("ERROR: Couldn't connect to the servers.")
-                self._logger.print()
-                self._logger.print("Please, reboot your system and try again.")
-                self._logger.print()
-                self._logger.print("If your region suffers from restricted connectivity, consider:")
-                self._logger.print(" - Using a HTTP Proxy.")
-                self._logger.print(" - Using the PC Launcher through a VPN.")
-                self._logger.print()
-                self._logger.print("Check the README at https://github.com/MiSTer-devel/Downloader_MiSTer for more information.")
-                self._waiter.sleep(50)
+                self._final_reporter.display_network_problems_msg()
+                return EXIT_ERROR_NETWORK_PROBLEMS
             elif download_dbs_err is not None:
-                self._logger.print('ERROR: Store could not be loaded because of a File System Error!')
-                self._logger.print()
-                self._logger.print("Please, reboot your system and try again.")
+                self._final_reporter.display_no_store_msg()
                 return EXIT_ERROR_STORE_NOT_LOADED
 
-        if not_file_checking_fastest:
+        save_store_err = self._online_importer.save_local_store()
+        install_box = self._online_importer.box()
+
+        if file_checking_opt == FileChecking.BALANCED and len(install_box.failed_files()) > 0:
+            self._local_repository.remove_free_spaces()
+        elif file_checking_opt != FileChecking.FASTEST:
             self._local_repository.save_free_spaces(self._file_system.free_spaces())
 
-        save_store_err = self._online_importer.save_local_store()
-
-        install_box = self._online_importer.box()
-        self._display_summary(install_box, self._config['start_time'])
+        self._final_reporter.display_end_summary(install_box)
 
         if save_store_err is not None:
             self._logger.print('WARNING! Store could not be saved because of a File System Error!')
             return EXIT_ERROR_STORE_NOT_SAVED
 
-        old_pext_paths = self._online_importer.old_pext_paths()
-        if old_pext_paths:
-            self._logger.print(
-                f'WARNING! {len(old_pext_paths)} paths were not handled correctly, like "{list(old_pext_paths)[0]}".'
-                '\nPlease report this issue on https://github.com/MiSTer-devel/Downloader_MiSTer or'
-                '\nsend an email to: theypsilon@gmail.com\nThank you!'
-            )
-            self._logger.debug('Old pext paths: ' + ', '.join(old_pext_paths))
-
         if self._config['update_linux']:
-            self._linux_updater.update_linux(self._online_importer.correctly_downloaded_dbs())
+            self._linux_updater.update_linux(install_box.installed_dbs())
 
         if self._config['fail_on_file_error']:
-            failure_count = len(self._online_importer.files_that_failed()) + len(self._online_importer.folders_that_failed()) + len(self._online_importer.zips_that_failed())
+            failure_count = len(install_box.failed_files()) + len(install_box.failed_folders()) + len(install_box.failed_zips())
             if failure_count > 0:
-                self._logger.debug('Length of files_that_failed: %d' % len(self._online_importer.files_that_failed()))
-                self._logger.debug('Length of folders_that_failed: %d' % len(self._online_importer.folders_that_failed()))
-                self._logger.debug('Length of zips_that_failed: %d' % len(self._online_importer.zips_that_failed()))
-                self._logger.debug('Length of failed_dbs: %d' % len(install_box.failed_dbs()))
+                self._final_reporter.display_file_error_failures(install_box)
                 return EXIT_ERROR_FAILED_FILES
 
         if len(install_box.failed_dbs()) > 0:
@@ -203,8 +181,54 @@ class FullRunService:
 
         return False
 
-    def _display_summary(self, box: InstallationBox, start_time) -> None:
-        run_time = str(datetime.timedelta(seconds=time.monotonic() - start_time))[2:-4]
+    def _needs_reboot(self):
+        return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.box().needs_reboot())
+
+    def _remove_run_signal(self) -> None:
+        if self._file_system.is_file(FILE_downloader_run_signal):
+            self._file_system.unlink(FILE_downloader_run_signal)
+
+
+class FileCheckingModeResolver:
+    def __init__(self, local_repository: LocalRepository, file_system: FileSystem, logger: Logger) -> None:
+        self._local_repository = local_repository
+        self._file_system = file_system
+        self._logger = logger
+
+    def calc_file_checking_changes(self, file_checking: FileChecking) -> Optional[FileChecking]:
+        if not self._local_repository.has_last_successful_run():
+            self._logger.print('WARNING: Deprecated "force checking" through .last_successful_run removal in Downloader 2.3')
+            self._logger.print('WARNING: Set the option file_checking = 3 in downloader.ini instead.')
+            self._logger.print('WARNING: It will be removed in a future version.')
+            return FileChecking.VERIFY_INTEGRITY
+
+        if file_checking == FileChecking.BALANCED:
+            prev_free_spaces = self._local_repository.load_previous_free_spaces()
+            actual_free_spaces = self._file_system.free_spaces()
+            if MEDIA_FAT not in prev_free_spaces or MEDIA_FAT not in actual_free_spaces:
+                return FileChecking.EXHAUSTIVE
+
+            for partition, cur_free_space in actual_free_spaces.items():
+                if partition not in prev_free_spaces:
+                    continue
+
+                if cur_free_space > (prev_free_spaces[partition] + FILE_CHECKING_SPACE_CHECK_TOLERANCE):
+                    return FileChecking.EXHAUSTIVE  # Free space as increased substantially... Did the user remove installed files? Assume yes.
+
+            return FileChecking.FASTEST
+
+        return None
+
+
+class FinalReporter:
+    def __init__(self, local_repository: LocalRepository, config: Config, logger: Logger, waiter: Waiter) -> None:
+        self._local_repository = local_repository
+        self._config = config
+        self._logger = logger
+        self._waiter = waiter
+
+    def display_end_summary(self, box: InstallationBox) -> None:
+        run_time = str(datetime.timedelta(seconds=time.monotonic() - self._config['start_time']))[2:-4]
 
         self._logger.print()
         self._logger.print('===========================')
@@ -257,41 +281,42 @@ class FullRunService:
             self._waiter.sleep(10)
 
         self._logger.print()
+        old_pext_paths = box.old_pext_paths()
+        if old_pext_paths:
+            self._logger.print(
+                f'WARNING! {len(old_pext_paths)} paths were not handled correctly, like "{list(old_pext_paths)[0]}".'
+                '\nPlease report this issue on https://github.com/MiSTer-devel/Downloader_MiSTer or'
+                '\nsend an email to: theypsilon@gmail.com\nThank you!'
+            )
+            self._logger.debug('Old pext paths: ' + ', '.join(old_pext_paths))
 
-    def _needs_reboot(self):
-        return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.needs_reboot())
+    def display_no_certs_msg(self) -> None:
+        self._logger.print("ERROR: Couldn't load certificates.")
+        self._logger.print()
+        self._logger.print("Please, reboot your system and try again.")
+        self._waiter.sleep(50)
 
-    def _remove_run_signal(self) -> None:
-        if self._file_system.is_file(FILE_downloader_run_signal):
-            self._file_system.unlink(FILE_downloader_run_signal)
+    def display_network_problems_msg(self) -> None:
+        self._logger.print("ERROR: Couldn't connect to the servers.")
+        self._logger.print()
+        self._logger.print("Please, reboot your system and try again.")
+        self._logger.print()
+        self._logger.print("If your region suffers from restricted connectivity, consider:")
+        self._logger.print(" - Using a HTTP Proxy.")
+        self._logger.print(" - Using the PC Launcher through a VPN.")
+        self._logger.print()
+        self._logger.print("Check the README at https://github.com/MiSTer-devel/Downloader_MiSTer for more information.")
+        self._waiter.sleep(50)
 
+    def display_no_store_msg(self) -> None:
+        self._logger.print('ERROR: Store could not be loaded because of a File System Error!')
+        self._logger.print()
+        self._logger.print("Please, reboot your system and try again.")
 
-class FileCheckingService:
-    def __init__(self, local_repository: LocalRepository, file_system: FileSystem, logger: Logger) -> None:
-        self._local_repository = local_repository
-        self._file_system = file_system
-        self._logger = logger
-
-    def collapse_balanced_file_checking(self, file_checking: FileChecking) -> Optional[FileChecking]:
-        if not self._local_repository.has_last_successful_run():
-            self._logger.print('WARNING: Deprecated "force checking" through .last_successful_run removal in Downloader 2.3')
-            self._logger.print('WARNING: Set the option file_checking = 3 in downloader.ini instead.')
-            self._logger.print('WARNING: It will be removed in a future version.')
-            return FileChecking.VERIFY_INTEGRITY
-
-        if file_checking == FileChecking.BALANCED:
-            prev_free_spaces = self._local_repository.load_previous_free_spaces()
-            actual_free_spaces = self._file_system.free_spaces()
-            if MEDIA_FAT not in prev_free_spaces or MEDIA_FAT not in actual_free_spaces:
-                return FileChecking.EXHAUSTIVE
-
-            for partition, cur_free_space in actual_free_spaces.items():
-                if partition not in prev_free_spaces:
-                    continue
-
-                if cur_free_space > (prev_free_spaces[partition] + FILE_CHECKING_SPACE_CHECK_TOLERANCE):
-                    return FileChecking.EXHAUSTIVE  # Free space as increased substantially... Did the user remove installed files? Assume yes.
-
-            return FileChecking.FASTEST
-
-        return None
+    def display_file_error_failures(self, box: InstallationBox) -> None:
+        self._logger.print('ERROR: Variable FAIL_ON_FILE_ERROR was set to true, and found the following errors.')
+        self._logger.print()
+        self._logger.print('Files that failed: %d' % len(box.failed_files()))
+        self._logger.print('Folders that failed: %d' % len(box.failed_folders()))
+        self._logger.print('Zips that failed: %d' % len(box.failed_zips()))
+        self._logger.print('Databases that failed: %d' % len(box.failed_dbs()))

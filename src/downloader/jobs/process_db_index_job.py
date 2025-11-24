@@ -44,6 +44,7 @@ class ProcessDbIndexJob(Job):
 
     # Results
     present_not_validated_files: list[PathPackage] = field(default_factory=list)
+    verified_integrity_pkgs: list[PathPackage] = field(default_factory=list)
     present_validated_files: list[PathPackage] = field(default_factory=list)
     skipped_updated_files: list[PathPackage] = field(default_factory=list)
     non_duplicated_files: list[PathPackage] = field(default_factory=list)
