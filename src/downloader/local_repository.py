@@ -187,6 +187,10 @@ class LocalRepository(FilelogSaver):
             self._logger.bench('LocalRepository Load previous free spaces done.')
 
     def save_free_spaces(self, free_spaces: dict[str, int]) -> Optional[Exception]:
+        if len(free_spaces) == 0:
+            self._logger.debug('LocalRepository Save free spaces skipped.')
+            return None
+
         self._logger.bench('LocalRepository Save free spaces start.')
         try:
             self._file_system.make_dirs_parent(self._previous_free_spaces_path)

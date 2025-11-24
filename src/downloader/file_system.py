@@ -278,19 +278,21 @@ class _FileSystem(FileSystem):
 
     def free_spaces(self) -> dict[str, int]:
         mounts = {}
-        with open("/proc/mounts") as f:
-            for line in f:
-                parts = line.split()
-                if len(parts) < 2:
-                    continue
+        try:
+            with open("/proc/mounts") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) < 2:
+                        continue
 
-                mountpoint = parts[1]
-                if mountpoint not in mounts and mountpoint in STORAGE_PATHS_SET:
-                    try:
-                        mounts[mountpoint] = shutil.disk_usage(mountpoint).free
-                    except OSError:
-                        pass
-
+                    mountpoint = parts[1]
+                    if mountpoint not in mounts and mountpoint in STORAGE_PATHS_SET:
+                        try:
+                            mounts[mountpoint] = shutil.disk_usage(mountpoint).free
+                        except OSError:
+                            pass
+        except FileNotFoundError:
+            pass
         return mounts
 
     def resolve(self, path: str) -> str:

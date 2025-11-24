@@ -161,6 +161,9 @@ class ConfigReader:
             result['logfile'] = str(launcher_path.with_suffix('.log'))
             result['curl_ssl'] = ''
 
+            if result['file_checking'] != FileChecking.EXHAUSTIVE and result['file_checking'] != FileChecking.VERIFY_INTEGRITY:
+                result['file_checking'] = FileChecking.EXHAUSTIVE
+
         if self._env['HTTP_PROXY'] or self._env['HTTPS_PROXY']:
             result['http_config'] = http_config(http_proxy=self._env['HTTP_PROXY'], https_proxy=self._env['HTTPS_PROXY'])
         elif result['http_proxy'] != '':
