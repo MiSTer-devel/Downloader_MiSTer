@@ -21,7 +21,7 @@ import unittest
 from downloader.config import FileChecking
 from downloader.constants import FILE_CHECKING_SPACE_CHECK_TOLERANCE, MEDIA_FAT, \
     FILE_downloader_previous_free_space_json, \
-    FILE_downloader_last_successful_run, MEDIA_USB0, MEDIA_USB1
+    FILE_downloader_last_successful_run, MEDIA_USB0, MEDIA_USB1, FILE_downloader_storage_json
 from test.fake_file_checking_mode_resolver import FileCheckingModeResolver
 from test.fake_file_system_factory import FileSystemFactory
 
@@ -34,6 +34,15 @@ small_increase = 1000
 
 class TestFileCheckingModeResolver(unittest.TestCase):
 
+    def test_calc_file_checking_changes___when_file_checking_not_balanced___returns_none(self):
+        for file_checking_value in [
+            FileChecking.FASTEST,
+            FileChecking.EXHAUSTIVE,
+            FileChecking.VERIFY_INTEGRITY,
+        ]:
+            with self.subTest(file_checking=file_checking_value):
+                self.assertIsNone(file_checking().calc_file_checking_changes(file_checking_value))
+
     def test_calc_file_checking_changes___when_last_successful_run_missing___returns_verify_integrity(self):
         for file_checking_value in [
             FileChecking.FASTEST,
@@ -44,14 +53,14 @@ class TestFileCheckingModeResolver(unittest.TestCase):
             with self.subTest(file_checking=file_checking_value):
                 self.assertEqual(FileChecking.VERIFY_INTEGRITY, file_checking(has_last_run=False).calc_file_checking_changes(file_checking_value))
 
-    def test_calc_file_checking_changes___when_file_checking_not_balanced___returns_none(self):
+    def test_calc_file_checking_changes___when_last_successful_run_and_store_are_missing___returns_none(self):
         for file_checking_value in [
             FileChecking.FASTEST,
             FileChecking.EXHAUSTIVE,
             FileChecking.VERIFY_INTEGRITY,
         ]:
             with self.subTest(file_checking=file_checking_value):
-                self.assertIsNone(file_checking().calc_file_checking_changes(file_checking_value))
+                self.assertEqual(None, file_checking(has_last_run=False, has_store=False).calc_file_checking_changes(file_checking_value))
 
     def test_calc_file_checking_changes___when_media_fat_missing_from_previous_spaces___returns_exhaustive(self):
         sut = file_checking(previous_free={MEDIA_USB0: one_mb}, actual_free={MEDIA_FAT: one_mb})
@@ -107,8 +116,10 @@ class TestFileCheckingModeResolver(unittest.TestCase):
                 self.assertEqual(FileChecking.FASTEST, sut.calc_file_checking_changes(FileChecking.BALANCED))
 
 
-def file_checking(previous_free=None, actual_free=None, has_last_run=True):
+def file_checking(previous_free=None, actual_free=None, has_last_run=True, has_store=True):
     files = {}
+    if has_store:
+        files[f'{MEDIA_FAT}/{FILE_downloader_storage_json}'] = {}
     if has_last_run:
         files[f'{MEDIA_FAT}/{FILE_downloader_last_successful_run % ""}'] = {}
     if previous_free is not None:

@@ -107,6 +107,9 @@ class LocalRepository(FilelogSaver):
             self._logger.print(f'WARNING! Base system path "{self._config["base_system_path"]}" does not exist. Creating it...')
             self._file_system.make_dirs(self._config['base_system_path'])
 
+    def has_store(self):
+        return self._file_system.is_file(self._storage_load_path)
+
     def load_store(self):
         self._logger.bench('LocalRepository Load store start.')
         try:
