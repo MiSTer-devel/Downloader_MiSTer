@@ -36,7 +36,6 @@ from downloader.path_package import PathPackage
 
 is_windows: Final = os.name == 'nt'
 COPY_BUFSIZE: Final = 256 * 1024
-JSON_READ_BUFSIZE: Final = 256 * 1024  # 128KB buffer for JSON file reading
 
 # OPTIMIZATION:
 # Uncommenting all the HAS_ORJSON blocks has the potential of saving around 200ms
@@ -532,7 +531,7 @@ class _FileSystem(FileSystem):
 
         suffix = Path(full_path).suffix.lower()
         if suffix == '.json':
-            with open(full_path, "rb", buffering=JSON_READ_BUFSIZE) as f:
+            with open(full_path, "rb") as f:
                 return _json_loads_from_binaryio(f)
         elif suffix == '.zip':
             return load_json_from_zip(full_path)
@@ -563,7 +562,7 @@ class _FileSystem(FileSystem):
     def save_json(self, db: Dict[str, Any], path: str) -> None:
         full_path = self._path(path)
         self._debug_log('Saving json', (path, full_path))
-        with open(full_path, 'wb', buffering=JSON_READ_BUFSIZE) as f:
+        with open(full_path, 'wb') as f:
             _json_dump_to_file(db, f)
 
     def unzip_contents(self, zip_file: Union[str, io.BytesIO], target_path: Union[str, Dict[str, str]], test_info: Any, /) -> None:

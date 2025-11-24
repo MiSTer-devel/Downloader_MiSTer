@@ -196,7 +196,7 @@ class FileCheckingModeResolver:
         self._logger = logger
 
     def calc_file_checking_changes(self, file_checking: FileChecking) -> Optional[FileChecking]:
-        if not self._local_repository.has_last_successful_run():
+        if not self._local_repository.has_last_successful_run() and self._local_repository.has_store():
             self._logger.print('WARNING: Deprecated "force checking" through .last_successful_run removal in Downloader 2.3')
             self._logger.print('WARNING: Set the option file_checking = 3 in downloader.ini instead.')
             self._logger.print('WARNING: It will be removed in a future version.')
