@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, cast
 
 from downloader.db_entity import check_zip, ZipIndexEntity
 from downloader.job_system import WorkerResult, Job
@@ -97,16 +97,15 @@ def _make_zip_job(stored_index: Optional[StoreFragmentZipSummary], z: ZipJobCont
         return NilJob(), e
 
     if 'summary_file' in z.zip_description:
-        def _make_it_from_store():
-            assert stored_index is not None  # Guaranteed by callers of this lambda
-            return _make_process_zip_job_from_ctx(z, zip_summary=stored_index, has_new_zip_summary=False)
+        def _make_it_from_store(sf: StoreFragmentZipSummary):
+            return _make_process_zip_job_from_ctx(z, zip_summary=sf, has_new_zip_summary=False)
 
         if stored_index is None:
             job = make_open_zip_summary_job(z, z.zip_description['summary_file'], None)
         elif stored_index['hash'] == z.zip_description['summary_file']['hash'] and stored_index['hash'] != NO_HASH_IN_STORE_CODE:
-            job = _make_it_from_store()
+            job = _make_it_from_store(stored_index)
         else:
-            job = make_open_zip_summary_job(z, z.zip_description['summary_file'], _make_it_from_store())
+            job = make_open_zip_summary_job(z, z.zip_description['summary_file'], _make_it_from_store(stored_index))
 
     elif 'internal_summary' in z.zip_description:
         zip_summary = z.zip_description['internal_summary']
