@@ -159,6 +159,7 @@ class ConfigReader:
             result['allow_reboot'] = AllowReboot.NEVER
             result['update_linux'] = False
             result['logfile'] = str(launcher_path.with_suffix('.log'))
+            result['rotate_logs'] = self._env['ROTATE_LOGS'] != 'false'
             result['curl_ssl'] = ''
 
             if result['file_checking'] != FileChecking.EXHAUSTIVE and result['file_checking'] != FileChecking.VERIFY_INTEGRITY:

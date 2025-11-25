@@ -529,7 +529,7 @@ class _ResponseHeaders:
                 if max_age <= 0:
                     return new_url, None
 
-                age = self._headers.get('age', 0)
+                age: int = self._headers.get('age', 0)  # type: ignore[assignment]  # str will be converted to int
                 if age != 0:
                     try:
                         age = int(age)
@@ -556,7 +556,7 @@ class _ResponseHeaders:
         is_keep_alive = (self._version == 10 and connection == 'keep-alive') or (self._version >= 11 and connection != 'close')
         return is_keep_alive
 
-    def keep_alive_params(self) -> Tuple[Optional[float], Optional[float]]:
+    def keep_alive_params(self) -> Tuple[Optional[int], Optional[int]]:
         keep_alive_header = self._headers.get('keep-alive', None)
         if keep_alive_header is None: return None, None
         self._params_parser.parse(keep_alive_header)

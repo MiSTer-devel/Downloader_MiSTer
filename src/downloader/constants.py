@@ -201,6 +201,7 @@ KENV_HTTP_PROXY: Final[str] = 'HTTP_PROXY'
 KENV_LC_HTTP_PROXY: Final[str] = 'http_proxy'
 KENV_HTTPS_PROXY: Final[str] = 'HTTPS_PROXY'
 KENV_LC_HTTPS_PROXY: Final[str] = 'https_proxy'
+KENV_ROTATE_LOGS: Final[str] = 'ROTATE_LOGS'
 
 # Db State Signature
 DB_STATE_SIGNATURE_NO_HASH: Final[str] = 'non_initialized_hash'
