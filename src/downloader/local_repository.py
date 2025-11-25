@@ -281,7 +281,7 @@ class LocalRepository(FilelogSaver):
         try:
             self._file_system.make_dirs_parent(self.logfile_path)
             log_root, log_ext = os.path.splitext(self.logfile_path)
-            log_paths = [self.logfile_path] + [f'{log_root}-old{i}{log_ext}' for i in range(1, 6)]
+            log_paths = [self.logfile_path] + [f'{log_root}_old{i}{log_ext}' for i in range(1, 6)]
             for i in range(5, 0, -1):  # equivalent to: reversed(range(1, 6))
                 src_log = log_paths[i - 1]
                 dst_log = log_paths[i]
