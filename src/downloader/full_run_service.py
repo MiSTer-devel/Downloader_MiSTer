@@ -64,7 +64,6 @@ class FullRunService:
     def configure_components(self) -> None:
         self._printlog_manager.configure(self._config)
         self._filelog_manager.set_local_repository(self._local_repository)
-        self._logger.debug('config: ' + json.dumps(self._config, default=lambda o: str(o) if isinstance(o, Path) else o.__dict__, indent=4))
 
     def print_drives(self) -> int:
         self._logger.bench('FullRunService Print Drives start.')

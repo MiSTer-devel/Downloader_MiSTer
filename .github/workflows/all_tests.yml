@@ -30,3 +30,19 @@ jobs:
 
     - name: System Slow Tests
       run: cd src && python3 -m unittest discover -s test/system/slow
+
+  windows-test:
+    runs-on: windows-latest
+    needs: test
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+
+    - name: Test PC Launcher on Windows
+      run: cd src && python pc_launcher.py
+      env:
+        PC_LAUNCHER_NO_WAIT: '1'
