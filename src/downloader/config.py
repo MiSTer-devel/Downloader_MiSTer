@@ -46,6 +46,7 @@ class Environment(TypedDict):
     FAIL_ON_FILE_ERROR: str
     HTTP_PROXY: str
     HTTPS_PROXY: str
+    ROTATE_LOGS: str
 
 
 @unique
@@ -112,6 +113,7 @@ class ConfigRequired(ConfigMisterSection):
     curl_ssl: str
     http_logging: bool
     http_config: Optional[HttpConfig]
+    rotate_logs: bool
 
 class Config(ConfigRequired, total=False):
     environment: Environment  # This should never be used. It's there just to be debug-logged.
@@ -155,7 +157,8 @@ def default_config() -> Config:
         'minimum_system_free_space_mb': DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB,
         'minimum_external_free_space_mb': DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB,
         'http_proxy': '',
-        'http_config': None
+        'http_config': None,
+        'rotate_logs': True
     }
 
 

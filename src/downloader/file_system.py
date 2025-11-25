@@ -132,7 +132,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def move(self, source: str, target: str) -> None:
+    def move(self, source: str, target: str, make_parent_target: bool = True) -> None:
         """interface"""
 
     @abstractmethod
@@ -364,8 +364,8 @@ class _FileSystem(FileSystem):
         self._debug_log('Touching', (path, full_path))
         Path(full_path).touch()
 
-    def move(self, source: str, target: str) -> None:
-        self._makedirs(self._parent_folder(target))
+    def move(self, source: str, target: str, make_parent_target: bool = True) -> None:
+        if make_parent_target: self._makedirs(self._parent_folder(target))
         full_source = self._path(source)
         full_target = self._path(target)
         self._debug_log('Moving', (source, full_source), (target, full_target))

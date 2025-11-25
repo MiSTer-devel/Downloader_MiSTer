@@ -21,6 +21,7 @@ from typing import Dict, Any, Optional, Tuple
 from downloader.db_entity import check_zip, ZipIndexEntity
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.jobs_factory import make_process_zip_index_job, make_open_zip_summary_job, make_zip_tag, ZipJobContext
+from downloader.jobs.transfer_job import TransferJob
 from downloader.jobs.wait_db_zips_job import WaitDbZipsJob
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.index import Index
@@ -89,14 +90,16 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
         return next_jobs, None
 
 
-def _make_zip_job(stored_index: Optional[StoreFragmentZipSummary], z: ZipJobContext) -> Tuple[Job, Optional[Exception]]:
+def _make_zip_job(stored_index: Optional[StoreFragmentZipSummary], z: ZipJobContext) -> Tuple[TransferJob, Optional[Exception]]:
     try:
         check_zip(z.zip_description, z.job.db.db_id, z.zip_id)
     except Exception as e:
         return NilJob(), e
 
     if 'summary_file' in z.zip_description:
-        def _make_it_from_store(): return _make_process_zip_job_from_ctx(z, zip_summary=stored_index, has_new_zip_summary=False)
+        def _make_it_from_store():
+            assert stored_index is not None  # Guaranteed by callers of this lambda
+            return _make_process_zip_job_from_ctx(z, zip_summary=stored_index, has_new_zip_summary=False)
 
         if stored_index is None:
             job = make_open_zip_summary_job(z, z.zip_description['summary_file'], None)

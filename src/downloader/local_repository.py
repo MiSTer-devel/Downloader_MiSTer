@@ -273,6 +273,27 @@ class LocalRepository(FilelogSaver):
         finally:
             self._logger.bench('LocalRepository Save store end.')
 
+    def rotate_logs(self) -> None:
+        if not self._config['rotate_logs']:
+            self._logger.debug('Skipping log rotation.')
+
+        self._logger.bench('LocalRepository rotate logs start.')
+        try:
+            self._file_system.make_dirs_parent(self.logfile_path)
+            log_root, log_ext = os.path.splitext(self.logfile_path)
+            log_paths = [self.logfile_path] + [f'{log_root}-old{i}{log_ext}' for i in range(1, 6)]
+            for i in range(5, 0, -1):  # equivalent to: reversed(range(1, 6))
+                src_log = log_paths[i - 1]
+                dst_log = log_paths[i]
+                if self._file_system.is_file(src_log):
+                    self._file_system.move(src_log, dst_log, make_parent_target = False)
+
+        except Exception as e:
+            self._logger.debug('WARNING: Could not rotate logs!')
+            self._logger.debug(e)
+
+        self._logger.bench('LocalRepository rotate logs end.')
+
     def save_log_from_tmp(self, path) -> None:
         try:
             self._file_system.turn_off_logs()

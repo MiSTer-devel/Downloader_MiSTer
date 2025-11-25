@@ -60,6 +60,7 @@ class OffLogger(Logger):
 
 
 class FilelogSaver(Protocol):
+    def rotate_logs(self) -> None: pass
     def save_log_from_tmp(self, tmp_logfile: str) -> None: pass
 
 class FilelogManager(Protocol):
@@ -85,9 +86,13 @@ class FileLogger(Logger, FilelogManager):
         if self._final_debug_msg is not None:
             self.debug(self._final_debug_msg)
 
+        if self._local_repository is not None:
+            self._local_repository.rotate_logs()
+
         self._logfile.close()
         if self._local_repository is not None:
             self._local_repository.save_log_from_tmp(self._logfile.name)
+
         self._logfile = None
 
     def set_local_repository(self, local_repository: FilelogSaver) -> None:

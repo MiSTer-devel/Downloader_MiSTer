@@ -69,7 +69,7 @@ class JobSystem(JobContext):
         self._fail_policy: JobFailPolicy = fail_policy
         self._job_queue: Deque[_JobPackage] = deque()
         self._unhandled_errors: List[BaseException] = []
-        self._notifications: queue.Queue[Tuple[_JobState, _JobPackage, Exception]] = queue.Queue()
+        self._notifications: queue.Queue[Tuple[_JobState, _JobPackage, Optional[Exception]]] = queue.Queue()
         self._jobs_cancelled: List[Job] = []
         self._workers: Dict[int, Worker] = {}
         self._lock = threading.Lock()

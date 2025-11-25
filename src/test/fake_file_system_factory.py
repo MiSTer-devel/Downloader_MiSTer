@@ -196,7 +196,7 @@ class FakeFileSystem(ProductionFileSystem):
     def set_free_spaces(self, partition_sizes: dict[str, int]):
         self._partition_sizes = partition_sizes
 
-    def move(self, source, target):
+    def move(self, source, target, make_parent_target: bool = True):
         source_file = self._path(source)
         target_file = self._path(target)
         if source_file not in self.state.files:
