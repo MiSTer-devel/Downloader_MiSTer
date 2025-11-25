@@ -67,10 +67,10 @@ class OnlineImporterTestBase(unittest.TestCase):
         self.assertEqual(fs_data(), sut.fs_data)
         self.assertReportsNothing(sut, save=save)
 
-    def _download_db(self, db, store, inputs):
+    def _download_db(self, db, store, inputs, description=None, store_sig=None, db_sig=None):
         return OnlineImporter\
             .from_implicit_inputs(inputs)\
-            .add_db(db, store)\
+            .add_db(db, store, description, store_sig, db_sig)\
             .download()
 
     def _download_databases(self, fs_inputs, dbs, input_stores=None, free_space_reservation=None):
