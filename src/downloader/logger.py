@@ -70,6 +70,10 @@ class FileLogger(Logger, FilelogManager):
     def __init__(self) -> None:
         self._logfile: Optional[TextIO] = cast(TextIO, tempfile.NamedTemporaryFile('w', delete=False))
         self._local_repository: Optional[FilelogSaver] = None
+        self._final_debug_msg: Optional[str] = None
+
+    def set_final_debug_msg(self, final_debug_msg: str):
+        self._final_debug_msg = final_debug_msg
 
     def finalize(self) -> None:
         if self._logfile is None:
@@ -77,6 +81,9 @@ class FileLogger(Logger, FilelogManager):
 
         if self._local_repository is None:
             self.print('Log saved in temp file: ' + self._logfile.name)
+
+        if self._final_debug_msg is not None:
+            self.debug(self._final_debug_msg)
 
         self._logfile.close()
         if self._local_repository is not None:
@@ -111,6 +118,7 @@ class TopLogger(Logger, ConfigLogManager):
         self._bench_mode = bench_mode
         self._start_time = start_time
         self._received_exception = False
+        self._config: Optional[Config] = None
 
     @staticmethod
     def for_main(env: Environment, start_time: float) -> 'TopLogger':
@@ -127,6 +135,9 @@ class TopLogger(Logger, ConfigLogManager):
     def configure(self, config: Config) -> None:
         self._bench_mode = config['bench']
         self._verbose_mode = config['verbose']
+        self._config = config
+        if self._verbose_mode:
+            self.debug(_create_config_msg(config))
 
     def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=False) -> None:
         self.print_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
@@ -136,6 +147,8 @@ class TopLogger(Logger, ConfigLogManager):
         if self._verbose_mode is False and self._received_exception is False:
             if any(isinstance(a, BaseException) for a in args):
                 self._received_exception = True
+                if self._config is not None:
+                    self.file_logger.set_final_debug_msg(_create_config_msg(self._config))
             else:
                 return
 
@@ -150,6 +163,15 @@ class TopLogger(Logger, ConfigLogManager):
         bench_header = f'BENCH {time_str(self._start_time)}| '
         self.print_logger.bench(bench_header, *args)
         self.file_logger.bench(bench_header, *args)
+
+# By design, this function is only called once. At the start if verbose, and if not at the end after facing errors.
+def _create_config_msg(config: Config) -> str:
+    try:
+        from pathlib import Path
+        import json
+        return 'Config: ' + json.dumps(config, default=lambda o: str(o) if isinstance(o, Path) else o.__dict__, indent=4)
+    except Exception:
+        return 'WARNING: Could not create message from config.'
 
 def _transform_debug_args(args: tuple[Any, ...]) -> list[str]:
     exception_msgs: list[str] = []

@@ -369,10 +369,8 @@ class JobSystem(JobContext):
             info = getattr(sub_job[1], 'info', None)
             msg += f' trying to spawn "{sub_job[0]}" job [{sub_job[1].type_id}|{type(sub_job[1]).__name__}{f": {info}" if info else ""}]'
 
-        self._logger.print(msg)
-        e_text = ''.join(traceback.TracebackException.from_exception(e).format())
-        self._logger.debug('%s:\n%s\n', msg, e_text)
-
+        self._logger.print('ERROR: A worker failed! Please, try again later!')
+        self._logger.debug(msg, e)
         self._unhandled_errors.append(e)
 
     def _raise_unhandled_exceptions(self, errors: List[BaseException]) -> None:
