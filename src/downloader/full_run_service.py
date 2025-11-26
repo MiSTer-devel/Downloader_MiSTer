@@ -289,7 +289,8 @@ class FinalReporter:
                 f'         I need YOUR HELP to fix this!!! Please, send me the following file\n'
                 f'           "{FILE_downloader_storage_backup_pext}"\n'
                 f'         to my email: theypsilon@gmail.com\n\n'
-                f'         This is not a breaking error. All files are safe.'
+                f'         This is not a breaking error. All files are safe.\n'
+                f'         You may run Downloader again without problems.\n'
             )
             self._logger.debug('Old pext paths: ' + ', '.join(old_pext_paths))
 
