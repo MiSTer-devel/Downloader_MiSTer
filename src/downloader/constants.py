@@ -69,6 +69,7 @@ FILE_yc_txt: Final[str] = 'yc.txt'
 # Downloader files
 FILE_downloader_storage_zip: Final[str] = 'Scripts/.config/downloader/downloader.json.zip'
 FILE_downloader_storage_json: Final[str] = 'Scripts/.config/downloader/downloader.json'
+FILE_downloader_storage_backup_pext: Final[str] = 'Scripts/.config/downloader/downloader_backup_pext.json'
 FILE_downloader_storage_sigs_json: Final[str] = 'Scripts/.config/downloader/downloader_sigs.json'
 FILE_downloader_previous_free_space_json: Final[str] = 'Scripts/.config/downloader/previous_free_space.json'
 FILE_downloader_external_storage: Final[str] = '.downloader_db.json'

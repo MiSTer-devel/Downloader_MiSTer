@@ -16,11 +16,12 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import os
-from typing import Optional, Any
+from typing import Optional
 
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
     FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json, \
-    FILE_downloader_storage_sigs_json, FILE_downloader_previous_free_space_json
+    FILE_downloader_storage_sigs_json, FILE_downloader_previous_free_space_json, \
+    FILE_downloader_storage_backup_pext
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.fail_policy import FailPolicy
 from downloader.file_system import FileSystem, FsError
@@ -46,6 +47,13 @@ class LocalRepository(FilelogSaver):
         self._previous_free_spaces_path_value: Optional[str] = None
         self._last_successful_run_value: Optional[str] = None
         self._logfile_path_value: Optional[str] = None
+        self._storage_backup_pext_path_value: Optional[str] = None
+
+    @property
+    def _storage_backup_pext_path(self) -> str:
+        if self._storage_backup_pext_path_value is None:
+            self._storage_backup_pext_path_value = os.path.join(self._config['base_system_path'], FILE_downloader_storage_backup_pext)
+        return self._storage_backup_pext_path_value
 
     @property
     def _storage_save_path(self) -> str:
@@ -218,6 +226,17 @@ class LocalRepository(FilelogSaver):
 
     def _store_drives(self):
         return self._external_drives_repository.connected_drives_except_base_path_drives(self._config)
+
+    def backup_local_store_for_pext_error(self) -> None:
+        self._logger.bench('LocalRepository backup local store for pext error start.')
+        try:
+            if self._file_system.is_file(self._storage_load_path):
+                self._file_system.copy(self._storage_load_path, self._storage_backup_pext_path)
+        except Exception as e:
+            self._logger.debug('Could not backup local store')
+            self._logger.debug(e)
+
+        self._logger.bench('LocalRepository backup local store for pext error end.')
 
     def save_store(self, local_store_wrapper) -> Optional[Exception]:
         if not local_store_wrapper.needs_save():
