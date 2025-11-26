@@ -290,7 +290,7 @@ class FinalReporter:
                 f'           "{FILE_downloader_storage_backup_pext}"\n'
                 f'         to my email: theypsilon@gmail.com\n\n'
                 f'         This is not a breaking error. All files are safe.\n'
-                f'         You may run Downloader again without problems.\n'
+                f'         You may run Downloader again without problems. Thank you!\n'
             )
             self._logger.debug('Old pext paths: ' + ', '.join(old_pext_paths))
 
