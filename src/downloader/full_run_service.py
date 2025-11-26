@@ -17,10 +17,8 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import datetime
-import json
 import sys
 import time
-from pathlib import Path
 from typing import Optional
 
 from downloader.base_path_relocator import BasePathRelocator
@@ -28,7 +26,8 @@ from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config, FileChecking
 from downloader.constants import EXIT_ERROR_NO_CERTS, EXIT_ERROR_STORE_NOT_SAVED, EXIT_ERROR_FAILED_FILES, \
     EXIT_ERROR_FAILED_DBS, EXIT_ERROR_STORE_NOT_LOADED, FILE_downloader_run_signal, REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE, \
-    REBOOT_WAIT_TIME_STANDARD, FILE_CHECKING_SPACE_CHECK_TOLERANCE, MEDIA_FAT, EXIT_ERROR_NETWORK_PROBLEMS
+    REBOOT_WAIT_TIME_STANDARD, FILE_CHECKING_SPACE_CHECK_TOLERANCE, MEDIA_FAT, EXIT_ERROR_NETWORK_PROBLEMS, \
+    FILE_downloader_storage_backup_pext
 from downloader.db_utils import DbSectionPackage, sorted_db_sections
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
@@ -138,8 +137,11 @@ class FullRunService:
                 self._final_reporter.display_no_store_msg()
                 return EXIT_ERROR_STORE_NOT_LOADED
 
-        save_store_err = self._online_importer.save_local_store()
         install_box = self._online_importer.box()
+        if len(install_box.old_pext_paths()) > 0:
+            self._local_repository.backup_local_store_for_pext_error()
+
+        save_store_err = self._online_importer.save_local_store()
 
         if file_checking_opt == FileChecking.BALANCED and len(install_box.failed_files()) > 0:
             self._local_repository.remove_free_spaces()
@@ -283,9 +285,11 @@ class FinalReporter:
         old_pext_paths = box.old_pext_paths()
         if old_pext_paths:
             self._logger.print(
-                f'WARNING! {len(old_pext_paths)} paths were not handled correctly, like "{list(old_pext_paths)[0]}".'
-                '\nPlease report this issue on https://github.com/MiSTer-devel/Downloader_MiSTer or'
-                '\nsend an email to: theypsilon@gmail.com\nThank you!'
+                f'WARNING! There was some buggy path in the process like "{list(old_pext_paths)[0]}".\n\n'
+                f'         I need YOUR HELP to fix this!!! Please, send me the following file\n'
+                f'           "{FILE_downloader_storage_backup_pext}"\n'
+                f'         to my email: theypsilon@gmail.com\n\n'
+                f'         This is not a breaking error. All files are safe.'
             )
             self._logger.debug('Old pext paths: ' + ', '.join(old_pext_paths))
 
