@@ -16,13 +16,15 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+import os
 from collections import Counter
 from enum import unique, Enum
 from itertools import groupby
 from operator import itemgetter
 from typing import Any, Dict, List, Optional
 from downloader.config import Config, ConfigDatabaseSection
-from downloader.constants import MEDIA_USB0, DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
+from downloader.constants import MEDIA_USB0, DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, \
+    FILE_downloader_storage_json
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.file_filter import FileFilterFactory
@@ -38,10 +40,12 @@ from downloader.jobs.reporters import FileDownloadProgressReporter, Installation
 from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
 from downloader.fail_policy import FailPolicy
 from downloader.local_store_wrapper import StoreWrapper, empty_db_state_signature
-from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
+from downloader.online_importer import OnlineImporter as ProductionOnlineImporter, InstallationBox
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.logger import Logger
 from downloader.waiter import Waiter
+from test.fake_file_system_factory import FakeFileSystem
+from test.fake_store_migrator import StoreMigrator
 from test.fake_online_importer_workers_factory import OnlineImporterWorkersFactory
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_http_gateway import FakeHttpGateway, FakeBuf
@@ -58,9 +62,8 @@ from test.fake_local_repository import LocalRepository
 
 @unique
 class StartJobPolicy(Enum):
-    ProcessDb = 0
-    OpeningDb = 1
-    FetchDb = 2
+    OpeningDb = 0
+    FetchDb = 1
 
 
 class OnlineImporter(ProductionOnlineImporter):
@@ -146,6 +149,9 @@ class OnlineImporter(ProductionOnlineImporter):
         self.dbs = []
         self._store_sigs = {}
         self._db_sigs = {}
+        self._store_file = os.path.join(self._config['base_system_path'], FILE_downloader_storage_json.lower())
+        self._box: Optional[InstallationBox] = None
+        self._error: Optional[Exception] = None
 
     def _make_workers(self) -> Dict[int, DownloaderWorker]:
         return {w.job_type_id(): w for w in self._worker_factory.create_workers()}
@@ -153,24 +159,7 @@ class OnlineImporter(ProductionOnlineImporter):
     def _make_jobs(self, db_pkgs: List[DbSectionPackage]) -> List[Job]:
         if self._start_job_policy == StartJobPolicy.FetchDb:
             return super()._make_jobs(db_pkgs)
-
-        if self._start_job_policy == StartJobPolicy.ProcessDb:  # @TODO: Remove this case to simplify this
-            if self._local_store is None and len(self.dbs) > 0:
-                raise ValueError('Local store not set')
-
-            jobs = []
-            for db, _store, ini_description in self.dbs:
-                process_main_db_job = ProcessDbMainJob(db=db, ini_description=ini_description,
-                                                       store=self._local_store.store_by_id(db.db_id).read_only(),
-                                                       config=self._config)
-                if db.db_id in self._db_sigs:
-                    process_main_db_job.db_hash = self._db_sigs[db.db_id].get('hash', process_main_db_job.db_hash)
-                    process_main_db_job.db_size = self._db_sigs[db.db_id].get('size', process_main_db_job.db_size)
-                jobs.append(process_main_db_job)
-            return jobs
-
-        if self._start_job_policy == StartJobPolicy.OpeningDb:  # @TODO(critical): Continue this work, it should be used instead of StartJobPolicy.ProcessDb for most UTs
-            #self.file_system_state.files[FILE_downloader_storage_json] = {}
+        elif self._start_job_policy == StartJobPolicy.OpeningDb:  # @TODO: Consider removing this state and doing all from FetchDb with some tweaks in pre/post download methods.
             expanded_pkgs = {}
             new_db_pkgs = []
             for pkg in db_pkgs:
@@ -181,7 +170,14 @@ class OnlineImporter(ProductionOnlineImporter):
             load_local_store_sigs_job = LoadLocalStoreSigsJob()
             load_local_store_sigs_job.local_store_sigs = empty_db_state_signature()
             load_local_store_job = LoadLocalStoreJob(new_db_pkgs, self._config)
-            load_local_store_job.local_store = self._local_store
+            if self._local_store is not None:
+                self.file_system_state.files[self._store_file] = {
+                    "json": {
+                        **self._local_store.unwrap_local_store(),
+                        "migration_version": StoreMigrator().latest_migration_version()
+                    }
+                }
+
             jobs = []
             for data in expanded_pkgs.values():
                 db: DbEntity = data["db"]
@@ -192,8 +188,12 @@ class OnlineImporter(ProductionOnlineImporter):
                     "hash": self._db_sigs.get(db.db_id, {}).get('hash', DB_STATE_SIGNATURE_NO_HASH),
                     "size": self._db_sigs.get(db.db_id, {}).get('size', DB_STATE_SIGNATURE_NO_SIZE)
                 }
-                transfer_job = CopyDataJob('', {}, calcs, db.db_id)
-                transfer_job.data = FakeBuf({"json": db.extract_props()})
+                transfer_job = CopyDataJob('db.json', {}, calcs, db.db_id)
+                if isinstance(self.file_system, FakeFileSystem):
+                    transfer_job.data = FakeBuf({"json": db.extract_props()})
+                else:
+                    import json, io
+                    transfer_job.data = io.BytesIO(json.dumps(db.extract_props()).encode('utf-8'))
                 jobs.append(OpenDbJob(
                     transfer_job=transfer_job,
                     section=db.db_id,
@@ -205,6 +205,12 @@ class OnlineImporter(ProductionOnlineImporter):
             return jobs
 
         raise Exception("Should not happen!")
+
+    def download_dbs_contents(self, db_pkgs: list[DbSectionPackage]) -> tuple[InstallationBox, Optional[BaseException]]:
+        result = super().download_dbs_contents(db_pkgs)
+        if self._store_file in self.file_system_state.files:
+            self.file_system_state.files.pop(self._store_file)
+        return result
 
     @staticmethod
     def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs, free_space_reservation=None,
@@ -242,13 +248,18 @@ class OnlineImporter(ProductionOnlineImporter):
     def job_system(self):
         return self._job_system
 
+    def box(self) -> Optional[InstallationBox]:
+        return self._box
+
+    def error(self) -> Optional[Exception]:
+        return self._error
+
     def download(self):
         db_pkgs: List[DbSectionPackage] = []
         for db, store, ini_description in self.dbs:
             self._add_store(db.db_id, store, store_sig=self._store_sigs.get(db.db_id, None))
             db_pkgs.append(DbSectionPackage(db_id=db.db_id, section=ini_description))
-        self.download_dbs_contents(db_pkgs)
-
+        self._box, self._error = self.download_dbs_contents(db_pkgs)
         return self
 
     def add_db(self, db: DbEntity, store: StoreWrapper = None, description: ConfigDatabaseSection = None,

@@ -93,8 +93,8 @@ def fetch_all(db_url: str, file_system_factory: Optional[FileSystemFactory] = No
         db_id=db_test,
         section={'db_url': db_url, 'section': db_test},
     )
-    sut.download_dbs_contents([db_pkg])
-    dbs = sut.box().installed_dbs()
+    box, _ = sut.download_dbs_contents([db_pkg])
+    dbs = box.installed_dbs()
     if len(dbs) == 0:
         return None
     return dbs[0].extract_props()

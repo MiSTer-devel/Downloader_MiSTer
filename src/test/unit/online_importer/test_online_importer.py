@@ -29,7 +29,7 @@ from test.objects import store_with_folders, db_distribution_mister, db_test_bei
     store_test_with_file_a_descr, store_test_with_file, db_test_with_file_a, file_descr, empty_test_store, \
     file_pdfviewer_descr, store_descr, media_usb0, \
     db_entity, file_c_descr, file_abc, folder_ab, path_system, file_system_abc_descr, store_reboot_descr, file_reboot, \
-    file_reboot_descr, db_test
+    file_reboot_descr, db_test, db_reboot_descr
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 
@@ -394,6 +394,19 @@ class TestOnlineImporter(OnlineImporterTestBase):
     def test_download_reboot_file___system_already_containing_it___needs_no_reboot2(self):
         sut = self.download_reboot_file(store_reboot_descr(custom_hash='other_hash'), fs(files={file_reboot: file_reboot_descr()}))
         self.assertReports(sut, [file_reboot], needs_reboot=True)
+
+    def test_download_reboot_file_and_later_again___on_empty_store_and_fs___sut_keeps_needs_reboot_but_box_doesnt(self):
+        sut = OnlineImporter().add_db(db_reboot_descr())
+
+        sut.download()
+
+        self.assertTrue(sut.box().needs_reboot())
+        self.assertReports(sut, [file_reboot], needs_reboot=True)
+
+        sut.download()
+
+        self.assertFalse(sut.box().needs_reboot())
+        self.assertReports(sut, [], needs_reboot=True, save=False)
 
     def test_removes_folder_slash_endings___on_empty_fs___registers_the_folder_without_the_ending_slash(self):
         sut = OnlineImporter()

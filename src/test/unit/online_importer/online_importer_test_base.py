@@ -52,7 +52,7 @@ class OnlineImporterTestBase(unittest.TestCase):
         if installed is not None:
             self.assertEqual(sorted(remove_all_priority_paths(installed)), sorted(box.installed_file_names()), 'installed')
         self.assertEqual(sorted(remove_all_priority_paths(errors)), sorted(box.failed_files()), 'errors')
-        self.assertEqual(needs_reboot, box.needs_reboot(), 'needs reboot')
+        self.assertEqual(needs_reboot, sut.needs_reboot(), 'needs reboot')
         self.assertEqual(sorted(remove_all_priority_paths(failed_folders)), sorted(box.failed_folders()), 'failed folders')
         self.assertEqual(sorted(remove_all_priority_paths(failed_zips)), sorted([f'{db_id}:{zip_id}' for db_id, zip_id in box.failed_zips()]), 'failed zips')
         self.assertEqual(sorted(full_partitions), sorted([p for p, s in box.full_partitions().items()]), 'full partitions')
@@ -61,6 +61,7 @@ class OnlineImporterTestBase(unittest.TestCase):
         self.assertEqual(sorted(verified_files), sorted(box.verified_integrity_files()), 'verified files')
         self.assertEqual(save, box.needs_save(), 'needs save')
         self.assertEqual([], list(box.old_pext_paths()), 'should not have old pext paths even in _old_pext tests')
+        self.assertIsNone(sut.error())
 
     def assertEverythingIsClean(self, sut, store, save=False):
         self.assertEqual(empty_test_store(), store)

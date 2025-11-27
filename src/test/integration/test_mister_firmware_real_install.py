@@ -15,11 +15,15 @@
 
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
+
+import os
 import tempfile
 from pathlib import Path
 
 from downloader.constants import FILE_MiSTer, DISTRIBUTION_MISTER_DB_ID, STORAGE_PRIORITY_PREFER_EXTERNAL, \
-    FILE_MiSTer_old
+    FILE_MiSTer_old, FILE_downloader_storage_json
+from downloader.local_store_wrapper import LocalStoreWrapper
+from test.fake_store_migrator import StoreMigrator
 from test.fake_file_system_factory import make_production_filesystem_factory
 from test.fake_online_importer import OnlineImporter, StartJobPolicy
 from test.objects import config_with, file_mister_descr, db_entity, store_descr
@@ -54,11 +58,20 @@ class TestMiSTerFirmwareRealInstall(OnlineImporterWithPriorityStorageTestBase):
         self.assertEqual(old_mister_hash, file_system.hash(path_file_mister))
         self.assertEqual('c70c3e2ebd6dbde780ecd2d1df7d8440', file_system.hash(path_file_mister_old))
 
-        actual_store = store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, base_path=base_path, files={FILE_MiSTer: file_mister_descr(hash_code=old_mister_hash)})
+        local_store = LocalStoreWrapper({
+            "dbs": {DISTRIBUTION_MISTER_DB_ID: store_descr(base_path=base_path, files={FILE_MiSTer: file_mister_descr(hash_code=old_mister_hash)})},
+            "db_sigs": {},
+            "migration_version": StoreMigrator().latest_migration_version()
+        })
+        store_path = os.path.join(base_system_path, FILE_downloader_storage_json)
+        file_system.make_dirs_parent(store_path)
+        file_system.save_json(local_store.unwrap_local_store(), store_path)
+        self.assertIsNone(sut.box())
 
-        sut.add_db(db, actual_store).download()
+        sut.add_db(db).download()
 
         self.assertNotEqual(new_mister_hash, old_mister_hash)
+        actual_store = sut.box().local_store().store_by_id(DISTRIBUTION_MISTER_DB_ID).unwrap_store()
         self.assertEqual(store_descr(db_id=DISTRIBUTION_MISTER_DB_ID, base_path=base_path, files={FILE_MiSTer: file_mister_descr(hash_code=new_mister_hash)}), actual_store)
         self.assertReports(sut, [FILE_MiSTer], needs_reboot=True)
 
@@ -69,4 +82,4 @@ class TestMiSTerFirmwareRealInstall(OnlineImporterWithPriorityStorageTestBase):
 def online_importer(config):
     path_dictionary = {'asdf': 3}
     file_system_factory = make_production_filesystem_factory(config, path_dictionary=path_dictionary)
-    return OnlineImporter(config=config, file_system_factory=file_system_factory, start_job_policy=StartJobPolicy.ProcessDb), file_system_factory.create_for_config(config)
+    return OnlineImporter(config=config, file_system_factory=file_system_factory), file_system_factory.create_for_config(config)
