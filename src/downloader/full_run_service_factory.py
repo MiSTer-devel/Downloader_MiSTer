@@ -34,8 +34,7 @@ from downloader.jobs.fetch_file_worker import SafeFileFetcher
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import JobErrorCtx
 from downloader.online_importer_workers_factory import OnlineImporterWorkersFactory
-from downloader.logger import DebugOnlyLoggerDecorator, Logger, FilelogManager, ConfigLogManager, \
-    TopLogger
+from downloader.logger import DebugOnlyLoggerDecorator, Logger, FilelogManager, ConfigLogManager, TopLogger
 from downloader.os_utils import LinuxOsUtils
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository

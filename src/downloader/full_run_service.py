@@ -119,7 +119,7 @@ class FullRunService:
         db_pkgs = [DbSectionPackage(db_id, section) for db_id, section in sorted_db_sections(self._config)]
         #db_pkgs = [db_pkg for db_pkg in db_pkgs  if db_pkg.db_id == 'distribution_mister']
 
-        download_dbs_err = self._online_importer.download_dbs_contents(db_pkgs)
+        install_box, download_dbs_err = self._online_importer.download_dbs_contents(db_pkgs)
         if download_dbs_err is not None:
             self._logger.debug(download_dbs_err)
             if isinstance(download_dbs_err, NetworkProblems):
@@ -128,7 +128,7 @@ class FullRunService:
                     return EXIT_ERROR_NO_CERTS
 
                 self._logger.print('Retrying all connections...')
-                download_dbs_err = self._online_importer.download_dbs_contents(db_pkgs)
+                install_box, download_dbs_err = self._online_importer.download_dbs_contents(db_pkgs)
 
             if isinstance(download_dbs_err, NetworkProblems):
                 self._final_reporter.display_network_problems_msg()
@@ -137,11 +137,10 @@ class FullRunService:
                 self._final_reporter.display_no_store_msg()
                 return EXIT_ERROR_STORE_NOT_LOADED
 
-        install_box = self._online_importer.box()
         if len(install_box.old_pext_paths()) > 0:
             self._local_repository.backup_local_store_for_pext_error()
 
-        save_store_err = self._local_repository.save_store(self._online_importer.local_store())
+        save_store_err = self._local_repository.save_store(install_box.local_store())
 
         if file_checking_opt == FileChecking.BALANCED and len(install_box.failed_files()) > 0:
             self._local_repository.remove_free_spaces()
@@ -183,7 +182,7 @@ class FullRunService:
         return False
 
     def _needs_reboot(self):
-        return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.box().needs_reboot())
+        return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.needs_reboot())
 
     def _remove_run_signal(self) -> None:
         if self._file_system.is_file(FILE_downloader_run_signal):

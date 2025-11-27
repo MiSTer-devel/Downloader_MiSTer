@@ -65,9 +65,11 @@ class OnlineImporter:
         self._worker_factory = worker_factory
         self._free_space_reservation = free_space_reservation
         self._old_pext_paths = old_pext_paths
-        self._box = InstallationBox()
-        self._local_store: Optional[LocalStoreWrapper] = None
         self._first_time = True
+        self._needs_reboot = False
+
+    def needs_reboot(self) -> bool:
+        return self._needs_reboot
 
     def _make_workers(self) -> dict[int, Worker]:
         return {w.job_type_id(): w for w in self._worker_factory.create_workers()}
@@ -91,7 +93,7 @@ class OnlineImporter:
         jobs.insert(int(len(jobs) / 2) + 1, load_local_store_sigs_job)
         return jobs
 
-    def download_dbs_contents(self, db_pkgs: list[DbSectionPackage]) -> Optional[BaseException]:
+    def download_dbs_contents(self, db_pkgs: list[DbSectionPackage]) -> tuple['InstallationBox', Optional[BaseException]]:
         logger = self._logger
         logger.bench('OnlineImporter start.')
 
@@ -110,10 +112,9 @@ class OnlineImporter:
             self._first_time = False
         else:
             # @TODO: Maybe use a factory to avoid resetting state
-            self._box = InstallationBox()
             self._installation_report.reset()
 
-        box = self._box
+        box = InstallationBox()
         report: InstallationReport = self._installation_report
 
         box.set_unused_filter_tags(self._file_filter_factory.unused_filter_parts())
@@ -179,7 +180,7 @@ class OnlineImporter:
         network_problems = db_fetch_success == 0 and db_fetch_errors > 0
         if network_problems:
             logger.bench('OnlineImporter could not progress with network problems.')
-            return NetworkProblems(f'Network problems detected. db_fetch_success == {db_fetch_success} and db_fetch_errors == {db_fetch_errors}')
+            return box, NetworkProblems(f'Network problems detected. db_fetch_success == {db_fetch_success} and db_fetch_errors == {db_fetch_errors}')
 
         for open_db_job in report.get_completed_jobs(OpenDbJob):
             if open_db_job.skipped is True:
@@ -198,7 +199,7 @@ class OnlineImporter:
         if len(box.skipped_dbs()) == len(db_pkgs):
             logger.bench('OnlineImporter early end.')
             logger.debug('Skipping all dbs!')
-            return None
+            return box, None
 
         logger.bench('OnlineImporter applying changes on stores...')
 
@@ -208,11 +209,12 @@ class OnlineImporter:
         # the load store job, so that's also normal. And in that case, the error is failed db, and
         # not failed store load.
 
+        local_store: Optional[LocalStoreWrapper] = None
         local_store_err: Optional[BaseException] = None
         load_local_store_jobs = report.get_completed_jobs(LoadLocalStoreJob)
         if len(load_local_store_jobs) >= 1:
-            self._local_store = load_local_store_jobs[0].local_store
-        elif self._local_store is None:
+            local_store = load_local_store_jobs[0].local_store
+        elif local_store is None:
             load_local_store_job_errors = report.get_failed_jobs(LoadLocalStoreJob)
             if len(load_local_store_job_errors) > 0:
                 local_store_err = load_local_store_job_errors[0][1]
@@ -288,11 +290,11 @@ class OnlineImporter:
         for open_zip_job, _e in report.get_failed_jobs(OpenZipContentsJob):
             box.add_failed_files(open_zip_job.files_to_unzip)
 
-        if self._local_store is None:
+        if local_store is None:
             logger.bench('OnlineImporter could not progress without loaded store.')
-            return local_store_err
+            return box, local_store_err
 
-        local_store = self._local_store
+        box.set_local_store(local_store)
 
         write_stores = {}
         read_stores = {}
@@ -401,7 +403,7 @@ class OnlineImporter:
         for db_id, file_pkgs in box.installed_file_pkgs().items():
             for file_pkg in file_pkgs:
                 if 'reboot' in file_pkg.description and file_pkg.description['reboot'] == True:
-                    self._box.set_needs_reboot(True)
+                    box.set_needs_reboot(True)
                 write_stores[db_id].add_file_pkg(file_pkg, file_pkg.rel_path in box.repeated_store_presence()[db_id])
 
         for db_id, folder_pkg in box.installed_folders():
@@ -423,7 +425,9 @@ class OnlineImporter:
         for w_store in write_stores.values():
             w_store.cleanup_externals()
 
-        self._box.set_needs_save(local_store.needs_save())
+        box.set_needs_save(local_store.needs_save())
+        if box.needs_reboot():
+            self._needs_reboot = True
 
         for store in stores:
             self._clean_store(store.unwrap_store())
@@ -432,9 +436,7 @@ class OnlineImporter:
             self._job_error_ctx.swallow_error(wrong_db_opts_err)
 
         logger.bench('OnlineImporter end.')
-        return None
-
-    def local_store(self) -> Optional[LocalStoreWrapper]: return self._local_store
+        return box, None
 
     @staticmethod
     def _clean_store(store) -> None:
@@ -449,9 +451,6 @@ class OnlineImporter:
                 zip_description['summary_file'].pop('unzipped_json')
             if 'internal_summary' in zip_description:
                 zip_description.pop('internal_summary')
-
-    def box(self) -> 'InstallationBox':
-        return self._box
 
 
 def is_system_path(description: dict[str, str]) -> bool:
@@ -494,6 +493,7 @@ class InstallationBox:
         self._old_pext_paths: set[str] = set()
         self._needs_save: bool = False
         self._needs_reboot: bool = False
+        self._local_store: Optional[LocalStoreWrapper] = None
 
     def set_unused_filter_tags(self, tags: list[str]) -> None:
         self._unused_filter_tags = tags
@@ -503,6 +503,10 @@ class InstallationBox:
         self._needs_save = needs_save
     def set_needs_reboot(self, needs_reboot: bool) -> None:
         self._needs_reboot = needs_reboot
+    def set_local_store(self, local_store: Optional[LocalStoreWrapper]) -> None:
+        self._local_store = local_store
+    def local_store(self) -> Optional[LocalStoreWrapper]:
+        return self._local_store
     def add_downloaded_file(self, path: str) -> None:
         self._downloaded_files.append(path)
     def add_downloaded_files(self, files: list[PathPackage]) -> None:
