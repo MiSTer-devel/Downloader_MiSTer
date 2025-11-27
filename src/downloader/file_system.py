@@ -140,6 +140,10 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
+    def append(self, source: str, target: str) -> None:
+        """interface"""
+
+    @abstractmethod
     def hash(self, path: str) -> str:
         """interface"""
 
@@ -374,7 +378,6 @@ class _FileSystem(FileSystem):
         self._shared_state.add_file(full_target)
 
     def copy(self, source: str, target: str) -> None:
-        """Copy a file from source to target with optimized buffer size for embedded systems."""
         full_source = self._path(source)
         full_target = self._path(target)
         self._debug_log('Copying', (source, full_source), (target, full_target))
@@ -390,6 +393,21 @@ class _FileSystem(FileSystem):
         except Exception as e:
             self._logger.debug(e)
             raise FileCopyError(f"Cannot copy '{source}' to '{target}'") from e
+
+    def append(self, source: str, target: str) -> None:
+        full_source = self._path(source)
+        full_target = self._path(target)
+        self._debug_log('Appending', (source, full_source), (target, full_target))
+        try:
+            with open(full_source, 'rb') as fsource, open(full_target, 'ab') as ftarget:
+                while True:
+                    data = fsource.read(COPY_BUFSIZE)
+                    if not data:
+                        break
+                    ftarget.write(data)
+        except Exception as e:
+            self._logger.debug(e)
+            raise FileCopyError(f"Cannot append '{source}' to '{target}'") from e
 
     def hash(self, path: str) -> str:
         try:
