@@ -16,34 +16,38 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import List
-
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_data_worker import FetchDataWorker
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.fetch_file_worker import FetchFileWorker
-from downloader.jobs.worker_context import DownloaderWorkerContext, DownloaderWorker
-from downloader.jobs.workers_factory import make_workers as production_make_workers
+from downloader.jobs.worker_context import DownloaderWorker
+from downloader.online_importer_workers_factory import OnlineImporterWorkersFactory as ProductionOnlineImporterWorkersFactory
 from test.fake_http_gateway import FakeHttpGateway
 
 
-def make_workers(ctx: DownloaderWorkerContext) -> List[DownloaderWorker]:
-    replacement_workers = []
-    if isinstance(ctx.http_gateway, FakeHttpGateway):
-        fake_http: FakeHttpGateway = ctx.http_gateway
-        replacement_workers.extend([
-            FakeWorkerDecorator(FetchFileWorker(
-                progress_reporter=ctx.progress_reporter, http_gateway=fake_http, file_system=ctx.file_system, timeout=ctx.config['downloader_timeout'],
-            ), fake_http),
-            FakeWorkerDecorator(FetchDataWorker(
-               ctx=ctx, timeout=ctx.config['downloader_timeout'],
-            ), fake_http),
-        ])
+class OnlineImporterWorkersFactory(ProductionOnlineImporterWorkersFactory):
+    def create_workers(self):
+        replacement_workers = []
+        if isinstance(self._http_gateway, FakeHttpGateway):
+            fake_http: FakeHttpGateway = self._http_gateway
+            replacement_workers.extend([
+                FakeWorkerDecorator(FetchFileWorker(
+                    progress_reporter=self._progress_reporter, http_gateway=fake_http, file_system=self._file_system,
+                    timeout=self._config['downloader_timeout'],
+                ), fake_http),
+                FakeWorkerDecorator(FetchDataWorker(
+                    http_gateway=fake_http,
+                    file_system=self._file_system,
+                    progress_reporter=self._progress_reporter,
+                    error_ctx=self._error_ctx,
+                    timeout=self._config['downloader_timeout'],
+                ), fake_http),
+            ])
 
-    replacement_type_ids = {r.job_type_id() for r in replacement_workers}
-    workers = [w for w in production_make_workers(ctx) if w.job_type_id() not in replacement_type_ids]
-    return [*workers, *replacement_workers]
+        replacement_type_ids = {r.job_type_id() for r in replacement_workers}
+        workers = [w for w in super().create_workers() if w.job_type_id() not in replacement_type_ids]
+        return [*workers, *replacement_workers]
 
 
 class FakeWorkerDecorator(DownloaderWorker):
@@ -69,3 +73,4 @@ class FakeWorkerDecorator(DownloaderWorker):
             return self._worker.operate_on(job)
         finally:
             self._fake_http.set_file_ctx(None)
+

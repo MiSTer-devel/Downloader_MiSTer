@@ -141,7 +141,7 @@ class FullRunService:
         if len(install_box.old_pext_paths()) > 0:
             self._local_repository.backup_local_store_for_pext_error()
 
-        save_store_err = self._online_importer.save_local_store()
+        save_store_err = self._local_repository.save_store(self._online_importer.local_store())
 
         if file_checking_opt == FileChecking.BALANCED and len(install_box.failed_files()) > 0:
             self._local_repository.remove_free_spaces()

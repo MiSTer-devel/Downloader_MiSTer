@@ -16,20 +16,5 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.job_system import Job, JobSystem, WorkerResult, ProgressReporter, JobContext
-from downloader.jobs.worker_context import DownloaderWorker
-
-
-class AbortJob(Job): type_id: int = JobSystem.get_job_type_id()
-
-class AbortWorker(DownloaderWorker):
-    def __init__(self, worker_context: JobContext, progress_reporter: ProgressReporter) -> None:
-        self._worker_context = worker_context
-        self._progress_reporter = progress_reporter
-
-    def job_type_id(self) -> int: return AbortJob.type_id
-    def reporter(self): return self._progress_reporter
-
-    def operate_on(self, job: Job) -> WorkerResult:
-        self._worker_context.cancel_pending_jobs()
-        return [], None
+class TestOnlineChecker:
+    pass

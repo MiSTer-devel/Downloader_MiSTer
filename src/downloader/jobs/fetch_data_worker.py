@@ -21,37 +21,42 @@ import socket
 from http.client import HTTPException
 from urllib.error import URLError
 
-from downloader.job_system import WorkerResult
+from downloader.file_system import FileSystem
+from downloader.http_gateway import HttpGateway
+from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.fetch_data_job import FetchDataJob
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
 from downloader.jobs.errors import FileDownloadError, FileValidationError
 from typing import Optional, Any
 
 
 class FetchDataWorker(DownloaderWorker):
-    def __init__(self, ctx: DownloaderWorkerContext, timeout: int) -> None:
-        self._ctx = ctx
+    def __init__(self, http_gateway: HttpGateway, file_system: FileSystem, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx, timeout: int) -> None:
+        self._http_gateway = http_gateway
+        self._file_system = file_system
+        self._progress_reporter = progress_reporter
+        self._error_ctx = error_ctx
         self._timeout = timeout
 
     def job_type_id(self) -> int: return FetchDataJob.type_id
-    def reporter(self): return self._ctx.progress_reporter
+    def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: FetchDataJob) -> WorkerResult:  # type: ignore[override]
         job.data, error = self._fetch_data(job.source, job.description.get('hash', None), job.description.get('size', None), job.calcs)
         if error is not None:
-            self._ctx.swallow_error(error)
+            self._error_ctx.swallow_error(error)
             return [], error
 
         return [] if job.after_job is None else [job.after_job], None
 
     def _fetch_data(self, url: str, valid_hash: Optional[str], valid_size: Optional[int], calcs: Optional[dict[str, Any]], /) -> tuple[Optional[io.BytesIO], Optional[Exception]]:
         try:
-            with self._ctx.http_gateway.open(url) as (final_url, in_stream):
+            with self._http_gateway.open(url) as (final_url, in_stream):
                 if in_stream.status != 200:
                     return None, FileDownloadError(f'Bad http status! {final_url}: {in_stream.status}')
 
                 return_calc_hash = valid_hash is not None or calcs is not None
-                buf, calc_hash = self._ctx.file_system.write_stream_to_data(in_stream, return_calc_hash, self._timeout)
+                buf, calc_hash = self._file_system.write_stream_to_data(in_stream, return_calc_hash, self._timeout)
                 calc_size = buf.getbuffer().nbytes
 
                 if valid_hash is not None and calc_hash != valid_hash:

@@ -19,21 +19,26 @@
 import os
 from typing import Optional, Union
 
-from downloader.job_system import WorkerResult
-from downloader.jobs.process_db_index_worker import create_fetch_jobs
-from downloader.path_package import PATH_PACKAGE_KIND_STANDARD, PATH_TYPE_FILE, PATH_TYPE_FOLDER, PathPackage
-from downloader.jobs.worker_context import DownloaderWorkerBase
-from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
 from downloader.file_system import UnzipError
+from downloader.job_system import WorkerResult, ProgressReporter
+from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
+from downloader.jobs.process_db_index_worker import create_fetch_jobs, ProcessIndexCtx
+from downloader.jobs.worker_context import DownloaderWorker
+from downloader.logger import Logger
+from downloader.path_package import PATH_PACKAGE_KIND_STANDARD, PATH_TYPE_FILE, PATH_TYPE_FOLDER, PathPackage
 
 
-class OpenZipContentsWorker(DownloaderWorkerBase):
+class OpenZipContentsWorker(DownloaderWorker):
+    def __init__(self, logger: Logger, progress_reporter: ProgressReporter, process_index_ctx: ProcessIndexCtx) -> None:
+        self._logger = logger
+        self._progress_reporter = progress_reporter
+        self._process_index_ctx = process_index_ctx
+
     def job_type_id(self) -> int: return OpenZipContentsJob.type_id
-    def reporter(self): return self._ctx.progress_reporter
+    def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: OpenZipContentsJob) -> WorkerResult:  # type: ignore[override]
-        logger = self._ctx.logger
-        logger.bench('OpenZipContentsWorker start: ', job.db.db_id, job.zip_id)
+        self._logger.bench('OpenZipContentsWorker start: ', job.db.db_id, job.zip_id)
 
         zip_paths: Optional[dict[str, str]]
         if job.zip_kind == ZipKind.EXTRACT_ALL_CONTENTS:
@@ -49,15 +54,15 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
         else: raise ValueError(f"Impossible kind '{job.zip_kind}' for zip '{job.zip_id}' in db '{job.db.db_id}'")
 
         target_path: Union[str, dict[str, str]] = job.target_folder.full_path if should_extract_all else (zip_paths or {})  # type: ignore[union-attr]
-        self._ctx.file_download_session_logger.print_progress_line(job.action_text)
-        logger.bench('OpenZipContentsWorker unzipping...', job.db.db_id, job.zip_id)
+        self._process_index_ctx.file_download_session_logger.print_progress_line(job.action_text)
+        self._logger.bench('OpenZipContentsWorker unzipping...', job.db.db_id, job.zip_id)
         try:
-            self._ctx.file_system.unzip_contents(job.transfer_job.transfer(), target_path, (job.target_folder, job.files_to_unzip, job.filtered_data['files']))  # type: ignore[union-attr]
+            self._process_index_ctx.file_system.unzip_contents(job.transfer_job.transfer(), target_path, (job.target_folder, job.files_to_unzip, job.filtered_data['files']))  # type: ignore[union-attr]
         except UnzipError as e:
-            self._ctx.swallow_error(e)
+            self._process_index_ctx.error_ctx.swallow_error(e)
             return [], e
 
-        logger.bench('OpenZipContentsWorker unzip done...', job.db.db_id, job.zip_id)
+        self._logger.bench('OpenZipContentsWorker unzip done...', job.db.db_id, job.zip_id)
 
         if should_extract_all:
             if len(job.filtered_data['files']) > 0:
@@ -72,19 +77,19 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
 
         job.downloaded_files.extend(job.files_to_unzip)
 
-        logger.bench('OpenZipContentsWorker precaching is_file...', job.db.db_id, job.zip_id)
-        self._ctx.file_system.precache_is_file_with_folders(job.recipient_folders, recheck=True)
+        self._logger.bench('OpenZipContentsWorker precaching is_file...', job.db.db_id, job.zip_id)
+        self._process_index_ctx.file_system.precache_is_file_with_folders(job.recipient_folders, recheck=True)
 
-        logger.bench('OpenZipContentsWorker validating...', job.db.db_id, job.zip_id)
+        self._logger.bench('OpenZipContentsWorker validating...', job.db.db_id, job.zip_id)
 
-        existing_files, invalid_files = self._ctx.file_system.are_files(job.files_to_unzip)
+        existing_files, invalid_files = self._process_index_ctx.file_system.are_files(job.files_to_unzip)
         for file_pkg in existing_files:
-            if self._ctx.file_system.hash(file_pkg.full_path) == file_pkg.description['hash']:
+            if self._process_index_ctx.file_system.hash(file_pkg.full_path) == file_pkg.description['hash']:
                 job.validated_files.append(file_pkg)
             else:
                 invalid_files.append(file_pkg)
 
-        logger.bench('OpenZipContentsWorker validation done...', job.db.db_id, job.zip_id)
+        self._logger.bench('OpenZipContentsWorker validation done...', job.db.db_id, job.zip_id)
 
         if len(invalid_files) == 0:
             return [], None
@@ -94,6 +99,6 @@ class OpenZipContentsWorker(DownloaderWorkerBase):
                 if 'url' not in file_pkg.description:
                     job.failed_files.append(file_pkg)
 
-        logger.bench('OpenZipContentsWorker launching recovery process index...', job.db.db_id, job.zip_id)
+        self._logger.bench('OpenZipContentsWorker launching recovery process index...', job.db.db_id, job.zip_id)
 
-        return create_fetch_jobs(self._ctx, job.db.db_id, invalid_files, [], set(), job.zip_description.get('base_files_url', job.db.base_files_url)), None
+        return create_fetch_jobs(self._process_index_ctx, job.db.db_id, invalid_files, [], set(), job.zip_description.get('base_files_url', job.db.base_files_url)), None

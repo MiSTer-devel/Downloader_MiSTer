@@ -17,20 +17,22 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import hashlib
-from downloader.job_system import WorkerResult
+from downloader.file_system import FileSystem
+from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.copy_data_job import CopyDataJob
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorker
 
 
 class CopyDataWorker(DownloaderWorker):
-    def __init__(self, ctx: DownloaderWorkerContext) -> None:
-        self._ctx = ctx
+    def __init__(self, file_system: FileSystem, progress_reporter: ProgressReporter) -> None:
+        self._file_system = file_system
+        self._progress_reporter = progress_reporter
 
     def job_type_id(self) -> int: return CopyDataJob.type_id
-    def reporter(self): return self._ctx.progress_reporter
+    def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: CopyDataJob) -> WorkerResult:  # type: ignore[override]
-        buf = self._ctx.file_system.read_file_bytes(job.source if job.source.startswith('/') else self._ctx.file_system.resolve(job.source))
+        buf = self._file_system.read_file_bytes(job.source if job.source.startswith('/') else self._file_system.resolve(job.source))
         buf.seek(0)
         if job.calcs is not None:
             job.calcs['hash'] = hashlib.md5(buf.read()).hexdigest()

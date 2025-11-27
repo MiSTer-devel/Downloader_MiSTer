@@ -16,20 +16,23 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.job_system import Job, JobSystem, WorkerResult, ProgressReporter, JobContext
-from downloader.jobs.worker_context import DownloaderWorker
+from dataclasses import dataclass, field
+
+from downloader.config import ConfigDatabaseSection
+from downloader.job_system import Job, JobSystem
+from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
+from downloader.jobs.transfer_job import TransferJob
 
 
-class AbortJob(Job): type_id: int = JobSystem.get_job_type_id()
+@dataclass(eq=False, order=False)
+class CheckDbJob(Job):
+    type_id: int = field(init=False, default=JobSystem.get_job_type_id())
+    transfer_job: TransferJob # Job & Transferrer @TODO: Python 3.10
+    section: str
+    ini_description: ConfigDatabaseSection
+    load_local_store_sigs_job: LoadLocalStoreSigsJob
 
-class AbortWorker(DownloaderWorker):
-    def __init__(self, worker_context: JobContext, progress_reporter: ProgressReporter) -> None:
-        self._worker_context = worker_context
-        self._progress_reporter = progress_reporter
+    def retry_job(self): return self.transfer_job
 
-    def job_type_id(self) -> int: return AbortJob.type_id
-    def reporter(self): return self._progress_reporter
-
-    def operate_on(self, job: Job) -> WorkerResult:
-        self._worker_context.cancel_pending_jobs()
-        return [], None
+    # Results
+    skipped: bool = field(default=False)

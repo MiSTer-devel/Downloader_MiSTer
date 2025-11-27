@@ -18,79 +18,90 @@
 
 from threading import Lock
 
+from downloader.config import Config
 from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
 from downloader.db_entity import DbEntity, fix_folders
 from downloader.db_utils import build_db_config, can_skip_db
-from downloader.job_system import WorkerResult
+from downloader.file_system import FileSystem
+from downloader.job_system import WorkerResult, JobContext, ProgressReporter
 from downloader.jobs.load_local_store_sigs_job import local_store_sigs_tag
 from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.open_db_job import OpenDbJob
-from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
+from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
+from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
+from downloader.logger import Logger
 
 
-class OpenDbWorker(DownloaderWorkerBase):
-    def __init__(self, ctx: DownloaderWorkerContext):
-        super().__init__(ctx)
+class OpenDbWorker(DownloaderWorker):
+    def __init__(self, file_system: FileSystem, logger: Logger, file_download_session_logger: FileDownloadSessionLogger, installation_report: InstallationReportImpl, worker_context: JobContext, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx, config: Config) -> None:
+        self._file_system = file_system
+        self._logger = logger
+        self._file_download_session_logger = file_download_session_logger
+        self._installation_report = installation_report
+        self._worker_context = worker_context
+        self._progress_reporter = progress_reporter
+        self._error_ctx = error_ctx
+        self._config = config
         self._lock = Lock()
         self._returned_load_local_store_job = False
 
     def job_type_id(self) -> int: return OpenDbJob.type_id
-    def reporter(self): return self._ctx.progress_reporter
+    def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: OpenDbJob) -> WorkerResult:  # type: ignore[override]
-        self._ctx.logger.bench('OpenDbWorker Loading database: ', job.section)
+        self._logger.bench('OpenDbWorker Loading database: ', job.section)
 
         # @TODO: Skip db before opening it, need to calculate the filter in other way for that and that's it. Around 300ms savings
 
         try:
-            db_props = self._ctx.file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())
+            db_props = self._file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())
         except Exception as e:
-            self._ctx.swallow_error(e)
+            self._error_ctx.swallow_error(e)
             return [], e
 
-        self._ctx.logger.bench('OpenDbWorker Validating database: ', job.section)
+        self._logger.bench('OpenDbWorker Validating database: ', job.section)
         try:
             db = DbEntity(db_props, job.section)
         except Exception as e:
-            self._ctx.swallow_error(e)
+            self._error_ctx.swallow_error(e)
             return [], e
 
-        self._ctx.logger.bench('OpenDbWorker database opened: ', job.section)
+        self._logger.bench('OpenDbWorker database opened: ', job.section)
 
         if db.needs_migration():
-            self._ctx.logger.bench('OpenDbWorker migrating db: ', db.db_id)
+            self._logger.bench('OpenDbWorker migrating db: ', db.db_id)
             error = db.migrate()
             if error is not None:
-                self._ctx.swallow_error(error)
+                self._error_ctx.swallow_error(error)
                 return [], error
 
         fix_folders(db.folders)
 
-        self._ctx.file_download_session_logger.print_header(db)
+        self._file_download_session_logger.print_header(db)
 
         calcs = job.transfer_job.calcs  # type: ignore[union-attr]
         if calcs is None:
-            self._ctx.swallow_error(Exception(f'OpenDbWorker [{db.db_id}] must receive a transfer_job with calcs not null.'))
+            self._error_ctx.swallow_error(Exception(f'OpenDbWorker [{db.db_id}] must receive a transfer_job with calcs not null.'))
             calcs = {}
 
         db_hash = calcs.get('hash', DB_STATE_SIGNATURE_NO_HASH)
         db_size = calcs.get('size', DB_STATE_SIGNATURE_NO_SIZE)
 
-        while self._ctx.installation_report.any_in_progress_job_with_tags(_local_store_sigs_tags):
-            self._ctx.logger.bench('OpenDbWorker waiting for store sigs: ', job.section)
-            self._ctx.job_ctx.wait_for_other_jobs(0.06)
+        while self._installation_report.any_in_progress_job_with_tags(_local_store_sigs_tags):
+            self._logger.bench('OpenDbWorker waiting for store sigs: ', job.section)
+            self._worker_context.wait_for_other_jobs(0.06)
 
         ini_description = job.ini_description
 
-        self._ctx.logger.bench("OpenDbWorker Building db config: ", db.db_id)
-        config = build_db_config(input_config=self._ctx.config, db=db, ini_description=ini_description)
+        self._logger.bench("OpenDbWorker Building db config: ", db.db_id)
+        config = build_db_config(input_config=self._config, db=db, ini_description=ini_description)
 
         sigs = job.load_local_store_sigs_job.local_store_sigs
         if sigs is not None:
             sig = sigs.get(job.section, None)
             if sig is not None:
                 if can_skip_db(config['file_checking'], sig, db_hash, db_size, config['filter']):
-                    self._ctx.logger.debug('Skipping db process. No changes detected for: ', db.db_id)
+                    self._logger.debug('Skipping db process. No changes detected for: ', db.db_id)
                     job.skipped = True
                     return [], None
 
@@ -110,7 +121,7 @@ class OpenDbWorker(DownloaderWorkerBase):
             load_local_store_job=job.load_local_store_job
         ))
 
-        self._ctx.logger.bench('OpenDbWorker done: ', job.section)
+        self._logger.bench('OpenDbWorker done: ', job.section)
         return jobs, None
 
 

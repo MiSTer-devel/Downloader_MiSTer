@@ -35,20 +35,20 @@ from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
-from downloader.jobs.worker_context import DownloaderWorker, DownloaderWorkerContext
+from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
 from downloader.fail_policy import FailPolicy
 from downloader.local_store_wrapper import StoreWrapper, empty_db_state_signature
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.logger import Logger
 from downloader.waiter import Waiter
+from test.fake_online_importer_workers_factory import OnlineImporterWorkersFactory
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_http_gateway import FakeHttpGateway, FakeBuf
 from test.fake_job_system import ProgressReporterTracker
 from test.fake_local_store_wrapper import LocalStoreWrapper, local_store_wrapper
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_logger import NoLogger
-from test.fake_workers_factory import make_workers
 from test.objects import config_with
 from test.fake_waiter import NoWaiter
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs, FileSystemState, NetworkState
@@ -110,32 +110,35 @@ class OnlineImporter(ProductionOnlineImporter):
         base_path_relocator = base_path_relocator or BasePathRelocator(config=self._config,
                                                                        file_system_factory=self.fs_factory)
         old_pext_paths = set()
-        self._worker_ctx = DownloaderWorkerContext(
-            job_ctx=self._job_system,
-            waiter=waiter,
+        file_filter_factory = file_filter_factory or FileFilterFactory(NoLogger())
+        online_importer_workers_factory = OnlineImporterWorkersFactory(
+            worker_context=self._job_system,
             logger=logger,
             http_gateway=http_gateway,
             file_system=self.file_system,
+            installation_report=installation_report,
             progress_reporter=self._report_tracker,
             local_repository=local_repository,
             base_path_relocator=base_path_relocator,
             file_download_session_logger=self._file_download_reporter,
-            installation_report=installation_report,
             free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation(),
-            external_drives_repository=ExternalDrivesRepository(file_system=self.file_system),
-            file_filter_factory=file_filter_factory or FileFilterFactory(NoLogger()),
-            target_paths_calculator_factory=TargetPathsCalculatorFactory(self.file_system, external_drives_repository,
-                                                                         old_pext_paths),
-            config=self._config,
-            fail_policy=fail_policy or FailPolicy.FAIL_FAST
+            file_filter_factory=file_filter_factory,
+            target_paths_calculator_factory=TargetPathsCalculatorFactory(self.file_system, external_drives_repository, old_pext_paths),
+            error_ctx=JobErrorCtx(logger, fail_policy=fail_policy or FailPolicy.FAIL_FAST),
+            config=self._config
         )
-
         self._start_job_policy = start_job_policy
         self._local_store: Optional[LocalStoreWrapper] = None
         super().__init__(
+            self._config,
             logger,
+            file_system=self.file_system,
+            installation_report=installation_report,
+            file_filter_factory=file_filter_factory,
+            file_download_session_logger=self._file_download_reporter,
+            job_error_ctx=JobErrorCtx(logger, fail_policy=fail_policy or FailPolicy.FAIL_FAST),
             job_system=self._job_system,
-            worker_ctx=self._worker_ctx,
+            worker_factory=online_importer_workers_factory,
             free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation(),
             old_pext_paths=old_pext_paths
         )
@@ -145,7 +148,7 @@ class OnlineImporter(ProductionOnlineImporter):
         self._db_sigs = {}
 
     def _make_workers(self) -> Dict[int, DownloaderWorker]:
-        return {w.job_type_id(): w for w in make_workers(self._worker_ctx)}
+        return {w.job_type_id(): w for w in self._worker_factory.create_workers()}
 
     def _make_jobs(self, db_pkgs: List[DbSectionPackage]) -> List[Job]:
         if self._start_job_policy == StartJobPolicy.FetchDb:

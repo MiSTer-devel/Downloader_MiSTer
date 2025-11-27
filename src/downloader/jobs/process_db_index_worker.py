@@ -21,24 +21,27 @@ from typing import Dict, Any, List, Tuple, Optional, Set, Union, Iterable
 import threading
 import os
 from collections import defaultdict
+from dataclasses import dataclass
 
 from downloader.config import FileChecking
 from downloader.db_entity import check_file_pkg, check_folder_paths
-from downloader.file_filter import BadFileFilterPartException, Config, ZipData
-from downloader.file_system import FileWriteError, FolderCreationError, FsError, ReadOnlyFileSystem
-from downloader.free_space_reservation import Partition
-from downloader.job_system import Job, WorkerResult
+from downloader.file_filter import BadFileFilterPartException, Config, ZipData, FileFilterFactory
+from downloader.file_system import FileWriteError, FolderCreationError, FsError, ReadOnlyFileSystem, FileSystem
+from downloader.free_space_reservation import Partition, FreeSpaceReservation
+from downloader.job_system import Job, WorkerResult, ProgressReporter
 from downloader.jobs.errors import WrongDatabaseOptions
 from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.index import Index
+from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
+from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
+from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
+from downloader.local_store_wrapper import ReadOnlyStoreAdapter
+from downloader.logger import Logger
+from downloader.other import calculate_url
 from downloader.path_package import PathPackage, PathType, PEXT_KIND_EXTERNAL, \
     PEXT_KIND_STANDARD, PATH_PACKAGE_KIND_PEXT
-from downloader.jobs.process_db_index_job import ProcessDbIndexJob
-from downloader.jobs.index import Index
-from downloader.jobs.worker_context import DownloaderWorkerBase, DownloaderWorkerContext
-from downloader.local_store_wrapper import ReadOnlyStoreAdapter
-from downloader.other import calculate_url
-from downloader.target_path_calculator import TargetPathsCalculator, StoragePriorityError
+from downloader.target_path_calculator import TargetPathsCalculator, StoragePriorityError, TargetPathsCalculatorFactory
 
 _CheckFilePackage = PathPackage
 _FetchFilePackage = PathPackage
@@ -49,35 +52,49 @@ _CreateFolderPackage = PathPackage
 _DeleteFolderPackage = PathPackage
 
 
-class ProcessDbIndexWorker(DownloaderWorkerBase):
-    def __init__(self, ctx: DownloaderWorkerContext) -> None:
-        super().__init__(ctx)
+@dataclass(frozen=True, slots=True)
+class ProcessIndexCtx:
+    error_ctx: JobErrorCtx
+    file_system: FileSystem
+    logger: Logger
+    installation_report: InstallationReportImpl
+    file_filter_factory: FileFilterFactory
+    target_paths_calculator_factory: TargetPathsCalculatorFactory
+    file_download_session_logger: FileDownloadSessionLogger
+    free_space_reservation: FreeSpaceReservation
+
+
+class ProcessDbIndexWorker(DownloaderWorker):
+    def __init__(self, logger: Logger, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx, process_index_ctx: ProcessIndexCtx) -> None:
+        self._logger = logger
+        self._progress_reporter = progress_reporter
+        self._error_ctx = error_ctx
+        self._process_index_ctx = process_index_ctx
         self._folders_created: Set[str] = set()
         self._lock = threading.Lock()
 
     def job_type_id(self) -> int: return ProcessDbIndexJob.type_id
-    def reporter(self): return self._ctx.progress_reporter
+    def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: ProcessDbIndexJob) -> WorkerResult:  # type: ignore[override]
-        logger = self._ctx.logger
         zip_id, db, config, summary, store = job.zip_id, job.db, job.config, job.index, job.store
 
-        logger.bench('ProcessDbIndexWorker start: ', db.db_id, zip_id)
+        self._logger.bench('ProcessDbIndexWorker start: ', db.db_id, zip_id)
         try:
-            non_existing_pkgs, need_update_pkgs, created_folders, _, error = process_index_job_main_sequence(self._ctx, job, summary, store)
+            non_existing_pkgs, need_update_pkgs, created_folders, _, error = process_index_job_main_sequence(self._process_index_ctx, job, summary, store)
             if error is not None:
                 return [], error
 
-            logger.bench('ProcessDbIndexWorker fetch jobs: ', db.db_id, zip_id)
-            next_jobs = create_fetch_jobs(self._ctx, db.db_id, non_existing_pkgs, need_update_pkgs, created_folders, db.base_files_url)
-            logger.bench('ProcessDbIndexWorker done: ', db.db_id, zip_id)
+            self._logger.bench('ProcessDbIndexWorker fetch jobs: ', db.db_id, zip_id)
+            next_jobs = create_fetch_jobs(self._process_index_ctx, db.db_id, non_existing_pkgs, need_update_pkgs, created_folders, db.base_files_url)
+            self._logger.bench('ProcessDbIndexWorker done: ', db.db_id, zip_id)
             return next_jobs, None
         except (BadFileFilterPartException, StoragePriorityError, FsError, OSError) as e:
-            self._ctx.swallow_error(WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e))) if isinstance(e, BadFileFilterPartException) else e)
+            self._error_ctx.swallow_error(WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e))) if isinstance(e, BadFileFilterPartException) else e)
             return [], e
 
 # @TODO(python 3.12): Use ProcessDbIndexJob & ProcessZipIndexJob instead of Union, which is incorrect
-def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[ProcessDbIndexJob, ProcessZipIndexJob], summary: Index, store: ReadOnlyStoreAdapter, /) -> Tuple[
+def process_index_job_main_sequence(ctx: ProcessIndexCtx, job: Union[ProcessDbIndexJob, ProcessZipIndexJob], summary: Index, store: ReadOnlyStoreAdapter, /) -> Tuple[
     list[PathPackage],
     list[PathPackage],
     set[str],
@@ -133,7 +150,7 @@ def process_index_job_main_sequence(ctx: DownloaderWorkerContext, job: Union[Pro
 
     return non_existing_pkgs, need_update_pkgs, created_folders, zip_data, None
 
-def create_packages_from_index(ctx: DownloaderWorkerContext, config: Config, summary: Index, store: ReadOnlyStoreAdapter) -> Tuple[
+def create_packages_from_index(ctx: ProcessIndexCtx, config: Config, summary: Index, store: ReadOnlyStoreAdapter) -> Tuple[
     List[_CheckFilePackage],
     List[_RemoveFilePackage],
     List[_CreateFolderPackage],
@@ -144,19 +161,19 @@ def create_packages_from_index(ctx: DownloaderWorkerContext, config: Config, sum
     create_folder_pkgs, delete_folder_pkgs = _translate_items(ctx, calculator, summary.folders, PathType.FOLDER, store.all_folders())
     return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs
 
-def _translate_items(ctx: DownloaderWorkerContext, calculator: TargetPathsCalculator, items: Dict[str, Dict[str, Any]], path_type: PathType, stored: Dict[str, Dict[str, Any]]) -> Tuple[List[PathPackage], List[PathPackage]]:
+def _translate_items(ctx: ProcessIndexCtx, calculator: TargetPathsCalculator, items: Dict[str, Dict[str, Any]], path_type: PathType, stored: Dict[str, Dict[str, Any]]) -> Tuple[List[PathPackage], List[PathPackage]]:
     present, present_errors = calculator.create_path_packages(items.items(), path_type)
     present_set = {pkg.rel_path for pkg in present}
     removed, removed_errors = calculator.create_path_packages([(path, description) for path, description in stored.items() if path not in present_set], path_type)
 
     for e in removed_errors:
-        ctx.swallow_error(e)
+        ctx.error_ctx.swallow_error(e)
     for e in present_errors:
-        ctx.swallow_error(e)
+        ctx.error_ctx.swallow_error(e)
 
     return present, removed
 
-def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, bench_label: str) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
+def process_check_file_packages(ctx: ProcessIndexCtx, non_duplicated_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, bench_label: str) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
     if len(non_duplicated_pkgs) == 0:
         return [], [], []
 
@@ -182,7 +199,7 @@ def process_check_file_packages(ctx: DownloaderWorkerContext, non_duplicated_pkg
     return non_existing_pkgs, validate_pkgs, already_installed_pkgs
 
 
-def process_validate_packages(ctx: DownloaderWorkerContext, validate_pkgs: List[_ValidateFilePackage]) -> Tuple[List[PathPackage], List[PathPackage], List[_FetchFilePackage]]:
+def process_validate_packages(ctx: ProcessIndexCtx, validate_pkgs: List[_ValidateFilePackage]) -> Tuple[List[PathPackage], List[PathPackage], List[_FetchFilePackage]]:
     if len(validate_pkgs) == 0:
         return [], [], []
 
@@ -212,7 +229,7 @@ def process_validate_packages(ctx: DownloaderWorkerContext, validate_pkgs: List[
 
     return present_validated_files, skipped_updated_files, more_fetch_pkgs
 
-def verify_present_not_validated_files_hashes(ctx: DownloaderWorkerContext, already_installed_pkgs: list[PathPackage]) -> tuple[list[PathPackage], list[PathPackage]]:
+def verify_present_not_validated_files_hashes(ctx: ProcessIndexCtx, already_installed_pkgs: list[PathPackage]) -> tuple[list[PathPackage], list[PathPackage]]:
     file_system = ReadOnlyFileSystem(ctx.file_system)
     verified_integrity_pkgs: List[PathPackage] = []
     failed_verification_pkgs: List[_FetchFilePackage] = []
@@ -234,7 +251,7 @@ def _url(file_path: str, file_description: Dict[str, Any], base_files_url: str) 
     return file_description['url'] if 'url' in file_description else calculate_url(base_files_url, file_path if file_path[0] != '|' else file_path[1:])
 
 
-def try_reserve_space(ctx: DownloaderWorkerContext, file_pkgs: Iterable[PathPackage]) -> List[Tuple[Partition, int]]:
+def try_reserve_space(ctx: ProcessIndexCtx, file_pkgs: Iterable[PathPackage]) -> List[Tuple[Partition, int]]:
     fits_well, full_partitions = ctx.free_space_reservation.reserve_space_for_file_pkgs(file_pkgs)
     if fits_well:
         return []
@@ -244,7 +261,7 @@ def try_reserve_space(ctx: DownloaderWorkerContext, file_pkgs: Iterable[PathPack
 
         return full_partitions
 
-def check_repeated_store_presence(ctx: DownloaderWorkerContext, store: ReadOnlyStoreAdapter, keep_store_candidate_pkgs: Iterable[PathPackage]) -> set[str]:
+def check_repeated_store_presence(ctx: ProcessIndexCtx, store: ReadOnlyStoreAdapter, keep_store_candidate_pkgs: Iterable[PathPackage]) -> set[str]:
     result = set()
     for pkg in keep_store_candidate_pkgs:
         if not pkg.is_pext_external():
@@ -255,7 +272,7 @@ def check_repeated_store_presence(ctx: DownloaderWorkerContext, store: ReadOnlyS
                 result.add(pkg.rel_path)  # @TODO: See if use_cache is needed, and if we should optimize this fs access
     return result
 
-def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter, bench_label: str) -> Tuple[
+def process_create_folder_packages(ctx: ProcessIndexCtx, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter, bench_label: str) -> Tuple[
     list[PathPackage],
     list[PathPackage],
     set[str],
@@ -267,7 +284,7 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
     try:
         check_folder_paths([pkg.rel_path for pkg in create_folder_pkgs], db_id)
     except Exception as e:
-        ctx.swallow_error(e)
+        ctx.error_ctx.swallow_error(e)
 
     folder_copies_to_be_removed: List[PathPackage] = []
     processing_folders: List[PathPackage] = []
@@ -327,7 +344,7 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
         try:
             ctx.file_system.make_dirs(folder_pkg.full_path)
         except FolderCreationError as e:
-            ctx.swallow_error(e)
+            ctx.error_ctx.swallow_error(e)
             errors.append(folder_pkg.full_path)
         else:
             created_folders.add(folder_pkg.full_path)
@@ -335,7 +352,7 @@ def process_create_folder_packages(ctx: DownloaderWorkerContext, create_folder_p
     installed_folders = [f for f in processing_folders if f.db_path() in db_folder_index]
     return folder_copies_to_be_removed, installed_folders, created_folders, errors
 
-def create_fetch_jobs(ctx: DownloaderWorkerContext, db_id: str, non_existing_pkgs: list[_FetchFilePackage], need_update_pkgs: list[_FetchFilePackage], created_folders: set[str], base_files_url: str) -> List[Job]:
+def create_fetch_jobs(ctx: ProcessIndexCtx, db_id: str, non_existing_pkgs: list[_FetchFilePackage], need_update_pkgs: list[_FetchFilePackage], created_folders: set[str], base_files_url: str) -> List[Job]:
     if len(non_existing_pkgs) == 0 and len(need_update_pkgs) == 0:
         return []
 
@@ -346,12 +363,12 @@ def create_fetch_jobs(ctx: DownloaderWorkerContext, db_id: str, non_existing_pkg
         ) if job is not None
     ]
 
-def _fetch_job(ctx: DownloaderWorkerContext, pkg: PathPackage, exists: bool, db_id: str, created_folders: set[str], base_files_url: str, /) -> Optional[FetchFileJob]:
+def _fetch_job(ctx: ProcessIndexCtx, pkg: PathPackage, exists: bool, db_id: str, created_folders: set[str], base_files_url: str, /) -> Optional[FetchFileJob]:
     source = _url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url)
     try:
         check_file_pkg(pkg, db_id, source)
     except Exception as e:
-        ctx.swallow_error(e)
+        ctx.error_ctx.swallow_error(e)
         return None
 
     parent_folder = pkg.parent

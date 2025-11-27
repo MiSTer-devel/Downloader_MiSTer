@@ -17,22 +17,30 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.db_entity import check_zip_summary, ZipIndexEntity, fix_zip
-from downloader.jobs.worker_context import DownloaderWorkerBase
-from downloader.jobs.open_zip_summary_job import OpenZipSummaryJob
+from downloader.file_system import FileSystem
+from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.jobs_factory import make_process_zip_index_job
-from downloader.job_system import WorkerResult
+from downloader.jobs.open_zip_summary_job import OpenZipSummaryJob
+from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
+from downloader.logger import Logger
 
-class OpenZipSummaryWorker(DownloaderWorkerBase):
+
+class OpenZipSummaryWorker(DownloaderWorker):
+    def __init__(self, file_system: FileSystem, logger: Logger, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx) -> None:
+        self._file_system = file_system
+        self._logger = logger
+        self._progress_reporter = progress_reporter
+        self._error_ctx = error_ctx
+
     def job_type_id(self) -> int: return OpenZipSummaryJob.type_id
-    def reporter(self): return self._ctx.progress_reporter
+    def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: OpenZipSummaryJob) -> WorkerResult:  # type: ignore[override]
         try:
-            logger = self._ctx.logger
             db, zip_id = job.db, job.zip_id
 
-            logger.bench('OpenZipSummaryWorker load dict: ', db.db_id, zip_id)
-            summary = self._ctx.file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())  # type: ignore[union-attr]
+            self._logger.bench('OpenZipSummaryWorker load dict: ', db.db_id, zip_id)
+            summary = self._file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())  # type: ignore[union-attr]
             check_zip_summary(summary, db.db_id, zip_id)
             base_files_url = db.base_files_url
             if 'base_files_url' in job.zip_description:
@@ -44,15 +52,15 @@ class OpenZipSummaryWorker(DownloaderWorkerBase):
                                        version=summary.get('v', 0))
 
             if zip_index.needs_migration():
-                logger.bench('OpenZipSummaryWorker migrating zip index entity: ', db.db_id, zip_id)
+                self._logger.bench('OpenZipSummaryWorker migrating zip index entity: ', db.db_id, zip_id)
                 error = zip_index.migrate(db.db_id)
                 if error is not None:
-                    self._ctx.swallow_error(error)
+                    self._error_ctx.swallow_error(error)
                     return [], error
 
-            logger.bench('OpenZipSummaryWorker fix zips: ', db.db_id, zip_id)
+            self._logger.bench('OpenZipSummaryWorker fix zips: ', db.db_id, zip_id)
             fix_zip(job.zip_description, zip_index)
-            logger.bench('OpenZipSummaryWorker done: ', db.db_id, zip_id)
+            self._logger.bench('OpenZipSummaryWorker done: ', db.db_id, zip_id)
 
             return [make_process_zip_index_job(
                 zip_id=zip_id,
@@ -65,5 +73,5 @@ class OpenZipSummaryWorker(DownloaderWorkerBase):
                 has_new_zip_summary=True
             )], None
         except Exception as e:
-            self._ctx.swallow_error(e)
+            self._error_ctx.swallow_error(e)
             return [], e
