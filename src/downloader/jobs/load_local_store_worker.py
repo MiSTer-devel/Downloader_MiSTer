@@ -16,33 +16,42 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.job_system import WorkerResult
+from downloader.base_path_relocator import BasePathRelocator
+from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob
-from downloader.jobs.worker_context import DownloaderWorkerBase
+from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
+from downloader.local_repository import LocalRepository
+from downloader.logger import Logger
 
 
-class LoadLocalStoreWorker(DownloaderWorkerBase):
+class LoadLocalStoreWorker(DownloaderWorker):
+    def __init__(self, logger: Logger, local_repository: LocalRepository, base_path_relocator: BasePathRelocator, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx) -> None:
+        self._logger = logger
+        self._local_repository = local_repository
+        self._base_path_relocator = base_path_relocator
+        self._progress_reporter = progress_reporter
+        self._error_ctx = error_ctx
+
     def job_type_id(self) -> int: return LoadLocalStoreJob.type_id
-    def reporter(self): return self._ctx.progress_reporter
+    def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: LoadLocalStoreJob) -> WorkerResult:  # type: ignore[override]
-        logger = self._ctx.logger
-        logger.bench('LoadLocalStoreWorker start.')
+        self._logger.bench('LoadLocalStoreWorker start.')
         try:
-            local_store = self._ctx.local_repository.load_store()
+            local_store = self._local_repository.load_store()
 
-            logger.bench('LoadLocalStoreWorker relocating base paths')
+            self._logger.bench('LoadLocalStoreWorker relocating base paths')
             # @TODO: Remove this 1-2 years after the 2.0 release, which deprecated date base scoped base_paths
-            for relocation_package in self._ctx.base_path_relocator.relocating_base_paths(job.db_pkgs, local_store):
-                self._ctx.base_path_relocator.relocate_non_system_files(relocation_package)
-                err = self._ctx.local_repository.save_store(local_store)
+            for relocation_package in self._base_path_relocator.relocating_base_paths(job.db_pkgs, local_store):
+                self._base_path_relocator.relocate_non_system_files(relocation_package)
+                err = self._local_repository.save_store(local_store)
                 if err is not None:
-                    logger.debug('WARNING! Base path relocation could not be saved in the store!')
+                    self._logger.debug('WARNING! Base path relocation could not be saved in the store!')
                     continue
         except Exception as e:
-            self._ctx.swallow_error(e)
+            self._error_ctx.swallow_error(e)
             return [], e
 
         job.local_store = local_store
-        logger.bench('LoadLocalStoreWorker done.')
+        self._logger.bench('LoadLocalStoreWorker done.')
         return [], None

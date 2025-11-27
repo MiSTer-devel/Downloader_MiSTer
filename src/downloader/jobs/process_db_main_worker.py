@@ -19,25 +19,31 @@
 from typing import Dict, Any, Optional, Tuple, cast
 
 from downloader.db_entity import check_zip, ZipIndexEntity
-from downloader.job_system import WorkerResult, Job
+from downloader.job_system import WorkerResult, Job, ProgressReporter
 from downloader.jobs.jobs_factory import make_process_zip_index_job, make_open_zip_summary_job, make_zip_tag, ZipJobContext
 from downloader.jobs.transfer_job import TransferJob
 from downloader.jobs.wait_db_zips_job import WaitDbZipsJob
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.index import Index
-from downloader.jobs.worker_context import DownloaderWorkerBase, NilJob
+from downloader.jobs.worker_context import DownloaderWorker, NilJob, JobErrorCtx
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE, StoreFragmentZipSummary
+from downloader.logger import Logger
 
 
-class ProcessDbMainWorker(DownloaderWorkerBase):
+class ProcessDbMainWorker(DownloaderWorker):
+    def __init__(self, logger: Logger, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx) -> None:
+        self._logger = logger
+        self._progress_reporter = progress_reporter
+        self._error_ctx = error_ctx
+
     def job_type_id(self) -> int: return ProcessDbMainJob.type_id
-    def reporter(self): return self._ctx.progress_reporter
+    def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: ProcessDbMainJob) -> WorkerResult:  # type: ignore[override]
-        self._ctx.logger.bench('ProcessDbMainWorker start: ', job.db.db_id)
+        self._logger.bench('ProcessDbMainWorker start: ', job.db.db_id)
         result = self._operate_on_impl(job)
-        self._ctx.logger.bench('ProcessDbMainWorker end: ', job.db.db_id)
+        self._logger.bench('ProcessDbMainWorker end: ', job.db.db_id)
         return result
 
     def _operate_on_impl(self, job: ProcessDbMainJob) -> WorkerResult:
@@ -53,15 +59,15 @@ class ProcessDbMainWorker(DownloaderWorkerBase):
             zip_jobs = []
             zip_job_tags = []
 
-            self._ctx.logger.bench('ProcessDbMainWorker ZIP summaries calc: ', db.db_id)
+            self._logger.bench('ProcessDbMainWorker ZIP summaries calc: ', db.db_id)
             zip_summaries = store.zip_summaries()
 
-            self._ctx.logger.bench('ProcessDbMainWorker ZIP make jobs: ', db.db_id)
+            self._logger.bench('ProcessDbMainWorker ZIP make jobs: ', db.db_id)
             for zip_id, zip_description in db.zips.items():
                 #if zip_id != 'cheats_folder_psx': continue
                 zip_job, err = _make_zip_job(zip_summaries.get(zip_id, None), ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
                 if err is not None:
-                    self._ctx.swallow_error(err)
+                    self._error_ctx.swallow_error(err)
                     job.ignored_zips.append(zip_id)
                     continue
 

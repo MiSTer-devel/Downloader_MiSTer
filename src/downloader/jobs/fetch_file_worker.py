@@ -21,13 +21,13 @@ from downloader.file_system import FileSystem
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.worker_context import DownloaderWorker
 from downloader.jobs.errors import FileDownloadError, FileValidationError
 import socket
 from urllib.error import URLError
 from http.client import HTTPException
 from typing import Optional, TypedDict
 
+from downloader.jobs.worker_context import DownloaderWorker
 from downloader.logger import Logger
 from downloader.waiter import Waiter
 

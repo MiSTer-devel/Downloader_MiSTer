@@ -16,18 +16,24 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.job_system import WorkerResult
+from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
-from downloader.jobs.worker_context import DownloaderWorkerBase
+from downloader.jobs.worker_context import DownloaderWorker
+from downloader.local_repository import LocalRepository
+from downloader.logger import Logger
 
 
-class LoadLocalStoreSigsWorker(DownloaderWorkerBase):
+class LoadLocalStoreSigsWorker(DownloaderWorker):
+    def __init__(self, logger: Logger, local_repository: LocalRepository, progress_reporter: ProgressReporter) -> None:
+        self._logger = logger
+        self._local_repository = local_repository
+        self._progress_reporter = progress_reporter
+
     def job_type_id(self) -> int: return LoadLocalStoreSigsJob.type_id
-    def reporter(self): return self._ctx.progress_reporter
+    def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: LoadLocalStoreSigsJob) -> WorkerResult:  # type: ignore[override]
-        logger = self._ctx.logger
-        logger.bench('LoadLocalStoreSigsWorker start.')
-        job.local_store_sigs = self._ctx.local_repository.load_store_sigs()
-        logger.bench('LoadLocalStoreSigsWorker done.')
+        self._logger.bench('LoadLocalStoreSigsWorker start.')
+        job.local_store_sigs = self._local_repository.load_store_sigs()
+        self._logger.bench('LoadLocalStoreSigsWorker done.')
         return [], None

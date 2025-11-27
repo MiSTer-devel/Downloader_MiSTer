@@ -17,25 +17,33 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.db_utils import can_skip_db
-from downloader.job_system import WorkerResult
+from downloader.job_system import WorkerResult, JobContext, ProgressReporter
 from downloader.jobs.load_local_store_job import local_store_tag
 from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
-from downloader.jobs.worker_context import DownloaderWorkerBase
+from downloader.jobs.reporters import InstallationReportImpl
+from downloader.jobs.worker_context import DownloaderWorker
+from downloader.logger import Logger
 
 
-class MixStoreAndDbWorker(DownloaderWorkerBase):
+class MixStoreAndDbWorker(DownloaderWorker):
+    def __init__(self, logger: Logger, installation_report: InstallationReportImpl, worker_context: JobContext, progress_reporter: ProgressReporter) -> None:
+        self._logger = logger
+        self._installation_report = installation_report
+        self._worker_context = worker_context
+        self._progress_reporter = progress_reporter
+
     def job_type_id(self) -> int: return MixStoreAndDbJob.type_id
-    def reporter(self): return self._ctx.progress_reporter
+    def reporter(self): return self._progress_reporter
 
     def operate_on(self, job: MixStoreAndDbJob) -> WorkerResult:  # type: ignore[override]
-        self._ctx.logger.bench('MixStoreAndDbWorker Loading database: ', job.db.db_id)
+        self._logger.bench('MixStoreAndDbWorker Loading database: ', job.db.db_id)
 
-        while self._ctx.installation_report.any_in_progress_job_with_tags(_local_store_tags):
-            self._ctx.logger.bench('MixStoreAndDbWorker waiting for store: ', job.db.db_id)
-            self._ctx.job_ctx.wait_for_other_jobs(0.06)
+        while self._installation_report.any_in_progress_job_with_tags(_local_store_tags):
+            self._logger.bench('MixStoreAndDbWorker waiting for store: ', job.db.db_id)
+            self._worker_context.wait_for_other_jobs(0.06)
 
-        self._ctx.logger.bench('MixStoreAndDbWorker store received: ', job.db.db_id)
+        self._logger.bench('MixStoreAndDbWorker store received: ', job.db.db_id)
         local_store = job.load_local_store_job.local_store
         if local_store is None:
             return [], Exception('MixStoreAndDbWorker must receive a LoadLocalStoreJob with local_store not null.')
@@ -47,11 +55,11 @@ class MixStoreAndDbWorker(DownloaderWorkerBase):
 
         sig = read_only_store.db_state_signature()
         if can_skip_db(job.config['file_checking'], sig, job.db_hash, job.db_size, job.config['filter']):  # @TODO: Eventually we can remove this check altogether and just rely in the one from the previous step
-            self._ctx.logger.debug('Skipping db process. No changes detected for: ', job.db.db_id)
+            self._logger.debug('Skipping db process. No changes detected for: ', job.db.db_id)
             job.skipped = True
             return [], None
 
-        self._ctx.logger.bench('MixStoreAndDbWorker done: ', job.db.db_id)
+        self._logger.bench('MixStoreAndDbWorker done: ', job.db.db_id)
         return [ProcessDbMainJob(
             db=job.db,
             db_hash=job.db_hash,

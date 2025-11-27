@@ -26,6 +26,7 @@ from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY, MEDIA_F
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.error import DownloaderError
+from downloader.file_system import FileSystem
 from downloader.job_system import Job, Worker
 from downloader.jobs.copy_data_job import CopyDataJob
 from downloader.jobs.errors import WrongDatabaseOptions, FileDownloadError
@@ -37,11 +38,11 @@ from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob, loc
 from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
-from downloader.jobs.reporters import InstallationReport
-from downloader.jobs.worker_context import DownloaderWorkerContext
-from downloader.jobs.workers_factory import make_workers
+from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger, InstallationReport
+from downloader.jobs.worker_context import JobErrorCtx
+from downloader.online_importer_workers_factory import OnlineImporterWorkersFactory
 from downloader.logger import Logger
-from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder
+from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder, FileFilterFactory
 from downloader.free_space_reservation import FreeSpaceReservation, Partition
 from downloader.job_system import JobSystem
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
@@ -52,10 +53,16 @@ from downloader.path_package import PathPackage
 
 
 class OnlineImporter:
-    def __init__(self, logger: Logger, job_system: JobSystem, worker_ctx: DownloaderWorkerContext, free_space_reservation: FreeSpaceReservation, old_pext_paths: set[str]) -> None:
+    def __init__(self, config: Config, logger: Logger, file_system: FileSystem, installation_report: InstallationReportImpl, file_filter_factory: FileFilterFactory, file_download_session_logger: FileDownloadSessionLogger, job_error_ctx: JobErrorCtx, job_system: JobSystem, worker_factory: OnlineImporterWorkersFactory, free_space_reservation: FreeSpaceReservation, old_pext_paths: set[str]) -> None:
+        self._config = config
         self._logger = logger
+        self._file_system = file_system
+        self._installation_report = installation_report
+        self._file_filter_factory = file_filter_factory
+        self._file_download_session_logger = file_download_session_logger
+        self._job_error_ctx = job_error_ctx
         self._job_system = job_system
-        self._worker_ctx = worker_ctx
+        self._worker_factory = worker_factory
         self._free_space_reservation = free_space_reservation
         self._old_pext_paths = old_pext_paths
         self._box = InstallationBox()
@@ -63,17 +70,17 @@ class OnlineImporter:
         self._first_time = True
 
     def _make_workers(self) -> dict[int, Worker]:
-        return {w.job_type_id(): w for w in make_workers(self._worker_ctx)}
+        return {w.job_type_id(): w for w in self._worker_factory.create_workers()}
 
     def _make_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]:
         jobs: list[Job] = []
         load_local_store_sigs_job = LoadLocalStoreSigsJob()
         load_local_store_sigs_job.add_tag(local_store_sigs_tag)
-        load_local_store_job = LoadLocalStoreJob(db_pkgs, self._worker_ctx.config)
+        load_local_store_job = LoadLocalStoreJob(db_pkgs, self._config)
         load_local_store_job.add_tag(local_store_tag)
         for pkg in db_pkgs:
             transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
-            transfer_job.after_job = OpenDbJob(  # type: ignore[union-attr]
+            transfer_job.after_job = OpenDbJob(
                 transfer_job=transfer_job,
                 section=pkg.db_id,
                 ini_description=pkg.section,
@@ -91,12 +98,12 @@ class OnlineImporter:
         self._job_system.register_workers(self._make_workers())
         self._job_system.push_jobs(self._make_jobs(db_pkgs))
 
-        file_mister_present = self._worker_ctx.file_system.is_file(os.path.join(MEDIA_FAT, FILE_MiSTer), use_cache=False)
+        file_mister_present = self._file_system.is_file(os.path.join(MEDIA_FAT, FILE_MiSTer), use_cache=False)
 
         logger.bench('OnlineImporter execute jobs start.')
         self._job_system.pending_jobs_amount()
         self._job_system.execute_jobs()
-        self._worker_ctx.file_download_session_logger.print_pending()
+        self._file_download_session_logger.print_pending()
         logger.bench('OnlineImporter execute jobs done.')
 
         if self._first_time:
@@ -104,12 +111,12 @@ class OnlineImporter:
         else:
             # @TODO: Maybe use a factory to avoid resetting state
             self._box = InstallationBox()
-            self._worker_ctx.installation_report.reset()
+            self._installation_report.reset()
 
         box = self._box
-        report: InstallationReport = self._worker_ctx.installation_report
+        report: InstallationReport = self._installation_report
 
-        box.set_unused_filter_tags(self._worker_ctx.file_filter_factory.unused_filter_parts())
+        box.set_unused_filter_tags(self._file_filter_factory.unused_filter_parts())
         box.set_old_pext_paths(self._old_pext_paths)
 
         for fetch_file_job in report.get_started_jobs(FetchFileJob):
@@ -126,7 +133,7 @@ class OnlineImporter:
                 continue
 
             self._logger.debug(e)
-            fs = self._worker_ctx.file_system
+            fs = self._file_system
             full_path = fetch_file_job.pkg.full_path
             if fs.is_file(full_path, use_cache=False):
                 continue
@@ -302,7 +309,7 @@ class OnlineImporter:
         for db_id, zip_id in box.removed_zips():
             write_stores[db_id].remove_zip_id(zip_id)
 
-        fs = self._worker_ctx.file_system
+        fs = self._file_system
 
         if len(files_to_consume := box.consume_files()) > 0:
             logger.bench('OnlineImporter files_to_consume start.')
@@ -324,7 +331,7 @@ class OnlineImporter:
 
                 if pkg.rel_path in processed_file_names: continue
                 if pkg.is_pext_external():
-                    full_path = os.path.join(self._worker_ctx.config['base_path'], pkg.rel_path)
+                    full_path = os.path.join(self._config['base_path'], pkg.rel_path)
                     if fs.is_file(full_path):
                         fs.unlink(full_path)
 
@@ -383,7 +390,7 @@ class OnlineImporter:
                         fs.remove_folder(pkg.full_path)
                         write_stores[db_id].remove_external_folder(pkg.drive, pkg.rel_path)
                         write_stores[db_id].remove_external_folder_from_zips(pkg.drive, pkg.rel_path)
-                    full_path = os.path.join(self._worker_ctx.config['base_path'], pkg.rel_path)
+                    full_path = os.path.join(self._config['base_path'], pkg.rel_path)
                     if fs.is_folder(full_path) and not fs.folder_has_items(full_path):
                         fs.remove_folder(full_path)
                 else:
@@ -422,18 +429,12 @@ class OnlineImporter:
             self._clean_store(store.unwrap_store())
 
         for wrong_db_opts_err in box.wrong_db_options():
-            self._worker_ctx.swallow_error(wrong_db_opts_err)
+            self._job_error_ctx.swallow_error(wrong_db_opts_err)
 
         logger.bench('OnlineImporter end.')
         return None
 
-    def save_local_store(self) -> Optional[Exception]:
-        if self._local_store is None:
-            return None
-        self._worker_ctx.logger.bench('OnlineImporter saving local store start.')
-        err = self._worker_ctx.local_repository.save_store(self._local_store)
-        self._worker_ctx.logger.bench('OnlineImporter saving local store end.')
-        return err
+    def local_store(self) -> Optional[LocalStoreWrapper]: return self._local_store
 
     @staticmethod
     def _clean_store(store) -> None:

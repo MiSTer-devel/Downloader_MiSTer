@@ -238,8 +238,8 @@ class LocalRepository(FilelogSaver):
 
         self._logger.bench('LocalRepository backup local store for pext error end.')
 
-    def save_store(self, local_store_wrapper) -> Optional[Exception]:
-        if not local_store_wrapper.needs_save():
+    def save_store(self, local_store_wrapper: Optional[LocalStoreWrapper]) -> Optional[Exception]:
+        if not local_store_wrapper or not local_store_wrapper.needs_save():
             self._logger.debug('Skipping local_store saving...')
             return None
 
