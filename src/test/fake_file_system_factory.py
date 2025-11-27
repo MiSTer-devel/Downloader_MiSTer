@@ -220,6 +220,19 @@ class FakeFileSystem(ProductionFileSystem):
         self._write_records.append(_Record('copy', (source_file, target_file)))
         self._fs_cache.add_file(target_file)
 
+    def append(self, source, target):
+        source_file = self._path(source)
+        target_file = self._path(target)
+        source_description = self.state.files[source_file]
+        if 'append_buggy' in self._fake_failures:
+            source_description['hash'] = 'buggy'
+        elif 'append_error' in self._fake_failures:
+            raise FileCopyError(target)
+
+        self.state.files[target_file] = {**self.state.files[target_file], **source_description}
+        self._write_records.append(_Record('append', (source_file, target_file)))
+        self._fs_cache.add_file(target_file)
+
     def make_dirs(self, path):
         folder = self._path(path)
         path_parents = list(Path(folder).parents)
