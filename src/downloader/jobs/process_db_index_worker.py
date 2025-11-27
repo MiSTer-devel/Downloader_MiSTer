@@ -52,7 +52,7 @@ _CreateFolderPackage = PathPackage
 _DeleteFolderPackage = PathPackage
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ProcessIndexCtx:
     error_ctx: JobErrorCtx
     file_system: FileSystem
