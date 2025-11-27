@@ -68,7 +68,6 @@ if (( 10#$(date +%Y) < 2000 )) ; then
     fi
 fi
 
-
 # CERTS SETUP
 if [ -s "${CACERT_PEM_1}" ] ; then
     export SSL_CERT_FILE="${CACERT_PEM_1}"
