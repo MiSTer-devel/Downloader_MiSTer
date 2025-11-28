@@ -203,6 +203,8 @@ class FileCheckingModeResolver:
             return FileChecking.VERIFY_INTEGRITY
 
         if file_checking == FileChecking.BALANCED:
+            if self._local_repository.has_store_for_pext_error(): return FileChecking.EXHAUSTIVE  # @TODO: This is for the pext bug. Remove it after a while
+
             prev_free_spaces = self._local_repository.load_previous_free_spaces()
             actual_free_spaces = self._file_system.free_spaces()
             if MEDIA_FAT not in prev_free_spaces or MEDIA_FAT not in actual_free_spaces:

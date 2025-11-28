@@ -227,6 +227,9 @@ class LocalRepository(FilelogSaver):
     def _store_drives(self):
         return self._external_drives_repository.connected_drives_except_base_path_drives(self._config)
 
+    def has_store_for_pext_error(self) -> bool:
+        return self._file_system.is_file(self._storage_backup_pext_path)
+
     def backup_local_store_for_pext_error(self) -> None:
         self._logger.bench('LocalRepository backup local store for pext error start.')
         try:
