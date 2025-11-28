@@ -232,15 +232,16 @@ class LocalRepository(FilelogSaver):
 
     def backup_local_store_for_pext_error(self) -> None:
         self._logger.bench('LocalRepository backup local store for pext error start.')
-        try:
-            if self._file_system.is_file(self._storage_load_path):
-                self._file_system.copy(self._storage_load_path, self._storage_backup_pext_path)
-            if self._config['config_path'].is_file():
-                self._file_system.append(str(self._config['config_path']), self._storage_backup_pext_path)
+        if not self._file_system.is_file(self._storage_backup_pext_path):
+            try:
+                if self._file_system.is_file(self._storage_load_path):
+                    self._file_system.copy(self._storage_load_path, self._storage_backup_pext_path)
+                if self._config['config_path'].is_file():
+                    self._file_system.append(str(self._config['config_path']), self._storage_backup_pext_path)
 
-        except Exception as e:
-            self._logger.debug('Could not backup local store')
-            self._logger.debug(e)
+            except Exception as e:
+                self._logger.debug('Could not backup local store')
+                self._logger.debug(e)
 
         self._logger.bench('LocalRepository backup local store for pext error end.')
 
