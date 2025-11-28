@@ -81,9 +81,9 @@ class TargetPathsCalculator:
 
             # @TODO: Following condition should never happen. Remove once confidence in non-old-pext paths is 100%
             if first_char == '|':
-                path = path[1:]
+                pkg.rel_path = path[1:]
                 with self._lock:
-                    self._old_pext_paths.add(path)
+                    self._old_pext_paths.add(pkg.rel_path)
 
             pkg._full_path = None
 
