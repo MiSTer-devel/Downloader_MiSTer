@@ -24,7 +24,7 @@ from downloader.jobs.check_db_job import CheckDbJob
 from downloader.jobs.jobs_factory import make_transfer_job
 from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob, local_store_sigs_tag
 from downloader.jobs.reporters import InstallationReport
-from downloader.online_importer_workers_factory import OnlineImporterWorkersFactory
+from downloader.online_importer import OnlineImporterWorkersFactory
 from downloader.logger import Logger
 
 

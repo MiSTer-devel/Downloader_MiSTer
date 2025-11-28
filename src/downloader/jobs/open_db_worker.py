@@ -28,19 +28,19 @@ from downloader.jobs.load_local_store_sigs_job import local_store_sigs_tag
 from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
-from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
+from downloader.jobs.worker_context import DownloaderWorker, FailCtx
 from downloader.logger import Logger
 
 
 class OpenDbWorker(DownloaderWorker):
-    def __init__(self, file_system: FileSystem, logger: Logger, file_download_session_logger: FileDownloadSessionLogger, installation_report: InstallationReportImpl, worker_context: JobContext, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx, config: Config) -> None:
+    def __init__(self, file_system: FileSystem, logger: Logger, file_download_session_logger: FileDownloadSessionLogger, installation_report: InstallationReportImpl, worker_context: JobContext, progress_reporter: ProgressReporter, fail_ctx: FailCtx, config: Config) -> None:
         self._file_system = file_system
         self._logger = logger
         self._file_download_session_logger = file_download_session_logger
         self._installation_report = installation_report
         self._worker_context = worker_context
         self._progress_reporter = progress_reporter
-        self._error_ctx = error_ctx
+        self._fail_ctx = fail_ctx
         self._config = config
         self._lock = Lock()
         self._returned_load_local_store_job = False
@@ -56,14 +56,14 @@ class OpenDbWorker(DownloaderWorker):
         try:
             db_props = self._file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())
         except Exception as e:
-            self._error_ctx.swallow_error(e)
+            self._fail_ctx.swallow_error(e)
             return [], e
 
         self._logger.bench('OpenDbWorker Validating database: ', job.section)
         try:
             db = DbEntity(db_props, job.section)
         except Exception as e:
-            self._error_ctx.swallow_error(e)
+            self._fail_ctx.swallow_error(e)
             return [], e
 
         self._logger.bench('OpenDbWorker database opened: ', job.section)
@@ -72,7 +72,7 @@ class OpenDbWorker(DownloaderWorker):
             self._logger.bench('OpenDbWorker migrating db: ', db.db_id)
             error = db.migrate()
             if error is not None:
-                self._error_ctx.swallow_error(error)
+                self._fail_ctx.swallow_error(error)
                 return [], error
 
         fix_folders(db.folders)
@@ -81,7 +81,7 @@ class OpenDbWorker(DownloaderWorker):
 
         calcs = job.transfer_job.calcs  # type: ignore[union-attr]
         if calcs is None:
-            self._error_ctx.swallow_error(Exception(f'OpenDbWorker [{db.db_id}] must receive a transfer_job with calcs not null.'))
+            self._fail_ctx.swallow_error(Exception(f'OpenDbWorker [{db.db_id}] must receive a transfer_job with calcs not null.'))
             calcs = {}
 
         db_hash = calcs.get('hash', DB_STATE_SIGNATURE_NO_HASH)

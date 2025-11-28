@@ -21,60 +21,71 @@ from typing import Optional, Any
 from collections import defaultdict
 import os
 
+from downloader.base_path_relocator import BasePathRelocator
 from downloader.config import Config
 from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY, MEDIA_FAT
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.error import DownloaderError
 from downloader.file_system import FileSystem
-from downloader.job_system import Job, Worker
+from downloader.http_gateway import HttpGateway
+from downloader.job_system import Job, JobContext, ProgressReporter
+from downloader.jobs.abort_worker import AbortWorker
 from downloader.jobs.copy_data_job import CopyDataJob
+from downloader.jobs.copy_data_worker import CopyDataWorker
 from downloader.jobs.errors import WrongDatabaseOptions, FileDownloadError
 from downloader.jobs.fetch_data_job import FetchDataJob
+from downloader.jobs.fetch_data_worker import FetchDataWorker
 from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.fetch_file_worker import FetchFileWorker
 from downloader.jobs.jobs_factory import make_transfer_job
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob, local_store_tag
 from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob, local_store_sigs_tag
+from downloader.jobs.load_local_store_sigs_worker import LoadLocalStoreSigsWorker
+from downloader.jobs.load_local_store_worker import LoadLocalStoreWorker
 from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
+from downloader.jobs.mix_store_and_db_worker import MixStoreAndDbWorker
 from downloader.jobs.open_db_job import OpenDbJob
+from downloader.jobs.open_db_worker import OpenDbWorker
+from downloader.jobs.open_zip_contents_worker import OpenZipContentsWorker
+from downloader.jobs.open_zip_summary_worker import OpenZipSummaryWorker
+from downloader.jobs.process_db_index_worker import ProcessIndexCtx, ProcessDbIndexWorker
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
-from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger, InstallationReport
-from downloader.jobs.worker_context import JobErrorCtx
-from downloader.online_importer_workers_factory import OnlineImporterWorkersFactory
+from downloader.jobs.process_db_main_worker import ProcessDbMainWorker
+from downloader.jobs.process_zip_index_worker import ProcessZipIndexWorker
+from downloader.jobs.reporters import InstallationReportImpl, InstallationReport, FileDownloadProgressReporter
+from downloader.jobs.wait_db_zips_worker import WaitDbZipsWorker
+from downloader.jobs.worker_context import FailCtx
+from downloader.local_repository import LocalRepository
 from downloader.logger import Logger
 from downloader.file_filter import BadFileFilterPartException, FileFoldersHolder, FileFilterFactory
-from downloader.free_space_reservation import FreeSpaceReservation, Partition
+from downloader.free_space_reservation import Partition, FreeSpaceReservation
 from downloader.job_system import JobSystem
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.local_store_wrapper import LocalStoreWrapper, StoreFragmentDrivePaths
 from downloader.path_package import PathPackage
+from downloader.target_path_calculator import TargetPathsCalculatorFactory
 
 
-class OnlineImporter:
-    def __init__(self, config: Config, logger: Logger, file_system: FileSystem, installation_report: InstallationReportImpl, file_filter_factory: FileFilterFactory, file_download_session_logger: FileDownloadSessionLogger, job_error_ctx: JobErrorCtx, job_system: JobSystem, worker_factory: OnlineImporterWorkersFactory, free_space_reservation: FreeSpaceReservation, old_pext_paths: set[str]) -> None:
-        self._config = config
-        self._logger = logger
+class OnlineImporterWorkersFactory:
+    def __init__(self, worker_context: JobContext, progress_reporter: ProgressReporter, file_system: FileSystem, http_gateway: HttpGateway, logger: Logger, file_download_reporter: FileDownloadProgressReporter, file_filter_factory: FileFilterFactory, target_paths_calculator_factory: TargetPathsCalculatorFactory, free_space_reservation: FreeSpaceReservation, local_repository: LocalRepository, base_path_relocator: BasePathRelocator, config: Config, fail_ctx: FailCtx):
+        self._worker_context = worker_context
+        self._progress_reporter = progress_reporter
         self._file_system = file_system
-        self._installation_report = installation_report
+        self._http_gateway = http_gateway
+        self._logger = logger
+        self._file_download_reporter = file_download_reporter
         self._file_filter_factory = file_filter_factory
-        self._file_download_session_logger = file_download_session_logger
-        self._job_error_ctx = job_error_ctx
-        self._job_system = job_system
-        self._worker_factory = worker_factory
+        self._target_paths_calculator_factory = target_paths_calculator_factory
         self._free_space_reservation = free_space_reservation
-        self._old_pext_paths = old_pext_paths
-        self._first_time = True
-        self._needs_reboot = False
+        self._local_repository = local_repository
+        self._base_path_relocator = base_path_relocator
+        self._config = config
+        self._fail_ctx = fail_ctx
 
-    def needs_reboot(self) -> bool:
-        return self._needs_reboot
-
-    def _make_workers(self) -> dict[int, Worker]:
-        return {w.job_type_id(): w for w in self._worker_factory.create_workers()}
-
-    def _make_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]:
+    def create_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]:
         jobs: list[Job] = []
         load_local_store_sigs_job = LoadLocalStoreSigsJob()
         load_local_store_sigs_job.add_tag(local_store_sigs_tag)
@@ -93,11 +104,125 @@ class OnlineImporter:
         jobs.insert(int(len(jobs) / 2) + 1, load_local_store_sigs_job)
         return jobs
 
+    def create_workers(self):
+        installation_report = InstallationReportImpl()
+        self._file_download_reporter.set_installation_report(installation_report)
+        process_index_ctx = ProcessIndexCtx(
+            fail_ctx=self._fail_ctx,
+            file_system=self._file_system,
+            logger=self._logger,
+            installation_report=installation_report,
+            file_filter_factory=self._file_filter_factory,
+            target_paths_calculator_factory=self._target_paths_calculator_factory,
+            file_download_session_logger=self._file_download_reporter,
+            free_space_reservation=self._free_space_reservation,
+        )
+        return [
+            AbortWorker(
+                worker_context=self._worker_context,
+                progress_reporter=self._progress_reporter,
+            ),
+            CopyDataWorker(
+                file_system=self._file_system,
+                progress_reporter=self._progress_reporter,
+            ),
+            FetchFileWorker(
+                progress_reporter=self._progress_reporter,
+                http_gateway=self._http_gateway,
+                file_system=self._file_system,
+                timeout=self._config["downloader_timeout"],
+            ),
+            FetchDataWorker(
+                http_gateway=self._http_gateway,
+                file_system=self._file_system,
+                progress_reporter=self._progress_reporter,
+                fail_ctx=self._fail_ctx,
+                timeout=self._config["downloader_timeout"],
+            ),
+            OpenDbWorker(
+                file_system=self._file_system,
+                logger=self._logger,
+                file_download_session_logger=self._file_download_reporter,
+                installation_report=installation_report,
+                worker_context=self._worker_context,
+                progress_reporter=self._progress_reporter,
+                fail_ctx=self._fail_ctx,
+                config=self._config,
+            ),
+            MixStoreAndDbWorker(
+                logger=self._logger,
+                installation_report=installation_report,
+                worker_context=self._worker_context,
+                progress_reporter=self._progress_reporter,
+            ),
+            ProcessDbIndexWorker(
+                logger=self._logger,
+                progress_reporter=self._progress_reporter,
+                fail_ctx=self._fail_ctx,
+                process_index_ctx=process_index_ctx,
+            ),
+            WaitDbZipsWorker(
+                logger=self._logger,
+                installation_report=installation_report,
+                worker_context=self._worker_context,
+                progress_reporter=self._progress_reporter,
+            ),
+            ProcessDbMainWorker(
+                logger=self._logger,
+                progress_reporter=self._progress_reporter,
+                fail_ctx=self._fail_ctx,
+            ),
+            ProcessZipIndexWorker(
+                logger=self._logger,
+                target_paths_calculator_factory=self._target_paths_calculator_factory,
+                progress_reporter=self._progress_reporter,
+                fail_ctx=self._fail_ctx,
+                process_index_ctx=process_index_ctx,
+            ),
+            LoadLocalStoreSigsWorker(
+                logger=self._logger,
+                local_repository=self._local_repository,
+                progress_reporter=self._progress_reporter,
+            ),
+            LoadLocalStoreWorker(
+                logger=self._logger,
+                local_repository=self._local_repository,
+                base_path_relocator=self._base_path_relocator,
+                progress_reporter=self._progress_reporter,
+                fail_ctx=self._fail_ctx,
+            ),
+            OpenZipSummaryWorker(
+                file_system=self._file_system,
+                logger=self._logger,
+                progress_reporter=self._progress_reporter,
+                fail_ctx=self._fail_ctx,
+            ),
+            OpenZipContentsWorker(
+                logger=self._logger,
+                progress_reporter=self._progress_reporter,
+                process_index_ctx=process_index_ctx,
+            ),
+        ]
+
+
+class OnlineImporter:
+    def __init__(self, config: Config, logger: Logger, file_system: FileSystem, file_filter_factory: FileFilterFactory, file_download_reporter: FileDownloadProgressReporter, fail_ctx: FailCtx, job_system: JobSystem, worker_factory: OnlineImporterWorkersFactory, old_pext_paths: set[str]) -> None:
+        self._config = config
+        self._logger = logger
+        self._file_system = file_system
+        self._job_system = job_system
+        self._worker_factory = worker_factory
+        self._old_pext_paths = old_pext_paths
+        self._file_filter_factory = file_filter_factory
+        self._file_download_reporter = file_download_reporter
+        self._fail_ctx = fail_ctx
+        self._needs_reboot = False
+
     def download_dbs_contents(self, db_pkgs: list[DbSectionPackage]) -> tuple['InstallationBox', Optional[BaseException]]:
         logger = self._logger
         logger.bench('OnlineImporter start.')
 
-        self._job_system.register_workers(self._make_workers())
+        self._job_system.register_workers({w.job_type_id(): w for w in self._worker_factory.create_workers()})
         self._job_system.push_jobs(self._make_jobs(db_pkgs))
 
         file_mister_present = self._file_system.is_file(os.path.join(MEDIA_FAT, FILE_MiSTer), use_cache=False)
@@ -105,17 +230,11 @@ class OnlineImporter:
         logger.bench('OnlineImporter execute jobs start.')
         self._job_system.pending_jobs_amount()
         self._job_system.execute_jobs()
-        self._file_download_session_logger.print_pending()
+        self._file_download_reporter.print_pending()
         logger.bench('OnlineImporter execute jobs done.')
 
-        if self._first_time:
-            self._first_time = False
-        else:
-            # @TODO: Maybe use a factory to avoid resetting state
-            self._installation_report.reset()
-
+        report: InstallationReport = self._file_download_reporter.installation_report()
         box = InstallationBox()
-        report: InstallationReport = self._installation_report
 
         box.set_unused_filter_tags(self._file_filter_factory.unused_filter_parts())
         box.set_old_pext_paths(self._old_pext_paths)
@@ -433,10 +552,13 @@ class OnlineImporter:
             self._clean_store(store.unwrap_store())
 
         for wrong_db_opts_err in box.wrong_db_options():
-            self._job_error_ctx.swallow_error(wrong_db_opts_err)
+            self._fail_ctx.swallow_error(wrong_db_opts_err)
 
         logger.bench('OnlineImporter end.')
         return box, None
+
+    def needs_reboot(self) -> bool: return self._needs_reboot
+    def _make_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]: return self._worker_factory.create_jobs(db_pkgs)
 
     @staticmethod
     def _clean_store(store) -> None:

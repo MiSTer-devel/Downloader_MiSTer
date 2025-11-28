@@ -35,7 +35,7 @@ from downloader.jobs.index import Index
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
-from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
+from downloader.jobs.worker_context import DownloaderWorker, FailCtx
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter
 from downloader.logger import Logger
 from downloader.other import calculate_url
@@ -54,7 +54,7 @@ _DeleteFolderPackage = PathPackage
 
 @dataclass(frozen=True)
 class ProcessIndexCtx:
-    error_ctx: JobErrorCtx
+    fail_ctx: FailCtx
     file_system: FileSystem
     logger: Logger
     installation_report: InstallationReportImpl
@@ -65,10 +65,10 @@ class ProcessIndexCtx:
 
 
 class ProcessDbIndexWorker(DownloaderWorker):
-    def __init__(self, logger: Logger, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx, process_index_ctx: ProcessIndexCtx) -> None:
+    def __init__(self, logger: Logger, progress_reporter: ProgressReporter, fail_ctx: FailCtx, process_index_ctx: ProcessIndexCtx) -> None:
         self._logger = logger
         self._progress_reporter = progress_reporter
-        self._error_ctx = error_ctx
+        self._fail_ctx = fail_ctx
         self._process_index_ctx = process_index_ctx
         self._folders_created: Set[str] = set()
         self._lock = threading.Lock()
@@ -90,7 +90,7 @@ class ProcessDbIndexWorker(DownloaderWorker):
             self._logger.bench('ProcessDbIndexWorker done: ', db.db_id, zip_id)
             return next_jobs, None
         except (BadFileFilterPartException, StoragePriorityError, FsError, OSError) as e:
-            self._error_ctx.swallow_error(WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e))) if isinstance(e, BadFileFilterPartException) else e)
+            self._fail_ctx.swallow_error(WrongDatabaseOptions("Wrong custom download filter on database %s. Part '%s' is invalid." % (db.db_id, str(e))) if isinstance(e, BadFileFilterPartException) else e)
             return [], e
 
 # @TODO(python 3.12): Use ProcessDbIndexJob & ProcessZipIndexJob instead of Union, which is incorrect
@@ -167,9 +167,9 @@ def _translate_items(ctx: ProcessIndexCtx, calculator: TargetPathsCalculator, it
     removed, removed_errors = calculator.create_path_packages([(path, description) for path, description in stored.items() if path not in present_set], path_type)
 
     for e in removed_errors:
-        ctx.error_ctx.swallow_error(e)
+        ctx.fail_ctx.swallow_error(e)
     for e in present_errors:
-        ctx.error_ctx.swallow_error(e)
+        ctx.fail_ctx.swallow_error(e)
 
     return present, removed
 
@@ -284,7 +284,7 @@ def process_create_folder_packages(ctx: ProcessIndexCtx, create_folder_pkgs: Lis
     try:
         check_folder_paths([pkg.rel_path for pkg in create_folder_pkgs], db_id)
     except Exception as e:
-        ctx.error_ctx.swallow_error(e)
+        ctx.fail_ctx.swallow_error(e)
 
     folder_copies_to_be_removed: List[PathPackage] = []
     processing_folders: List[PathPackage] = []
@@ -344,7 +344,7 @@ def process_create_folder_packages(ctx: ProcessIndexCtx, create_folder_pkgs: Lis
         try:
             ctx.file_system.make_dirs(folder_pkg.full_path)
         except FolderCreationError as e:
-            ctx.error_ctx.swallow_error(e)
+            ctx.fail_ctx.swallow_error(e)
             errors.append(folder_pkg.full_path)
         else:
             created_folders.add(folder_pkg.full_path)
@@ -368,7 +368,7 @@ def _fetch_job(ctx: ProcessIndexCtx, pkg: PathPackage, exists: bool, db_id: str,
     try:
         check_file_pkg(pkg, db_id, source)
     except Exception as e:
-        ctx.error_ctx.swallow_error(e)
+        ctx.fail_ctx.swallow_error(e)
         return None
 
     parent_folder = pkg.parent

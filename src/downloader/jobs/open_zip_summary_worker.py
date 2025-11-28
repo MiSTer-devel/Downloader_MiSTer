@@ -21,16 +21,16 @@ from downloader.file_system import FileSystem
 from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.jobs_factory import make_process_zip_index_job
 from downloader.jobs.open_zip_summary_job import OpenZipSummaryJob
-from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
+from downloader.jobs.worker_context import DownloaderWorker, FailCtx
 from downloader.logger import Logger
 
 
 class OpenZipSummaryWorker(DownloaderWorker):
-    def __init__(self, file_system: FileSystem, logger: Logger, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx) -> None:
+    def __init__(self, file_system: FileSystem, logger: Logger, progress_reporter: ProgressReporter, fail_ctx: FailCtx) -> None:
         self._file_system = file_system
         self._logger = logger
         self._progress_reporter = progress_reporter
-        self._error_ctx = error_ctx
+        self._fail_ctx = fail_ctx
 
     def job_type_id(self) -> int: return OpenZipSummaryJob.type_id
     def reporter(self): return self._progress_reporter
@@ -55,7 +55,7 @@ class OpenZipSummaryWorker(DownloaderWorker):
                 self._logger.bench('OpenZipSummaryWorker migrating zip index entity: ', db.db_id, zip_id)
                 error = zip_index.migrate(db.db_id)
                 if error is not None:
-                    self._error_ctx.swallow_error(error)
+                    self._fail_ctx.swallow_error(error)
                     return [], error
 
             self._logger.bench('OpenZipSummaryWorker fix zips: ', db.db_id, zip_id)
@@ -73,5 +73,5 @@ class OpenZipSummaryWorker(DownloaderWorker):
                 has_new_zip_summary=True
             )], None
         except Exception as e:
-            self._error_ctx.swallow_error(e)
+            self._fail_ctx.swallow_error(e)
             return [], e

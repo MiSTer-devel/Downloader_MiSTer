@@ -25,7 +25,7 @@ from downloader.jobs.jobs_factory import make_zip_kind, make_transfer_job
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
 from downloader.jobs.process_db_index_worker import create_fetch_jobs, process_index_job_main_sequence, ProcessIndexCtx
 from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
-from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
+from downloader.jobs.worker_context import DownloaderWorker, FailCtx
 from downloader.local_store_wrapper import ReadOnlyStoreAdapter, StoreFragmentDrivePaths
 from downloader.logger import Logger
 from downloader.path_package import PathPackage, PathType
@@ -33,11 +33,11 @@ from downloader.target_path_calculator import TargetPathsCalculator, TargetPaths
 
 
 class ProcessZipIndexWorker(DownloaderWorker):
-    def __init__(self, logger: Logger, target_paths_calculator_factory: TargetPathsCalculatorFactory, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx, process_index_ctx: ProcessIndexCtx) -> None:
+    def __init__(self, logger: Logger, target_paths_calculator_factory: TargetPathsCalculatorFactory, progress_reporter: ProgressReporter, fail_ctx: FailCtx, process_index_ctx: ProcessIndexCtx) -> None:
         self._logger = logger
         self._target_paths_calculator_factory = target_paths_calculator_factory
         self._progress_reporter = progress_reporter
-        self._error_ctx = error_ctx
+        self._fail_ctx = fail_ctx
         self._process_index_ctx = process_index_ctx
 
     def job_type_id(self) -> int: return ProcessZipIndexJob.type_id
@@ -91,7 +91,7 @@ class ProcessZipIndexWorker(DownloaderWorker):
 
         zip_kind, kind_err = make_zip_kind(job.zip_description.get('kind', None), (job.zip_id, job.db.db_id))
         if kind_err is not None:
-            self._error_ctx.swallow_error(kind_err)
+            self._fail_ctx.swallow_error(kind_err)
             return [], None
 
         total_amount_of_files_in_zip = len(job.zip_index.files)
@@ -100,7 +100,7 @@ class ProcessZipIndexWorker(DownloaderWorker):
 
         target_pkg, target_error = self._create_target_package(calculator, zip_kind, job.zip_description)
         if target_error is not None:
-            self._error_ctx.swallow_error(target_error)
+            self._fail_ctx.swallow_error(target_error)
             return [], target_error
 
         data_job = make_transfer_job(job.zip_description['contents_file']['url'], job.zip_description['contents_file'], False, job.db.db_id)
@@ -165,7 +165,7 @@ class ProcessZipIndexWorker(DownloaderWorker):
             .deduce_target_path(path, job.zip_description, PathType.FOLDER)
 
         if path_error is not None:
-            self._error_ctx.swallow_error(path_error)
+            self._fail_ctx.swallow_error(path_error)
 
         if path_pkg.pext_props and path_pkg.is_pext_external():
             drive = path_pkg.pext_props.drive

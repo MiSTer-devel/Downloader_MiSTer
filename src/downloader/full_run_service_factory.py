@@ -32,14 +32,13 @@ from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem
 from downloader.jobs.fetch_file_worker import SafeFileFetcher
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
-from downloader.jobs.worker_context import JobErrorCtx
-from downloader.online_importer_workers_factory import OnlineImporterWorkersFactory
+from downloader.jobs.worker_context import FailCtx
 from downloader.logger import DebugOnlyLoggerDecorator, Logger, FilelogManager, ConfigLogManager, TopLogger
 from downloader.os_utils import LinuxOsUtils
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository
 from downloader.migrations import migrations
-from downloader.online_importer import OnlineImporter
+from downloader.online_importer import OnlineImporter, OnlineImporterWorkersFactory
 from downloader.reboot_calculator import RebootCalculator
 from downloader.store_migrator import StoreMigrator
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
@@ -82,9 +81,8 @@ class FullRunServiceFactory:
         )
         atexit.register(http_gateway.cleanup)
         safe_file_fetcher = SafeFileFetcher(config, system_file_system, self._logger, http_gateway, waiter)
-        installation_report = InstallationReportImpl()
         interrupts = Interruptions(file_system_factory)
-        file_download_reporter = FileDownloadProgressReporter(self._logger, waiter, interrupts, installation_report)
+        file_download_reporter = FileDownloadProgressReporter(self._logger, waiter, interrupts)
         job_system = JobSystem(
             reporter=DownloaderProgressReporter(self._logger, [file_download_reporter]),
             logger=self._logger,
@@ -99,34 +97,31 @@ class FullRunServiceFactory:
         base_path_relocator = BasePathRelocator(config, file_system_factory, waiter, self._logger)
 
         old_pext_paths = set()  # @TODO: Should end up empty. Remove when we have 100% in not having pext paths anymore.
-        job_error_ctx = JobErrorCtx(self._logger)
+        fail_ctx = FailCtx(self._logger)
         online_importer_workers_factory = OnlineImporterWorkersFactory(
             worker_context=job_system,
             logger=self._logger,
             http_gateway=http_gateway,
             file_system=system_file_system,
-            installation_report=installation_report,
             progress_reporter=file_download_reporter,
             local_repository=local_repository,
             base_path_relocator=base_path_relocator,
-            file_download_session_logger=file_download_reporter,
+            file_download_reporter=file_download_reporter,
             free_space_reservation=free_space_reservation,
             file_filter_factory=file_filter_factory,
             target_paths_calculator_factory=TargetPathsCalculatorFactory(system_file_system, external_drives_repository, old_pext_paths),
-            error_ctx=job_error_ctx,
+            fail_ctx=fail_ctx,
             config=config
         )
         online_importer = OnlineImporter(
             config=config,
             logger=self._logger,
             file_system=system_file_system,
-            installation_report=installation_report,
             file_filter_factory=file_filter_factory,
-            file_download_session_logger=file_download_reporter,
-            job_error_ctx=job_error_ctx,
+            file_download_reporter=file_download_reporter,
+            fail_ctx=fail_ctx,
             job_system=job_system,
             worker_factory=online_importer_workers_factory,
-            free_space_reservation=free_space_reservation,
             old_pext_paths=old_pext_paths
         )
 
