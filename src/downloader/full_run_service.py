@@ -293,6 +293,7 @@ class FinalReporter:
                 f'         This is not a breaking error. All files are safe.\n'
                 f'         You may run Downloader again without problems. Thank you!\n'
             )
+            self._waiter.sleep(5)
             self._logger.debug('Old pext paths: ' + ', '.join(old_pext_paths))
 
     def display_no_certs_msg(self) -> None:
