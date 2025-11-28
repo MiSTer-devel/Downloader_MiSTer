@@ -30,23 +30,28 @@ from downloader.db_utils import DbSectionPackage
 from downloader.file_filter import FileFilterFactory
 from downloader.free_space_reservation import FreeSpaceReservation, UnlimitedFreeSpaceReservation
 from downloader.interruptions import Interruptions
-from downloader.job_system import Job, JobFailPolicy, JobSystem, ProgressReporter
+from downloader.job_system import JobFailPolicy, JobSystem, ProgressReporter
 from downloader.jobs.copy_data_job import CopyDataJob
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob
 from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
 from downloader.jobs.open_db_job import OpenDbJob
-from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
-from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
+from downloader.jobs.worker_context import FailCtx
 from downloader.fail_policy import FailPolicy
 from downloader.local_store_wrapper import StoreWrapper, empty_db_state_signature
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter, InstallationBox
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.logger import Logger
 from downloader.waiter import Waiter
+from downloader.job_system import WorkerResult, Job
+from downloader.jobs.fetch_data_job import FetchDataJob
+from downloader.jobs.fetch_data_worker import FetchDataWorker
+from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.fetch_file_worker import FetchFileWorker
+from downloader.jobs.worker_context import DownloaderWorker
+from downloader.online_importer import OnlineImporterWorkersFactory as ProductionOnlineImporterWorkersFactory
 from test.fake_file_system_factory import FakeFileSystem
 from test.fake_store_migrator import StoreMigrator
-from test.fake_online_importer_workers_factory import OnlineImporterWorkersFactory
 from test.fake_base_path_relocator import BasePathRelocator
 from test.fake_http_gateway import FakeHttpGateway, FakeBuf
 from test.fake_job_system import ProgressReporterTracker
@@ -64,7 +69,6 @@ from test.fake_local_repository import LocalRepository
 class StartJobPolicy(Enum):
     OpeningDb = 0
     FetchDb = 1
-
 
 class OnlineImporter(ProductionOnlineImporter):
     def __init__(
@@ -99,11 +103,10 @@ class OnlineImporter(ProductionOnlineImporter):
         self.network_state = network_state or NetworkState()
         waiter = NoWaiter() if waiter is None else waiter
         logger = NoLogger() if logger is None else logger
-        installation_report = InstallationReportImpl()
         http_gateway = FakeHttpGateway(self._config, self.network_state)
         self._file_download_reporter = FileDownloadProgressReporter(logger, waiter,
                                                                     Interruptions(fs=file_system_factory,
-                                                                                  gw=http_gateway), installation_report)
+                                                                                  gw=http_gateway))
         self._report_tracker = progress_reporter or ProgressReporterTracker(self._file_download_reporter)
         self._job_system = job_system or JobSystem(self._report_tracker, logger=logger, max_threads=1,
                                                    fail_policy=job_fail_policy or JobFailPolicy.FAIL_FAST,
@@ -114,20 +117,20 @@ class OnlineImporter(ProductionOnlineImporter):
                                                                        file_system_factory=self.fs_factory)
         old_pext_paths = set()
         file_filter_factory = file_filter_factory or FileFilterFactory(NoLogger())
+        self._free_space_reservation = free_space_reservation or UnlimitedFreeSpaceReservation()
         online_importer_workers_factory = OnlineImporterWorkersFactory(
             worker_context=self._job_system,
             logger=logger,
             http_gateway=http_gateway,
             file_system=self.file_system,
-            installation_report=installation_report,
             progress_reporter=self._report_tracker,
             local_repository=local_repository,
             base_path_relocator=base_path_relocator,
-            file_download_session_logger=self._file_download_reporter,
-            free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation(),
+            file_download_reporter=self._file_download_reporter,
+            free_space_reservation=self._free_space_reservation,
             file_filter_factory=file_filter_factory,
             target_paths_calculator_factory=TargetPathsCalculatorFactory(self.file_system, external_drives_repository, old_pext_paths),
-            error_ctx=JobErrorCtx(logger, fail_policy=fail_policy or FailPolicy.FAIL_FAST),
+            fail_ctx=FailCtx(logger, fail_policy=fail_policy or FailPolicy.FAIL_FAST),
             config=self._config
         )
         self._start_job_policy = start_job_policy
@@ -136,25 +139,18 @@ class OnlineImporter(ProductionOnlineImporter):
             self._config,
             logger,
             file_system=self.file_system,
-            installation_report=installation_report,
             file_filter_factory=file_filter_factory,
-            file_download_session_logger=self._file_download_reporter,
-            job_error_ctx=JobErrorCtx(logger, fail_policy=fail_policy or FailPolicy.FAIL_FAST),
+            file_download_reporter=self._file_download_reporter,
+            fail_ctx=FailCtx(logger, fail_policy=fail_policy or FailPolicy.FAIL_FAST),
             job_system=self._job_system,
             worker_factory=online_importer_workers_factory,
-            free_space_reservation=free_space_reservation or UnlimitedFreeSpaceReservation(),
             old_pext_paths=old_pext_paths
         )
 
         self.dbs = []
-        self._store_sigs = {}
-        self._db_sigs = {}
         self._store_file = os.path.join(self._config['base_system_path'], FILE_downloader_storage_json.lower())
         self._box: Optional[InstallationBox] = None
         self._error: Optional[Exception] = None
-
-    def _make_workers(self) -> Dict[int, DownloaderWorker]:
-        return {w.job_type_id(): w for w in self._worker_factory.create_workers()}
 
     def _make_jobs(self, db_pkgs: List[DbSectionPackage]) -> List[Job]:
         if self._start_job_policy == StartJobPolicy.FetchDb:
@@ -164,19 +160,13 @@ class OnlineImporter(ProductionOnlineImporter):
             new_db_pkgs = []
             for pkg in db_pkgs:
                 expanded_pkgs[pkg.db_id] = {"section": pkg.section}
-            for db, store, ini_description in self.dbs:
+            for db, store, ini_description, store_sig, db_sig in self.dbs:
                 expanded_pkgs[db.db_id]["db"] = db
+                expanded_pkgs[db.db_id]["db_sig"] = db_sig or {}
 
             load_local_store_sigs_job = LoadLocalStoreSigsJob()
             load_local_store_sigs_job.local_store_sigs = empty_db_state_signature()
             load_local_store_job = LoadLocalStoreJob(new_db_pkgs, self._config)
-            if self._local_store is not None:
-                self.file_system_state.files[self._store_file] = {
-                    "json": {
-                        **self._local_store.unwrap_local_store(),
-                        "migration_version": StoreMigrator().latest_migration_version()
-                    }
-                }
 
             jobs = []
             for data in expanded_pkgs.values():
@@ -184,9 +174,10 @@ class OnlineImporter(ProductionOnlineImporter):
                 section: ConfigDatabaseSection = data["section"]
                 new_db_pkgs.append(DbSectionPackage(db_id=db.db_id, section=section))
 
+                db_sig = data["db_sig"]
                 calcs = {
-                    "hash": self._db_sigs.get(db.db_id, {}).get('hash', DB_STATE_SIGNATURE_NO_HASH),
-                    "size": self._db_sigs.get(db.db_id, {}).get('size', DB_STATE_SIGNATURE_NO_SIZE)
+                    "hash": db_sig.get('hash', DB_STATE_SIGNATURE_NO_HASH),
+                    "size": db_sig.get('size', DB_STATE_SIGNATURE_NO_SIZE)
                 }
                 transfer_job = CopyDataJob('db.json', {}, calcs, db.db_id)
                 if isinstance(self.file_system, FakeFileSystem):
@@ -207,6 +198,13 @@ class OnlineImporter(ProductionOnlineImporter):
         raise Exception("Should not happen!")
 
     def download_dbs_contents(self, db_pkgs: list[DbSectionPackage]) -> tuple[InstallationBox, Optional[BaseException]]:
+        if self._local_store is not None:
+            self.file_system_state.files[self._store_file] = {
+                "json": {
+                    **self._local_store.unwrap_local_store(),
+                    "migration_version": StoreMigrator().latest_migration_version()
+                }
+            }
         result = super().download_dbs_contents(db_pkgs)
         if self._store_file in self.file_system_state.files:
             self.file_system_state.files.pop(self._store_file)
@@ -256,19 +254,15 @@ class OnlineImporter(ProductionOnlineImporter):
 
     def download(self):
         db_pkgs: List[DbSectionPackage] = []
-        for db, store, ini_description in self.dbs:
-            self._add_store(db.db_id, store, store_sig=self._store_sigs.get(db.db_id, None))
+        for db, store, ini_description, store_sig, db_sig in self.dbs:
+            self._add_store(db.db_id, store, store_sig=store_sig)
             db_pkgs.append(DbSectionPackage(db_id=db.db_id, section=ini_description))
         self._box, self._error = self.download_dbs_contents(db_pkgs)
         return self
 
     def add_db(self, db: DbEntity, store: StoreWrapper = None, description: ConfigDatabaseSection = None,
                store_sig=None, db_sig=None):
-        self.dbs.append((db, store, {} if description is None else description))
-        if store_sig is not None:
-            self._store_sigs[db.db_id] = store_sig
-        if db_sig is not None:
-            self._db_sigs[db.db_id] = db_sig
+        self.dbs.append((db, store, {} if description is None else description, store_sig, db_sig))
         return self
 
     def download_db(self, db, store):
@@ -292,3 +286,51 @@ class OnlineImporter(ProductionOnlineImporter):
         for p, reservation in self.box().full_partitions().items():
             actual_remaining_space[p] -= reservation
         return actual_remaining_space
+
+class OnlineImporterWorkersFactory(ProductionOnlineImporterWorkersFactory):
+    def create_workers(self):
+        replacement_workers = []
+        if isinstance(self._http_gateway, FakeHttpGateway):
+            fake_http: FakeHttpGateway = self._http_gateway
+            replacement_workers.extend([
+                FakeWorkerDecorator(FetchFileWorker(
+                    progress_reporter=self._progress_reporter, http_gateway=fake_http, file_system=self._file_system,
+                    timeout=self._config['downloader_timeout'],
+                ), fake_http),
+                FakeWorkerDecorator(FetchDataWorker(
+                    http_gateway=fake_http,
+                    file_system=self._file_system,
+                    progress_reporter=self._progress_reporter,
+                    fail_ctx=self._fail_ctx,
+                    timeout=self._config['downloader_timeout'],
+                ), fake_http),
+            ])
+
+        replacement_type_ids = {r.job_type_id() for r in replacement_workers}
+        workers = [w for w in super().create_workers() if w.job_type_id() not in replacement_type_ids]
+        return [*workers, *replacement_workers]
+
+
+class FakeWorkerDecorator(DownloaderWorker):
+    def __init__(self, worker: DownloaderWorker, fake_http: FakeHttpGateway):
+        self._worker = worker
+        self._fake_http = fake_http
+
+    def job_type_id(self) -> int: return self._worker.job_type_id()
+    def operate_on(self, job: Job) -> WorkerResult:
+        if isinstance(job, FetchFileJob):
+            self._fake_http.set_file_ctx({
+                'description': {**job.pkg.description},
+                'path': job.pkg.full_path,
+                'info': job.pkg.rel_path
+            })
+        elif isinstance(job, FetchDataJob):
+            self._fake_http.set_file_ctx({
+                'description': {**job.description},
+                'path': None,
+                'info': None
+            })
+        try:
+            return self._worker.operate_on(job)
+        finally:
+            self._fake_http.set_file_ctx(None)

@@ -59,7 +59,7 @@ class OpenZipContentsWorker(DownloaderWorker):
         try:
             self._process_index_ctx.file_system.unzip_contents(job.transfer_job.transfer(), target_path, (job.target_folder, job.files_to_unzip, job.filtered_data['files']))  # type: ignore[union-attr]
         except UnzipError as e:
-            self._process_index_ctx.error_ctx.swallow_error(e)
+            self._process_index_ctx.fail_ctx.swallow_error(e)
             return [], e
 
         self._logger.bench('OpenZipContentsWorker unzip done...', job.db.db_id, job.zip_id)

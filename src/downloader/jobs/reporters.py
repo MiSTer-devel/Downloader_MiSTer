@@ -183,19 +183,6 @@ class InstallationReportImpl(InstallationReport):
         self._jobs_tag_completed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
         self._jobs_tag_failed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
 
-    def reset(self) -> None:
-        self._jobs_started.clear()
-        self._jobs_completed.clear()
-        self._jobs_cancelled.clear()
-        self._jobs_failed.clear()
-        self._jobs_retried.clear()
-        self._processed_files_set.data.clear()
-        self._processed_folders.data.clear()
-        self._processed_folders_set.data.clear()
-        self._jobs_tag_tracking.data.reset()
-        self._jobs_tag_completed.data.clear()
-        self._jobs_tag_failed.data.clear()
-
     def add_job_started(self, job: Job) -> None:
         self._jobs_started[job.type_id].append(job)
         with self._jobs_tag_tracking as tracking: tracking.add_job_started(job)
@@ -408,14 +395,17 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
 
 
 class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
-    def __init__(self, logger: Logger, waiter: Waiter, interrupts: Interruptions, report: InstallationReportImpl) -> None:
+    def __init__(self, logger: Logger, waiter: Waiter, interrupts: Interruptions) -> None:
         self._logger = logger
         self._interrupts = interrupts
-        self._report = report
         self._session_logger = FileDownloadSessionLoggerImpl(logger, waiter)
+        self._report: Optional[InstallationReportImpl] = None
 
-    def session_logger(self) -> FileDownloadSessionLogger:
-        return self._session_logger
+    def installation_report(self) -> InstallationReport: return self._report
+    def session_logger(self) -> FileDownloadSessionLogger: return self._session_logger
+
+    def set_installation_report(self, report: InstallationReportImpl):
+        self._report = report
 
     def notify_job_started(self, job: Job) -> None:
         self._report.add_job_started(job)

@@ -25,17 +25,17 @@ from downloader.jobs.transfer_job import TransferJob
 from downloader.jobs.wait_db_zips_job import WaitDbZipsJob
 from downloader.jobs.process_db_index_job import ProcessDbIndexJob
 from downloader.jobs.index import Index
-from downloader.jobs.worker_context import DownloaderWorker, NilJob, JobErrorCtx
+from downloader.jobs.worker_context import DownloaderWorker, NilJob, FailCtx
 from downloader.jobs.process_db_main_job import ProcessDbMainJob
 from downloader.local_store_wrapper import NO_HASH_IN_STORE_CODE, StoreFragmentZipSummary
 from downloader.logger import Logger
 
 
 class ProcessDbMainWorker(DownloaderWorker):
-    def __init__(self, logger: Logger, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx) -> None:
+    def __init__(self, logger: Logger, progress_reporter: ProgressReporter, fail_ctx: FailCtx) -> None:
         self._logger = logger
         self._progress_reporter = progress_reporter
-        self._error_ctx = error_ctx
+        self._fail_ctx = fail_ctx
 
     def job_type_id(self) -> int: return ProcessDbMainJob.type_id
     def reporter(self): return self._progress_reporter
@@ -67,7 +67,7 @@ class ProcessDbMainWorker(DownloaderWorker):
                 #if zip_id != 'cheats_folder_psx': continue
                 zip_job, err = _make_zip_job(zip_summaries.get(zip_id, None), ZipJobContext(zip_id=zip_id, zip_description=zip_description, config=config, job=job))
                 if err is not None:
-                    self._error_ctx.swallow_error(err)
+                    self._fail_ctx.swallow_error(err)
                     job.ignored_zips.append(zip_id)
                     continue
 

@@ -28,7 +28,7 @@ from downloader.logger import Logger
 class NilJob(Job): type_id = -1
 
 
-class JobErrorCtx:
+class FailCtx:
     def __init__(self, logger: Logger, fail_policy: FailPolicy = FailPolicy.FAULT_TOLERANT) -> None:
         self._logger = logger
         self._fail_policy = fail_policy

@@ -25,17 +25,17 @@ from downloader.file_system import FileSystem
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.fetch_data_job import FetchDataJob
-from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
+from downloader.jobs.worker_context import DownloaderWorker, FailCtx
 from downloader.jobs.errors import FileDownloadError, FileValidationError
 from typing import Optional, Any
 
 
 class FetchDataWorker(DownloaderWorker):
-    def __init__(self, http_gateway: HttpGateway, file_system: FileSystem, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx, timeout: int) -> None:
+    def __init__(self, http_gateway: HttpGateway, file_system: FileSystem, progress_reporter: ProgressReporter, fail_ctx: FailCtx, timeout: int) -> None:
         self._http_gateway = http_gateway
         self._file_system = file_system
         self._progress_reporter = progress_reporter
-        self._error_ctx = error_ctx
+        self._fail_ctx = fail_ctx
         self._timeout = timeout
 
     def job_type_id(self) -> int: return FetchDataJob.type_id
@@ -44,7 +44,7 @@ class FetchDataWorker(DownloaderWorker):
     def operate_on(self, job: FetchDataJob) -> WorkerResult:  # type: ignore[override]
         job.data, error = self._fetch_data(job.source, job.description.get('hash', None), job.description.get('size', None), job.calcs)
         if error is not None:
-            self._error_ctx.swallow_error(error)
+            self._fail_ctx.swallow_error(error)
             return [], error
 
         return [] if job.after_job is None else [job.after_job], None

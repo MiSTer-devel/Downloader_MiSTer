@@ -19,18 +19,18 @@
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob
-from downloader.jobs.worker_context import DownloaderWorker, JobErrorCtx
+from downloader.jobs.worker_context import DownloaderWorker, FailCtx
 from downloader.local_repository import LocalRepository
 from downloader.logger import Logger
 
 
 class LoadLocalStoreWorker(DownloaderWorker):
-    def __init__(self, logger: Logger, local_repository: LocalRepository, base_path_relocator: BasePathRelocator, progress_reporter: ProgressReporter, error_ctx: JobErrorCtx) -> None:
+    def __init__(self, logger: Logger, local_repository: LocalRepository, base_path_relocator: BasePathRelocator, progress_reporter: ProgressReporter, fail_ctx: FailCtx) -> None:
         self._logger = logger
         self._local_repository = local_repository
         self._base_path_relocator = base_path_relocator
         self._progress_reporter = progress_reporter
-        self._error_ctx = error_ctx
+        self._fail_ctx = fail_ctx
 
     def job_type_id(self) -> int: return LoadLocalStoreJob.type_id
     def reporter(self): return self._progress_reporter
@@ -49,7 +49,7 @@ class LoadLocalStoreWorker(DownloaderWorker):
                     self._logger.debug('WARNING! Base path relocation could not be saved in the store!')
                     continue
         except Exception as e:
-            self._error_ctx.swallow_error(e)
+            self._fail_ctx.swallow_error(e)
             return [], e
 
         job.local_store = local_store
