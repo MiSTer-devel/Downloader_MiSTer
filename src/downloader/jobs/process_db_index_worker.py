@@ -349,7 +349,7 @@ def process_create_folder_packages(ctx: ProcessIndexCtx, create_folder_pkgs: Lis
         else:
             created_folders.add(folder_pkg.full_path)
 
-    installed_folders = [f for f in processing_folders if f.db_path() in db_folder_index]
+    installed_folders = [f for f in processing_folders if f.rel_path in db_folder_index]
     return folder_copies_to_be_removed, installed_folders, created_folders, errors
 
 def create_fetch_jobs(ctx: ProcessIndexCtx, db_id: str, non_existing_pkgs: list[_FetchFilePackage], need_update_pkgs: list[_FetchFilePackage], created_folders: set[str], base_files_url: str) -> List[Job]:

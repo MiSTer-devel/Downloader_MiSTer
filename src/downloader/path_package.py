@@ -128,12 +128,6 @@ class PathPackage:
             ) if self.pext_props is None else self.pext_props.clone(),
         )
 
-    def db_path(self) -> str:
-        if self.kind == PATH_PACKAGE_KIND_PEXT:
-            return path_pext(self.rel_path, self.description)
-        else:
-            return self.rel_path
-
     def temp_path(self, already_exists: bool) -> Optional[str]:
         if 'tmp' in self.description and isinstance(self.description['tmp'], str):
             return (self.drive + '/' + self.description['tmp']) if self.drive is not None else self.description['tmp']

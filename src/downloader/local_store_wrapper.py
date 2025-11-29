@@ -520,8 +520,8 @@ class ReadOnlyStoreAdapter:
             is_pext = 'target_folder_path' in zip_data and zip_data['target_folder_path'].startswith('|') or zip_data.get('path', '') == 'pext'
             if not is_pext:
                 continue
-            data['files'] = {path_pext(f, d): d for f, d in data['files'].items()}
-            data['folders'] = {path_pext(f, d): d for f, d in data['folders'].items()}
+            data['files'] = {f: {**d, "path": "pext"} for f, d in data['files'].items()}
+            data['folders'] = {f: {**d, "path": "pext"} for f, d in data['folders'].items()}
 
         return grouped
 
