@@ -24,12 +24,12 @@ verbose = false
 ;   'fastest' -> Only check file presences when there are database changes. Fastest.
 ;
 ;   'balanced' -> Check file presences when there are database changes or the free space in the
-;             storages have increased noticeably (2mb). Recommended for most users.
+;           storages have increased noticeably (2mb). Recommended for most users.
 ;
 ;   'exhaustive' -> Always check file presences. Option for users who remove/add cores manually.
 ;
 ;   'verify_integrity' -> Always check file presences and hashes (much slower). Useful to verify
-;             that installed files are not corrupted (ExFAT partitions can become corrupt in rare cases).
+;           that installed files are not corrupted (ExFAT partitions can become corrupt in rare cases).
 ;
 file_checking = 'balanced'
 
