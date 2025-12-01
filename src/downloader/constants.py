@@ -35,7 +35,7 @@ REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE: Final[int] = 30
 REBOOT_WAIT_TIME_STANDARD: Final[int] = 5
 
 # File Checking minimal check parameters:
-FILE_CHECKING_SPACE_CHECK_TOLERANCE = 2 * 1024 * 1024  # 2MB
+FILE_CHECKING_SPACE_CHECK_TOLERANCE = 512 * 1024  # 512kb
 
 # File System affixes
 SUFFIX_file_in_progress: Final[str] = '._downloader_in_progress'
