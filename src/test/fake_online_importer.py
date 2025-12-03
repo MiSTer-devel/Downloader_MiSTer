@@ -294,6 +294,7 @@ class OnlineImporterWorkersFactory(ProductionOnlineImporterWorkersFactory):
             fake_http: FakeHttpGateway = self._http_gateway
             replacement_workers.extend([
                 FakeWorkerDecorator(FetchFileWorker(
+                    logger=NoLogger(),
                     progress_reporter=self._progress_reporter, http_gateway=fake_http, file_system=self._file_system,
                     timeout=self._config['downloader_timeout'],
                 ), fake_http),

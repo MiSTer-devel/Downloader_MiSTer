@@ -27,7 +27,7 @@ class OnlineImporterTestBase(unittest.TestCase):
     def assertReportsNothing(self, sut, save=False, failed_folders=None, failed_zips=None, skipped_dbs=None, skipped_updated_files=None):
         self.assertReports(sut, [], save=save, failed_folders=failed_folders, failed_zips=failed_zips, skipped_dbs=skipped_dbs, skipped_updated_files=skipped_updated_files)
 
-    def assertReports(self, sut, installed=None, errors=None, needs_reboot=False, save=True, failed_folders=None, failed_zips=None, full_partitions=None, validated=None, downloaded=None, skipped_dbs=None, skipped_updated_files=None, verified_files=None):
+    def assertReports(self, sut, installed=None, errors=None, needs_reboot=False, save=True, failed_folders=None, failed_zips=None, full_partitions=None, validated=None, downloaded=None, skipped_dbs=None, skipped_updated_files=None, verified_files=None, failed_verification_files=None):
         box = sut.box()
         if installed is None and validated is None and downloaded is None:
             installed = []
@@ -45,6 +45,8 @@ class OnlineImporterTestBase(unittest.TestCase):
             skipped_updated_files = {}
         if verified_files is None:
             verified_files = []
+        if failed_verification_files is None:
+            failed_verification_files = []
         if downloaded is not None:
             self.assertEqual(sorted(remove_all_priority_paths(downloaded)), sorted(box.downloaded_files()), 'downloaded')
         if validated is not None:
@@ -59,6 +61,7 @@ class OnlineImporterTestBase(unittest.TestCase):
         self.assertEqual(sorted(skipped_dbs), sorted(box.skipped_dbs()), 'skipped dbs')
         self.assertEqual(skipped_updated_files, box.skipped_updated_files(), 'skipped updated files')
         self.assertEqual(sorted(verified_files), sorted(box.verified_integrity_files()), 'verified files')
+        self.assertEqual(sorted(failed_verification_files), sorted(box.failed_verification_files()), 'verified files')
         self.assertEqual(save, box.needs_save(), 'needs save')
         self.assertEqual([], list(box.old_pext_paths()), 'should not have old pext paths even in _old_pext tests')
         self.assertIsNone(sut.error())

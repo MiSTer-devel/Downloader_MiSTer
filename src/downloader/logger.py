@@ -99,7 +99,7 @@ class FileLogger(Logger, FilelogManager):
         self._do_print_in_file(*args, sep=sep, end=end, flush=flush)
 
     def debug(self, *args: Any, sep: str='', end: str='\n', flush: bool=True) -> None:
-        self._do_print_in_file("DEBUG| ", *_transform_debug_args(args), sep=sep, end=end, flush=flush)
+        self._do_print_in_file("DEBUG| ", *args, sep=sep, end=end, flush=flush)
 
     def bench(self, *args: Any) -> None:
         self._do_print_in_file(*args, sep='', end='\n', flush=False)

@@ -270,7 +270,7 @@ class FakeFileSystem(ProductionFileSystem):
 
         return False
 
-    def remove_folder(self, path):
+    def remove_folder(self, path) -> Optional[Exception]:
         folder = self._path(path)
         if folder in self.state.folders:
             for other_folder in self.state.folders:
@@ -279,6 +279,7 @@ class FakeFileSystem(ProductionFileSystem):
 
             self.state.folders.pop(folder)
         self._write_records.append(_Record('make_dirs', folder))
+        return None
 
     def remove_non_empty_folder(self, folder_path):
         path = self._path(folder_path)
@@ -309,15 +310,15 @@ class FakeFileSystem(ProductionFileSystem):
 
         return in_stream.buf, in_stream.description.get('hash', 'no_hash') if calc_md5 else ''
 
-    def unlink(self, path, verbose=True):
+    def unlink(self, path, verbose=True) -> Optional[Exception]:
         full_path = self._path(path)
         if full_path in self.state.files:
             self.state.files.pop(full_path)
             self._write_records.append(_Record('unlink', full_path))
             self._fs_cache.remove_file(full_path)
-            return True
+            return None
         else:
-            return False
+            return FileNotFoundError(path)
 
     def load_dict_from_transfer(self, source: str, transfer: Union[str, io.BytesIO]):
         if isinstance(transfer, str):

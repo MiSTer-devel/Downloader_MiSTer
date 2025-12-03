@@ -76,8 +76,11 @@ class TestFileSystem(unittest.TestCase):
         self.sut().touch(empty_file)
         self.assertTrue(self.sut().is_file(empty_file))
 
-        self.sut().unlink(empty_file)
+        self.assertIsNone(self.sut().unlink(empty_file))
         self.assertFalse(self.sut().is_file(empty_file))
+
+    def test_unlink___on_non_existing_file___returns_file_not_found_error(self):
+        self.assertIsInstance(self.sut().unlink('file not existing'), FileNotFoundError)
 
     def test_curl_path_temp_x___always___returns_temp_plus_x(self):
         self.assertEqual('/tmp/x', self.sut().download_target_path('/tmp/x'))
@@ -89,11 +92,11 @@ class TestFileSystem(unittest.TestCase):
     def test_remove_folder___on_existing_folder___removes_it(self):
         self.sut().make_dirs('foo')
         self.assertTrue(os.path.isdir(str(Path(self.tempdir.name) / 'foo')))
-        self.sut().remove_folder('foo')
+        self.assertIsNone(self.sut().remove_folder('foo'))
         self.assertFalse(os.path.isdir(str(Path(self.tempdir.name) / 'foo')))
 
     def test_remove_folder___on_missing_folder___does_nothing(self):
-        self.sut().remove_folder('not_existing/')
+        self.assertIsInstance(self.sut().remove_folder('not_existing/'), FileNotFoundError)
 
     def test_folder_has_items___on_existing_folder_with_files___returns_true(self):
         self.sut().make_dirs('foo')

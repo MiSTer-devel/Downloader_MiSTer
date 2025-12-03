@@ -73,16 +73,19 @@ class CertificatesFix:
         return self._get_new_cacert(cacert_path)
 
     def _unlink(self, path) -> bool:
-        try:
-            self._file_system.unlink(path)
-            return True
-        except OSError as err:
+        err = self._file_system.unlink(path)
+        if isinstance(err, OSError):
             if err.errno != 30:
                 raise err
 
             self._logger.debug(err)
             self._logger.debug("ERROR: Could not remove certs file.")
             return False
+        elif err is not None:
+            self._logger.debug('WARNING: certificates_fix._unlink failed ', path, err)
+            return True
+        else:
+            return True
 
     def _get_new_cacert(self, cacert_path) -> bool:
         try:

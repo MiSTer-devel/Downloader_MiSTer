@@ -42,7 +42,7 @@ class TestOnlineImporterFileChecking(OnlineImporterTestBase):
 
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_test_with_file_a_descr(), store)
-        self.assertReports(sut, [file_a], save=False, verified_files=[])
+        self.assertReports(sut, [file_a], save=False, verified_files=[], failed_verification_files=[file_a])
 
     def test_download_on_exhaustive___on_installed_db___does_nothing(self):
         store = store_test_with_file_a_descr()
