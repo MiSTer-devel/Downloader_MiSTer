@@ -20,7 +20,7 @@ from threading import Lock
 
 from downloader.config import Config
 from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
-from downloader.db_entity import DbEntity, fix_folders
+from downloader.db_entity import DbEntity
 from downloader.db_utils import build_db_config, can_skip_db
 from downloader.file_system import FileSystem
 from downloader.job_system import WorkerResult, JobContext, ProgressReporter
@@ -75,8 +75,6 @@ class OpenDbWorker(DownloaderWorker):
                 self._fail_ctx.swallow_error(error)
                 return [], error
 
-        fix_folders(db.folders)
-
         self._file_download_session_logger.print_header(db)
 
         calcs = job.transfer_job.calcs  # type: ignore[union-attr]
@@ -100,7 +98,7 @@ class OpenDbWorker(DownloaderWorker):
         if sigs is not None:
             sig = sigs.get(job.section, None)
             if sig is not None:
-                if can_skip_db(config['file_checking'], sig, db_hash, db_size, config['filter']):
+                if can_skip_db(self._config['file_checking'], sig, db_hash, db_size, config['filter']):
                     self._logger.debug('Skipping db process. No changes detected for: ', db.db_id)
                     job.skipped = True
                     return [], None

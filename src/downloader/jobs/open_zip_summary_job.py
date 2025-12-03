@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import Dict, Any, Optional
+from typing import Any, Optional
 
 from downloader.config import Config, ConfigDatabaseSection
 from downloader.db_entity import DbEntity
@@ -35,7 +35,7 @@ class OpenZipSummaryJob(Job):
     store: ReadOnlyStoreAdapter
     zip_id: str
     ini_description: ConfigDatabaseSection
-    zip_description: Dict[str, Any]
+    zip_description: dict[str, Any]
     config: Config
     transfer_job: TransferJob # Job & Transferrer  @TODO: Python 3.10
     backup: Optional[ProcessZipIndexJob]

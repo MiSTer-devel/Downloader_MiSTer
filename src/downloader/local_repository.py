@@ -48,6 +48,7 @@ class LocalRepository(FilelogSaver):
         self._last_successful_run_value: Optional[str] = None
         self._logfile_path_value: Optional[str] = None
         self._storage_backup_pext_path_value: Optional[str] = None
+        self._temp_log_name: Optional[str] = None
 
     @property
     def _storage_backup_pext_path(self) -> str:
@@ -236,8 +237,9 @@ class LocalRepository(FilelogSaver):
             try:
                 if self._file_system.is_file(self._storage_load_path):
                     self._file_system.copy(self._storage_load_path, self._storage_backup_pext_path)
-                if self._config['config_path'].is_file():
-                    self._file_system.append(str(self._config['config_path']), self._storage_backup_pext_path)
+                if self._temp_log_name is not None:
+                    self._logger.debug('Appending log into storage backup ext path.', flush=True)
+                    self._file_system.append(self._temp_log_name, self._storage_backup_pext_path)
 
             except Exception as e:
                 self._logger.debug('Could not backup local store')
@@ -319,6 +321,9 @@ class LocalRepository(FilelogSaver):
             self._logger.debug(e)
 
         self._logger.bench('LocalRepository rotate logs end.')
+
+    def set_temp_log_name(self, name: str) -> None:
+        self._temp_log_name = name
 
     def save_log_from_tmp(self, path) -> None:
         try:

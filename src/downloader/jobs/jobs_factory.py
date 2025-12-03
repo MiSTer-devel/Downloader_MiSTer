@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Any
 from dataclasses import dataclass
 
 from downloader.config import Config, ConfigDatabaseSection
@@ -44,11 +44,11 @@ def make_transfer_job(source: str, description: dict[str, Any], do_calcs: bool, 
 @dataclass
 class ZipJobContext:
     zip_id: str
-    zip_description: Dict[str, Any]
+    zip_description: dict[str, Any]
     config: Config
     job: ProcessDbMainJob
 
-def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any], process_zip_backup: Optional[ProcessZipIndexJob]) -> TransferJob:
+def make_open_zip_summary_job(z: ZipJobContext, file_description: dict[str, Any], process_zip_backup: Optional[ProcessZipIndexJob]) -> TransferJob:
     zip_tag = make_zip_tag(z.job.db, z.zip_id)
     transfer_job = make_transfer_job(file_description['url'], file_description, False, z.job.db.db_id)
     transfer_job.add_tag(zip_tag)  # type: ignore[union-attr]
@@ -69,10 +69,9 @@ def make_open_zip_summary_job(z: ZipJobContext, file_description: Dict[str, Any]
     return transfer_job
 
 
-def make_process_zip_index_job(zip_id: str, zip_description: Dict[str, Any], zip_index: ZipIndexEntity, config: Config, db: DbEntity, ini_description: ConfigDatabaseSection, store: ReadOnlyStoreAdapter, has_new_zip_summary: bool) -> ProcessZipIndexJob:
+def make_process_zip_index_job(zip_id: str, zip_index: ZipIndexEntity, config: Config, db: DbEntity, ini_description: ConfigDatabaseSection, store: ReadOnlyStoreAdapter, has_new_zip_summary: bool) -> ProcessZipIndexJob:
     job = ProcessZipIndexJob(
         zip_id=zip_id,
-        zip_description=zip_description,
         zip_index=zip_index,
         config=config,
         db=db,
@@ -86,7 +85,7 @@ def make_process_zip_index_job(zip_id: str, zip_description: Dict[str, Any], zip
 
 def make_zip_tag(db: DbEntity, zip_id: str) -> str:  return f'{db.db_id}:zip:{zip_id}'
 
-def make_zip_kind(kind: Optional[str], ctx: Any = None) -> Tuple[ZipKind, Optional[Exception]]:
+def make_zip_kind(kind: Optional[str], ctx: Any = None) -> tuple[ZipKind, Optional[Exception]]:
     if kind == 'extract_all_contents':
         return ZipKind.EXTRACT_ALL_CONTENTS, None
     elif kind == 'extract_single_files':

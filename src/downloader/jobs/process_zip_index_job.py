@@ -38,7 +38,6 @@ class ProcessZipIndexJob(Job):
     config: Config
     zip_id: str
     ini_description: ConfigDatabaseSection
-    zip_description: dict[str, Any]
     zip_index: ZipIndexEntity
     has_new_zip_summary: bool
 

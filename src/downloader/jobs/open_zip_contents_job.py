@@ -18,7 +18,7 @@
 
 from dataclasses import field, dataclass
 from enum import IntEnum, auto, unique
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional
 
 from downloader.config import ConfigDatabaseSection
 from downloader.db_entity import DbEntity
@@ -46,11 +46,11 @@ class OpenZipContentsJob(Job):
 
     zip_id: str
     zip_kind: ZipKind
-    zip_description: Dict[str, Any]
+    zip_description: dict[str, Any]
     target_folder: Optional[PathPackage]
     total_amount_of_files_in_zip: int
-    files_to_unzip: List[PathPackage]
-    recipient_folders: List[PathPackage]
+    files_to_unzip: list[PathPackage]
+    recipient_folders: list[PathPackage]
     transfer_job: TransferJob # Job & Transferrer @TODO: Python 3.10
     action_text: str
     zip_base_files_url: str
@@ -59,8 +59,8 @@ class OpenZipContentsJob(Job):
     def retry_job(self): return self.transfer_job
 
     # Results
-    downloaded_files: List[PathPackage] = field(default_factory=list)
-    validated_files: List[PathPackage] = field(default_factory=list)
-    failed_files: List[PathPackage] = field(default_factory=list)
-    directories_to_remove: List[PathPackage] = field(default_factory=list)
-    files_to_remove: List[PathPackage] = field(default_factory=list)
+    downloaded_files: list[PathPackage] = field(default_factory=list)
+    validated_files: list[PathPackage] = field(default_factory=list)
+    failed_files: list[PathPackage] = field(default_factory=list)
+    directories_to_remove: list[PathPackage] = field(default_factory=list)
+    files_to_remove: list[PathPackage] = field(default_factory=list)

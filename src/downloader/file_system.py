@@ -28,7 +28,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Final, List, Optional, Set, Dict, Any, Tuple, Union, IO, BinaryIO
 
-from downloader.config import AllowDelete, Config
+from downloader.config import Config
 from downloader.constants import HASH_file_does_not_exist, STORAGE_PATHS_SET
 from downloader.error import DownloaderError
 from downloader.logger import Logger, OffLogger
@@ -79,7 +79,7 @@ class FileSystemFactory:
         #         self._logger.debug('Using standard JSON library.')
         #     self._logger.bench('FileSystemFactory trying to load ORJSON end.')
 
-        return _FileSystem(config, self._path_dictionary, self._logger, self._unique_temp_filenames, self._shared_state)
+        return _FileSystem(config['base_path'], self._path_dictionary, self._logger, self._unique_temp_filenames, self._shared_state)
 
     def cancel_ongoing_operations(self) -> None:
         self._shared_state.interrupting_operations = True
@@ -161,10 +161,6 @@ class FileSystem(ABC):
 
     @abstractmethod
     def folder_has_items(self, path: str) -> bool:
-        """interface"""
-
-    @abstractmethod
-    def folders(self) -> List[str]:
         """interface"""
 
     @abstractmethod
@@ -271,8 +267,8 @@ class FileWriteError(FsError): pass
 class FsTimeoutError(FsError): pass
 
 class _FileSystem(FileSystem):
-    def __init__(self, config: Config, path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], shared_state: 'FsSharedState') -> None:
-        self._config = config
+    def __init__(self, base_path: str, path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], shared_state: 'FsSharedState') -> None:
+        self._base_path = base_path
         self._path_dictionary = path_dictionary
         self._logger = logger
         self._unique_temp_filenames = unique_temp_filenames
@@ -458,13 +454,7 @@ class _FileSystem(FileSystem):
 
         return False
 
-    def folders(self) -> List[str]:
-        raise Exception('folders Not implemented')
-
     def remove_folder(self, path: str) -> None:
-        if self._config['allow_delete'] != AllowDelete.ALL:
-            return
-
         full_path = self._path(path)
         self._debug_log('Deleting empty folder', (path, full_path))
         try:
@@ -529,12 +519,6 @@ class _FileSystem(FileSystem):
 
     def unlink(self, path: str, verbose: bool = True) -> bool:
         verbose = verbose and not path.startswith('/tmp/')
-        if self._config['allow_delete'] != AllowDelete.ALL:
-            if self._config['allow_delete'] == AllowDelete.OLD_RBF and path[-4:].lower() == ".rbf":
-                return self._unlink(path, verbose)
-
-            return True
-
         return self._unlink(path, verbose)
 
     def load_dict_from_transfer(self, source: str, transfer: Union[str, io.BytesIO]) -> Dict[str, Any]:
@@ -652,7 +636,7 @@ class _FileSystem(FileSystem):
         if path[0] == '/' or os.path.isabs(path):
             return path
 
-        return os.path.join(self._config['base_path'], path)
+        return os.path.join(self._base_path, path)
 
 
 class InvalidFileResolution(DownloaderError):
