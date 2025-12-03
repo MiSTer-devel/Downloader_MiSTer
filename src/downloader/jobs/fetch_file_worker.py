@@ -33,7 +33,8 @@ from downloader.waiter import Waiter
 
 
 class FetchFileWorker(DownloaderWorker):
-    def __init__(self, progress_reporter: ProgressReporter, http_gateway: HttpGateway, file_system: FileSystem, timeout: int) -> None:
+    def __init__(self, logger: Logger, progress_reporter: ProgressReporter, http_gateway: HttpGateway, file_system: FileSystem, timeout: int) -> None:
+        self._logger = logger
         self._progress_reporter = progress_reporter
         self._file_system = file_system
         self._fetcher = FileFetcher(http_gateway=http_gateway, file_system=file_system, timeout=timeout)
@@ -58,7 +59,9 @@ class FetchFileWorker(DownloaderWorker):
 
         try:
             if file_hash != desc['hash']:
-                self._file_system.unlink(file_path, verbose=False)
+                err = self._file_system.unlink(file_path, verbose=False)
+                if err is not None:
+                    self._logger.debug('WARNING: FetchFileWorker could not remove file_path ', file_path, err)
                 return [], FileValidationError(f"Bad hash on {job.pkg.rel_path} ({desc['hash']} != {file_hash})")
 
             if file_path != target_path:

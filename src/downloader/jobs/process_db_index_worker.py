@@ -125,8 +125,8 @@ def process_index_job_main_sequence(ctx: ProcessIndexCtx, job: Union[ProcessDbIn
 
     if config['file_checking'] == FileChecking.VERIFY_INTEGRITY:
         logger.bench(bench_label, ' verify not validated files: ', db.db_id, zip_id)
-        job.verified_integrity_pkgs, failed_verification_pkgs = verify_present_not_validated_files_hashes(ctx, job.present_not_validated_files)
-        need_update_pkgs.extend(failed_verification_pkgs)
+        job.verified_integrity_pkgs, job.failed_verification_pkgs = verify_present_not_validated_files_hashes(ctx, job.present_not_validated_files)
+        need_update_pkgs.extend(job.failed_verification_pkgs)
 
     if non_existing_pkgs or need_update_pkgs:
         logger.bench(bench_label, ' Reserve space: ', db.db_id, zip_id)
@@ -241,8 +241,9 @@ def verify_present_not_validated_files_hashes(ctx: ProcessIndexCtx, already_inst
             ctx.file_download_session_logger.print_progress_line(f'OK: {pkg.rel_path}')
             verified_integrity_pkgs.append(pkg)
         else:
-            ctx.file_download_session_logger.print_progress_line(f'FAILED VERIFICATION: {pkg.rel_path}')
-            ctx.logger.debug('fs_hash: ', fs_hash, ' != desc_hash: ', pkg.description['hash'])
+            fs_size = file_system.size(pkg.full_path)
+            ctx.file_download_session_logger.print_progress_line(f'WARNING (failed verification): {pkg.rel_path}')
+            ctx.logger.debug('fs_hash: ', fs_hash, ' != desc_hash: ', pkg.description['hash'], ' fs_size: ', fs_size, ' desc_size: ', pkg.description['size'])
             failed_verification_pkgs.append(pkg)
 
     return verified_integrity_pkgs, failed_verification_pkgs

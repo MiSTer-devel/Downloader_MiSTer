@@ -164,7 +164,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def remove_folder(self, path: str) -> None:
+    def remove_folder(self, path: str) -> Optional[Exception]:
         """interface"""
 
     @abstractmethod
@@ -180,7 +180,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def unlink(self, path: str, verbose: bool = True) -> bool:
+    def unlink(self, path: str, verbose: bool = True) -> Optional[Exception]:
         """interface"""
 
     @abstractmethod
@@ -248,15 +248,10 @@ class ReadOnlyFileSystem:
     def size(self, path):
         return self._fs.size(path)
 
-    def unlink(self, file_path, verbose: bool=False, exception=None):
-        if isinstance(exception, UnlinkTemporaryException):
-            self._fs.unlink(file_path)
-            return
-
+    def unlink(self, file_path, verbose: bool=False):
         raise FileWriteError(f"Cannot delete file '{file_path}' from read-only filesystem wrapper")
 
 
-class UnlinkTemporaryException: pass
 class FsError(DownloaderError): pass
 class FsOperationsError(FsError): pass
 class FolderCreationError(FsError): pass
@@ -454,13 +449,15 @@ class _FileSystem(FileSystem):
 
         return False
 
-    def remove_folder(self, path: str) -> None:
+    def remove_folder(self, path: str) -> Optional[Exception]:
         full_path = self._path(path)
         self._debug_log('Deleting empty folder', (path, full_path))
         try:
             os.rmdir(full_path)
-        except OSError as e:
-            self._ignore_error(e)
+        except Exception as e:
+            return e
+
+        return None
 
     def _ignore_error(self, e: Exception) -> None:
         self._logger.debug(e)
@@ -517,7 +514,7 @@ class _FileSystem(FileSystem):
         buf.seek(0)
         return buf, md5_hasher.hexdigest() if calc_md5 else ''
 
-    def unlink(self, path: str, verbose: bool = True) -> bool:
+    def unlink(self, path: str, verbose: bool = True) -> Optional[Exception]:
         verbose = verbose and not path.startswith('/tmp/')
         return self._unlink(path, verbose)
 
@@ -619,7 +616,7 @@ class _FileSystem(FileSystem):
     def turn_off_logs(self) -> None:
         self._logger = OffLogger()
 
-    def _unlink(self, path: str, verbose: bool) -> bool:
+    def _unlink(self, path: str, verbose: bool) -> Optional[Exception]:
         full_path = self._path(path)
         if verbose:
             self._logger.print(f'Removing {path} ({full_path})')
@@ -628,9 +625,10 @@ class _FileSystem(FileSystem):
         try:
             Path(full_path).unlink()
             self._shared_state.remove_file(full_path)
-            return True
-        except FileNotFoundError as _:
-            return False
+            return None
+        except Exception as e:
+            self._logger.debug('unlink error: ', e)
+            return e
 
     def _path(self, path: str) -> str:
         if path[0] == '/' or os.path.isabs(path):

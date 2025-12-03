@@ -189,7 +189,9 @@ class FullRunService:
     def _remove_run_signal(self) -> None:
         if self._file_system.is_file(FILE_downloader_run_signal):
             self._logger.debug('Removing run signal: ', FILE_downloader_run_signal)
-            self._file_system.unlink(FILE_downloader_run_signal)
+            err = self._file_system.unlink(FILE_downloader_run_signal)
+            if err is not None:
+                self._logger.debug('WARNING: Could not remove run signal: ', err)
         else:
             self._logger.debug('Run signal NOT removed.')
 
@@ -246,6 +248,16 @@ class FinalReporter:
             self._logger.print()
             self._logger.print("Unused filter terms:")
             self._logger.print(format_files_message(box.unused_filter_tags()) + f" (Did you misspell {'it' if len(box.unused_filter_tags()) == 1 else 'them'}?)")
+
+        if self._config['file_checking'] == FileChecking.VERIFY_INTEGRITY:
+            self._logger.print()
+            self._logger.print(f'Verify Integrity report:')
+            self._logger.print(f'  - Verified {len(box.verified_integrity_files())} files.', end='')
+            failed_verification_amount = len(box.failed_verification_files())
+            if failed_verification_amount > 0:
+                self._logger.print(f'\n  - Verification failed for {failed_verification_amount} files; they were reinstalled.')
+            else:
+                self._logger.print(' All files were verified.')
 
         if len(box.updated_dbs()) > 0 and len(box.installed_dbs()) > 1:
             self._logger.print()

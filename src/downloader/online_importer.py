@@ -127,6 +127,7 @@ class OnlineImporterWorkersFactory:
                 progress_reporter=self._progress_reporter,
             ),
             FetchFileWorker(
+                logger=self._logger,
                 progress_reporter=self._progress_reporter,
                 http_gateway=self._http_gateway,
                 file_system=self._file_system,
@@ -253,19 +254,18 @@ class OnlineImporter:
                 continue
 
             self._logger.debug(e)
-            fs = self._file_system
             full_path = fetch_file_job.pkg.full_path
-            if fs.is_file(full_path, use_cache=False):
+            if self._file_system.is_file(full_path, use_cache=False):
                 continue
 
             backup_path = fetch_file_job.pkg.backup_path()
             temp_path = fetch_file_job.pkg.temp_path(fetch_file_job.already_exists)
-            if backup_path is not None and fs.is_file(backup_path, use_cache=False):
-                fs.move(backup_path, full_path)
-            elif temp_path is not None and fs.is_file(temp_path, use_cache=False) and fs.hash(temp_path) == fetch_file_job.pkg.description['hash']:
-                fs.move(temp_path, full_path)
+            if backup_path is not None and self._file_system.is_file(backup_path, use_cache=False):
+                self._file_system.move(backup_path, full_path)
+            elif temp_path is not None and self._file_system.is_file(temp_path, use_cache=False) and self._file_system.hash(temp_path) == fetch_file_job.pkg.description['hash']:
+                self._file_system.move(temp_path, full_path)
 
-            if fs.is_file(full_path, use_cache=False):
+            if self._file_system.is_file(full_path, use_cache=False):
                 continue
 
             # This error message should never happen.
@@ -353,6 +353,7 @@ class OnlineImporter:
         for index_job in report.get_completed_jobs(ProcessDbIndexJob):
             box.add_present_not_validated_files(index_job.present_not_validated_files)
             box.add_verified_integrity_files(index_job.verified_integrity_pkgs, index_job.db.db_id)
+            box.add_failed_verification_files(index_job.failed_verification_pkgs, index_job.db.db_id)
             box.add_duplicated_files(index_job.duplicated_files, index_job.db.db_id)
             box.add_non_duplicated_files(index_job.non_duplicated_files, index_job.db.db_id)
             box.add_present_validated_files(index_job.present_validated_files, index_job.db.db_id)
@@ -430,7 +431,7 @@ class OnlineImporter:
         for db_id, zip_id in box.removed_zips():
             write_stores[db_id].remove_zip_id(zip_id)
 
-        fs = self._file_system
+        self._file_system = self._file_system
 
         if len(files_to_consume := box.consume_files()) > 0:
             logger.bench('OnlineImporter files_to_consume start.')
@@ -459,16 +460,19 @@ class OnlineImporter:
                 removed_files.append((pkg, dbs))
 
             if self._config['allow_delete'] == AllowDelete.ALL:
-                for unlink_file in unlink_list:
-                    if fs.is_file(unlink_file):
-                        fs.unlink(unlink_file)
+                pass
             elif self._config['allow_delete'] == AllowDelete.OLD_RBF:
-                for unlink_file in [uf for uf in unlink_list if uf[-4:].lower() == ".rbf"]:
-                    if fs.is_file(unlink_file):
-                        fs.unlink(unlink_file)
                 self._logger.debug('Not deleted files because AllowDelete.OLD_RBF: ', [uf for uf in unlink_list if uf[-4:].lower() != ".rbf"])
+                unlink_list = [uf for uf in unlink_list if uf[-4:].lower() == ".rbf"]
             else:
                 self._logger.debug('Not deleted files because AllowDelete.NONE: ', unlink_list)
+                unlink_list = []
+
+            for unlink_file in unlink_list:
+                if self._file_system.is_file(unlink_file):
+                    err = self._file_system.unlink(unlink_file)
+                    if err is not None:
+                        self._logger.debug('WARNING: Online Importer could not remove ', unlink_file, err)
 
             box.add_removed_files(removed_files)
             logger.bench('OnlineImporter files_to_consume done.')
@@ -497,7 +501,7 @@ class OnlineImporter:
                     write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
                 continue
 
-            if fs.folder_has_items(pkg.full_path):
+            if self._file_system.folder_has_items(pkg.full_path):
                 continue
 
             removing_folders = []
@@ -506,12 +510,12 @@ class OnlineImporter:
                     if is_external:
                         # @TODO: This count part blow is for checking if previously it was previously stored as "is_pext_external_subfolder", but since this information is lost, we need to do this. When we store "path" = "pext" we will have this information again, so we can do this much cleaner.
                         if pkg.rel_path.count('/') >= 2 and pkg.rel_path.count('/') >= 2 \
-                                and not fs.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
+                                and not self._file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
                             write_stores[db_id].remove_external_folder(drive, pkg.rel_path)
                             write_stores[db_id].remove_external_folder_from_zips(drive, pkg.rel_path)
                             removing_folders.append(full_ext_path)
                     else:
-                        if not fs.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
+                        if not self._file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
                             removing_folders.append(full_ext_path)
                             write_stores[db_id].remove_local_folder(pkg.rel_path)
                             write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
@@ -530,8 +534,10 @@ class OnlineImporter:
 
             if self._config['allow_delete'] == AllowDelete.ALL:
                 for removing_dir in removing_folders:
-                    if fs.is_folder(removing_dir) and not fs.folder_has_items(removing_dir):
-                        fs.remove_folder(removing_dir)
+                    if self._file_system.is_folder(removing_dir) and not self._file_system.folder_has_items(removing_dir):
+                        err = self._file_system.remove_folder(removing_dir)
+                        if err is not None:
+                            self._logger.debug('WARNING: Online Importer could not remove folder ', removing_dir, err)
             else:
                 self._logger.debug('Not removing empty folders because of != AllowDelete.ALL', removing_folders)
 
@@ -601,6 +607,7 @@ class InstallationBox:
         self._validated_files: dict[str, list[PathPackage]] = defaultdict(list)  # @TODO: Remove this?
         self._present_validated_files: dict[str, list[PathPackage]] = defaultdict(list)
         self._verified_integrity_file_names: list[str] = []
+        self._failed_verification_file_names: list[str] = []
         self._installed_file_pkgs: dict[str, list[PathPackage]] = defaultdict(list)
         self._installed_file_names: list[str] = []
         self._present_not_validated_files: list[str] = []
@@ -672,6 +679,9 @@ class InstallationBox:
     def add_verified_integrity_files(self, pkgs: list[PathPackage], _db_id: str) -> None:
         if len(pkgs) == 0: return
         self._verified_integrity_file_names.extend(pkg.rel_path for pkg in pkgs)
+    def add_failed_verification_files(self, pkgs: list[PathPackage], _db_id: str) -> None:
+        if len(pkgs) == 0: return
+        self._failed_verification_file_names.extend(pkg.rel_path for pkg in pkgs)
     def add_present_not_validated_files(self, paths: list[PathPackage]) -> None:
         if len(paths) == 0: return
         self._present_not_validated_files.extend([p.rel_path for p in paths])
@@ -733,6 +743,7 @@ class InstallationBox:
     def downloaded_files(self): return self._downloaded_files
     def present_validated_files(self) -> list[str]: return [pkg.rel_path for path_pkgs in self._present_validated_files.values() for pkg in path_pkgs]
     def verified_integrity_files(self) -> list[str]: return self._verified_integrity_file_names
+    def failed_verification_files(self) -> list[str]: return self._failed_verification_file_names
     def present_not_validated_files(self): return self._present_not_validated_files
     def fetch_started_files(self): return self._fetch_started_files
     def failed_files(self): return self._failed_files
