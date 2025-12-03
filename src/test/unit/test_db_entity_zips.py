@@ -18,7 +18,7 @@
 
 import unittest
 
-from downloader.db_entity import DbEntityValidationException, check_zip
+from downloader.db_entity import DbEntityValidationException, check_zip_description
 from downloader.db_entity import DbEntity
 from test.objects import raw_db_empty_descr, db_empty, zipped_nes_palettes_id
 from test.zip_objects import zipped_nes_palettes_desc
@@ -31,39 +31,39 @@ class TestDbEntityZips(unittest.TestCase):
         self.assertRaises(DbEntityValidationException, lambda: DbEntity(raw_db, db_empty))
 
     def test_construct_db_entity___with_wrong_zip_because_its_empty___raises_db_entity_validation_exception(self):
-        self.assertRaises(DbEntityValidationException, lambda: check_zip({}, db_empty, zipped_nes_palettes_id))
+        self.assertRaises(DbEntityValidationException, lambda: check_zip_description({}, db_empty, zipped_nes_palettes_id))
 
     def test_construct_db_entity___with_wrong_zip_field___raises_db_entity_validation_exception(self):
         for field in ['kind', 'description', 'contents_file']:
             with self.subTest(field):
                 raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc()})
                 raw_db['zips'][zipped_nes_palettes_id].pop(field)
-                self.assertRaises(DbEntityValidationException, lambda: check_zip(raw_db['zips'][zipped_nes_palettes_id], db_empty, zipped_nes_palettes_id))
+                self.assertRaises(DbEntityValidationException, lambda: check_zip_description(raw_db['zips'][zipped_nes_palettes_id], db_empty, zipped_nes_palettes_id))
 
     def test_construct_db_entity___with_wrong_zip_because_no_summary___raises_db_entity_validation_exception(self):
         raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc()})
         raw_db['zips'][zipped_nes_palettes_id].pop('summary_file')
-        self.assertRaises(DbEntityValidationException, lambda: check_zip(raw_db['zips'][zipped_nes_palettes_id], db_empty, zipped_nes_palettes_id))
+        self.assertRaises(DbEntityValidationException, lambda: check_zip_description(raw_db['zips'][zipped_nes_palettes_id], db_empty, zipped_nes_palettes_id))
 
     def test_construct_db_entity___with_wrong_zip_because_ambiguous_summary___raises_db_entity_validation_exception(self):
         raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc()})
         raw_db['zips'][zipped_nes_palettes_id]['internal_summary'] = {}
-        self.assertRaises(DbEntityValidationException, lambda: check_zip(raw_db['zips'][zipped_nes_palettes_id], db_empty, zipped_nes_palettes_id))
+        self.assertRaises(DbEntityValidationException, lambda: check_zip_description(raw_db['zips'][zipped_nes_palettes_id], db_empty, zipped_nes_palettes_id))
 
     def test_construct_db_entity___with_wrong_internal_zip_summary_because_of_missing_field___raises_db_entity_validation_exception(self):
         for field in {'files', 'folders'}:
             with self.subTest(field):
                 raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc(summary_internal_zip_id=zipped_nes_palettes_id)})
                 raw_db['zips'][zipped_nes_palettes_id]['internal_summary'].pop(field)
-                self.assertRaises(DbEntityValidationException, lambda: check_zip(raw_db['zips'][zipped_nes_palettes_id], db_empty, zipped_nes_palettes_id))
+                self.assertRaises(DbEntityValidationException, lambda: check_zip_description(raw_db['zips'][zipped_nes_palettes_id], db_empty, zipped_nes_palettes_id))
 
     def test_construct_db_entity___with_correct_internal_zip_summary___returns_db(self):
         raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc(summary_internal_zip_id=zipped_nes_palettes_id)})
-        self.assertIsNone(check_zip(raw_db['zips'][zipped_nes_palettes_id], db_empty, zipped_nes_palettes_id))
+        self.assertIsNone(check_zip_description(raw_db['zips'][zipped_nes_palettes_id], db_empty, zipped_nes_palettes_id))
 
     def test_construct_db_entity___with_wrong_zip_kind___raises_db_entity_validation_exception(self):
         for wrong_field in ['', None, 'wrong']:
             with self.subTest(wrong_field):
                 raw_db = raw_db_empty_descr(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc()})
                 raw_db['zips'][zipped_nes_palettes_id]['kind'] = wrong_field
-                self.assertRaises(DbEntityValidationException, lambda: check_zip(raw_db['zips'][zipped_nes_palettes_id], db_empty, zipped_nes_palettes_id))
+                self.assertRaises(DbEntityValidationException, lambda: check_zip_description(raw_db['zips'][zipped_nes_palettes_id], db_empty, zipped_nes_palettes_id))

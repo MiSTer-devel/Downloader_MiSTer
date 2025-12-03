@@ -27,7 +27,6 @@ from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FI
     FILE_yc_txt, DATABASE_LATEST_SUPPORTED_VERSION
 from downloader.db_options import DbOptions
 from downloader.error import DownloaderError
-from downloader.jobs.index import Index
 from downloader.path_package import PathPackage
 
 
@@ -63,6 +62,7 @@ class DbEntity:
         self.header: List[str] = db_props.get('header', [])
         if not isinstance(self.header, list): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "header" field. The database maintainer should fix this.')
         self.default_options: DbOptions = DbOptions(db_props.get('default_options', None) or {})
+        _fix_folders(self.folders)
 
     def extract_props(self) -> dict[str, Any]:  # pragma: no cover
         result = self.__dict__.copy()
@@ -103,10 +103,14 @@ class DbEntity:
 
 @dataclass
 class ZipIndexEntity:
-    files: Dict[str, Any]
-    folders: Dict[str, Any]
+    files: dict[str, Any]
+    folders: dict[str, Any]
     base_files_url: str
     version: int
+    description: dict[str, Any]
+
+    def __post_init__(self) -> None:
+        _fix_zip(self)
 
     def needs_migration(self) -> bool:
         return self.version != DATABASE_LATEST_SUPPORTED_VERSION
@@ -125,7 +129,7 @@ class ZipIndexEntity:
             ' Update Downloader or configure "db_url" to point to a supported database version.'
         )
 
-def check_zip(desc: dict[str, Any], db_id: str, zip_id: str) -> None:
+def check_zip_description(desc: dict[str, Any], db_id: str, zip_id: str) -> None:
     if 'kind' not in desc or desc['kind'] not in ('extract_all_contents', 'extract_single_files'):
         raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "kind" field. The database maintainer should fix this.')
     if 'description' not in desc or not isinstance(desc['description'], str):
@@ -213,14 +217,15 @@ def check_folder_paths(folders: list[str], db_id: str) -> None:
     for folder_path in folders:
         _validate_and_extract_parts_from_path(db_id, folder_path)
 
-def fix_folders(folders: dict[str, Any]) -> None:
+def _fix_folders(folders: dict[str, Any]) -> None:
     if not folders: return
 
     to_fix = [folder_path for folder_path in folders if folder_path.endswith('/')]
     for folder_path in to_fix:
         folders[folder_path[:-1]] = folders.pop(folder_path)
 
-def fix_zip(zip_desc: dict[str, Any], zip_index: ZipIndexEntity) -> None:
+def _fix_zip(zip_index: ZipIndexEntity) -> None:
+    zip_desc = zip_index.description
     if 'target_folder_path' in zip_desc and len(zip_desc['target_folder_path']) > 0 and zip_desc['target_folder_path'][0] == '|':
         zip_desc['target_folder_path'] = zip_desc['target_folder_path'][1:]
         zip_desc['path'] = 'pext'
@@ -235,6 +240,9 @@ def fix_zip(zip_desc: dict[str, Any], zip_index: ZipIndexEntity) -> None:
 
 
 def add_pext(desc: dict[str, Any]) -> dict[str, Any]:
+    if 'path' in desc and desc['path'] == 'pext':
+        return desc
+
     desc['path'] = 'pext'
     return desc
 

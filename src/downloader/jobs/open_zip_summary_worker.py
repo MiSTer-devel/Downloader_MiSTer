@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.db_entity import check_zip_summary, ZipIndexEntity, fix_zip
+from downloader.db_entity import check_zip_summary, ZipIndexEntity
 from downloader.file_system import FileSystem
 from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.jobs_factory import make_process_zip_index_job
@@ -46,10 +46,12 @@ class OpenZipSummaryWorker(DownloaderWorker):
             if 'base_files_url' in job.zip_description:
                 base_files_url = job.zip_description['base_files_url']
 
+            self._logger.bench('OpenZipSummaryWorker zip index entity instantiation: ', db.db_id, zip_id)
             zip_index = ZipIndexEntity(files=summary['files'],
                                        folders=summary['folders'],
                                        base_files_url=summary.get('base_files_url', base_files_url),
-                                       version=summary.get('v', 0))
+                                       version=summary.get('v', 0),
+                                       description=job.zip_description)
 
             if zip_index.needs_migration():
                 self._logger.bench('OpenZipSummaryWorker migrating zip index entity: ', db.db_id, zip_id)
@@ -58,13 +60,10 @@ class OpenZipSummaryWorker(DownloaderWorker):
                     self._fail_ctx.swallow_error(error)
                     return [], error
 
-            self._logger.bench('OpenZipSummaryWorker fix zips: ', db.db_id, zip_id)
-            fix_zip(job.zip_description, zip_index)
             self._logger.bench('OpenZipSummaryWorker done: ', db.db_id, zip_id)
 
             return [make_process_zip_index_job(
                 zip_id=zip_id,
-                zip_description=job.zip_description,
                 zip_index=zip_index,
                 config=job.config,
                 db=db,

@@ -18,7 +18,7 @@
 
 from typing import Dict, Any, Optional, Tuple, cast
 
-from downloader.db_entity import check_zip, ZipIndexEntity
+from downloader.db_entity import check_zip_description, ZipIndexEntity
 from downloader.job_system import WorkerResult, Job, ProgressReporter
 from downloader.jobs.jobs_factory import make_process_zip_index_job, make_open_zip_summary_job, make_zip_tag, ZipJobContext
 from downloader.jobs.transfer_job import TransferJob
@@ -98,7 +98,7 @@ class ProcessDbMainWorker(DownloaderWorker):
 
 def _make_zip_job(stored_index: Optional[StoreFragmentZipSummary], z: ZipJobContext) -> Tuple[TransferJob, Optional[Exception]]:
     try:
-        check_zip(z.zip_description, z.job.db.db_id, z.zip_id)
+        check_zip_description(z.zip_description, z.job.db.db_id, z.zip_id)
     except Exception as e:
         return NilJob(), e
 
@@ -132,12 +132,12 @@ def _make_process_zip_job_from_ctx(z: ZipJobContext, zip_summary: Dict[str, Any]
         files=zip_summary['files'],
         folders=zip_summary['folders'],
         base_files_url=zip_summary.get('base_files_url', base_files_url),
-        version=z.job.db.version
+        version=z.job.db.version,
+        description=z.zip_description
     )
 
     return make_process_zip_index_job(
         zip_id=z.zip_id,
-        zip_description=z.zip_description,
         zip_index=zip_index,
         config=z.config,
         db=z.job.db,

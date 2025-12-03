@@ -26,7 +26,7 @@ from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict, cast
 from types import MappingProxyType
 from collections import defaultdict, ChainMap
 
-from downloader.path_package import PathPackage, PathType, path_pext
+from downloader.path_package import PathPackage, PathType
 
 NO_HASH_IN_STORE_CODE = 'file_does_not_exist_so_cant_get_hash'
 
@@ -510,29 +510,27 @@ class ReadOnlyStoreAdapter:
 
         for zip_id, summary in self._store.get('filtered_zip_data', {}).items():
             for fp, fd in summary.get('files', {}).items():
-                grouped[zip_id]['files'][fp if fp[0] != '|' else fp[1:]] = fd
+                grouped[zip_id]['files'][fp] = fd
             for dp, dd in summary.get('folders', {}).items():
-                grouped[zip_id]['folders'][dp if dp[0] != '|' else dp[1:]] = dd
+                grouped[zip_id]['folders'][dp] = dd
 
         for zip_id, data in grouped.items():
             zip_data = self._store.get('zips', {}).get(zip_id, {})
             data['hash'] = zip_data.get('summary_file', {}).get('hash', NO_HASH_IN_STORE_CODE)
-            is_pext = 'target_folder_path' in zip_data and zip_data['target_folder_path'].startswith('|') or zip_data.get('path', '') == 'pext'
+            is_pext = 'target_folder_path' in zip_data and zip_data.get('path', '') == 'pext'
             if not is_pext:
                 continue
+            # @TODO: Shouldn't be pext already? But this is coming from external sources ultimately right?
+            #        Might need to address this in the migration?
             data['files'] = {f: {**d, 'path': 'pext'} for f, d in data['files'].items()}
             data['folders'] = {f: {**d, 'path': 'pext'} for f, d in data['folders'].items()}
 
         return grouped
 
     def select(self, index: ZipIndexEntity) -> 'ReadOnlyStoreAdapter':
-        # @TODO: Remove this | handling after we change the pext path format in the stores
-        norm_files = [fp[1:] if len(fp) > 0 and fp[0] == '|' else fp for fp in index.files]
-        norm_folders = [dp[1:] if len(dp) > 0 and dp[0] == '|' else dp for dp in index.folders]
-
         new_store = {
-            'files': {fp: self._store['files'][fp] for fp in norm_files if fp in self._store['files']},
-            'folders': {fp: self._store['folders'][fp] for fp in norm_folders if fp in self._store['folders']},
+            'files': {fp: self._store['files'][fp] for fp in index.files if fp in self._store['files']},
+            'folders': {fp: self._store['folders'][fp] for fp in index.folders if fp in self._store['folders']},
         }
 
         if 'base_path' in self._store:
@@ -541,8 +539,8 @@ class ReadOnlyStoreAdapter:
         if 'external' in self._store:
             new_store['external'] = {
                 drive: {
-                    'files': {fp: summary['files'][fp] for fp in norm_files if fp in summary['files']},
-                    'folders': {dp: summary['folders'][dp] for dp in norm_folders if dp in summary['folders']}
+                    'files': {fp: summary['files'][fp] for fp in index.files if fp in summary['files']},
+                    'folders': {dp: summary['folders'][dp] for dp in index.folders if dp in summary['folders']}
                 }
                 for drive, summary in self._store['external'].items()
             }
@@ -551,8 +549,8 @@ class ReadOnlyStoreAdapter:
 
     def deselect_all(self, indexes: List[ZipIndexEntity]) -> 'ReadOnlyStoreAdapter':
         # @TODO: Remove this | handling after we change the pext path format in the stores
-        norm_files = {fp if (fp[0] != '|' or len(fp) == 0) else fp[1:] for index in indexes for fp in index.files}
-        norm_folders = {dp if (dp[0] != '|' or len(dp) == 0) else dp[1:] for index in indexes for dp in index.folders}
+        norm_files = {fp for index in indexes for fp in index.files}
+        norm_folders = {dp for index in indexes for dp in index.folders}
 
         new_store = {
             'files': {fp: fd for fp, fd in self._store['files'].items() if fp not in norm_files},

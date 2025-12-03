@@ -16,18 +16,15 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import json
-import sys
 import tempfile
 import unittest
 import os
 from pathlib import Path
 
-from downloader.constants import FILE_MiSTer, K_BASE_PATH, K_BASE_SYSTEM_PATH, K_ALLOW_DELETE
-from downloader.file_system import FileSystemFactory
-from test.fake_logger import NoLogger
+from downloader.constants import K_BASE_PATH
 from test.objects import temp_name
 from test.fake_file_system_factory import make_production_filesystem_factory
-from downloader.config import AllowDelete, default_config
+from downloader.config import default_config
 
 not_created_file = temp_name() + '_opened_file'
 empty_file = temp_name() + '_empty_file'
@@ -74,46 +71,6 @@ class TestFileSystem(unittest.TestCase):
         self.sut().copy(empty_file, not_created_file)
         self.assertTrue(self.sut().is_file(not_created_file))
         self.assertTrue(self.sut().is_file(empty_file))
-
-    def test_unlink_mister___when_allow_delete_only_rbf___keeps_it(self):
-        sut = self.sut(self.default_test_config(allow_delete=AllowDelete.OLD_RBF))
-
-        sut.make_dirs_parent(FILE_MiSTer)
-        sut.touch(FILE_MiSTer)
-        self.assertTrue(sut.is_file(FILE_MiSTer))
-
-        sut.unlink(FILE_MiSTer)
-        self.assertTrue(sut.is_file(FILE_MiSTer))
-
-    def test_unlink_file_MiSTer___when_allow_delete_none___doesnt_delete_it(self):
-        sut = self.sut(self.default_test_config(allow_delete=AllowDelete.NONE))
-
-        sut.make_dirs_parent(FILE_MiSTer)
-        sut.touch(FILE_MiSTer)
-        self.assertTrue(sut.is_file(FILE_MiSTer))
-
-        sut.unlink(FILE_MiSTer)
-        self.assertTrue(sut.is_file(FILE_MiSTer))
-
-    def test_unlink_rbf_file___when_allow_delete_only_rbf___deletes_it(self):
-        sut = self.sut(self.default_test_config(allow_delete=AllowDelete.OLD_RBF))
-
-        sut.make_dirs_parent(rbf_file)
-        sut.touch(rbf_file)
-        self.assertTrue(sut.is_file(rbf_file))
-
-        sut.unlink(rbf_file)
-        self.assertFalse(sut.is_file(rbf_file))
-
-    def test_unlink_something_else___when_allow_delete_only_rbf___doesnt_delete_it(self):
-        sut = self.sut(self.default_test_config(allow_delete=AllowDelete.OLD_RBF))
-
-        sut.make_dirs_parent(empty_file)
-        sut.touch(empty_file)
-        self.assertTrue(sut.is_file(empty_file))
-
-        sut.unlink(empty_file)
-        self.assertTrue(sut.is_file(empty_file))
 
     def test_unlink_anything___with_default_config___deletes_it(self):
         self.sut().touch(empty_file)
@@ -164,18 +121,9 @@ class TestFileSystem(unittest.TestCase):
     def sut(self, config=None):
         return make_production_filesystem_factory(self.default_test_config() if config is None else config).create_for_system_scope()
 
-    def factory(self, config=None):
-        return FileSystemFactory(self.default_test_config() if config is None else config, NoLogger())
-
-    def fs_1_and_2_by_same_factory(self):
-        factory = self.factory({K_BASE_PATH: K_BASE_PATH, K_BASE_SYSTEM_PATH: K_BASE_SYSTEM_PATH})
-        return factory.create_for_system_scope(), factory.create_for_system_scope()
-
-    def default_test_config(self, allow_delete=None):
+    def default_test_config(self):
         actual_config = default_config()
-        actual_config[K_BASE_PATH] = self.tempdir.name
-        if allow_delete is not None:
-            actual_config[K_ALLOW_DELETE] = allow_delete
+        actual_config['base_path'] = self.tempdir.name
         return actual_config
 
 

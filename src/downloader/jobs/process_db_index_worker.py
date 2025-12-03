@@ -248,7 +248,7 @@ def verify_present_not_validated_files_hashes(ctx: ProcessIndexCtx, already_inst
     return verified_integrity_pkgs, failed_verification_pkgs
 
 def _url(file_path: str, file_description: Dict[str, Any], base_files_url: str) -> Any:
-    return file_description['url'] if 'url' in file_description else calculate_url(base_files_url, file_path if file_path[0] != '|' else file_path[1:])
+    return file_description['url'] if 'url' in file_description else calculate_url(base_files_url, file_path)
 
 
 def try_reserve_space(ctx: ProcessIndexCtx, file_pkgs: Iterable[PathPackage]) -> List[Tuple[Partition, int]]:
@@ -320,7 +320,7 @@ def process_create_folder_packages(ctx: ProcessIndexCtx, create_folder_pkgs: Lis
                 continue
 
             if is_external:
-                removed_pkg = pkg.clone_as_pext()
+                removed_pkg = pkg.clone_as_pext()  # @TODO: Shouldn't be pext already?
                 removed_pkg.drive = other_drive
                 removed_pkg.pext_props.drive = other_drive  # type: ignore[union-attr]
                 removed_pkg.pext_props.kind = PEXT_KIND_EXTERNAL  # type: ignore[union-attr]

@@ -37,6 +37,7 @@ file_b: Final = 'b/B'
 file_c: Final = 'c/C'
 file_d: Final = 'd/D'
 file_abc: Final = 'a/b/C'
+file_x_rbf: Final = 'x/x.rbf'
 file_nes_smb1: Final = 'games/NES/smb.nes'
 file_nes_contra: Final = 'games/NES/contra.nes'
 file_nes_palette_a: Final = 'games/NES/Palette/a.pal'
@@ -58,6 +59,7 @@ folder_b: Final = 'b'
 folder_c: Final = 'c'
 folder_d: Final = 'd'
 folder_ab: Final = 'a/b'
+folder_x: Final = 'x'
 folder_games: Final = 'games'
 folder_games_nes: Final = 'games/NES'
 folder_games_nes_palettes: Final = 'games/NES/Palette'
@@ -88,7 +90,7 @@ file_size_c: Final = 3915440
 file_size_d: Final = 4115440
 file_size_sonic: Final = 2915020
 file_size_smb1: Final = 2915020
-
+file_size_x: Final = 2915040
 
 def media_fat(path):
     return media_drive(MEDIA_FAT, path)
@@ -151,6 +153,7 @@ def config_with(
         user_defined_options=None,
         minimum_free_space=None,
         file_checking=None,
+        allow_delete=None,
 
         databases: Dict[str, Any] = None):
 
@@ -181,6 +184,8 @@ def config_with(
         config['minimum_system_free_space_mb'] = minimum_free_space
     if file_checking is not None:
         config['file_checking'] = file_checking
+    if allow_delete is not None:
+        config['allow_delete'] = allow_delete
     return config
 
 
@@ -213,9 +218,9 @@ def temp_name():
         return temp.name
 
 
-def zip_desc(description, target_folder_path, is_pext=None, zipped_files=None, summary=None, summary_hash=None, summary_size=None, contents_hash=None, contents_size=None, summary_internal_zip_id=None):
+def zip_desc(description, target_folder_path, kind=None, is_pext=None, zipped_files=None, summary=None, summary_hash=None, summary_size=None, contents_hash=None, contents_size=None, summary_internal_zip_id=None):
     json = {
-        "kind": "extract_all_contents",
+        "kind": kind or "extract_all_contents",
         "base_files_url": "https://base_files_url",
         "description": description,
         "contents_file": {
@@ -395,14 +400,15 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
 
     return entity
 
-def zip_index_entity(files=None, folders=None, base_files_url=None, version=None) -> ZipIndexEntity:
+def zip_index_entity(files=None, folders=None, base_files_url=None, version=None, description=None) -> ZipIndexEntity:
     return ZipIndexEntity(
         files=files if files is not None else {},
         folders=folders if folders is not None else {},
         base_files_url=base_files_url if base_files_url is not None else '',
-        version=version if version is not None else DATABASE_LATEST_SUPPORTED_VERSION
+        version=version if version is not None else DATABASE_LATEST_SUPPORTED_VERSION,
+        description=description if description is not None \
+            else zip_desc("Description", '.', kind='extract_single_files')
     )
-
 
 def raw_db_empty_with_linux_descr():
     return {
@@ -504,6 +510,12 @@ def file_mister_old_descr():
         "path": "system"
     }
 
+def file_x_rbf_descr(size=None, file_hash=None):
+    return {
+        "hash": file_x_rbf if file_hash is None else file_hash,
+        "size": file_size_x if size is None else size,
+        "url": "https://x.rbf"
+    }
 
 def file_a_descr(size=None, file_hash=None):
     return {
@@ -750,6 +762,10 @@ def store_with_folders(folders, db_id=None):
     return db_to_store(db_with_folders(db_id or db_test, folders))
 
 
+def db_test_with_x_rbf(db_id=None, descr=None, timestamp=None):
+    return db_entity(db_id=db_id, files={file_x_rbf: file_x_rbf_descr() if descr is None else descr}, folders={folder_x: {}}, timestamp=timestamp)
+
+
 def db_test_with_file_a(db_id=None, descr=None, timestamp=None):
     return db_entity(db_id=db_id, db_files=[file_test_json_zip], files={file_a: file_a_descr() if descr is None else descr}, folders={folder_a: {}}, timestamp=timestamp)
 
@@ -774,6 +790,7 @@ def store_test_with_file_b_descr(descr=None): return db_to_store(db_test_with_fi
 def store_test_with_file_c_descr(descr=None): return db_to_store(db_test_with_file_c(descr=descr))
 def store_test_with_smb1_descr(descr=None): return db_to_store(db_smb1(descr=descr))
 def store_test_with_sonic_descr(descr=None): return db_to_store(db_sonic(descr=descr))
+def store_test_with_x_rbf_descr(descr=None): return db_to_store(db_test_with_x_rbf(descr=descr))
 def store_test_with_file(file, description): return db_to_store(db_test_with_file(file, description))
 def not_found_ini(): return _not_file('not_found.ini')
 

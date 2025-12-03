@@ -22,7 +22,7 @@ from collections import defaultdict
 import os
 
 from downloader.base_path_relocator import BasePathRelocator
-from downloader.config import Config
+from downloader.config import Config, AllowDelete
 from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY, MEDIA_FAT
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
@@ -388,7 +388,7 @@ class OnlineImporter:
             if zindex_job.filtered_data:
                 box.add_filtered_zip_data(zindex_job.db.db_id, zindex_job.zip_id, zindex_job.filtered_data)
             if zindex_job.has_new_zip_summary:
-                box.add_installed_zip_summary(zindex_job.db.db_id, zindex_job.zip_id, zindex_job.result_zip_index, zindex_job.zip_description)
+                box.add_installed_zip_summary(zindex_job.db.db_id, zindex_job.zip_id, zindex_job.result_zip_index, zindex_job.zip_index.description)
 
         for zindex_job, _e in report.get_failed_jobs(ProcessZipIndexJob):
             box.add_failed_zip(zindex_job.db.db_id, zindex_job.zip_id)
@@ -438,13 +438,12 @@ class OnlineImporter:
             processed_files: dict[str, list[PathPackage]] = defaultdict(list)
             removed_files: list[tuple[PathPackage, set[str]]] = []
 
+            unlink_list = []
             for pkg, dbs in files_to_consume:
                 for db_id in dbs:
                     if pkg.rel_path in processed_file_names: continue
                     for is_external, drive in read_stores[db_id].list_other_drives_for_file(pkg.rel_path, pkg.drive):
-                        file_path = os.path.join(drive, pkg.rel_path)
-                        if fs.is_file(file_path):
-                            fs.unlink(file_path)
+                        unlink_list.append(os.path.join(drive, pkg.rel_path))
 
                 for db_id in dbs:
                     write_stores[db_id].remove_file(pkg.rel_path)
@@ -452,14 +451,24 @@ class OnlineImporter:
 
                 if pkg.rel_path in processed_file_names: continue
                 if pkg.is_pext_external():
-                    full_path = os.path.join(self._config['base_path'], pkg.rel_path)
-                    if fs.is_file(full_path):
-                        fs.unlink(full_path)
+                    unlink_list.append(os.path.join(self._config['base_path'], pkg.rel_path))
 
-                fs.unlink(pkg.full_path)
+                unlink_list.append(pkg.full_path)
                 processed_files[list(dbs)[0]].append(pkg)
                 processed_file_names.add(pkg.rel_path)
                 removed_files.append((pkg, dbs))
+
+            if self._config['allow_delete'] == AllowDelete.ALL:
+                for unlink_file in unlink_list:
+                    if fs.is_file(unlink_file):
+                        fs.unlink(unlink_file)
+            elif self._config['allow_delete'] == AllowDelete.OLD_RBF:
+                for unlink_file in [uf for uf in unlink_list if uf[-4:].lower() == ".rbf"]:
+                    if fs.is_file(unlink_file):
+                        fs.unlink(unlink_file)
+                self._logger.debug('Not deleted files because AllowDelete.OLD_RBF: ', [uf for uf in unlink_list if uf[-4:].lower() != ".rbf"])
+            else:
+                self._logger.debug('Not deleted files because AllowDelete.NONE: ', unlink_list)
 
             box.add_removed_files(removed_files)
             logger.bench('OnlineImporter files_to_consume done.')
@@ -491,6 +500,7 @@ class OnlineImporter:
             if fs.folder_has_items(pkg.full_path):
                 continue
 
+            removing_folders = []
             for db_id in dbs:
                 for is_external, drive in read_stores[db_id].list_other_drives_for_folder(pkg):
                     if is_external:
@@ -499,25 +509,31 @@ class OnlineImporter:
                                 and not fs.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
                             write_stores[db_id].remove_external_folder(drive, pkg.rel_path)
                             write_stores[db_id].remove_external_folder_from_zips(drive, pkg.rel_path)
-                            fs.remove_folder(full_ext_path)
+                            removing_folders.append(full_ext_path)
                     else:
                         if not fs.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
-                            fs.remove_folder(full_ext_path)
+                            removing_folders.append(full_ext_path)
                             write_stores[db_id].remove_local_folder(pkg.rel_path)
                             write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
 
                 if pkg.is_pext_external() and pkg.drive is not None:
                     if not pkg.is_pext_external_subfolder() and not pkg.is_pext_parent():
-                        fs.remove_folder(pkg.full_path)
+                        removing_folders.append(pkg.full_path)
                         write_stores[db_id].remove_external_folder(pkg.drive, pkg.rel_path)
                         write_stores[db_id].remove_external_folder_from_zips(pkg.drive, pkg.rel_path)
-                    full_path = os.path.join(self._config['base_path'], pkg.rel_path)
-                    if fs.is_folder(full_path) and not fs.folder_has_items(full_path):
-                        fs.remove_folder(full_path)
+
+                    removing_folders.append(os.path.join(self._config['base_path'], pkg.rel_path))
                 else:
-                    fs.remove_folder(pkg.full_path)
+                    removing_folders.append(pkg.full_path)
                     write_stores[db_id].remove_local_folder(pkg.rel_path)
                     write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
+
+            if self._config['allow_delete'] == AllowDelete.ALL:
+                for removing_dir in removing_folders:
+                    if fs.is_folder(removing_dir) and not fs.folder_has_items(removing_dir):
+                        fs.remove_folder(removing_dir)
+            else:
+                self._logger.debug('Not removing empty folders because of != AllowDelete.ALL', removing_folders)
 
         for db_id, file_pkgs in box.installed_file_pkgs().items():
             for file_pkg in file_pkgs:

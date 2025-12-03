@@ -61,8 +61,10 @@ class FullRunService:
         self._final_reporter = FinalReporter(local_repository, config, logger, waiter)
 
     def configure_components(self) -> None:
+        self._logger.bench('FullRunService configure_components start.')
         self._printlog_manager.configure(self._config)
         self._filelog_manager.set_local_repository(self._local_repository)
+        self._logger.bench('FullRunService configure_components done.')
 
     def print_drives(self) -> int:
         self._logger.bench('FullRunService Print Drives start.')
@@ -186,7 +188,10 @@ class FullRunService:
 
     def _remove_run_signal(self) -> None:
         if self._file_system.is_file(FILE_downloader_run_signal):
+            self._logger.debug('Removing run signal: ', FILE_downloader_run_signal)
             self._file_system.unlink(FILE_downloader_run_signal)
+        else:
+            self._logger.debug('Run signal NOT removed.')
 
 
 class FileCheckingModeResolver:

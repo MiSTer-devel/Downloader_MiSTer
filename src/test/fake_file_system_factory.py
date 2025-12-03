@@ -270,9 +270,6 @@ class FakeFileSystem(ProductionFileSystem):
 
         return False
 
-    def folders(self):
-        return list(self.state.folders)
-
     def remove_folder(self, path):
         folder = self._path(path)
         if folder in self.state.folders:

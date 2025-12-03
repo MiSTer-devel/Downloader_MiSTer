@@ -113,10 +113,11 @@ class PathPackage:
         )
 
     def clone_as_pext(self) -> 'PathPackage':
+        # @TODO: Cover this in tests
         return PathPackage(
             self.rel_path,
             self.drive,
-            self.description,
+            {**self.description, 'path': 'pext'},
             self.ty,
             PATH_PACKAGE_KIND_PEXT,
             PextPathProps(
@@ -165,11 +166,5 @@ class PextPathProps:
             self.other_drives,
             self.is_subfolder,
         )
-
-
-def path_pext(path: str, description: dict[str, Any]) -> str:
-    if 'path' not in description or description['path'] != 'pext':
-        return '|' + path
-    return path
 
 RemovedCopy = Tuple[bool, str, str]
