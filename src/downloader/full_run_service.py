@@ -250,14 +250,17 @@ class FinalReporter:
             self._logger.print(format_files_message(box.unused_filter_tags()) + f" (Did you misspell {'it' if len(box.unused_filter_tags()) == 1 else 'them'}?)")
 
         if self._config['file_checking'] == FileChecking.VERIFY_INTEGRITY:
+            verified_integrity_files_amount = len(box.verified_integrity_files())
+            failed_verification_amount = len(box.failed_verification_files())
+
             self._logger.print()
             self._logger.print(f'Verify Integrity report:')
-            self._logger.print(f'  - Verified {len(box.verified_integrity_files())} files.', end='')
-            failed_verification_amount = len(box.failed_verification_files())
+            if verified_integrity_files_amount > 0:
+                self._logger.print(f'  - Verified {verified_integrity_files_amount} files.' + (' All files were verified.' if failed_verification_amount == 0 else ''))
             if failed_verification_amount > 0:
-                self._logger.print(f'\n  - Verification failed for {failed_verification_amount} files; they were reinstalled.')
-            else:
-                self._logger.print(' All files were verified.')
+                self._logger.print(f'  - Verification failed for {failed_verification_amount} files; they were reinstalled.')
+            if verified_integrity_files_amount == 0 and failed_verification_amount == 0:
+                self._logger.print(f'  - No files to check.')
 
         if len(box.updated_dbs()) > 0 and len(box.installed_dbs()) > 1:
             self._logger.print()
