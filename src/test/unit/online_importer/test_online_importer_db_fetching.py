@@ -40,6 +40,22 @@ db_info = 'db test'
 
 
 class TestOnlineImporterDbFetching(unittest.TestCase):
+    """
+    Specification for database fetching from various sources and error handling.
+
+    This test suite validates the database acquisition workflow:
+
+    - HTTP downloads: Fetching database JSON files from remote URLs
+    - File system reads: Loading databases from local file paths
+    - Network failures: Graceful handling of download errors
+    - Job system integration: Database fetch jobs and failure policies
+    - Job cancellation: Abort behavior when critical jobs fail
+    - Store loading: Coordinating store loading with database fetching
+
+    The database is the source of truth for what files should be installed. These tests
+    ensure the downloader can reliably acquire database files from different sources and
+    handle failures without leaving the system in an inconsistent state.
+    """
     def test_fetch_all___db_with_working_http_uri___returns_expected_db(self):
         db_description = {'hash': 'ignore', 'unzipped_json': db_test_descr().extract_props()}
         self.assertEqual(db_test_descr().extract_props(), fetch_all(http_db_url, network_state=NetworkState(remote_files={http_db_url: db_description})))

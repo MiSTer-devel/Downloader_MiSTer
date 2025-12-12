@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from unit.online_importer.online_importer_test_base import OnlineImporterTestBase
+from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 from downloader.config import AllowDelete
 
 from test.objects import store_test_with_file_a_descr, config_with, file_a, file_a_descr, folder_a, \
@@ -27,6 +27,19 @@ from test.fake_file_system_factory import fs_data
 
 
 class TestOnlineImporterAllowDelete(OnlineImporterTestBase):
+    """
+    Specification for allow_delete configuration behavior when files are removed from databases.
+
+    The allow_delete setting controls what happens to files on the local file system when they
+    are removed from database definitions. This test suite validates three modes:
+
+    - AllowDelete.ALL: Remove both files and folders when no longer in database
+    - AllowDelete.NONE: Keep all files and folders, only update store metadata
+    - AllowDelete.OLD_RBF: Remove only .rbf core files, preserve other files and folders
+
+    This feature prevents accidental data loss from database changes while allowing cleanup
+    of obsolete core files when desired.
+    """
     def test_file_a_removed_from_db___on_allow_delete_all___updates_store_and_deletes_all(self):
         store = store_test_with_file_a_descr()
 

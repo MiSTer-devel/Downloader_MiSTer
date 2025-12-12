@@ -25,6 +25,24 @@ from downloader.config import FileChecking
 
 
 class TestOnlineImporterFileChecking(OnlineImporterTestBase):
+    """
+    Specification for file_checking configuration modes that control download optimization.
+
+    File checking modes determine how aggressively the downloader verifies and re-downloads
+    files based on database updates:
+
+    - FileChecking.VERIFY_INTEGRITY: Verify hash of all installed files, re-download corrupted ones
+    - FileChecking.EXHAUSTIVE: Check file existence, install missing files even if in store
+    - FileChecking.FASTEST: Skip database processing if signature matches, fastest but may miss manual deletions
+
+    These modes balance between download speed and file integrity verification. FASTEST mode
+    uses database signatures to skip processing when nothing changed. VERIFY_INTEGRITY provides
+    maximum protection against file corruption at the cost of hash computation overhead.
+
+    Note: For detailed coverage of the signature matching mechanism used by FASTEST mode, see
+    test_online_importer_skip_db_processing.py which tests edge cases around signature components,
+    invalid signatures, and filter changes.
+    """
 
     def test_download_on_verify_integrity___on_installed_db___verifies_successfully_that_file_and_nothing_else(self):
         store = store_test_with_file_a_descr()

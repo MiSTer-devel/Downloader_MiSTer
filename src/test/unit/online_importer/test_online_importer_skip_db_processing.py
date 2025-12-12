@@ -25,6 +25,33 @@ from test.objects import store_test_with_file_a_descr, db_test_with_file_a, file
 
 
 class TestOnlineImporterSkipDbProcessing(OnlineImporterTestBase):
+    """
+    Specification for database signature-based early exit optimization.
+
+    This test suite provides detailed coverage of the signature matching mechanism used by
+    FileChecking.FASTEST mode. For an overview of all file_checking modes, see
+    test_online_importer_file_checking.py.
+
+    When file_checking mode is FASTEST, the downloader can skip processing a database
+    entirely if its signature matches the store's recorded signature. This optimization
+    dramatically speeds up runs when nothing has changed.
+
+    Database signatures include:
+    - db_hash: Hash of the database JSON content
+    - size: Total size of all files in database
+    - timestamp: Database generation timestamp
+    - filter: Configuration filter settings
+
+    This test suite validates:
+    - Early exit when signatures match (no file operations performed)
+    - Normal processing when signatures differ (any component: hash, size, filter)
+    - Store updates when signature changes even if files unchanged
+    - Filter changes forcing reprocessing despite matching signature
+    - Behavior with invalid/missing signature components
+
+    The optimization is critical for reducing download times when databases are
+    frequently checked but rarely change.
+    """
 
     def test_download_db_process___when_file_checking_fastest_and_signature_from_store_matches_downloaded_signature___does_nothing_and_ends_early(self):
         sut = self.download_db(db_sig=sig(), store_sig=sig(), config=config_with(file_checking=FileChecking.FASTEST))

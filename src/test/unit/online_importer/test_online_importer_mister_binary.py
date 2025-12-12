@@ -27,6 +27,19 @@ from test.unit.online_importer.online_importer_test_base import OnlineImporterTe
 
 
 class TestOnlineImporterMiSTerBinary(OnlineImporterTestBase):
+    """
+    Specification for MiSTer binary update process and reboot requirement detection.
+
+    The MiSTer binary (main FPGA framework executable) requires special handling during updates:
+
+    - Old binary is preserved as MiSTer.old (backup in case update fails)
+    - New binary is downloaded as MiSTer.new then atomically renamed to MiSTer
+    - Updates trigger needs_reboot flag since the currently running binary cannot replace itself
+    - Process works whether old binary exists or not (fresh install vs update)
+
+    These tests validate that the atomic update sequence is correct and that the reboot flag
+    is properly set when the MiSTer binary is installed or updated.
+    """
 
     def test_download_distribution_mister_with_mister___replacing_old_mister_on_empty_store___needs_reboot(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(

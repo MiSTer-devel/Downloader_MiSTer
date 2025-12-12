@@ -49,6 +49,10 @@ file_s32x_md: Final = 'docs/S32X/S32X.md'
 file_neogeo_md: Final = 'docs/NeoGeo/NeoGeo.md'
 file_foo: Final = 'foo.txt'
 file_save_psx_castlevania: Final = 'saves/PSX/castlevania.sav'
+file_psx_20250101_rbf: Final = 'PSX_20250101.rbf'
+file_psx_20250202_rbf: Final = 'PSX_20250202.rbf'
+file_nes_20250101_rbf: Final = 'NES_20250101.rbf'
+file_nes_20250202_rbf: Final = 'NES_20250202.rbf'
 hash_menu_rbf: Final = 'menu.rbf'
 hash_MiSTer: Final = FILE_MiSTer_new
 hash_PDFViewer: Final = 'pdfviewer'
@@ -91,6 +95,8 @@ file_size_d: Final = 4115440
 file_size_sonic: Final = 2915020
 file_size_smb1: Final = 2915020
 file_size_x: Final = 2915040
+file_size_psx_rbf: Final = 3245120
+file_size_nes_rbf: Final = 2845200
 
 def media_fat(path):
     return media_drive(MEDIA_FAT, path)
@@ -665,6 +671,58 @@ def file_save_psx_castlevania_descr(overwrite=None):
     return o
 
 
+def file_psx_20250101_rbf_descr():
+    return {
+        "hash": file_psx_20250101_rbf,
+        "size": file_size_psx_rbf,
+        "url": "https://cores/psx_20250101.rbf",
+        "tangle": ["psx_core"]
+    }
+
+
+def file_psx_20250202_rbf_descr():
+    return {
+        "hash": file_psx_20250202_rbf,
+        "size": file_size_psx_rbf,
+        "url": "https://cores/psx_20250202.rbf",
+        "tangle": ["psx_core"]
+    }
+
+
+def file_nes_20250101_rbf_descr():
+    return {
+        "hash": file_nes_20250101_rbf,
+        "size": file_size_nes_rbf,
+        "url": "https://cores/nes_20250101.rbf",
+        "tangle": ["nes_core"]
+    }
+
+
+def file_nes_20250202_rbf_descr():
+    return {
+        "hash": file_nes_20250202_rbf,
+        "size": file_size_nes_rbf,
+        "url": "https://cores/nes_20250202.rbf",
+        "tangle": ["nes_core"]
+    }
+
+
+def files_psx_20250101_rbf():
+    return {file_psx_20250101_rbf: file_psx_20250101_rbf_descr()}
+
+
+def files_psx_20250202_rbf():
+    return {file_psx_20250202_rbf: file_psx_20250202_rbf_descr()}
+
+
+def files_nes_20250101_rbf():
+    return {file_nes_20250101_rbf: file_nes_20250101_rbf_descr()}
+
+
+def files_nes_20250202_rbf():
+    return {file_nes_20250202_rbf: file_nes_20250202_rbf_descr()}
+
+
 def tweak_descr(o, zip_id=True, tags=True, url=True, zip_path=False):
     if not url and 'url' in o:
         o.pop('url')
@@ -782,6 +840,21 @@ def db_test_with_file_d(db_id=None, descr=None):
     return db_entity(db_id=db_id, files={file_d: file_d_descr() if descr is None else descr}, folders={folder_d: {}})
 
 
+def db_test_with_psx_20250101_rbf(db_id=None, descr=None):
+    return db_entity(db_id=db_id, files={file_psx_20250101_rbf: file_psx_20250101_rbf_descr() if descr is None else descr})
+
+
+def db_test_with_psx_20250202_rbf(db_id=None, descr=None):
+    return db_entity(db_id=db_id, files={file_psx_20250202_rbf: file_psx_20250202_rbf_descr() if descr is None else descr})
+
+
+def db_test_with_psx_20250202_and_nes_20250202_rbf(db_id=None):
+    return db_entity(db_id=db_id, files={
+        file_psx_20250202_rbf: file_psx_20250202_rbf_descr(),
+        file_nes_20250202_rbf: file_nes_20250202_rbf_descr()
+    })
+
+
 def sig_db_0(): return {'hash': 34, 'filter': '', 'size': 1, 'timestamp': 0}
 def sig_db_1():  return {'hash': 3434, 'filter': '', 'size': 11, 'timestamp': 0}
 
@@ -791,6 +864,10 @@ def store_test_with_file_c_descr(descr=None): return db_to_store(db_test_with_fi
 def store_test_with_smb1_descr(descr=None): return db_to_store(db_smb1(descr=descr))
 def store_test_with_sonic_descr(descr=None): return db_to_store(db_sonic(descr=descr))
 def store_test_with_x_rbf_descr(descr=None): return db_to_store(db_test_with_x_rbf(descr=descr))
+def store_test_with_psx_20250101_rbf_descr(descr=None): return db_to_store(db_test_with_psx_20250101_rbf(descr=descr))
+def store_test_with_psx_20250202_rbf_descr(descr=None): return db_to_store(db_test_with_psx_20250202_rbf(descr=descr))
+def store_test_with_psx_20250101_and_nes_20250101_rbf_descr(): return db_to_store(db_entity(files={**files_psx_20250101_rbf(), **files_nes_20250101_rbf()}))
+def store_test_with_psx_20250101_and_nes_20250202_rbf_descr(): return db_to_store(db_entity(files={**files_psx_20250101_rbf(), **files_nes_20250202_rbf()}))
 def store_test_with_file(file, description): return db_to_store(db_test_with_file(file, description))
 def not_found_ini(): return _not_file('not_found.ini')
 

@@ -39,6 +39,21 @@ def on_tmp(path):
 
 
 class TestOnlineImporterFileOps(unittest.TestCase):
+    """
+    Specification for file operation sequencing and atomicity guarantees.
+
+    This test suite validates low-level file system operations performed during downloads:
+
+    - Atomic updates: Files downloaded to .tmp then renamed atomically
+    - In-progress markers: .file_in_progress suffixes during active downloads
+    - Cross-filesystem moves: Handling moves between SD card and USB/CIFS storage
+    - Partial download cleanup: Removing temporary files when downloads fail
+    - Path resolution: Correct handling of base_path and base_system_path
+    - Operation ordering: Move sequences for safe file replacement
+
+    These tests ensure the downloader never leaves the file system in an inconsistent
+    state even when operations fail partway through.
+    """
 
     installed_path = '/installed'
     installed_system_path = '/installed_system'

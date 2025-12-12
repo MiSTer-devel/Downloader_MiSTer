@@ -250,6 +250,8 @@ class OnlineImporter:
 
         for fetch_file_job, e in report.get_failed_jobs(FetchFileJob):
             box.add_failed_file(fetch_file_job.pkg.rel_path)
+            if 'tangle' in fetch_file_job.pkg.description:
+                box.add_failed_file_entanglements(fetch_file_job.pkg.description['tangle'])
             if fetch_file_job.pkg.rel_path != FILE_MiSTer or not file_mister_present:
                 continue
 
@@ -440,7 +442,11 @@ class OnlineImporter:
             removed_files: list[tuple[PathPackage, set[str]]] = []
 
             unlink_list = []
+            failed_entanglements = box.failed_file_entanglements()
             for pkg, dbs in files_to_consume:
+                if is_entangled_with(pkg, failed_entanglements):
+                    continue
+
                 for db_id in dbs:
                     if pkg.rel_path in processed_file_names: continue
                     for is_external, drive in read_stores[db_id].list_other_drives_for_file(pkg.rel_path, pkg.drive):
@@ -601,6 +607,16 @@ def is_system_path(description: dict[str, str]) -> bool:
     return 'path' in description and description['path'] == 'system'
 
 
+def is_entangled_with(pkg: PathPackage, failed_entanglements: set[str]) -> bool:
+    """Check if a file package is entangled with any failed downloads."""
+    if 'tangle' not in pkg.description:
+        return False
+    for tangle in pkg.description['tangle']:
+        if tangle.lower() in failed_entanglements:
+            return True
+    return False
+
+
 class InstallationBox:
     def __init__(self) -> None:
         self._downloaded_files: list[str] = []
@@ -613,6 +629,7 @@ class InstallationBox:
         self._present_not_validated_files: list[str] = []
         self._fetch_started_files: list[str] = []
         self._failed_files: list[str] = []
+        self._failed_file_entanglements: set[str] = set()
         self._failed_folders: list[str] = []
         self._failed_zips: list[tuple[str, str]] = []
         self._full_partitions: dict[str, int] = dict()
@@ -696,6 +713,11 @@ class InstallationBox:
         self._fetch_started_files.append(path)
     def add_failed_file(self, path: str) -> None:
         self._failed_files.append(path)
+    def add_failed_file_entanglements(self, tangles: list[str]) -> None:
+        for tangle in tangles:
+            self._failed_file_entanglements.add(tangle.lower())
+    def failed_file_entanglements(self) -> set[str]:
+        return self._failed_file_entanglements
     def add_failed_db(self, db_id: str) -> None:
         self._failed_dbs.add(db_id)
     def add_failed_files(self, file_pkgs: list[PathPackage]) -> None:

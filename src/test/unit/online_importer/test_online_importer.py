@@ -35,6 +35,22 @@ from test.unit.online_importer.online_importer_test_base import OnlineImporterTe
 
 
 class TestOnlineImporter(OnlineImporterTestBase):
+    """
+    Specification for core OnlineImporter behavior across common download scenarios.
+
+    This broad test suite validates the fundamental workflows of the downloader:
+
+    - Fresh installs: Installing files from empty stores and file systems
+    - Updates: Detecting and applying file changes from database updates
+    - Store/FS synchronization: Restoring consistency when store and FS diverge
+    - File operations: Downloads, moves, copies, and overwrites
+    - Multiple databases: Handling multiple DB sources in a single run
+    - Path resolution: External storage, system paths, and base path handling
+    - Error handling: Network failures, hash mismatches, and partial failures
+
+    These tests establish the expected behavior for the most common usage patterns and
+    serve as the baseline specification for OnlineImporter functionality.
+    """
 
     def test_download_dbs_contents___with_trivial_db___does_nothing(self):
         sut = OnlineImporter()

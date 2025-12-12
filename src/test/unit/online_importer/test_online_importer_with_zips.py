@@ -31,6 +31,23 @@ from test.zip_objects import files_nes_palettes, folders_games_nes_palettes, wit
 
 
 class TestOnlineImporterWithZips(OnlineImporterTestBase):
+    """
+    Specification for zip archive handling and selective file extraction.
+
+    Databases can bundle large file collections (game ROMs, cheat files, documentation)
+    as zip archives to reduce storage and bandwidth requirements. This test suite validates:
+
+    - Zip extraction: Extracting individual files from zip archives
+    - Summary files: Using zip summaries to avoid downloading entire archives
+    - Contents files: Extracting from zip.contents.txt for selective installation
+    - Threshold behavior: Switching between summary and full extraction based on file count
+    - Store synchronization: Tracking which zip files are installed vs extracted
+    - NeoGeo BIOS: Special handling for BIOS files in zip archives
+    - Cheats folder: Large collections of cheat files across multiple systems
+
+    The zip_file_count_threshold configuration determines whether to extract individual
+    files or download the entire zip based on how many files are needed from it.
+    """
 
     def setUp(self) -> None:
         self.config = default_config()
