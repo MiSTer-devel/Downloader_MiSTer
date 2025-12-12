@@ -68,6 +68,8 @@ from downloader.local_store_wrapper import LocalStoreWrapper, StoreFragmentDrive
 from downloader.path_package import PathPackage
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 
+FILE_PROP_ENTANGLEMENTS = 'tangle'
+
 
 class OnlineImporterWorkersFactory:
     def __init__(self, worker_context: JobContext, progress_reporter: ProgressReporter, file_system: FileSystem, http_gateway: HttpGateway, logger: Logger, file_download_reporter: FileDownloadProgressReporter, file_filter_factory: FileFilterFactory, target_paths_calculator_factory: TargetPathsCalculatorFactory, free_space_reservation: FreeSpaceReservation, local_repository: LocalRepository, base_path_relocator: BasePathRelocator, config: Config, fail_ctx: FailCtx):
@@ -250,8 +252,8 @@ class OnlineImporter:
 
         for fetch_file_job, e in report.get_failed_jobs(FetchFileJob):
             box.add_failed_file(fetch_file_job.pkg.rel_path)
-            if 'tangle' in fetch_file_job.pkg.description:
-                box.add_failed_file_entanglements(fetch_file_job.pkg.description['tangle'])
+            if FILE_PROP_ENTANGLEMENTS in fetch_file_job.pkg.description:
+                box.add_failed_file_entanglements(fetch_file_job.pkg.description[FILE_PROP_ENTANGLEMENTS])
             if fetch_file_job.pkg.rel_path != FILE_MiSTer or not file_mister_present:
                 continue
 
@@ -608,11 +610,10 @@ def is_system_path(description: dict[str, str]) -> bool:
 
 
 def is_entangled_with(pkg: PathPackage, failed_entanglements: set[str]) -> bool:
-    """Check if a file package is entangled with any failed downloads."""
-    if 'tangle' not in pkg.description:
+    if FILE_PROP_ENTANGLEMENTS not in pkg.description:
         return False
-    for tangle in pkg.description['tangle']:
-        if tangle.lower() in failed_entanglements:
+    for entanglement in pkg.description[FILE_PROP_ENTANGLEMENTS]:
+        if entanglement.lower() in failed_entanglements:
             return True
     return False
 
@@ -713,8 +714,8 @@ class InstallationBox:
         self._fetch_started_files.append(path)
     def add_failed_file(self, path: str) -> None:
         self._failed_files.append(path)
-    def add_failed_file_entanglements(self, tangles: list[str]) -> None:
-        for tangle in tangles:
+    def add_failed_file_entanglements(self, entanglements: list[str]) -> None:
+        for tangle in entanglements:
             self._failed_file_entanglements.add(tangle.lower())
     def failed_file_entanglements(self) -> set[str]:
         return self._failed_file_entanglements
