@@ -92,9 +92,24 @@ The format of the aforementioned JSON file should be as follow:
             *            Default value: false
             */
             "reboot": false,
+
+            /**
+            * [Optional] File entanglements (array of strings).
+            *            File entanglement occurs when different file versions represent the same
+            *            functional entity across successive database updates. When a newer version
+            *            fails to download, the system retains the older version to prevent breaking
+            *            user functionality.
+            *
+            *            Example: PSX_20250101.rbf and PSX_20250202.rbf are entangled - both represent
+            *            the PSX core at different points in time. If PSX_20250202.rbf fails to download,
+            *            PSX_20250101.rbf is preserved to keep the PSX core working.
+            *
+            *            By default is not defined.
+            */
+            "tangle": ["psx_core"],
         },
-      
-      
+
+
         /**
           * ... Same for other files ...
           */
