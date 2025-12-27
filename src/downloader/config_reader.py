@@ -165,6 +165,8 @@ class ConfigReader:
             if result['file_checking'] != FileChecking.EXHAUSTIVE and result['file_checking'] != FileChecking.VERIFY_INTEGRITY:
                 result['file_checking'] = FileChecking.EXHAUSTIVE
 
+        result['skip_free_space_checks'] = self._env['SKIP_FREE_SPACE_CHECKS'] or result['is_pc_launcher']
+
         if self._env['HTTP_PROXY'] or self._env['HTTPS_PROXY']:
             result['http_config'] = http_config(http_proxy=self._env['HTTP_PROXY'], https_proxy=self._env['HTTPS_PROXY'])
         elif result['http_proxy'] != '':

@@ -26,7 +26,7 @@ from typing import Optional
 from downloader.config import Environment
 from downloader.config_reader import ConfigReader
 from downloader.constants import KENV_LOGLEVEL, KENV_LC_HTTP_PROXY, KENV_HTTP_PROXY, KENV_HTTPS_PROXY, \
-    KENV_LC_HTTPS_PROXY, KENV_ROTATE_LOGS
+    KENV_LC_HTTPS_PROXY, KENV_ROTATE_LOGS, KENV_SKIP_FREE_SPACE_CHECKS
 from downloader.logger import TopLogger
 from downloader.full_run_service_factory import FullRunServiceFactory
 
@@ -77,6 +77,7 @@ def read_env(default_commit: Optional[str]) -> Environment:
         'DEFAULT_BASE_PATH': os.getenv(KENV_DEFAULT_BASE_PATH, None),
         'FORCED_BASE_PATH': os.getenv(KENV_FORCED_BASE_PATH, None),
         'PC_LAUNCHER': os.getenv(KENV_PC_LAUNCHER, None),
+        'SKIP_FREE_SPACE_CHECKS': os.getenv(KENV_SKIP_FREE_SPACE_CHECKS, None),
         'DEBUG': os.getenv(KENV_DEBUG, 'false').lower(),
         'FAIL_ON_FILE_ERROR': os.getenv(KENV_FAIL_ON_FILE_ERROR, 'false'),
         'HTTP_PROXY': os.getenv(KENV_HTTP_PROXY) or os.getenv(KENV_LC_HTTP_PROXY),
