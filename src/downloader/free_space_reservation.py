@@ -21,7 +21,7 @@ import threading
 from typing import Dict, List, Tuple, Optional, Iterable, Protocol
 
 from downloader.config import Config
-from downloader.constants import STORAGE_PATHS_PRIORITY_SEQUENCE, K_MINIMUM_SYSTEM_FREE_SPACE_MB, K_BASE_SYSTEM_PATH, K_MINIMUM_EXTERNAL_FREE_SPACE_MB
+from downloader.constants import STORAGE_PATHS_PRIORITY_SEQUENCE, K_MINIMUM_SYSTEM_FREE_SPACE_MB, K_BASE_PATH, K_BASE_SYSTEM_PATH, K_MINIMUM_EXTERNAL_FREE_SPACE_MB
 from downloader.logger import Logger
 from downloader.path_package import PathPackage
 
@@ -45,7 +45,7 @@ class LinuxFreeSpaceReservation(FreeSpaceReservation):
         with self._lock:
             partitions_reservations: Dict[str, int] = {}
             for file_pkg in file_pkgs:
-                partition = self._get_partition_for_file(file_pkg.full_path)
+                partition = self._get_partition_for_file(file_pkg)
                 if partition.path not in partitions_reservations:
                     partitions_reservations[partition.path] = 0
                 partitions_reservations[partition.path] += partition.file_size(file_pkg.description['size'])
@@ -67,8 +67,10 @@ class LinuxFreeSpaceReservation(FreeSpaceReservation):
     def free_space(self) -> Dict[str, int]:
         return {partition_path: partition.remaining_space for partition_path, partition in self._partitions.items()}
 
-    def _get_partition_for_file(self, file_path) -> 'Partition':
-        partition_path = self._get_partition_path_from_file(file_path)
+    def _get_partition_for_file(self, file_pkg: PathPackage) -> 'Partition':
+        partition_path = file_pkg.drive
+        if not partition_path:
+            partition_path = self._get_partition_path_from_file(file_pkg.full_path)
         if partition_path not in self._partitions:
             self._partitions[partition_path] = self._make_partition(partition_path)
         return self._partitions[partition_path]
@@ -79,7 +81,7 @@ class LinuxFreeSpaceReservation(FreeSpaceReservation):
                 return path
 
         self._logger.print(f'Could not find partition for file {file_path}')
-        return STORAGE_PATHS_PRIORITY_SEQUENCE[0]
+        return self._config[K_BASE_PATH]
 
     def _make_partition(self, partition_path) -> 'Partition':
         statvfs = os.statvfs(partition_path)
