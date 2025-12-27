@@ -41,6 +41,8 @@ class ExternalDrivesRepository:
                 for directory in self._connected_drives:
                     self._logger.debug(directory)
                 self._logger.debug()
+            else:
+                self._logger.debug('Detected no connected drives.')
         return self._connected_drives
 
     def connected_drives_except_base_path_drives(self, config):
