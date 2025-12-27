@@ -11,7 +11,7 @@ echo "Integration Tests:"
 python3 -m unittest discover -s test/integration
 echo
 echo "System Quick Tests:"
-python3 -m unittest discover -s test/system/quick
+python3 -m unittest discover -s test/system/quick -v
 echo
 
 if [[ "${1:-}" != "--slow" ]] && [[ "${1:-}" != "-s" ]] ; then
@@ -20,6 +20,6 @@ if [[ "${1:-}" != "--slow" ]] && [[ "${1:-}" != "-s" ]] ; then
 fi
 
 echo "System Slow Tests:"
-python3 -m unittest discover -s test/system/slow
+python3 -m unittest discover -s test/system/slow -v
 echo
 echo "Done"

@@ -26,10 +26,10 @@ jobs:
       run: cd src && python3 -m unittest discover -s test/integration
 
     - name: System Quick Tests
-      run: cd src && python3 -m unittest discover -s test/system/quick
+      run: cd src && python3 -m unittest discover -s test/system/quick -v
 
     - name: System Slow Tests
-      run: cd src && python3 -m unittest discover -s test/system/slow
+      run: cd src && python3 -m unittest discover -s test/system/slow -v
 
   windows-test:
     runs-on: windows-latest
