@@ -21,7 +21,6 @@ from typing import Dict, Tuple, Optional
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config
-from downloader.constants import FILE_MiSTer_version
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from downloader.file_filter import FileFilterFactory
 from downloader.file_system import FileSystemFactory
@@ -92,7 +91,7 @@ class FullRunServiceFactory:
         )
 
         file_filter_factory = FileFilterFactory(self._logger)
-        free_space_reservation = LinuxFreeSpaceReservation(logger=self._logger, config=config) if system_file_system.is_file(FILE_MiSTer_version) else UnlimitedFreeSpaceReservation()
+        free_space_reservation = UnlimitedFreeSpaceReservation() if config['is_pc_launcher'] else LinuxFreeSpaceReservation(logger=self._logger, config=config)
         linux_updater = LinuxUpdater(self._logger, waiter, config, system_file_system, safe_file_fetcher)
         base_path_relocator = BasePathRelocator(config, file_system_factory, waiter, self._logger)
 
