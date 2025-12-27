@@ -21,7 +21,7 @@ import threading
 from typing import Dict, List, Tuple, Optional, Iterable, Protocol
 
 from downloader.config import Config
-from downloader.constants import STORAGE_PATHS_PRIORITY_SEQUENCE, K_MINIMUM_SYSTEM_FREE_SPACE_MB, K_BASE_PATH, K_BASE_SYSTEM_PATH, K_MINIMUM_EXTERNAL_FREE_SPACE_MB
+from downloader.constants import STORAGE_PATHS_PRIORITY_SEQUENCE, K_MINIMUM_SYSTEM_FREE_SPACE_MB, K_BASE_SYSTEM_PATH, K_MINIMUM_EXTERNAL_FREE_SPACE_MB
 from downloader.logger import Logger
 from downloader.path_package import PathPackage
 
@@ -80,8 +80,8 @@ class LinuxFreeSpaceReservation(FreeSpaceReservation):
             if file_path.startswith(path):
                 return path
 
-        self._logger.print(f'Could not find partition for file {file_path}')
-        return self._config[K_BASE_PATH]
+        self._logger.print(f'WARNING: Could not find partition for file {file_path}')
+        return self._config['base_path']
 
     def _make_partition(self, partition_path) -> 'Partition':
         statvfs = os.statvfs(partition_path)
