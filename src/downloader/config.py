@@ -42,6 +42,7 @@ class Environment(TypedDict):
     DEFAULT_BASE_PATH: Optional[str]
     FORCED_BASE_PATH: Optional[str]
     PC_LAUNCHER: Optional[str]
+    SKIP_FREE_SPACE_CHECKS: Optional[str]
     DEBUG: str
     FAIL_ON_FILE_ERROR: str
     HTTP_PROXY: str
@@ -106,6 +107,7 @@ class ConfigRequired(ConfigMisterSection):
     start_time: float
     logfile: Optional[str]
     is_pc_launcher: bool
+    skip_free_space_checks: bool
     databases: Dict[str, ConfigDatabaseSection]
     config_path: Path
     commit: str
@@ -150,6 +152,7 @@ def default_config() -> Config:
         'start_time': 0,
         'logfile': None,
         'is_pc_launcher': False,
+        'skip_free_space_checks': False,
         'user_defined_options': [],
         'commit': 'unknown',
         'fail_on_file_error': False,
