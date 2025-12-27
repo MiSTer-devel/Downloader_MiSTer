@@ -130,18 +130,18 @@ def process_index_job_main_sequence(ctx: ProcessIndexCtx, job: Union[ProcessDbIn
 
     if non_existing_pkgs or need_update_pkgs:
         logger.bench(bench_label, ' Reserve space: ', db.db_id, zip_id)
-        need_install_pkgs = chain(non_existing_pkgs, need_update_pkgs)
+        need_install_pkgs = non_existing_pkgs + need_update_pkgs
         job.full_partitions = try_reserve_space(ctx, need_install_pkgs)
         if len(job.full_partitions) > 0:
             job.failed_files_no_space = non_existing_pkgs + need_update_pkgs
             logger.debug("Not enough space '%s'!", db.db_id)
             return [], [], set(), {}, FileWriteError(f"Could not allocate space for {len(job.failed_files_no_space)} files.")
     else:
-        need_install_pkgs = None
+        need_install_pkgs = []
 
-    if need_install_pkgs is not None or job.present_validated_files:
+    if need_install_pkgs or job.present_validated_files:
         logger.bench(bench_label, ' Checking non external store presence: ', db.db_id, zip_id)
-        job.repeated_store_presence = check_repeated_store_presence(ctx, store, chain(need_install_pkgs or [], job.present_validated_files))
+        job.repeated_store_presence = check_repeated_store_presence(ctx, store, chain(need_install_pkgs, job.present_validated_files))
 
     logger.bench(bench_label, ' Create folders: ', db.db_id, zip_id)
     job.removed_folders, job.installed_folders, created_folders, job.failed_folders = process_create_folder_packages(ctx, create_folder_pkgs, db.db_id, filtered_summary.folders, store, bench_label)
