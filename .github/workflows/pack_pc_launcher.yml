@@ -7,20 +7,37 @@ on:
   workflow_dispatch:
 
 jobs:
-  pack:
-    runs-on: ubuntu-latest
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            python-cmd: python3
+          - os: windows-latest
+            python-cmd: python
+          - os: macos-latest
+            python-cmd: python
 
     steps:
-
     - uses: actions/checkout@v2
 
-    - name: PC Launcher Test
-      run: python3 src/pc_launcher.py
+    - name: PC Launcher Test on ${{ matrix.os }}
+      run: ${{ matrix.python-cmd }} src/pc_launcher.py
       env:
         DEFAULT_DB_ID: distribution_mister
         DEFAULT_DB_URL: ${{ github.workspace }}/src/test/system/fixtures/small_db_install/small_db_3.json
         DEBUG: true
         PC_LAUNCHER_NO_WAIT: '1'
+
+  pack:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+
+    - uses: actions/checkout@v2
 
     - name: Pack PC Launcher
       run: chmod +x .github/pack_pc_launcher.sh && ./.github/pack_pc_launcher.sh
