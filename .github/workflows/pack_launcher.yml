@@ -14,6 +14,12 @@ jobs:
 
     - uses: actions/checkout@v2
 
+    - name: Launcher Test
+      run: ./downloader.sh
+      env:
+        DEFAULT_DB_ID: distribution_mister
+        DEFAULT_DB_URL: ${{ github.workspace }}/src/test/system/fixtures/small_db_install/small_db_3.json
+
     - name: Pack Launcher
       run: ./.github/pack_launcher.sh
       env:
