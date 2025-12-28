@@ -2,15 +2,22 @@
 # Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 import argparse
+import os
 import subprocess
 import tempfile
 
 
 def test(db_id: str, db_url: str):
     with tempfile.TemporaryDirectory() as temp_folder:
-        log('downloading downloader.sh')
-        curl('https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/downloader.sh',
-             temp_folder + '/downloader.sh')
+        downloader_source = os.environ.get('DOWNLOADER_SOURCE', 'https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/dont_download.sh')
+
+        if downloader_source.startswith('http://') or downloader_source.startswith('https://'):
+            log(f'downloading downloader.sh from {downloader_source}')
+            curl(downloader_source, temp_folder + '/downloader.sh')
+        else:
+            log(f'copying downloader.sh from {downloader_source}')
+            run(['cp', downloader_source, temp_folder + '/downloader.sh'])
+
         run(['chmod', '+x', 'downloader.sh'], cwd=temp_folder)
 
         downloader_ini_content = f"""

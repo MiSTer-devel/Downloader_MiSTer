@@ -58,10 +58,6 @@ jobs:
       if: steps.check-changes.outputs.NEW_RELEASE == 'yes'
       run: cd src && python3 -m unittest discover -s test/system/slow -v
 
-    - name: Launcher Test
-      if: steps.check-changes.outputs.NEW_RELEASE == 'yes'
-      run: ./.github/launcher_test.py distribution_mister src/test/system/fixtures/small_db_install/small_db_1.json
-
   windows-test:
     runs-on: windows-latest
     needs: main-test
@@ -100,6 +96,11 @@ jobs:
 
         SKIP_COMMIT=true ./src/build.sh | sha256sum > latest.id
         ZIP_FILE="$(pwd)/dont_download.zip" ./src/build.sh > dont_download.sh
+
+    - name: Build Test
+      run: ./.github/downloader_test.py distribution_mister src/test/system/fixtures/small_db_install/small_db_1.json
+      env:
+        DOWNLOADER_SOURCE: ./dont_download.sh
 
     - uses: docker/setup-qemu-action@v2
       with:
