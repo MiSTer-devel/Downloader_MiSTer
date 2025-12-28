@@ -36,7 +36,6 @@ jobs:
     needs: test
 
     steps:
-
     - uses: actions/checkout@v4
 
     - name: Pack PC Launcher

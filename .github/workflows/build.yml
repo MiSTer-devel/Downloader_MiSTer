@@ -12,26 +12,38 @@ permissions:
 
 jobs:
 
-  main-test:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-python
+    - name: Unit Tests
+      run: cd src && python3 -m unittest discover -s test/unit
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-python
+    - name: Integration Tests
+      run: cd src && python3 -m unittest discover -s test/integration
+
+  system-quick-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-python
+    - name: System Quick Tests
+      run: cd src && python3 -m unittest discover -s test/system/quick -v
+
+  check-changes:
     runs-on: ubuntu-latest
     outputs:
       NEW_RELEASE: ${{ steps.check-changes.outputs.NEW_RELEASE }}
 
     steps:
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
-
     - uses: actions/checkout@v4
-
-    - name: Unit Tests
-      run: cd src && python3 -m unittest discover -s test/unit
-
-    - name: Integration Tests
-      run: cd src && python3 -m unittest discover -s test/integration
-
-    - name: System Quick Tests
-      run: cd src && python3 -m unittest discover -s test/system/quick -v
+    - uses: ./.github/actions/setup-python
 
     - name: Check for changes
       id: check-changes
@@ -54,21 +66,24 @@ jobs:
           echo "NEW_RELEASE=no" >> "$GITHUB_OUTPUT"
         fi
 
+  system-slow-tests:
+    runs-on: ubuntu-latest
+    needs: check-changes
+    if: needs.check-changes.outputs.NEW_RELEASE == 'yes'
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-python
     - name: System Slow Tests
-      if: steps.check-changes.outputs.NEW_RELEASE == 'yes'
       run: cd src && python3 -m unittest discover -s test/system/slow -v
 
   build:
     runs-on: ubuntu-latest
-    needs: main-test
-    if: needs.main-test.outputs.NEW_RELEASE == 'yes'
+    needs: [unit-tests, integration-tests, system-quick-tests, system-slow-tests, check-changes]
+    if: needs.check-changes.outputs.NEW_RELEASE == 'yes'
 
     steps:
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
-
     - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-python
 
     - name: Build
       run: |
@@ -94,7 +109,6 @@ jobs:
   pc-launcher-test:
     runs-on: ${{ matrix.os }}
     needs: build
-    if: needs.main-test.outputs.NEW_RELEASE == 'yes'
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -107,7 +121,7 @@ jobs:
             python-cmd: python
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Download build artifacts
       uses: actions/download-artifact@v4
@@ -126,7 +140,6 @@ jobs:
   compile-release:
     runs-on: ubuntu-latest
     needs: pc-launcher-test
-    if: needs.main-test.outputs.NEW_RELEASE == 'yes'
 
     steps:
     - run: echo "owner_lc=$(echo "${GITHUB_REPOSITORY_OWNER,,}")" >> "$GITHUB_OUTPUT"
