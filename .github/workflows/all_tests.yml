@@ -10,11 +10,11 @@ jobs:
 
     steps:
 
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.9'
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Type check
       run: python3 -m pip install mypy && mypy --check-untyped-defs src/__main__.py src/downloader
@@ -36,9 +36,9 @@ jobs:
     needs: test
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.9'
 

@@ -21,7 +21,7 @@ jobs:
             python-cmd: python
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: PC Launcher Test on ${{ matrix.os }}
       run: ${{ matrix.python-cmd }} src/pc_launcher.py
@@ -37,7 +37,7 @@ jobs:
 
     steps:
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Pack PC Launcher
       run: chmod +x .github/pack_pc_launcher.sh && ./.github/pack_pc_launcher.sh

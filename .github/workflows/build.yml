@@ -18,11 +18,11 @@ jobs:
       NEW_RELEASE: ${{ steps.check-changes.outputs.NEW_RELEASE }}
 
     steps:
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.9'
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Unit Tests
       run: cd src && python3 -m unittest discover -s test/unit
@@ -64,11 +64,11 @@ jobs:
     if: needs.main-test.outputs.NEW_RELEASE == 'yes'
 
     steps:
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.9'
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Build
       run: |
@@ -83,7 +83,7 @@ jobs:
         DOWNLOADER_SOURCE: ./dont_download.sh
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-artifacts
         path: |
@@ -110,7 +110,7 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Download build artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-artifacts
 
@@ -135,7 +135,7 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Download build artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-artifacts
 
