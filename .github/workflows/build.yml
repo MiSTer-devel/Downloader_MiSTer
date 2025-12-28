@@ -98,7 +98,7 @@ jobs:
         ZIP_FILE="$(pwd)/dont_download.zip" ./src/build.sh > dont_download.sh
 
     - name: Build Test
-      run: ./.github/downloader_test.py distribution_mister src/test/system/fixtures/small_db_install/small_db_1.json
+      run: ./.github/downloader_test.py distribution_mister $(pwd)/src/test/system/fixtures/small_db_install/small_db_1.json
       env:
         DOWNLOADER_SOURCE: ./dont_download.sh
 
