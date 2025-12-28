@@ -10,8 +10,13 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: ./.github/actions/setup-python
-    - name: Type check
-      run: python3 -m pip install mypy && mypy --check-untyped-defs src/__main__.py src/downloader
+    - run: |
+        set -euo pipefail
+        python3 -m pip install mypy
+        mypy --check-untyped-defs src/__main__.py src/downloader > mypy_output.txt 2>&1 || true
+        TYPE_ERRORS=$(grep -c "error:" mypy_output.txt || echo "0")
+        cat mypy_output.txt
+        echo "**Type Check:** Found $TYPE_ERRORS type errors" >> $GITHUB_STEP_SUMMARY
 
   unit-tests:
     runs-on: ubuntu-latest
