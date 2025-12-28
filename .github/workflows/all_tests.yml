@@ -5,34 +5,53 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  type-check:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Type check
-            run: python3 -m pip install mypy && mypy --check-untyped-defs src/__main__.py src/downloader
-          - name: Unit Tests
-            run: cd src && python3 -m unittest discover -s test/unit
-          - name: Integration Tests
-            run: cd src && python3 -m unittest discover -s test/integration
-          - name: System Quick Tests
-            run: cd src && python3 -m unittest discover -s test/system/quick -v
-          - name: System Slow Tests
-            run: cd src && python3 -m unittest discover -s test/system/slow -v
-          - name: Full Run Launcher Test
-            run: ./downloader.sh
-
     steps:
     - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-python
+    - name: Type check
+      run: python3 -m pip install mypy && mypy --check-untyped-defs src/__main__.py src/downloader
 
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-python
+    - name: Unit Tests
+      run: cd src && python3 -m unittest discover -s test/unit
 
-    - name: ${{ matrix.name }}
-      run: ${{ matrix.run }}
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-python
+    - name: Integration Tests
+      run: cd src && python3 -m unittest discover -s test/integration
+
+  system-quick-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-python
+    - name: System Quick Tests
+      run: cd src && python3 -m unittest discover -s test/system/quick -v
+
+  system-slow-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-python
+    - name: System Slow Tests
+      run: cd src && python3 -m unittest discover -s test/system/slow -v
+
+  launcher-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-python
+    - name: Full Run Launcher Test
+      run: ./downloader.sh
       env:
         DEBUG: true
         DEFAULT_BASE_PATH: ${{ runner.temp }}/downloader_test
