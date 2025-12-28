@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2022-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,20 +19,26 @@
 
 import os
 import subprocess
-from shutil import copyfileobj
+from shutil import copy, copyfileobj
 from tempfile import NamedTemporaryFile
 from urllib.request import urlopen
 
 
-temp_container = {}
-
-
 def fetch_temp_downloader():
+    downloader_source = os.environ.get('DOWNLOADER_SOURCE', 'https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/downloader.zip')
+
     with NamedTemporaryFile(suffix='.zip', mode='wb', delete=False) as temp:
-        temp_container['downloader'] = temp
-        with urlopen('https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/downloader.zip') as in_stream:
-            if in_stream.status == 200:
-                copyfileobj(in_stream, temp)
+        temp_name = temp.name
+
+        if downloader_source.startswith('http://') or downloader_source.startswith('https://'):
+            with urlopen(downloader_source) as in_stream:
+                if in_stream.status == 200:
+                    copyfileobj(in_stream, temp)
+        else:
+            temp.close()
+            copy(downloader_source, temp_name)
+
+    return temp_name
 
 
 def launch_downloader(filename):
@@ -42,16 +48,17 @@ def launch_downloader(filename):
 
 
 def main():
+    temp_filename = None
     try:
-        fetch_temp_downloader()
-        result = launch_downloader(temp_container['downloader'].name)
+        temp_filename = fetch_temp_downloader()
+        result = launch_downloader(temp_filename)
     except Exception as e:
         print(e)
         result = 1
 
-    if 'downloader' in temp_container:
+    if temp_filename:
         try:
-            os.unlink(temp_container['downloader'].name)
+            os.unlink(temp_filename)
         except FileNotFoundError:
             pass
 

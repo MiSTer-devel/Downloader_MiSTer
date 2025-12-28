@@ -58,32 +58,12 @@ jobs:
       if: steps.check-changes.outputs.NEW_RELEASE == 'yes'
       run: cd src && python3 -m unittest discover -s test/system/slow -v
 
-  windows-test:
-    runs-on: windows-latest
+  build:
+    runs-on: ubuntu-latest
     needs: main-test
     if: needs.main-test.outputs.NEW_RELEASE == 'yes'
 
     steps:
-    - uses: actions/checkout@v2
-
-    - uses: actions/setup-python@v2
-      with:
-        python-version: '3.9'
-
-    - name: Test PC Launcher on Windows
-      run: cd src && python pc_launcher.py
-      env:
-        PC_LAUNCHER_NO_WAIT: '1'
-
-  build-release:
-    runs-on: ubuntu-latest
-    needs: [main-test, windows-test]
-    if: needs.main-test.outputs.NEW_RELEASE == 'yes'
-
-    steps:
-    - run: echo "owner_lc=$(echo "${GITHUB_REPOSITORY_OWNER,,}")" >> "$GITHUB_OUTPUT"
-      id: vars
-
     - uses: actions/setup-python@v2
       with:
         python-version: '3.9'
@@ -101,6 +81,63 @@ jobs:
       run: ./.github/downloader_test.py distribution_mister $(pwd)/src/test/system/fixtures/small_db_install/small_db_1.json
       env:
         DOWNLOADER_SOURCE: ./dont_download.sh
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: |
+          latest.id
+          dont_download.zip
+          dont_download.sh
+
+  pc-launcher-test:
+    runs-on: ${{ matrix.os }}
+    needs: build
+    if: needs.main-test.outputs.NEW_RELEASE == 'yes'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            python-cmd: python3
+          - os: windows-latest
+            python-cmd: python
+          - os: macos-latest
+            python-cmd: python
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts
+
+    - name: PC Launcher Build Test on ${{ matrix.os }}
+      run: ${{ matrix.python-cmd }} src/pc_launcher.py
+      env:
+        DEFAULT_DB_ID: distribution_mister
+        DEFAULT_DB_URL: ${{ github.workspace }}/src/test/system/fixtures/small_db_install/small_db_1.json
+        DEBUG: true
+        PC_LAUNCHER_NO_WAIT: '1'
+        DOWNLOADER_SOURCE: ${{ github.workspace }}/dont_download.zip
+
+  compile-release:
+    runs-on: ubuntu-latest
+    needs: pc-launcher-test
+    if: needs.main-test.outputs.NEW_RELEASE == 'yes'
+
+    steps:
+    - run: echo "owner_lc=$(echo "${GITHUB_REPOSITORY_OWNER,,}")" >> "$GITHUB_OUTPUT"
+      id: vars
+
+    - uses: actions/checkout@v2
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts
 
     - uses: docker/setup-qemu-action@v2
       with:
