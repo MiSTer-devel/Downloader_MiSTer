@@ -1,0 +1,26 @@
+name: Upload Downloader Tester
+
+on:
+  push:
+    paths:
+      - '.github/downloader_test.py'
+  workflow_dispatch:
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Upload to Release
+      run: |
+        set -euo pipefail        
+        if ! gh release list | grep -q "latest" ; then
+            gh release create "latest" || true
+            sleep 15s
+        fi
+        
+        gh release upload latest .github/downloader_test.py --clobber
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
