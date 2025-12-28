@@ -14,9 +14,29 @@ jobs:
         set -euo pipefail
         python3 -m pip install mypy
         mypy --check-untyped-defs src/__main__.py src/downloader > mypy_output.txt 2>&1 || true
+
+        # Count errors
         TYPE_ERRORS=$(grep -c "error:" mypy_output.txt || echo "0")
-        cat mypy_output.txt
+
+        # Write summary header
         echo "**Type Check:** Found $TYPE_ERRORS type errors" >> $GITHUB_STEP_SUMMARY
+
+        # Add error list with links
+        if [ "$TYPE_ERRORS" -gt 0 ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          while IFS= read -r line; do
+            if [[ $line =~ ^([^:]+):([0-9]+):[[:space:]]error:[[:space:]](.+)$ ]]; then
+              file="${BASH_REMATCH[1]}"
+              line_num="${BASH_REMATCH[2]}"
+              message="${BASH_REMATCH[3]}"
+              url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/$file#L$line_num"
+              echo "- [\`$file:$line_num\`]($url): \`$message\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          done < mypy_output.txt
+        fi
+
+        # Display full output in logs
+        cat mypy_output.txt
 
   unit-tests:
     runs-on: ubuntu-latest
