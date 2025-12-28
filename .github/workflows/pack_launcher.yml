@@ -18,7 +18,7 @@ jobs:
       run: ./downloader.sh
       env:
         DEFAULT_DB_ID: distribution_mister
-        DEFAULT_DB_URL: ${{ github.workspace }}/src/test/system/fixtures/small_db_install/small_db_3.json
+        DEFAULT_DB_URL: ${{ github.workspace }}/src/test/system/fixtures/workflows/empty.json
         DEBUG: true
         DEFAULT_BASE_PATH: ${{ runner.temp }}/downloader_test
 
