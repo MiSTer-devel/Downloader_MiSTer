@@ -20,7 +20,6 @@ jobs:
         DEFAULT_DB_ID: distribution_mister
         DEFAULT_DB_URL: ${{ github.workspace }}/src/test/system/fixtures/small_db_install/small_db_3.json
         DEBUG: true
-        FORCED_BASE_PATH: ${{ runner.temp }}/downloader_test
         PC_LAUNCHER_NO_WAIT: '1'
 
     - name: Pack PC Launcher
