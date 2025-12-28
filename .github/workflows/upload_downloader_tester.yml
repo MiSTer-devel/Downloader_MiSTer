@@ -14,7 +14,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Validate Tester
-      run: ./.github/downloader_test.py distribution_mister $(pwd)/src/test/system/fixtures/small_db_install/small_db_1.json
+      run: ./.github/downloader_test.py distribution_mister $(pwd)/src/test/system/fixtures/workflows/tiny.json
 
     - name: Upload to Release
       run: |

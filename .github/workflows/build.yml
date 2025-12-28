@@ -93,7 +93,7 @@ jobs:
         ZIP_FILE="$(pwd)/dont_download.zip" ./src/build.sh > dont_download.sh
 
     - name: Build Test
-      run: ./.github/downloader_test.py distribution_mister $(pwd)/src/test/system/fixtures/small_db_install/small_db_1.json
+      run: ./.github/downloader_test.py distribution_mister $(pwd)/src/test/system/fixtures/workflows/tiny.json
       env:
         DOWNLOADER_SOURCE: ./dont_download.sh
 
@@ -132,7 +132,7 @@ jobs:
       run: ${{ matrix.python-cmd }} src/pc_launcher.py
       env:
         DEFAULT_DB_ID: distribution_mister
-        DEFAULT_DB_URL: ${{ github.workspace }}/src/test/system/fixtures/small_db_install/small_db_1.json
+        DEFAULT_DB_URL: ${{ github.workspace }}/src/test/system/fixtures/workflows/tiny.json
         DEBUG: true
         PC_LAUNCHER_NO_WAIT: '1'
         DOWNLOADER_SOURCE: ${{ github.workspace }}/dont_download.zip
