@@ -35,6 +35,7 @@ jobs:
       run: ${{ matrix.run }}
       env:
         DEBUG: true
+        DEFAULT_BASE_PATH: ${{ runner.temp }}/downloader_test
 
   pc-launcher:
     runs-on: ${{ matrix.os }}
