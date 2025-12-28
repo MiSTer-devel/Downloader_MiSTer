@@ -13,14 +13,17 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Validate Tester
+      run: ./.github/downloader_test.py distribution_mister $(pwd)/src/test/system/fixtures/small_db_install/small_db_1.json
+
     - name: Upload to Release
       run: |
-        set -euo pipefail        
+        set -euo pipefail
         if ! gh release list | grep -q "latest" ; then
             gh release create "latest" || true
             sleep 15s
         fi
-        
+
         gh release upload latest .github/downloader_test.py --clobber
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
