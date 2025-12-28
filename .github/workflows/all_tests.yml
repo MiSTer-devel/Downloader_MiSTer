@@ -7,33 +7,21 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
-    steps:
-
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
-
-    - uses: actions/checkout@v4
-
-    - name: Type check
-      run: python3 -m pip install mypy && mypy --check-untyped-defs src/__main__.py src/downloader
-
-    - name: Unit Tests
-      run: cd src && python3 -m unittest discover -s test/unit
-
-    - name: Integration Tests
-      run: cd src && python3 -m unittest discover -s test/integration
-
-    - name: System Quick Tests
-      run: cd src && python3 -m unittest discover -s test/system/quick -v
-
-    - name: System Slow Tests
-      run: cd src && python3 -m unittest discover -s test/system/slow -v
-
-  windows-test:
-    runs-on: windows-latest
-    needs: test
+    strategy:
+      matrix:
+        include:
+          - name: Type check
+            run: python3 -m pip install mypy && mypy --check-untyped-defs src/__main__.py src/downloader
+          - name: Unit Tests
+            run: cd src && python3 -m unittest discover -s test/unit
+          - name: Integration Tests
+            run: cd src && python3 -m unittest discover -s test/integration
+          - name: System Quick Tests
+            run: cd src && python3 -m unittest discover -s test/system/quick -v
+          - name: System Slow Tests
+            run: cd src && python3 -m unittest discover -s test/system/slow -v
+          - name: Full Run Launcher Test
+            run: ./downloader.sh
 
     steps:
     - uses: actions/checkout@v4
@@ -42,7 +30,29 @@ jobs:
       with:
         python-version: '3.9'
 
-    - name: Test PC Launcher on Windows
-      run: cd src && python pc_launcher.py
+    - name: ${{ matrix.name }}
+      run: ${{ matrix.run }}
+      env:
+        DEBUG: true
+
+  pc-launcher:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            python-cmd: python3
+          - os: windows-latest
+            python-cmd: python
+          - os: macos-latest
+            python-cmd: python
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Full Run PC Launcher Test on ${{ matrix.os }}
+      run: ${{ matrix.python-cmd }} src/pc_launcher.py
       env:
         PC_LAUNCHER_NO_WAIT: '1'
+        DEBUG: true
