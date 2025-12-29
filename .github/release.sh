@@ -16,14 +16,20 @@ if "latest" not in has_latest.stdout:
 
 md5sum('dont_download.zip', 'dont_download.zip.md5')
 
+old_commit = subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True, check=True).stdout.strip()
+
 subprocess.run(['git', 'add', 'dont_download.sh', 'latest.id'], check=True)
 subprocess.run(['git', 'commit', '-m', 'BOT: New dont_download.sh'], check=True)
 subprocess.run(['git', 'push', 'origin', 'main'], check=True)
 
-subprocess.run([
-    'gh', 'release', 'upload', 'latest', '--clobber',
-    'dont_download.zip',
-    'dont_download.zip.md5',
-    'downloader.zip',
-    'downloader_bin',
-  ], check=True)
+try:
+    subprocess.run([
+        'gh', 'release', 'upload', 'latest', '--clobber',
+        'dont_download.zip',
+        'dont_download.zip.md5',
+        'downloader.zip',
+        'downloader_bin',
+    ], check=True)
+except:
+    subprocess.run(['git', 'push', '--force', 'origin', f'{old_commit}:refs/heads/main'], check=True)
+    raise
