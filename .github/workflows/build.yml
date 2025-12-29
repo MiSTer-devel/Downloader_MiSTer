@@ -106,6 +106,7 @@ jobs:
           latest.id
           dont_download.zip
           dont_download.sh
+          src/downloader.zip
 
   pc-launcher-test:
     runs-on: ${{ matrix.os }}
