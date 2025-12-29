@@ -51,6 +51,7 @@ jobs:
         set -euo pipefail
 
         SKIP_COMMIT=true ./src/build.sh | sha256sum > latest.id
+        git add latest.id
 
         git fetch origin main
 
