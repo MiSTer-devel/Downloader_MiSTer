@@ -27,7 +27,7 @@ jobs:
       run: ${{ matrix.python-cmd }} src/pc_launcher.py
       env:
         DEFAULT_DB_ID: distribution_mister
-        DEFAULT_DB_URL: ${{ github.workspace }}/src/test/system/fixtures/workflows/empty.json
+        DEFAULT_DB_URL: ${{ github.workspace }}/src/test/system/fixtures/workflows/empty_db.json
         DEBUG: true
         PC_LAUNCHER_NO_WAIT: '1'
 

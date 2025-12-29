@@ -24,6 +24,6 @@ subprocess.run([
     'gh', 'release', 'upload', 'latest', '--clobber',
     'dont_download.zip',
     'dont_download.zip.md5',
-    'src/downloader.zip',
+    'downloader.zip',
     'downloader_bin',
   ], check=True)
