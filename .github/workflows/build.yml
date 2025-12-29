@@ -92,6 +92,7 @@ jobs:
 
         SKIP_COMMIT=true ./src/build.sh | sha256sum > latest.id
         ZIP_FILE="$(pwd)/dont_download.zip" ./src/build.sh > dont_download.sh
+        cp src/downloader.zip downloader.zip
 
     - name: Build Test
       run: ./.github/downloader_test.py distribution_mister $(pwd)/src/test/system/fixtures/workflows/tiny_db.json
@@ -106,7 +107,7 @@ jobs:
           latest.id
           dont_download.zip
           dont_download.sh
-          src/downloader.zip
+          downloader.zip
 
   pc-launcher-test:
     runs-on: ${{ matrix.os }}
