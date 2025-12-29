@@ -281,7 +281,13 @@ class LocalRepository(FilelogSaver):
 
             for drive, store in external_stores.items():
                 self._logger.bench('LocalRepository Write external json start: ', drive)
-                self._file_system.save_json(store, os.path.join(drive, FILE_downloader_external_storage))
+                external_store_path = os.path.join(drive, FILE_downloader_external_storage)
+                try:
+                    self._file_system.save_json(store, external_store_path)
+                except OSError as e:
+                    self._logger.debug(e)
+                    self._logger.print(f'ERROR: Could not save "{external_store_path}"\n'
+                                       f'       Is your drive "{drive}" connected and writable?')
                 self._logger.bench('LocalRepository Write external json done: ', drive)
                 external_drives.discard(drive)
 
