@@ -149,7 +149,7 @@ If not done manually, the launcher will automatically install that build on its 
 
 ### Supporters+ shout-out!
 
-Alex Frégeau, tavuntu, The Sentinel's Playground Team and Thomas Williams.
+Alex Frégeau, DefKonZer0 and Thomas Williams.
 
 Thank you so much for supporting this project! If you would like to show up here, join us as **Supporter+** on Patreon:
 
