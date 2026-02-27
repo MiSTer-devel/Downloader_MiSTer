@@ -140,7 +140,7 @@ def default_config() -> Config:
         'allow_reboot': AllowReboot.ALWAYS,
         'update_linux': True,
         'downloader_threads_limit': 6,
-        'downloader_timeout': 300,
+        'downloader_timeout': 180,
         'downloader_retries': 3,
         'zip_file_count_threshold': 60,
         'zip_accumulated_mb_threshold': 100,

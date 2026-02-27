@@ -17,13 +17,14 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import signal
+import time
 import unittest
 from functools import reduce
 
-from downloader.job_system import CantSetSignalsException, Job, JobFailPolicy, JobSystem, JobSystemAbortException, Worker, CycleDetectedException, \
+from downloader.job_system import ActivityTracker, CantSetSignalsException, Job, JobFailPolicy, JobSystem, JobSystemAbortException, Worker, CycleDetectedException, \
     CantPushJobs, \
     CantRegisterWorkerException, CantExecuteJobs, CantWaitWhenNotExecutingJobs, WorkerResult
-from typing import Dict, Optional, List
+from typing import Callable, Dict, Optional, List
 
 from test.fake_job_system import TestProgressReporter
 from test.fake_logger import NoLogger
@@ -31,7 +32,8 @@ from test.fake_logger import NoLogger
 
 class TestSingleThreadJobSystem(unittest.TestCase):
 
-    def sut(self, fail: JobFailPolicy = JobFailPolicy.FAIL_GRACEFULLY) -> JobSystem: return JobSystem(self.reporter, logger=NoLogger(), max_threads=1, fail_policy=fail)
+    def sut(self, fail: JobFailPolicy = JobFailPolicy.FAIL_GRACEFULLY, activity_tracker: Optional[ActivityTracker] = None, time_monotonic: Optional[Callable] = None, timeout: float = 300) -> JobSystem:
+        return JobSystem(self.reporter, logger=NoLogger(), max_threads=1, activity_tracker=activity_tracker, time_monotonic=time_monotonic or time.monotonic, fail_policy=fail, max_timeout=timeout)
 
     def setUp(self):
         self.reporter = TestProgressReporter()
@@ -239,6 +241,21 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         self.system.execute_jobs()
 
         self.assertReports(completed={1: 3}, started={1: 3})
+
+    def test_timeout___depends_on_activity_tracker(self):
+        for tracker, timed_out in [(None, True), (ActivityTracker().track(float('inf')), False)]:
+            self.setUp()
+            with self.subTest(tracker=tracker):
+                clock = [0.0]
+                def fake_monotonic():
+                    clock[0] += 1.0
+                    return clock[0]
+
+                self.system = self.sut(fail=JobFailPolicy.FAULT_TOLERANT, activity_tracker=tracker, time_monotonic=fake_monotonic, timeout=0)
+                self.system.register_worker(1, TestWorker(self.system))
+                self.system.push_job(TestJob(1))
+                self.system.execute_jobs()
+                self.assertReports(completed={1: 1}, timed_out=timed_out)
 
     def test_job_add_tag_a_b___when_checked_tags___returns_b(self):
         job = TestJob(1)

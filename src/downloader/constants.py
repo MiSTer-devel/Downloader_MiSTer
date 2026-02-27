@@ -140,6 +140,10 @@ STORAGE_PATHS_PRIORITY_SEQUENCE: Final[list[str]] = [
 ]
 STORAGE_PATHS_SET: Final[set[str]] = set(STORAGE_PATHS_PRIORITY_SEQUENCE)
 
+# Timeouts
+HTTP_SOCKET_TIMEOUT: Final[int] = 60
+JOB_SYSTEM_INACTIVITY_TIMEOUT: Final[int] = 600
+
 # Filters
 ESSENTIAL_TERM: Final[str] = 'essential'
 

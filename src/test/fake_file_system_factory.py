@@ -18,6 +18,7 @@
 import io
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -25,6 +26,7 @@ from downloader.constants import HASH_file_does_not_exist, STORAGE_PATHS_SET
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
     FsError, UnzipError, \
     absolute_parent_folder, FolderCreationError, FsSharedState, FileCopyError, FileReadError
+from downloader.job_system import ActivityTracker
 from downloader.path_package import PathPackage
 from test.fake_http_gateway import FakeBuf
 from test.fake_importer_implicit_inputs import FileSystemState
@@ -33,8 +35,8 @@ from test.fake_logger import NoLogger
 first_fake_temp_file = '/tmp/unique_temp_filename_0'
 
 
-def make_production_filesystem_factory(config, path_dictionary=None) -> ProductionFileSystemFactory:
-    return ProductionFileSystemFactory(config, path_dictionary or {}, NoLogger())
+def make_production_filesystem_factory(config, path_dictionary=None, time_monotonic=time.monotonic) -> ProductionFileSystemFactory:
+    return ProductionFileSystemFactory(config, path_dictionary or {}, NoLogger(), ActivityTracker(), time_monotonic)
 
 
 def fs_data(files=None, folders=None, base_path=None):

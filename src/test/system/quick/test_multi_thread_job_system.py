@@ -26,8 +26,8 @@ from test.unit.test_single_thread_job_system import TestSingleThreadJobSystem
 class TestMultiThreadJobSystem(TestSingleThreadJobSystem):
 
     def test_base_provides_tests(self): self.assertGreater(len([m for m in dir(self) if m.startswith('test_')]), 5)
-    def sut(self, fail: JobFailPolicy = JobFailPolicy.FAIL_GRACEFULLY, threads: int = 20, max_cycle: int = 3, timeout: int = 0.5)  -> JobSystem:
-        return JobSystem(self.reporter, logger=NoLogger(), max_threads=threads, fail_policy=fail, max_cycle=max_cycle, wait_time=0.016, max_timeout=timeout)
+    def sut(self, fail: JobFailPolicy = JobFailPolicy.FAIL_GRACEFULLY, activity_tracker=None, time_monotonic=None, threads: int = 20, max_cycle: int = 3, timeout: int = 0.5)  -> JobSystem:
+        return JobSystem(self.reporter, logger=NoLogger(), max_threads=threads, activity_tracker=activity_tracker, time_monotonic=time_monotonic or time.monotonic, fail_policy=fail, max_cycle=max_cycle, wait_time=0.016, max_timeout=timeout)
 
     def test_cancel_pending_jobs___when_there_are_many_jobs_produced___jobs_in_progress_will_fail_and_no_more_will_start(self):
         self.system = self.sut(threads=3, max_cycle=100)

@@ -32,6 +32,21 @@ import threading
 import signal
 
 
+class ActivityTracker:
+    """Tracks worker activity to prevent false pipeline timeouts during long-running jobs."""
+
+    def __init__(self) -> None:
+        self._last_progress_time: Optional[float] = None
+
+    def track(self, progress_time: float) -> 'ActivityTracker':
+        self._last_progress_time = progress_time
+        return self
+
+    @property
+    def last_progress_time(self) -> Optional[float]:
+        return self._last_progress_time
+
+
 class JobContext(Protocol):
     """A context for workers to interact with the job system in a thread-safe manner."""
 
@@ -58,9 +73,11 @@ class JobSystem(JobContext):
         JobSystem._next_job_type_id += 1
         return JobSystem._next_job_type_id
 
-    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', max_threads: int = 6, max_tries: int = 3, wait_time: float = 0.25, max_cycle: int = 3, max_timeout: float = 300, fail_policy: JobFailPolicy = JobFailPolicy.FAULT_TOLERANT) -> None:
+    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', activity_tracker: Optional[ActivityTracker] = None, time_monotonic: Callable[[], float] = time.monotonic, max_threads: int = 6, max_tries: int = 3, wait_time: float = 0.25, max_cycle: int = 3, max_timeout: float = 300, fail_policy: JobFailPolicy = JobFailPolicy.FAULT_TOLERANT) -> None:
         self._reporter: ProgressReporter = reporter
         self._logger: JobSystemLogger = logger
+        self._activity_tracker: ActivityTracker = activity_tracker if activity_tracker is not None else ActivityTracker()
+        self._time_monotonic = time_monotonic
         self._max_threads: int = max_threads
         self._max_tries: int = max_tries
         self._wait_time: float = wait_time
@@ -385,10 +402,17 @@ class JobSystem(JobContext):
         raise errors[0]
 
     def _update_timeout_clock(self) -> None:  # We only want to update the timeout when the state of the job pipeline changes
-        self._timeout_clock = time.monotonic() + self._max_timeout
+        self._timeout_clock = self._time_monotonic() + self._max_timeout
 
     def _check_clock(self) -> None:
-        if self._timeout_clock > time.monotonic():
+        now = self._time_monotonic()
+
+        last_progress = self._activity_tracker.last_progress_time
+        if last_progress is not None and last_progress + self._max_timeout > now:
+            self._update_timeout_clock()
+            return
+
+        if self._timeout_clock > now:
             return
 
         self._timed_out = True

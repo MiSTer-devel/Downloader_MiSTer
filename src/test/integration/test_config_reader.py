@@ -39,7 +39,7 @@ class TestConfigReader(unittest.TestCase):
             K_BASE_PATH: default_base_path(),
             K_BASE_SYSTEM_PATH: default_base_path(),
             K_DOWNLOADER_THREADS_LIMIT: 6,
-            K_DOWNLOADER_TIMEOUT: 300,
+            K_DOWNLOADER_TIMEOUT: 180,
             K_DOWNLOADER_RETRIES: 3,
             K_VERBOSE: False,
             K_DATABASES: {'distribution_mister': {
@@ -150,7 +150,7 @@ class TestConfigReader(unittest.TestCase):
             K_BASE_PATH: default_base_path(),
             K_BASE_SYSTEM_PATH: default_base_path(),
             K_DOWNLOADER_THREADS_LIMIT: 6,
-            K_DOWNLOADER_TIMEOUT: 300,
+            K_DOWNLOADER_TIMEOUT: 180,
             K_DOWNLOADER_RETRIES: 3,
             K_VERBOSE: False,
             K_DATABASES: {'somethinguppercase': {

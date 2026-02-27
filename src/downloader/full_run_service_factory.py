@@ -21,6 +21,7 @@ from typing import Dict, Tuple, Optional
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config
+from downloader.constants import HTTP_SOCKET_TIMEOUT, JOB_SYSTEM_INACTIVITY_TIMEOUT
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
 from downloader.file_filter import FileFilterFactory
 from downloader.file_system import FileSystemFactory
@@ -28,7 +29,7 @@ from downloader.free_space_reservation import LinuxFreeSpaceReservation, Unlimit
 from downloader.full_run_service import FullRunService
 from downloader.http_gateway import HttpGateway
 from downloader.interruptions import Interruptions
-from downloader.job_system import JobSystem
+from downloader.job_system import ActivityTracker, JobSystem
 from downloader.jobs.fetch_file_worker import SafeFileFetcher
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import FailCtx
@@ -60,13 +61,14 @@ class FullRunServiceFactory:
     def create(self, config: Config):
         path_dictionary: Dict[str, str] = dict()
         waiter = Waiter()
-        file_system_factory = FileSystemFactory(config, path_dictionary, self._logger)
+        activity_tracker = ActivityTracker()
+        file_system_factory = FileSystemFactory(config, path_dictionary, self._logger, activity_tracker)
         system_file_system = file_system_factory.create_for_system_scope()
         external_drives_repository = self._external_drives_repository_factory.create(system_file_system, self._logger)
         store_migrator = StoreMigrator(migrations(config), self._logger)
         local_repository = LocalRepository(config, self._logger, system_file_system, store_migrator, external_drives_repository)
 
-        http_connection_timeout = config['downloader_timeout'] / 4 if config['downloader_timeout'] > 60 else 15
+        http_connection_timeout = HTTP_SOCKET_TIMEOUT
 
         ssl_ctx, ssl_err = context_from_curl_ssl(config['curl_ssl'])
         if ssl_err is not None:
@@ -85,9 +87,10 @@ class FullRunServiceFactory:
         job_system = JobSystem(
             reporter=DownloaderProgressReporter(self._logger, [file_download_reporter]),
             logger=self._logger,
+            activity_tracker=activity_tracker,
             max_threads=config['downloader_threads_limit'],
             max_tries=config['downloader_retries'],
-            max_timeout=config['downloader_timeout'] * 2,
+            max_timeout=JOB_SYSTEM_INACTIVITY_TIMEOUT,
         )
 
         file_filter_factory = FileFilterFactory(self._logger)
