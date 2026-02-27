@@ -21,16 +21,18 @@ import os
 import hashlib
 import shutil
 import json
+import socket
 import threading
 import time
 import zipfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Final, List, Optional, Set, Dict, Any, Tuple, Union, IO, BinaryIO
+from typing import Callable, Final, List, Optional, Set, Dict, Any, Tuple, Union, IO, BinaryIO
 
 from downloader.config import Config
 from downloader.constants import HASH_file_does_not_exist, STORAGE_PATHS_SET
 from downloader.error import DownloaderError
+from downloader.job_system import ActivityTracker
 from downloader.logger import Logger, OffLogger
 from downloader.path_package import PathPackage
 
@@ -47,10 +49,12 @@ COPY_BUFSIZE: Final = 256 * 1024
 
 
 class FileSystemFactory:
-    def __init__(self, config: Config, path_dictionary: Dict[str, str], logger: Logger) -> None:
+    def __init__(self, config: Config, path_dictionary: Dict[str, str], logger: Logger, activity_tracker: ActivityTracker, time_monotonic: Callable[[], float] = time.monotonic) -> None:
         self._config = config
         self._path_dictionary = path_dictionary
         self._logger = logger
+        self._activity_tracker = activity_tracker
+        self._time_monotonic = time_monotonic
         self._unique_temp_filenames: Set[Optional[str]] = set()
         self._unique_temp_filenames.add(None)
         self._shared_state = FsSharedState()
@@ -79,7 +83,7 @@ class FileSystemFactory:
         #         self._logger.debug('Using standard JSON library.')
         #     self._logger.bench('FileSystemFactory trying to load ORJSON end.')
 
-        return _FileSystem(config['base_path'], self._path_dictionary, self._logger, self._unique_temp_filenames, self._shared_state)
+        return _FileSystem(config['base_path'], self._path_dictionary, self._logger, self._unique_temp_filenames, self._shared_state, self._activity_tracker, self._time_monotonic)
 
     def cancel_ongoing_operations(self) -> None:
         self._shared_state.interrupting_operations = True
@@ -262,12 +266,14 @@ class FileWriteError(FsError): pass
 class FsTimeoutError(FsError): pass
 
 class _FileSystem(FileSystem):
-    def __init__(self, base_path: str, path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], shared_state: 'FsSharedState') -> None:
+    def __init__(self, base_path: str, path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], shared_state: 'FsSharedState', activity_tracker: ActivityTracker, time_monotonic: Callable[[], float] = time.monotonic) -> None:
         self._base_path = base_path
         self._path_dictionary = path_dictionary
         self._logger = logger
         self._unique_temp_filenames = unique_temp_filenames
         self._shared_state = shared_state
+        self._activity_tracker = activity_tracker
+        self._time_monotonic = time_monotonic
         self._quick_hit = 0
         self._slow_hit = 0
 
@@ -379,6 +385,7 @@ class _FileSystem(FileSystem):
                     data = fsource.read(COPY_BUFSIZE)
                     if not data:
                         break
+                    self._activity_tracker.track(self._time_monotonic())
                     ftarget.write(data)
             self._shared_state.add_file(full_target)
         except Exception as e:
@@ -467,52 +474,57 @@ class _FileSystem(FileSystem):
         return self._path(path)
 
     def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /) -> tuple[int, str]:
-        start_time = time.monotonic()
+        last_data_time = self._time_monotonic()
         md5_hasher = hashlib.md5()
         file_size = 0
         with open(target_path, 'wb') as out_file:
             while True:
-                elapsed_time = time.monotonic() - start_time
-                if elapsed_time > timeout:
-                    raise FsTimeoutError(f"Copy operation timed out after {timeout} seconds.")
-
                 if self._shared_state.interrupting_operations:
                     raise FsOperationsError("File system operations have been disabled.")
 
-                chunk = in_stream.read(COPY_BUFSIZE)
-                if not chunk:
-                    break
+                try:
+                    chunk = in_stream.read(COPY_BUFSIZE)
+                    if not chunk:
+                        break
 
-                out_file.write(chunk)
-                md5_hasher.update(chunk)
-                file_size += len(chunk)
+                    last_data_time = self._time_monotonic()
+                    self._activity_tracker.track(last_data_time)
+                    out_file.write(chunk)
+                    md5_hasher.update(chunk)
+                    file_size += len(chunk)
+                except socket.timeout:
+                    elapsed_time = self._time_monotonic() - last_data_time
+                    if elapsed_time > timeout:
+                        raise FsTimeoutError(f"Copy operation timed after being stalled for {timeout} seconds.")
 
         return file_size, md5_hasher.hexdigest()
 
     def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> Tuple[io.BytesIO, str]:
-        start_time = time.monotonic()
+        last_data_time = self._time_monotonic()
         buf = io.BytesIO()
-        md5_hasher = hashlib.md5() if calc_md5 is not None else None
+        md5_hasher = hashlib.md5() if calc_md5 else None
         while True:
-            elapsed_time = time.monotonic() - start_time
-            if elapsed_time > timeout:
-                raise FsTimeoutError(f"Copy operation timed out after {timeout} seconds.")
-
             if self._shared_state.interrupting_operations:
                 raise FsOperationsError("File system operations have been disabled.")
 
-            chunk = in_stream.read(COPY_BUFSIZE)
-            if not chunk:
-                break
-            buf.write(chunk)
+            try:
+                chunk = in_stream.read(COPY_BUFSIZE)
+                if not chunk:
+                    break
 
-            if not calc_md5:
-                continue
+                last_data_time = self._time_monotonic()
+                self._activity_tracker.track(last_data_time)
+                buf.write(chunk)
 
-            md5_hasher.update(chunk)
+                if md5_hasher is not None:
+                    md5_hasher.update(chunk)
+            except socket.timeout:
+                elapsed_time = self._time_monotonic() - last_data_time
+                if elapsed_time > timeout:
+                    raise FsTimeoutError(f"Copy operation timed after being stalled for {timeout} seconds.")
 
         buf.seek(0)
-        return buf, md5_hasher.hexdigest() if calc_md5 else ''
+        return buf, md5_hasher.hexdigest() if md5_hasher is not None else ''
 
     def unlink(self, path: str, verbose: bool = True) -> Optional[Exception]:
         verbose = verbose and not path.startswith('/tmp/')
@@ -592,6 +604,7 @@ class _FileSystem(FileSystem):
                             buf = source.read(COPY_BUFSIZE)
                             if not buf:
                                 break
+                            self._activity_tracker.track(self._time_monotonic())
                             target.write(buf)
 
         except Exception as e:
