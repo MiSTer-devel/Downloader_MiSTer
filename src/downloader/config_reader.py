@@ -127,10 +127,6 @@ class ConfigReader:
         if self._env['UPDATE_LINUX'] != DEFAULT_UPDATE_LINUX_ENV:
             result['update_linux'] = self._env['UPDATE_LINUX'] == 'true'
 
-        if self._env['FORCED_BASE_PATH'] is not None:
-            result['base_path'] = self._env['FORCED_BASE_PATH']
-            result['base_system_path'] = self._env['FORCED_BASE_PATH']
-
         result['fail_on_file_error'] = self._env['FAIL_ON_FILE_ERROR'] == 'true'
         result['commit'] = self._valid_max_length('COMMIT', self._env['COMMIT'], 50)
         result['default_db_id'] = self._valid_db_id(K_DEFAULT_DB_ID, self._env['DEFAULT_DB_ID'])
@@ -164,6 +160,10 @@ class ConfigReader:
 
             if result['file_checking'] != FileChecking.EXHAUSTIVE and result['file_checking'] != FileChecking.VERIFY_INTEGRITY:
                 result['file_checking'] = FileChecking.EXHAUSTIVE
+
+        if self._env['FORCED_BASE_PATH'] is not None:
+            result['base_path'] = self._env['FORCED_BASE_PATH']
+            result['base_system_path'] = self._env['FORCED_BASE_PATH']
 
         result['skip_free_space_checks'] = self._env['SKIP_FREE_SPACE_CHECKS'] or result['is_pc_launcher']
 
