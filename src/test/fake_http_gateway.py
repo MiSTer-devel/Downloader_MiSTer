@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, Tuple, Generator, Optional, TypedDict
+from typing import Any, Generator, Optional, TypedDict
 from contextlib import contextmanager
 import ssl
 
@@ -25,7 +25,7 @@ from test.objects import binary_content
 
 
 class FileContextRequired(TypedDict):
-    description: Dict[str, Any]
+    description: dict[str, Any]
     path: str
 
 class FileContext(FileContextRequired, total=False):
@@ -38,11 +38,11 @@ class FakeHttpGateway(HttpGateway):
         self._network_state = network_state
         self._file_ctx: Optional[FileContext] = None
 
-    def set_file_ctx(self, file_ctx: Optional[Tuple[FileContext, str]]) -> None:
+    def set_file_ctx(self, file_ctx: Optional[tuple[FileContext, str]]) -> None:
         self._file_ctx = file_ctx
 
     @contextmanager
-    def open(self, url: str, _method: str = None, _body: Any = None, _headers: Any = None) -> Generator[Tuple[str, 'FakeHTTPResponse'], None, None]:
+    def open(self, url: str, _method: str = None, _body: Any = None, _headers: Any = None) -> Generator[tuple[str, 'FakeHTTPResponse'], None, None]:
         description = None
         target_file_path = None
         info_path = None
@@ -82,7 +82,7 @@ class FakeHttpGateway(HttpGateway):
 
 
 class FakeHTTPResponse:
-    def __init__(self, url: str, status: int, storing_problems: bool, description: Optional[Dict[str, Any]], file_path: Optional[str]):
+    def __init__(self, url: str, status: int, storing_problems: bool, description: Optional[dict[str, Any]], file_path: Optional[str]):
         self.url = url
         self.status = status
         self.storing_problems = storing_problems

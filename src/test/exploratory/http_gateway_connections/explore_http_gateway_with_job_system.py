@@ -23,7 +23,6 @@ import ssl
 import time
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 from downloader.config import default_config
 from downloader.file_system import FileSystemFactory
@@ -103,11 +102,11 @@ class Reporter(ProgressReporter):
     def notify_job_retried(self, job: Job, retry_job: Job, exception: Exception) -> None: pass
     def notify_job_started(self, job: Job) -> None: pass
 
-    completed: List[FetchFileJob] = []
-    failed: List[Tuple[FetchFileJob, Exception]] = []
-    cancelled: List[FetchFileJob] = []
+    completed: list[FetchFileJob] = []
+    failed: list[tuple[FetchFileJob, Exception]] = []
+    cancelled: list[FetchFileJob] = []
 
-    def notify_job_completed(self, job: FetchFileJob, next_jobs: List[Job]) -> None:  # type: ignore[override]
+    def notify_job_completed(self, job: FetchFileJob, next_jobs: list[Job]) -> None:  # type: ignore[override]
         self._logger.print(f'>>>>>> COMPLETED! {job.source}')
         self.completed.append(job)
 
@@ -115,7 +114,7 @@ class Reporter(ProgressReporter):
         self._logger.print(f'>>>>>> FAILED! {job.source}', exception)
         self.failed.append((job, exception))
 
-    def notify_jobs_cancelled(self, jobs: List[FetchFileJob]) -> None:  # type: ignore[override]
+    def notify_jobs_cancelled(self, jobs: list[FetchFileJob]) -> None:  # type: ignore[override]
         self.cancelled.extend(jobs)
 
         if self._cancelled: return

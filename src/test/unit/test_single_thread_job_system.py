@@ -24,7 +24,7 @@ from functools import reduce
 from downloader.job_system import ActivityTracker, CantSetSignalsException, Job, JobFailPolicy, JobSystem, JobSystemAbortException, Worker, CycleDetectedException, \
     CantPushJobs, \
     CantRegisterWorkerException, CantExecuteJobs, CantWaitWhenNotExecutingJobs, WorkerResult
-from typing import Callable, Dict, Optional, List
+from typing import Callable, Optional
 
 from test.fake_job_system import TestProgressReporter
 from test.fake_logger import NoLogger
@@ -270,12 +270,12 @@ class TestSingleThreadJobSystem(unittest.TestCase):
         self.assertFalse(job.has_tag('b'))
 
     def assertReports(self,
-        completed: Optional[Dict[int, int]] = None,
-        started: Optional[Dict[int, int]] = None,
-        in_progress: Optional[Dict[int, int]] = None,
-        failed: Optional[Dict[int, int]] = None,
-        retried: Optional[Dict[int, int]] = None,
-        cancelled: Optional[Dict[int, int]] = None,
+        completed: Optional[dict[int, int]] = None,
+        started: Optional[dict[int, int]] = None,
+        in_progress: Optional[dict[int, int]] = None,
+        failed: Optional[dict[int, int]] = None,
+        retried: Optional[dict[int, int]] = None,
+        cancelled: Optional[dict[int, int]] = None,
         pending: int = 0,
         timed_out: bool = False,
         errors: int = 0
@@ -305,7 +305,7 @@ class TestSingleThreadJobSystem(unittest.TestCase):
 
 class TestJob(Job):
     def __init__(self, type_id: int, next_job: Optional['TestJob'] = None, retry_job: Optional['TestJob'] = None, backup_job: Optional['TestJob'] = None, fails: int = 0, register_worker: Optional[Worker] = None,
-                 cancel_pending_jobs: bool = False, raises: bool = False, execute_jobs: bool = False, set_signals: Optional[List[signal.Signals]] = None):
+                 cancel_pending_jobs: bool = False, raises: bool = False, execute_jobs: bool = False, set_signals: Optional[list[signal.Signals]] = None):
         self._type_id = type_id
         self._retry_job = retry_job
         self._backup_job = backup_job

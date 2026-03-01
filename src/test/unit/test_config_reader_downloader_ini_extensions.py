@@ -18,7 +18,6 @@
 
 import configparser
 import unittest
-from typing import Dict, List
 
 from downloader.config import InvalidConfigParameter, ConfigDatabaseSection
 from downloader.config_reader import ConfigReader
@@ -49,7 +48,7 @@ class FakeConfigReader(ConfigReader):
         ini_config.read_string(content)
         return ini_config
 
-    def _discover_drop_in_files(self, config_path: str) -> List[str]:
+    def _discover_drop_in_files(self, config_path: str) -> list[str]:
         base_name = config_path.rsplit('/', 1)[0] if '/' in config_path else ''
         prefix = (base_name + '/') if base_name else ''
 
@@ -230,7 +229,7 @@ def fs(files: dict):
     return files
 
 
-def databases(sections: dict) -> Dict[str, dict]:
+def databases(sections: dict) -> dict[str, dict]:
     result = {}
     for section_id, props in sections.items():
         entry = {'section': section_id, 'db_url': props['db_url']}

@@ -25,7 +25,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor, Future
 from datetime import datetime
 from pathlib import Path
-from typing import List
 
 from downloader.http_gateway import HttpGateway, HttpLogger, http_config
 
@@ -64,7 +63,7 @@ def main() -> None:
     signals = [signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT]
     signal_handlers = [(s, signal.getsignal(s)) for s in signals]
 
-    futures: List[Future[None]] = []
+    futures: list[Future[None]] = []
     interrupted = False
     cancelled = 0
     dir_path = f'{os.path.dirname(os.path.realpath(__file__))}/delme'

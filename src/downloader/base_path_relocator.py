@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Any, Dict, List
+from typing import Any
 from downloader.config import Config, config_with_base_path
 from downloader.db_utils import DbSectionPackage
 from downloader.error import DownloaderError
@@ -33,7 +33,7 @@ class BasePathRelocator:
         self._waiter = waiter
         self._logger = logger
 
-    def relocating_base_paths(self, db_pkgs: List[DbSectionPackage], local_store: LocalStoreWrapper) -> List['BasePathRelocatorPackage']:
+    def relocating_base_paths(self, db_pkgs: list[DbSectionPackage], local_store: LocalStoreWrapper) -> list['BasePathRelocatorPackage']:
         result = []
         for pkg in db_pkgs:
             store = local_store.store_by_id(pkg.db_id)
@@ -85,7 +85,7 @@ class BasePathRelocatorPackage:
     def db_id(self): return self._db_id
 
     def relocate_non_system_files(self) -> None:
-        files_to_relocate: list[tuple[str, Dict[str, Any]]] = []
+        files_to_relocate: list[tuple[str, dict[str, Any]]] = []
         for file, description in self._store.read_only().files.items():
             if 'path' in description and description['path'] == 'system':
                 continue

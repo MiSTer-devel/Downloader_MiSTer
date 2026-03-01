@@ -24,7 +24,7 @@ from enum import Enum, auto
 from contextlib import contextmanager
 import traceback
 from types import FrameType
-from typing import Deque, Dict, Optional, Callable, List, Tuple, Any, Iterable, Protocol, Union
+from typing import Deque, Optional, Callable, Any, Iterable, Protocol, Union
 import sys
 import time
 import queue
@@ -70,36 +70,36 @@ class JobSystem(JobContext):
         self._max_timeout: float = max_timeout
         self._fail_policy: JobFailPolicy = fail_policy
         self._job_queue: Deque[_JobPackage] = deque()
-        self._unhandled_errors: List[BaseException] = []
-        self._notifications: queue.Queue[Tuple[_JobState, _JobPackage, Optional[Exception]]] = queue.Queue()
-        self._jobs_cancelled: List[Job] = []
-        self._workers: Dict[int, Worker] = {}
+        self._unhandled_errors: list[BaseException] = []
+        self._notifications: queue.Queue[tuple[_JobState, _JobPackage, Optional[Exception]]] = queue.Queue()
+        self._jobs_cancelled: list[Job] = []
+        self._workers: dict[int, Worker] = {}
         self._lock = threading.Lock()
         self._pending_jobs_amount: int = 0
         self._are_jobs_cancelled: bool = False
         self._is_executing_jobs: bool = False
         self._timeout_clock: float = 0
         self._timed_out: bool = False
-        self._signals: List[signal.Signals] = [signal.SIGINT]
+        self._signals: list[signal.Signals] = [signal.SIGINT]
 
     def timed_out(self) -> bool: return self._timed_out
     def get_unhandled_exceptions(self) -> Iterable[BaseException]: return self._unhandled_errors
     def pending_jobs_amount(self) -> int: return self._pending_jobs_amount
     def are_jobs_cancelled(self) -> bool: return self._are_jobs_cancelled
 
-    def set_interfering_signals(self, signals: List[signal.Signals]) -> None:
+    def set_interfering_signals(self, signals: list[signal.Signals]) -> None:
         with self._lock:
             if self._is_executing_jobs: raise CantSetSignalsException('Can not set interfering signals while executing jobs')
 
         self._signals = signals
 
-    def register_workers(self, workers: Dict[int, 'Worker']) -> None:
+    def register_workers(self, workers: dict[int, 'Worker']) -> None:
         with self._lock:
             if self._is_executing_jobs: raise CantRegisterWorkerException('Can not register workers while executing jobs')
 
             self._workers.update(workers)
 
-    def push_jobs(self, jobs: List['Job']) -> None:
+    def push_jobs(self, jobs: list['Job']) -> None:
         with self._lock:
             if self._is_executing_jobs: raise CantPushJobs('Can not push more jobs while executing jobs')
 
@@ -181,7 +181,7 @@ class JobSystem(JobContext):
 
     def _execute_with_threads(self, max_threads: int) -> None:
         with self._temporary_signal_handlers(), ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
-            futures: list[Tuple['_JobPackage', Future[None]]] = [(package, thread_executor.submit(self._operate_on_next_job, package, self._notifications)) for package in self._job_queue]
+            futures: list[tuple['_JobPackage', Future[None]]] = [(package, thread_executor.submit(self._operate_on_next_job, package, self._notifications)) for package in self._job_queue]
             max_futures = max(max_threads * 1.5, len(futures))
             self._job_queue.clear()
             while (self._pending_jobs_amount > 0 or futures) and self._are_jobs_cancelled is False:
@@ -224,7 +224,7 @@ class JobSystem(JobContext):
             if self._fail_policy == JobFailPolicy.FAIL_GRACEFULLY and self._unhandled_errors:
                 self._are_jobs_cancelled = True
 
-    def _operate_on_next_job(self, package: '_JobPackage', notifications: queue.Queue[Tuple['_JobState', '_JobPackage', Optional[Exception]]]) -> None:
+    def _operate_on_next_job(self, package: '_JobPackage', notifications: queue.Queue[tuple['_JobState', '_JobPackage', Optional[Exception]]]) -> None:
         if self._are_jobs_cancelled:
             notifications.put((_JobState.JOB_CANCELLED, package, None))
             return
@@ -321,7 +321,7 @@ class JobSystem(JobContext):
         else:
             self._record_job_failed(package, e)
 
-    def _remove_done_futures(self, futures: list[Tuple['_JobPackage', Future[None]]]) -> list[Tuple['_JobPackage', Future[None]]]:
+    def _remove_done_futures(self, futures: list[tuple['_JobPackage', Future[None]]]) -> list[tuple['_JobPackage', Future[None]]]:
         still_pending = []
         for package, future in futures:
             if future.done():
@@ -332,7 +332,7 @@ class JobSystem(JobContext):
                 still_pending.append((package, future))
         return still_pending
 
-    def _cancel_futures(self, futures: list[Tuple['_JobPackage', Future[None]]]) -> None:
+    def _cancel_futures(self, futures: list[tuple['_JobPackage', Future[None]]]) -> None:
         for package, future in futures:
             if future.cancel():
                 self._jobs_cancelled.append(package.job)
@@ -349,7 +349,7 @@ class JobSystem(JobContext):
 
         self._handle_returned_error(package, _wrap_unknown_base_error(e))
 
-    def _add_unhandled_exception(self, e: BaseException, package: Optional['_JobPackage'] = None, sub_job: Optional[Tuple[str, 'Job']] = None, ctx: Optional[str] = None, method: Optional[Callable] = None) -> None:
+    def _add_unhandled_exception(self, e: BaseException, package: Optional['_JobPackage'] = None, sub_job: Optional[tuple[str, 'Job']] = None, ctx: Optional[str] = None, method: Optional[Callable] = None) -> None:
         if self._fail_policy == JobFailPolicy.FAIL_FAST: raise e
 
         msg = f'WARNING! {ctx or _unknown}: '
@@ -375,7 +375,7 @@ class JobSystem(JobContext):
         self._logger.debug(msg, e)
         self._unhandled_errors.append(e)
 
-    def _raise_unhandled_exceptions(self, errors: List[BaseException]) -> None:
+    def _raise_unhandled_exceptions(self, errors: list[BaseException]) -> None:
         if not errors: return
 
         msg = f'Unhandled exceptions: {len(errors)}\n'
@@ -408,7 +408,7 @@ class JobSystem(JobContext):
         parent_package = package.parent
         if parent_package is None: return True
 
-        seen: Dict[int, int] = dict()
+        seen: dict[int, int] = dict()
         current: Optional[_JobPackage] = parent_package
 
         while current is not None:
@@ -454,7 +454,7 @@ class JobSystem(JobContext):
         self._update_timeout_clock()
         self._try_report('report-started', self._reporter_for_package(package).notify_job_started, package.job)
 
-    def _record_job_completed(self, package: '_JobPackage', next_jobs: List['Job']) -> None:
+    def _record_job_completed(self, package: '_JobPackage', next_jobs: list['Job']) -> None:
         self._pending_jobs_amount -= 1
         self._update_timeout_clock()
         self._try_report('report-completed', self._reporter_for_package(package).notify_job_completed, package.job, next_jobs)
@@ -468,7 +468,7 @@ class JobSystem(JobContext):
         self._update_timeout_clock()
         self._try_report('report-failed', self._reporter_for_package(package).notify_job_failed, package.job, e)
 
-    def _record_jobs_cancelled(self, jobs: List['Job']) -> None:
+    def _record_jobs_cancelled(self, jobs: list['Job']) -> None:
         self._update_timeout_clock()
         self._try_report('report-cancelled', self._reporter.notify_jobs_cancelled, jobs)
 
@@ -516,7 +516,7 @@ class Job(ABC):
     def priority(self) -> bool: return False
 
 
-WorkerResult = Tuple[List[Job], Optional[Exception]]
+WorkerResult = tuple[list[Job], Optional[Exception]]
 
 class Worker(ABC):
     """Abstract base class for defining workers that process jobs."""
@@ -539,10 +539,10 @@ class ProgressReporter(Protocol):
     def notify_work_in_progress(self) -> None:
         """Called after each loop."""
 
-    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
+    def notify_jobs_cancelled(self, jobs: list[Job]) -> None:
         """Called when pending jobs are cancelled. System must interrupt all ongoing activities."""
 
-    def notify_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
+    def notify_job_completed(self, job: Job, next_jobs: list[Job]) -> None:
         """Called when a job is completed. Must not throw exceptions."""
 
     def notify_job_failed(self, job: Job, exception: Exception) -> None:
@@ -589,7 +589,7 @@ class _JobPackage:
     job: Job
     worker: Worker
     tries: int
-    next_jobs: List[Job]
+    next_jobs: list[Job]
     parent: Optional['_JobPackage']
 
     # Consider removing __str__ at least in non-debug environments

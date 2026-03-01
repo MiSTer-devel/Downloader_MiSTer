@@ -18,7 +18,7 @@
 
 from enum import IntEnum, unique
 from pathlib import Path
-from typing import Literal, TypedDict, Optional, List, Dict, Union
+from typing import Literal, TypedDict, Optional, Union
 
 from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, \
     MEDIA_FAT, DISTRIBUTION_MISTER_DB_ID, K_DOWNLOADER_THREADS_LIMIT, STORAGE_PRIORITY_PREFER_SD, \
@@ -110,7 +110,7 @@ class ConfigMisterSection(TypedDict):
     filter: str
     minimum_system_free_space_mb: int
     minimum_external_free_space_mb: int
-    user_defined_options: List[str]
+    user_defined_options: list[str]
     http_proxy: Optional[str]
 
 
@@ -123,8 +123,8 @@ class ConfigRequired(ConfigMisterSection):
     logfile: Optional[str]
     is_pc_launcher: bool
     skip_free_space_checks: bool
-    databases: Dict[str, ConfigDatabaseSection]
-    ignored_databases: List[IgnoredDatabase]
+    databases: dict[str, ConfigDatabaseSection]
+    ignored_databases: list[IgnoredDatabase]
     config_path: Path
     commit: str
     fail_on_file_error: bool
@@ -182,7 +182,7 @@ def default_config() -> Config:
     }
 
 
-def download_sensitive_configs() -> List[str]:
+def download_sensitive_configs() -> list[str]:
     return [K_BASE_PATH, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES]
 
 

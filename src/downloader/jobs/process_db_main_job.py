@@ -17,7 +17,6 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import List
 
 from downloader.config import Config, default_config, ConfigDatabaseSection
 from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
@@ -40,5 +39,5 @@ class ProcessDbMainJob(Job):
     def retry_job(self): return None
 
     # Results
-    ignored_zips: List[str] = field(default_factory=list)
-    removed_zips: List[str] = field(default_factory=list)
+    ignored_zips: list[str] = field(default_factory=list)
+    removed_zips: list[str] = field(default_factory=list)

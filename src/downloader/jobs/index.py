@@ -17,10 +17,10 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from typing import Any
 
 
 @dataclass
 class Index:
-    files: Dict[str, Any]
-    folders: Dict[str, Any]
+    files: dict[str, Any]
+    folders: dict[str, Any]

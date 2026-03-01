@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import List, Union
+from typing import Union
 import unittest
 
 from downloader.job_system import Job
@@ -152,7 +152,7 @@ class TestInstallationReportImpl(unittest.TestCase):
 
         self.assertFalse(self.tags(['zip']))
 
-    def tags(self, tags: List[Union[int, str]]) -> bool:
+    def tags(self, tags: list[Union[int, str]]) -> bool:
         return self.report.any_in_progress_job_with_tags(tags)
 
 
@@ -164,7 +164,7 @@ class TestJob(Job):
     def type_id(self) -> int:
         return self._type_id
 
-def job(tag: Union[List[Union[int, str]], Union[int, str]], id: int = 0) -> Job:
+def job(tag: Union[list[Union[int, str]], Union[int, str]], id: int = 0) -> Job:
     result = TestJob(id)
     if isinstance(tag, list):
         for t in tag:

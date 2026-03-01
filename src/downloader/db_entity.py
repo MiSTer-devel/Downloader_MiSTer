@@ -17,7 +17,7 @@
 
 import ipaddress
 from dataclasses import dataclass
-from typing import Dict, Any, Final, List, Optional
+from typing import Any, Final, Optional
 from urllib.parse import urlparse
 
 from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FILE_MiSTer_alt_ini, \
@@ -46,20 +46,20 @@ class DbEntity:
         if self.db_id != section.lower(): raise DbEntityValidationException(f'ERROR: Section "{section}" does not match database id "{self.db_id}". Fix your INI file.')
         self.timestamp: int = db_props['timestamp']
         if not isinstance(self.timestamp, int): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "timestamp" field. The database maintainer should fix this.')
-        self.files: Dict[str, Any] = db_props['files']
+        self.files: dict[str, Any] = db_props['files']
         if not isinstance(self.files, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "files" field. The database maintainer should fix this.')
-        self.folders: Dict[str, Any] = db_props['folders']
+        self.folders: dict[str, Any] = db_props['folders']
         if not isinstance(self.folders, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "folders" field. The database maintainer should fix this.')
 
-        self.zips: Dict[str, Any] = db_props.get('zips', {})
+        self.zips: dict[str, Any] = db_props.get('zips', {})
         if not isinstance(self.zips, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "zips" field. The database maintainer should fix this.')
         self.base_files_url: str = db_props.get('base_files_url', '')
         if not isinstance(self.base_files_url, str): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "base_files_url" field. The database maintainer should fix this.')
-        self.tag_dictionary: Dict[str, int] = db_props.get('tag_dictionary', {})
+        self.tag_dictionary: dict[str, int] = db_props.get('tag_dictionary', {})
         if not isinstance(self.tag_dictionary, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "tag_dictionary" field. The database maintainer should fix this.')
-        self.linux: Optional[Dict[str, Any]] = db_props.get('linux', None)
+        self.linux: Optional[dict[str, Any]] = db_props.get('linux', None)
         if self.linux is not None and not isinstance(self.linux, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "linux" field. The database maintainer should fix this.')
-        self.header: List[str] = db_props.get('header', [])
+        self.header: list[str] = db_props.get('header', [])
         if not isinstance(self.header, list): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "header" field. The database maintainer should fix this.')
         self.default_options: DbOptions = DbOptions(db_props.get('default_options', None) or {})
         _fix_folders(self.folders)

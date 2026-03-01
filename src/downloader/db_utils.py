@@ -18,7 +18,6 @@
 
 
 from dataclasses import dataclass
-from typing import List, Tuple
 
 from downloader.config import Config, ConfigDatabaseSection, FileChecking
 from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, DB_STATE_SIGNATURE_NO_TIMESTAMP
@@ -32,7 +31,7 @@ class DbSectionPackage:
     section: ConfigDatabaseSection
 
 
-def sorted_db_sections(config: Config) -> List[Tuple[str, ConfigDatabaseSection]]:
+def sorted_db_sections(config: Config) -> list[tuple[str, ConfigDatabaseSection]]:
     result = []
     first = None
     for db_id, db_section in config['databases'].items():

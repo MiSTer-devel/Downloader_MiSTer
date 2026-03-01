@@ -22,7 +22,7 @@ import glob
 import os
 import re
 from pathlib import Path
-from typing import List, Optional, TypeVar, Union, SupportsInt
+from typing import Optional, TypeVar, Union, SupportsInt
 
 
 from downloader.config import Environment, Config, default_config, InvalidConfigParameter, AllowReboot, \
@@ -35,7 +35,7 @@ from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, 
     FILE_CHECKING_BALANCED, FILE_CHECKING_EXHAUSTIVE, FILE_CHECKING_VERIFY_INTEGRITY
 from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
 from downloader.http_gateway import http_config
-from downloader.logger import Logger, time_str
+from downloader.logger import Logger
 
 
 class ConfigReader:
@@ -234,7 +234,7 @@ class ConfigReader:
 
         self._logger.bench('ConfigReader Read drop-in databases end.')
 
-    def _discover_drop_in_files(self, config_path: str) -> List[str]:
+    def _discover_drop_in_files(self, config_path: str) -> list[str]:
         config_dir = str(Path(config_path).parent)
         d_dir = os.path.join(config_dir, 'downloader.d')
 

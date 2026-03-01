@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from itertools import chain
-from typing import Dict, Any, List, Tuple, Optional, Set, Union, Iterable
+from typing import Any, Optional, Union, Iterable
 import threading
 import os
 from collections import defaultdict
@@ -70,7 +70,7 @@ class ProcessDbIndexWorker(DownloaderWorker):
         self._progress_reporter = progress_reporter
         self._fail_ctx = fail_ctx
         self._process_index_ctx = process_index_ctx
-        self._folders_created: Set[str] = set()
+        self._folders_created: set[str] = set()
         self._lock = threading.Lock()
 
     def job_type_id(self) -> int: return ProcessDbIndexJob.type_id
@@ -94,7 +94,7 @@ class ProcessDbIndexWorker(DownloaderWorker):
             return [], e
 
 # @TODO(python 3.12): Use ProcessDbIndexJob & ProcessZipIndexJob instead of Union, which is incorrect
-def process_index_job_main_sequence(ctx: ProcessIndexCtx, job: Union[ProcessDbIndexJob, ProcessZipIndexJob], summary: Index, store: ReadOnlyStoreAdapter, /) -> Tuple[
+def process_index_job_main_sequence(ctx: ProcessIndexCtx, job: Union[ProcessDbIndexJob, ProcessZipIndexJob], summary: Index, store: ReadOnlyStoreAdapter, /) -> tuple[
     list[PathPackage],
     list[PathPackage],
     set[str],
@@ -150,18 +150,18 @@ def process_index_job_main_sequence(ctx: ProcessIndexCtx, job: Union[ProcessDbIn
 
     return non_existing_pkgs, need_update_pkgs, created_folders, zip_data, None
 
-def create_packages_from_index(ctx: ProcessIndexCtx, config: Config, summary: Index, store: ReadOnlyStoreAdapter) -> Tuple[
-    List[_CheckFilePackage],
-    List[_RemoveFilePackage],
-    List[_CreateFolderPackage],
-    List[_DeleteFolderPackage]
+def create_packages_from_index(ctx: ProcessIndexCtx, config: Config, summary: Index, store: ReadOnlyStoreAdapter) -> tuple[
+    list[_CheckFilePackage],
+    list[_RemoveFilePackage],
+    list[_CreateFolderPackage],
+    list[_DeleteFolderPackage]
 ]:
     calculator = ctx.target_paths_calculator_factory.target_paths_calculator(config)
     check_file_pkgs, remove_files_pkgs = _translate_items(ctx, calculator, summary.files, PathType.FILE, store.all_files())
     create_folder_pkgs, delete_folder_pkgs = _translate_items(ctx, calculator, summary.folders, PathType.FOLDER, store.all_folders())
     return check_file_pkgs, remove_files_pkgs, create_folder_pkgs, delete_folder_pkgs
 
-def _translate_items(ctx: ProcessIndexCtx, calculator: TargetPathsCalculator, items: Dict[str, Dict[str, Any]], path_type: PathType, stored: Dict[str, Dict[str, Any]]) -> Tuple[List[PathPackage], List[PathPackage]]:
+def _translate_items(ctx: ProcessIndexCtx, calculator: TargetPathsCalculator, items: dict[str, dict[str, Any]], path_type: PathType, stored: dict[str, dict[str, Any]]) -> tuple[list[PathPackage], list[PathPackage]]:
     present, present_errors = calculator.create_path_packages(items.items(), path_type)
     present_set = {pkg.rel_path for pkg in present}
     removed, removed_errors = calculator.create_path_packages([(path, description) for path, description in stored.items() if path not in present_set], path_type)
@@ -173,7 +173,7 @@ def _translate_items(ctx: ProcessIndexCtx, calculator: TargetPathsCalculator, it
 
     return present, removed
 
-def process_check_file_packages(ctx: ProcessIndexCtx, non_duplicated_pkgs: List[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, bench_label: str) -> Tuple[List[_FetchFilePackage], List[_ValidateFilePackage], List[_AlreadyInstalledFilePackage]]:
+def process_check_file_packages(ctx: ProcessIndexCtx, non_duplicated_pkgs: list[_CheckFilePackage], db_id: str, store: ReadOnlyStoreAdapter, bench_label: str) -> tuple[list[_FetchFilePackage], list[_ValidateFilePackage], list[_AlreadyInstalledFilePackage]]:
     if len(non_duplicated_pkgs) == 0:
         return [], [], []
 
@@ -183,8 +183,8 @@ def process_check_file_packages(ctx: ProcessIndexCtx, non_duplicated_pkgs: List[
     existing, non_existing_pkgs = file_system.are_files(non_duplicated_pkgs)
 
     ctx.logger.bench(bench_label, ' existing loop: ', db_id, len(non_duplicated_pkgs))
-    already_installed_pkgs: List[_ValidateFilePackage]
-    validate_pkgs: List[_ValidateFilePackage]
+    already_installed_pkgs: list[_ValidateFilePackage]
+    validate_pkgs: list[_ValidateFilePackage]
 
     ctx.logger.bench(bench_label, ' invalid hashes start: ', db_id, len(non_duplicated_pkgs))
     invalid_hashes = store.invalid_hashes(existing)
@@ -199,15 +199,15 @@ def process_check_file_packages(ctx: ProcessIndexCtx, non_duplicated_pkgs: List[
     return non_existing_pkgs, validate_pkgs, already_installed_pkgs
 
 
-def process_validate_packages(ctx: ProcessIndexCtx, validate_pkgs: List[_ValidateFilePackage]) -> Tuple[List[PathPackage], List[PathPackage], List[_FetchFilePackage]]:
+def process_validate_packages(ctx: ProcessIndexCtx, validate_pkgs: list[_ValidateFilePackage]) -> tuple[list[PathPackage], list[PathPackage], list[_FetchFilePackage]]:
     if len(validate_pkgs) == 0:
         return [], [], []
 
     file_system = ReadOnlyFileSystem(ctx.file_system)
 
-    more_fetch_pkgs: List[_FetchFilePackage] = []
-    present_validated_files: List[_FetchFilePackage] = []
-    skipped_updated_files: List[_FetchFilePackage] = []
+    more_fetch_pkgs: list[_FetchFilePackage] = []
+    present_validated_files: list[_FetchFilePackage] = []
+    skipped_updated_files: list[_FetchFilePackage] = []
 
     for pkg in validate_pkgs:
         # @TODO: Parallelize the slow hash calculations
@@ -231,8 +231,8 @@ def process_validate_packages(ctx: ProcessIndexCtx, validate_pkgs: List[_Validat
 
 def verify_present_not_validated_files_hashes(ctx: ProcessIndexCtx, already_installed_pkgs: list[PathPackage]) -> tuple[list[PathPackage], list[PathPackage]]:
     file_system = ReadOnlyFileSystem(ctx.file_system)
-    verified_integrity_pkgs: List[PathPackage] = []
-    failed_verification_pkgs: List[_FetchFilePackage] = []
+    verified_integrity_pkgs: list[PathPackage] = []
+    failed_verification_pkgs: list[_FetchFilePackage] = []
 
     for pkg in already_installed_pkgs:
         # @TODO: Parallelize the slow hash calculations
@@ -248,11 +248,11 @@ def verify_present_not_validated_files_hashes(ctx: ProcessIndexCtx, already_inst
 
     return verified_integrity_pkgs, failed_verification_pkgs
 
-def _url(file_path: str, file_description: Dict[str, Any], base_files_url: str) -> Any:
+def _url(file_path: str, file_description: dict[str, Any], base_files_url: str) -> Any:
     return file_description['url'] if 'url' in file_description else calculate_url(base_files_url, file_path)
 
 
-def try_reserve_space(ctx: ProcessIndexCtx, file_pkgs: Iterable[PathPackage]) -> List[Tuple[Partition, int]]:
+def try_reserve_space(ctx: ProcessIndexCtx, file_pkgs: Iterable[PathPackage]) -> list[tuple[Partition, int]]:
     fits_well, full_partitions = ctx.free_space_reservation.reserve_space_for_file_pkgs(file_pkgs)
     if fits_well:
         return []
@@ -273,7 +273,7 @@ def check_repeated_store_presence(ctx: ProcessIndexCtx, store: ReadOnlyStoreAdap
                 result.add(pkg.rel_path)  # @TODO: See if use_cache is needed, and if we should optimize this fs access
     return result
 
-def process_create_folder_packages(ctx: ProcessIndexCtx, create_folder_pkgs: List[PathPackage], db_id: str, db_folder_index: Dict[str, Any], store: ReadOnlyStoreAdapter, bench_label: str) -> Tuple[
+def process_create_folder_packages(ctx: ProcessIndexCtx, create_folder_pkgs: list[PathPackage], db_id: str, db_folder_index: dict[str, Any], store: ReadOnlyStoreAdapter, bench_label: str) -> tuple[
     list[PathPackage],
     list[PathPackage],
     set[str],
@@ -287,11 +287,11 @@ def process_create_folder_packages(ctx: ProcessIndexCtx, create_folder_pkgs: Lis
     except Exception as e:
         ctx.fail_ctx.swallow_error(e)
 
-    folder_copies_to_be_removed: List[PathPackage] = []
-    processing_folders: List[PathPackage] = []
+    folder_copies_to_be_removed: list[PathPackage] = []
+    processing_folders: list[PathPackage] = []
 
-    parent_drives: Dict[str, set[str]] = defaultdict(set)
-    parent_pkgs: Dict[str, PathPackage] = dict()
+    parent_drives: dict[str, set[str]] = defaultdict(set)
+    parent_pkgs: dict[str, PathPackage] = dict()
 
     for pkg in sorted(create_folder_pkgs, key=lambda x: len(x.rel_path)):
         if pkg.is_pext_parent():
@@ -353,7 +353,7 @@ def process_create_folder_packages(ctx: ProcessIndexCtx, create_folder_pkgs: Lis
     installed_folders = [f for f in processing_folders if f.rel_path in db_folder_index]
     return folder_copies_to_be_removed, installed_folders, created_folders, errors
 
-def create_fetch_jobs(ctx: ProcessIndexCtx, db_id: str, non_existing_pkgs: list[_FetchFilePackage], need_update_pkgs: list[_FetchFilePackage], created_folders: set[str], base_files_url: str) -> List[Job]:
+def create_fetch_jobs(ctx: ProcessIndexCtx, db_id: str, non_existing_pkgs: list[_FetchFilePackage], need_update_pkgs: list[_FetchFilePackage], created_folders: set[str], base_files_url: str) -> list[Job]:
     if len(non_existing_pkgs) == 0 and len(need_update_pkgs) == 0:
         return []
 

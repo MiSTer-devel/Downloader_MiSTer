@@ -20,7 +20,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 from downloader.constants import HASH_file_does_not_exist, STORAGE_PATHS_SET
 from downloader.file_system import FileSystemFactory as ProductionFileSystemFactory, FileSystem as ProductionFileSystem, \
@@ -148,7 +148,7 @@ class FakeFileSystem(ProductionFileSystem):
 
         return False
 
-    def are_files(self, file_pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
+    def are_files(self, file_pkgs: list[PathPackage]) -> tuple[list[PathPackage], list[PathPackage]]:
         are = []
         nope = []
         for p in file_pkgs:
@@ -306,7 +306,7 @@ class FakeFileSystem(ProductionFileSystem):
         self._fs_cache.add_file(lower_path)
         return self.size(lower_path), self.hash(lower_path)
 
-    def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> Tuple[io.BytesIO, str]:
+    def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> tuple[io.BytesIO, str]:
         if in_stream.storing_problems:
             raise FsError('Storing Problems')
 
@@ -338,11 +338,11 @@ class FakeFileSystem(ProductionFileSystem):
         file_description = self.state.files[full_path]
         return self._load_json_from_description(path, file_description)
 
-    def _load_dict_from_data(self, source: str, data: io.BytesIO) -> Dict[str, Any]:
+    def _load_dict_from_data(self, source: str, data: io.BytesIO) -> dict[str, Any]:
         if not isinstance(data, FakeBuf): raise FsError('This should have been a FakeBuf.')
         return self._load_json_from_description(source, data.description)
 
-    def _load_json_from_description(self, info: str, description: Dict[str, Any]) -> Any:
+    def _load_json_from_description(self, info: str, description: dict[str, Any]) -> Any:
         if 'unzipped_json' in description:
             return description['unzipped_json']
         elif 'json' in description:
@@ -364,7 +364,7 @@ class FakeFileSystem(ProductionFileSystem):
         self.state.files[file]['json'] = db
         self._write_records.append(_Record('save_json', file))
 
-    def unzip_contents(self, transfer: Union[str, io.BytesIO], target_path: Union[str, Dict[str, str]], test_info: Tuple[Optional[PathPackage], List[PathPackage], Dict[str, Dict[str, Any]]]):
+    def unzip_contents(self, transfer: Union[str, io.BytesIO], target_path: Union[str, dict[str, str]], test_info: tuple[Optional[PathPackage], list[PathPackage], dict[str, dict[str, Any]]]):
         if isinstance(transfer, str):
             contents = self.state.files[self._path(transfer)]['zipped_files']
             self.unlink(transfer)
@@ -410,7 +410,7 @@ class FakeFileSystem(ProductionFileSystem):
     def turn_off_logs(self) -> None:
         pass
 
-    def _is_folder_unziped(self, extracting: Dict[str, str], folder: str):
+    def _is_folder_unziped(self, extracting: dict[str, str], folder: str):
         for file in extracting:
             if file.lower().startswith(folder):
                 return True

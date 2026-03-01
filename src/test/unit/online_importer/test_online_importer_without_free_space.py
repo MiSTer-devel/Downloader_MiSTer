@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any
+from typing import Any
 
 from downloader.config import default_config
 from downloader.constants import MEDIA_FAT, STORAGE_PRIORITY_PREFER_EXTERNAL, MEDIA_USB1, DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB, DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB, STORAGE_PRIORITY_PREFER_SD
@@ -118,7 +118,7 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
             "save": False
         }, sut, stores, free=free)
 
-    def download_db_file_a(self, partitions: Dict[str, Any], input_stores=None, with_fs=None):
+    def download_db_file_a(self, partitions: dict[str, Any], input_stores=None, with_fs=None):
         return self._download_dbs(
             fs() if with_fs is None else with_fs,
             [db_test_with_file_a()],
@@ -145,7 +145,7 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
             "free": {MEDIA_FAT: self.mb600 - self.size_a - self.size_b - self.size_c}
         }, sut, stores, free=free)
 
-    def download_three_dbs(self, partitions: Dict[str, Any]):
+    def download_three_dbs(self, partitions: dict[str, Any]):
         return self._download_dbs(
             fs(),
             [db_test_with_file_a(db_id='1'), db_test_with_file_b(db_id='2'), db_test_with_file_c(db_id='3')],
@@ -163,7 +163,7 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
             "free": {MEDIA_FAT: self.mb600 - self.size_a - self.size_b - self.size_c - self.size_d}
         }, sut, stores, free=free)
 
-    def download_four_dbs(self, partitions: Dict[str, Any]):
+    def download_four_dbs(self, partitions: dict[str, Any]):
         return self._download_dbs(
             fs(),
             [db_test_with_file_a(db_id='1'), db_test_with_file_b(db_id='2'), db_test_with_file_c(db_id='3'), db_test_with_file_d(db_id='4')],
@@ -266,7 +266,7 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
             "free": {MEDIA_FAT: self.mb600 - self.size_a, MEDIA_USB1: self.mb600 - self.size_smb1 - self.size_sonic}
         }, sut, stores, free=free)
 
-    def download_three_dbs_with_external_priority_files(self, partitions: Dict[str, Any], input_stores=None, with_fs=None):
+    def download_three_dbs_with_external_priority_files(self, partitions: dict[str, Any], input_stores=None, with_fs=None):
         return self._download_dbs(
             fs_external(folders=[media_usb1(folder_games), media_fat(folder_games)]) if with_fs is None else with_fs,
             [db_test_with_file_a(db_id='1'), db_smb1(db_id='2'), db_sonic(db_id='3')],
@@ -299,7 +299,7 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
             "free": {MEDIA_FAT: 1000 - self.size_nes_cheat - self.size_sms_cheat}
         }, sut, stores, free=free)
 
-    def download_db_with_zipped_file(self, partitions: Dict[str, Any], input_stores=None, with_fs=None):
+    def download_db_with_zipped_file(self, partitions: dict[str, Any], input_stores=None, with_fs=None):
         return self._download_dbs(
             fs() if with_fs is None else with_fs,
             [db_test_descr(zips={

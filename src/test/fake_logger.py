@@ -19,7 +19,7 @@
 import re
 import sys
 import time
-from typing import Any, List
+from typing import Any
 from downloader.config import Config
 from downloader.logger import FilelogManager, FilelogSaver, Logger, ConfigLogManager
 
@@ -67,7 +67,7 @@ class DescribeNowDecorator(Logger):
     def debug(self, *args, sep='', end='\n', flush=True):
         self._decorated_logger.debug(*self._handle_args([*args]), sep=sep, end=end, flush=True)
 
-    def _handle_args(self, args: List[Any]) -> List[Any]:
+    def _handle_args(self, args: list[Any]) -> list[Any]:
         header = describe_time(time.time())
         for i in range(len(args)):
             if isinstance(args[i], str) and not self._re.fullmatch(args[i]):

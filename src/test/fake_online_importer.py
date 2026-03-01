@@ -21,7 +21,7 @@ from collections import Counter
 from enum import unique, Enum
 from itertools import groupby
 from operator import itemgetter
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from downloader.config import Config, ConfigDatabaseSection
 from downloader.constants import MEDIA_USB0, DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, \
     FILE_downloader_storage_json
@@ -83,7 +83,7 @@ class OnlineImporter(ProductionOnlineImporter):
             base_path_relocator: Optional[BasePathRelocator] = None,
             job_system: Optional[JobSystem] = None,
             progress_reporter: Optional[ProgressReporter] = None,
-            path_dictionary: Optional[Dict[str, Any]] = None,
+            path_dictionary: Optional[dict[str, Any]] = None,
             network_state: Optional[NetworkState] = None,
             file_system_state: Optional[FileSystemState] = None,
             fail_policy: Optional[FailPolicy] = None,
@@ -152,7 +152,7 @@ class OnlineImporter(ProductionOnlineImporter):
         self._box: Optional[InstallationBox] = None
         self._error: Optional[Exception] = None
 
-    def _make_jobs(self, db_pkgs: List[DbSectionPackage]) -> List[Job]:
+    def _make_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]:
         if self._start_job_policy == StartJobPolicy.FetchDb:
             return super()._make_jobs(db_pkgs)
         elif self._start_job_policy == StartJobPolicy.OpeningDb:  # @TODO: Consider removing this state and doing all from FetchDb with some tweaks in pre/post download methods.
@@ -253,7 +253,7 @@ class OnlineImporter(ProductionOnlineImporter):
         return self._error
 
     def download(self):
-        db_pkgs: List[DbSectionPackage] = []
+        db_pkgs: list[DbSectionPackage] = []
         for db, store, ini_description, store_sig, db_sig in self.dbs:
             self._add_store(db.db_id, store, store_sig=store_sig)
             db_pkgs.append(DbSectionPackage(db_id=db.db_id, section=ini_description))

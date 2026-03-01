@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import List, Optional
+from typing import Optional
 
 from downloader.job_system import ProgressReporter, Job, JobSystem as ProductionJobSystem, JobFailPolicy
 from downloader.jobs.reporters import JobTagTracking
@@ -54,11 +54,11 @@ class ProgressReporterTracker(ProgressReporter):
         self.tracks["work_in_progress"] += 1
         self._reporter.notify_work_in_progress()
 
-    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
+    def notify_jobs_cancelled(self, jobs: list[Job]) -> None:
         self.tracks["job_cancelled"].extend([(job.__class__.__name__, str(job)) for job in jobs])
         self._reporter.notify_jobs_cancelled(jobs)
 
-    def notify_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
+    def notify_job_completed(self, job: Job, next_jobs: list[Job]) -> None:
         self.tracks["job_completed"].append((job.__class__.__name__, str(job)))
         self._reporter.notify_job_completed(job, next_jobs)
 
@@ -86,7 +86,7 @@ class TestProgressReporter(ProgressReporter):
     def notify_work_in_progress(self):
         pass
 
-    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
+    def notify_jobs_cancelled(self, jobs: list[Job]) -> None:
         for job in jobs:
             job.add_tag(job.type_id)
             self.cancelled_jobs[job.type_id] = self.cancelled_jobs.get(job.type_id, 0) + 1
@@ -97,7 +97,7 @@ class TestProgressReporter(ProgressReporter):
         self.started_jobs[job.type_id] = self.started_jobs.get(job.type_id, 0) + 1
         self.tracker.add_job_started(job)
 
-    def notify_job_completed(self, job: Job, next_jobs: List[Job]):
+    def notify_job_completed(self, job: Job, next_jobs: list[Job]):
         job.add_tag(job.type_id)
         for c_job in next_jobs: c_job.add_tag(c_job.type_id)
         self.completed_jobs[job.type_id] = self.completed_jobs.get(job.type_id, 0) + 1

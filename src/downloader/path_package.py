@@ -18,7 +18,7 @@
 
 
 from enum import auto, unique, Enum
-from typing import Any, Final, Optional, Tuple
+from typing import Any, Final, Optional
 
 from downloader.constants import SUFFIX_file_in_progress
 
@@ -149,7 +149,7 @@ class PextPathProps:
         kind: PextKind,
         parent: str,
         drive: str,
-        other_drives: Tuple[str, ...],
+        other_drives: tuple[str, ...],
         is_subfolder: bool,/
     ) -> None:
         self.kind = kind
@@ -167,4 +167,4 @@ class PextPathProps:
             self.is_subfolder,
         )
 
-RemovedCopy = Tuple[bool, str, str]
+RemovedCopy = tuple[bool, str, str]

@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Dict, Any, Optional, Tuple, cast
+from typing import Any, Optional, cast
 
 from downloader.db_entity import check_zip_description, ZipIndexEntity
 from downloader.job_system import WorkerResult, Job, ProgressReporter
@@ -96,7 +96,7 @@ class ProcessDbMainWorker(DownloaderWorker):
         return next_jobs, None
 
 
-def _make_zip_job(stored_index: Optional[StoreFragmentZipSummary], z: ZipJobContext) -> Tuple[TransferJob, Optional[Exception]]:
+def _make_zip_job(stored_index: Optional[StoreFragmentZipSummary], z: ZipJobContext) -> tuple[TransferJob, Optional[Exception]]:
     try:
         check_zip_description(z.zip_description, z.job.db.db_id, z.zip_id)
     except Exception as e:
@@ -123,7 +123,7 @@ def _make_zip_job(stored_index: Optional[StoreFragmentZipSummary], z: ZipJobCont
     return job, None
 
 
-def _make_process_zip_job_from_ctx(z: ZipJobContext, zip_summary: Dict[str, Any], has_new_zip_summary: bool):
+def _make_process_zip_job_from_ctx(z: ZipJobContext, zip_summary: dict[str, Any], has_new_zip_summary: bool):
     base_files_url = z.job.db.base_files_url
     if 'base_files_url' in z.zip_description:
         base_files_url = z.zip_description['base_files_url']

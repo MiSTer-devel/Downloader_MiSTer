@@ -20,7 +20,7 @@ import dataclasses
 import threading
 import time
 from collections import defaultdict
-from typing import Dict, Optional, Tuple, List, Set, Type, TypeVar, Generic, Protocol, Union
+from typing import Optional, Type, TypeVar, Generic, Protocol, Union
 
 from downloader.db_entity import DbEntity
 from downloader.interruptions import Interruptions
@@ -35,10 +35,10 @@ from types import TracebackType
 
 class DownloaderProgressReporter(ProgressReporter):
 
-    def __init__(self, logger: Logger, other_reporters: List[ProgressReporter]) -> None:
+    def __init__(self, logger: Logger, other_reporters: list[ProgressReporter]) -> None:
         self._logger = logger
         self._other_reporters = other_reporters
-        self._failed_jobs: List[Job] = []
+        self._failed_jobs: list[Job] = []
 
     @property
     def failed_jobs(self):
@@ -51,10 +51,10 @@ class DownloaderProgressReporter(ProgressReporter):
         for r in self._other_reporters:
             r.notify_work_in_progress()
 
-    def notify_jobs_cancelled(self, _jobs: List[Job]) -> None:
+    def notify_jobs_cancelled(self, _jobs: list[Job]) -> None:
         pass
 
-    def notify_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
+    def notify_job_completed(self, job: Job, next_jobs: list[Job]) -> None:
         pass
 
     def notify_job_failed(self, job: Job, exception: BaseException) -> None:
@@ -67,19 +67,19 @@ class DownloaderProgressReporter(ProgressReporter):
 @dataclasses.dataclass
 class ProcessedFolder:
     pkg: PathPackage
-    dbs: Set[str]
+    dbs: set[str]
 
 TJob = TypeVar("TJob", bound=Job)
 class InstallationReport(Protocol):
-    def get_completed_jobs(self, type_class: Type[TJob]) -> List[TJob]: """Return all successful jobs for a job class."""
-    def get_started_jobs(self, type_class: Type[TJob]) -> List[TJob]: """Return all started jobs for a job class."""
-    def get_failed_jobs(self, type_class: Type[TJob]) ->  List[Tuple[TJob, BaseException]]: """Return all failed jobs for a job class."""
-    def get_retried_jobs    (self, job_class: Type[TJob]) -> List[Tuple[TJob, BaseException]]: """Return all retried jobs for a job class."""
-    def get_cancelled_jobs  (self, job_class: Type[TJob]) -> List[TJob]: """Return all cancelled jobs for a job class."""
-    def processed_folder(self, path: str) -> Dict[str, PathPackage]: """File that a database is currently processing."""
-    def all_processed_folders(self) -> List[str]: """Returns all processed folders."""
-    def get_jobs_completed_by_tag(self, tag: str) -> List[Job]: """Returns all jobs completed by a tag."""
-    def get_jobs_failed_by_tag(self, tag: str) -> List[Job]: """Returns all jobs failed by a tag."""
+    def get_completed_jobs(self, type_class: Type[TJob]) -> list[TJob]: """Return all successful jobs for a job class."""
+    def get_started_jobs(self, type_class: Type[TJob]) -> list[TJob]: """Return all started jobs for a job class."""
+    def get_failed_jobs(self, type_class: Type[TJob]) ->  list[tuple[TJob, BaseException]]: """Return all failed jobs for a job class."""
+    def get_retried_jobs    (self, job_class: Type[TJob]) -> list[tuple[TJob, BaseException]]: """Return all retried jobs for a job class."""
+    def get_cancelled_jobs  (self, job_class: Type[TJob]) -> list[TJob]: """Return all cancelled jobs for a job class."""
+    def processed_folder(self, path: str) -> dict[str, PathPackage]: """File that a database is currently processing."""
+    def all_processed_folders(self) -> list[str]: """Returns all processed folders."""
+    def get_jobs_completed_by_tag(self, tag: str) -> list[Job]: """Returns all jobs completed by a tag."""
+    def get_jobs_failed_by_tag(self, tag: str) -> list[Job]: """Returns all jobs failed by a tag."""
 
 
 class JobTagTracking:
@@ -98,11 +98,11 @@ class JobTagTracking:
     def add_job_started(self, job: Job) -> None:
         self._add_job_in_progress(job)
 
-    def add_jobs_cancelled(self, jobs: List[Job]) -> None:
+    def add_jobs_cancelled(self, jobs: list[Job]) -> None:
         for job in jobs:
             self._remove_job_in_progress(job)
 
-    def add_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
+    def add_job_completed(self, job: Job, next_jobs: list[Job]) -> None:
         auto_spawn = False
         for c_job in next_jobs:
             if c_job == job:
@@ -166,32 +166,32 @@ class _WithLock(Generic[T]):
 class InstallationReportImpl(InstallationReport):
     def __init__(self) -> None:
         # These are only accessed in the main thread
-        self._jobs_started: Dict[int, List[Job]] = defaultdict(list)
-        self._jobs_completed: Dict[int, List[Job]] = defaultdict(list)
-        self._jobs_cancelled: Dict[int, List[Job]] = defaultdict(list)
-        self._jobs_failed: Dict[int, List[Tuple[Job, BaseException]]] = defaultdict(list)
-        self._jobs_retried: Dict[int, List[Tuple[Job, BaseException]]] = defaultdict(list)
+        self._jobs_started: dict[int, list[Job]] = defaultdict(list)
+        self._jobs_completed: dict[int, list[Job]] = defaultdict(list)
+        self._jobs_cancelled: dict[int, list[Job]] = defaultdict(list)
+        self._jobs_failed: dict[int, list[tuple[Job, BaseException]]] = defaultdict(list)
+        self._jobs_retried: dict[int, list[tuple[Job, BaseException]]] = defaultdict(list)
 
         # Following might be modified by multiple threads, but read only in the main thread
-        self._processed_files_set = _WithLock[Set[str]](set())
-        self._processed_folders = _WithLock[Dict[str, Dict[str, PathPackage]]]({})
-        self._processed_folders_set = _WithLock[Set[str]](set())
+        self._processed_files_set = _WithLock[set[str]](set())
+        self._processed_folders = _WithLock[dict[str, dict[str, PathPackage]]]({})
+        self._processed_folders_set = _WithLock[set[str]](set())
         job_tag_lock = threading.Lock()
         self._jobs_tag_tracking = _WithLock[JobTagTracking](JobTagTracking(), job_tag_lock)
 
         # Following might be modified and read in multiple threads
-        self._jobs_tag_completed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
-        self._jobs_tag_failed = _WithLock[Dict[Union[str, int], List[Job]]](defaultdict(list), job_tag_lock)
+        self._jobs_tag_completed = _WithLock[dict[Union[str, int], list[Job]]](defaultdict(list), job_tag_lock)
+        self._jobs_tag_failed = _WithLock[dict[Union[str, int], list[Job]]](defaultdict(list), job_tag_lock)
 
     def add_job_started(self, job: Job) -> None:
         self._jobs_started[job.type_id].append(job)
         with self._jobs_tag_tracking as tracking: tracking.add_job_started(job)
 
-    def add_jobs_cancelled(self, jobs: List[Job]) -> None:
+    def add_jobs_cancelled(self, jobs: list[Job]) -> None:
         for job in jobs: self._jobs_cancelled[job.type_id].append(job)
         with self._jobs_tag_tracking as tracking: tracking.add_jobs_cancelled(jobs)
 
-    def add_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
+    def add_job_completed(self, job: Job, next_jobs: list[Job]) -> None:
         self._jobs_completed[job.type_id].append(job)
         with self._jobs_tag_tracking as tracking:
             tracking.add_job_completed(job, next_jobs)
@@ -209,7 +209,7 @@ class InstallationReportImpl(InstallationReport):
         self._jobs_retried[job.type_id].append((job, exception))
         with self._jobs_tag_tracking as tracking: tracking.add_job_retried(job, retry_job)
 
-    def any_in_progress_job_with_tags(self, tags: List[str]) -> bool:
+    def any_in_progress_job_with_tags(self, tags: list[str]) -> bool:
         if len(tags) == 0: return False
         with self._jobs_tag_tracking as tracking:
             for tag in tags:
@@ -217,15 +217,15 @@ class InstallationReportImpl(InstallationReport):
 
         return False
 
-    def get_jobs_completed_by_tag(self, tag: str) -> List[Job]:
+    def get_jobs_completed_by_tag(self, tag: str) -> list[Job]:
         with self._jobs_tag_completed as tag_completed:
             return tag_completed[tag]
 
-    def get_jobs_failed_by_tag(self, tag: str) -> List[Job]:
+    def get_jobs_failed_by_tag(self, tag: str) -> list[Job]:
         with self._jobs_tag_failed as tag_failed:
             return tag_failed[tag]
 
-    def add_processed_files(self, files: List[PathPackage]) -> Tuple[List[PathPackage], List[str]]:
+    def add_processed_files(self, files: list[PathPackage]) -> tuple[list[PathPackage], list[str]]:
         if len(files) == 0: return [], []
 
         files_set = {pkg.rel_path for pkg in files}
@@ -238,7 +238,7 @@ class InstallationReportImpl(InstallationReport):
 
         return non_duplicates, list(duplicates)
 
-    def add_processed_folders(self, folders: List[PathPackage], db_id: str) -> List[PathPackage]:
+    def add_processed_folders(self, folders: list[PathPackage], db_id: str) -> list[PathPackage]:
         if len(folders) == 0: return []
         non_already_present = []
         with self._processed_folders as processed_folders:
@@ -254,15 +254,15 @@ class InstallationReportImpl(InstallationReport):
 
         return non_already_present
 
-    def get_started_jobs    (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_started   [job_class.type_id]  # type: ignore[return-value, index]
-    def get_completed_jobs  (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_completed [job_class.type_id]  # type: ignore[return-value, index]
-    def get_failed_jobs     (self, job_class: Type[TJob]) -> List[Tuple[TJob, BaseException]]:  return self._jobs_failed    [job_class.type_id]  # type: ignore[return-value, index]
-    def get_retried_jobs    (self, job_class: Type[TJob]) -> List[Tuple[TJob, BaseException]]:  return self._jobs_retried   [job_class.type_id]  # type: ignore[return-value, index]
-    def get_cancelled_jobs  (self, job_class: Type[TJob]) -> List[TJob]:                        return self._jobs_cancelled [job_class.type_id]  # type: ignore[return-value, index]
+    def get_started_jobs    (self, job_class: Type[TJob]) -> list[TJob]:                        return self._jobs_started   [job_class.type_id]  # type: ignore[return-value, index]
+    def get_completed_jobs  (self, job_class: Type[TJob]) -> list[TJob]:                        return self._jobs_completed [job_class.type_id]  # type: ignore[return-value, index]
+    def get_failed_jobs     (self, job_class: Type[TJob]) -> list[tuple[TJob, BaseException]]:  return self._jobs_failed    [job_class.type_id]  # type: ignore[return-value, index]
+    def get_retried_jobs    (self, job_class: Type[TJob]) -> list[tuple[TJob, BaseException]]:  return self._jobs_retried   [job_class.type_id]  # type: ignore[return-value, index]
+    def get_cancelled_jobs  (self, job_class: Type[TJob]) -> list[TJob]:                        return self._jobs_cancelled [job_class.type_id]  # type: ignore[return-value, index]
 
     # All the rest are Non-thread-safe: Should only be used after threads are out
-    def processed_folder(self, path: str) -> Dict[str, PathPackage]: return self._processed_folders.data[path]
-    def all_processed_folders(self) -> List[str]: return list(self._processed_folders.data.keys())
+    def processed_folder(self, path: str) -> dict[str, PathPackage]: return self._processed_folders.data[path]
+    def all_processed_folders(self) -> list[str]: return list(self._processed_folders.data.keys())
 
 
 class FileDownloadSessionLogger(Protocol):
@@ -285,7 +285,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._deactivated: bool = False
         self._needs_newline: bool = False
         self._need_clear_header: bool = False
-        self._symbols: List[str] = []
+        self._symbols: list[str] = []
 
     def _deactivate(self) -> None:
         self._deactivated = True
@@ -305,10 +305,10 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
             self._symbols.append('*')
             self._print_symbols()
 
-    def print_jobs_cancelled(self, jobs: List[Job]) -> None:
+    def print_jobs_cancelled(self, jobs: list[Job]) -> None:
         self._logger.print(f"Cancelled {len(jobs)} jobs.")
 
-    def print_job_completed(self, job: Job, _next_jobs: List[Job]) -> None:
+    def print_job_completed(self, job: Job, _next_jobs: list[Job]) -> None:
         if isinstance(job, FetchFileJob) and job.db_id is not None:
             self._symbols.append('.')
             if self._needs_newline or self._check_time < time.monotonic():
@@ -414,7 +414,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
     def notify_work_in_progress(self) -> None:
         self._session_logger.print_work_in_progress()
 
-    def notify_job_completed(self, job: Job, next_jobs: List[Job]) -> None:
+    def notify_job_completed(self, job: Job, next_jobs: list[Job]) -> None:
         self._report.add_job_completed(job, next_jobs)
         self._session_logger.print_job_completed(job, next_jobs)
 
@@ -426,7 +426,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         self._report.add_job_retried(job, retry_job, exception)
         self._session_logger.print_job_retried(job, retry_job, exception)
 
-    def notify_jobs_cancelled(self, jobs: List[Job]) -> None:
+    def notify_jobs_cancelled(self, jobs: list[Job]) -> None:
         self._report.add_jobs_cancelled(jobs)
         self._session_logger.print_jobs_cancelled(jobs)
         try:

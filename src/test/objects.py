@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import unittest
 from pathlib import Path
-from typing import Dict, Any, Final
+from typing import Any, Final
 
 from downloader.config import default_config, Environment
 from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, KENV_LOGLEVEL, FILE_MiSTer_new, \
@@ -164,7 +164,7 @@ def config_with(
         file_checking=None,
         allow_delete=None,
 
-        databases: Dict[str, Any] = None):
+        databases: dict[str, Any] = None):
 
     config = default_config()
     if filter_value is not None:

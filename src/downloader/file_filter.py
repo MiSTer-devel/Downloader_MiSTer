@@ -18,7 +18,7 @@
 
 import re
 from pathlib import Path
-from typing import List, Optional, Set, Dict, Tuple, Any, Iterable, TypedDict, Union, Final
+from typing import Optional, Any, Iterable, TypedDict, Union, Final
 from abc import ABC, abstractmethod
 
 from downloader.config import Config
@@ -28,17 +28,17 @@ from downloader.error import DownloaderError
 from downloader.jobs.index import Index
 from downloader.logger import Logger
 
-FileFolderDesc = Dict[str, Any]
+FileFolderDesc = dict[str, Any]
 
 
 class FileFoldersHolder(TypedDict):
-    files: Dict[str, FileFolderDesc]
-    folders: Dict[str, FileFolderDesc]
+    files: dict[str, FileFolderDesc]
+    folders: dict[str, FileFolderDesc]
 
 def make_file_folders_holder() -> FileFoldersHolder: return {'files': {}, 'folders': {}}
 
 
-ZipData = Dict[str, FileFoldersHolder]
+ZipData = dict[str, FileFoldersHolder]
 
 
 filter_part_regex = re.compile("!?[a-z0-9]+[-_a-z0-9.]*$", )
@@ -78,7 +78,7 @@ class FileFilter:
     def __init__(self, filter_calculator: Optional[FilterCalculator]) -> None:
         self._filter_calculator = filter_calculator
 
-    def select_filtered_files(self, summary: Index) -> Tuple[Index, ZipData]:
+    def select_filtered_files(self, summary: Index) -> tuple[Index, ZipData]:
         filtered_zip_data: ZipData = {}
         #return summary, filtered_zip_data
 
@@ -127,13 +127,13 @@ class FileFilter:
 class FileFilterFactory:
     def __init__(self, logger: Logger) -> None:
         self._logger = logger
-        self._unused: Set[str] = set()
-        self._used: Set[str] = set()
+        self._unused: set[str] = set()
+        self._used: set[str] = set()
 
     def create(self, db: DbEntity, index: Index, config: Config) -> FileFilter:
         return FileFilter(self._create_filter_calculator(db, index, config))
 
-    def unused_filter_parts(self) -> List[str]:
+    def unused_filter_parts(self) -> list[str]:
         return list(self._unused - self._used)
 
     def _create_filter_calculator(self, db: DbEntity, index: Index, config: Config) -> Optional[FilterCalculator]:
@@ -215,7 +215,7 @@ def _part_in_db(alphanumeric_part: Union[str, int], index: Index) -> bool:
         or _part_in_descriptions(alphanumeric_part, index.folders.values())
 
 
-def _part_in_descriptions(alphanumeric_part: Union[str, int], descriptions: Iterable[Dict[str, Any]]) -> bool:
+def _part_in_descriptions(alphanumeric_part: Union[str, int], descriptions: Iterable[dict[str, Any]]) -> bool:
     for descr in descriptions:
         if 'tags' in descr and alphanumeric_part in descr['tags']:
             return True
