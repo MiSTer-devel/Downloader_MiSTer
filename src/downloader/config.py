@@ -18,7 +18,7 @@
 
 from enum import IntEnum, unique
 from pathlib import Path
-from typing import TypedDict, Optional, List, Dict
+from typing import Literal, TypedDict, Optional, List, Dict, Union
 
 from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, \
     MEDIA_FAT, DISTRIBUTION_MISTER_DB_ID, K_DOWNLOADER_THREADS_LIMIT, STORAGE_PRIORITY_PREFER_SD, \
@@ -70,6 +70,21 @@ class FileChecking(IntEnum):
     EXHAUSTIVE = 2
     VERIFY_INTEGRITY = 3
 
+class IgnoredDatabaseDuplicate(TypedDict):
+    file: str
+    db_id: str
+    reason: Literal['duplicate']
+    ctx: str
+
+
+class IgnoredDatabaseEmpty(TypedDict):
+    file: str
+    reason: Literal['empty']
+
+
+IgnoredDatabase = Union[IgnoredDatabaseDuplicate, IgnoredDatabaseEmpty]
+
+
 class ConfigDatabaseSectionRequired(TypedDict):
     section: str
     db_url: str
@@ -109,6 +124,7 @@ class ConfigRequired(ConfigMisterSection):
     is_pc_launcher: bool
     skip_free_space_checks: bool
     databases: Dict[str, ConfigDatabaseSection]
+    ignored_databases: List[IgnoredDatabase]
     config_path: Path
     commit: str
     fail_on_file_error: bool
@@ -132,6 +148,7 @@ def default_config() -> Config:
         'curl_ssl': '',
         'http_logging': False,
         'databases': {},
+        'ignored_databases': [],
         'config_path': Path(FILE_downloader_ini),
         'base_path': MEDIA_FAT,
         'base_system_path': MEDIA_FAT,

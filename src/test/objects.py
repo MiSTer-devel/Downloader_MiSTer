@@ -916,3 +916,13 @@ def path_with(path, added_part):
 
 
 zipped_nes_palettes_id = 'zipped_nes_palettes_id'
+
+
+def ini(sections: dict) -> str:
+    lines = []
+    for section_name, props in sections.items():
+        lines.append(f'[{section_name}]')
+        for key, value in props.items():
+            lines.append(f'{key} = {value}')
+        lines.append('')
+    return '\n'.join(lines)

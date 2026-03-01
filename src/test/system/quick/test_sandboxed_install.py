@@ -225,3 +225,4 @@ class TestSandboxedInstall(SandboxTestBase):
                 'SNES.rbf': {'hash': '133af32b4894d9c5527cc5c91269ee28'},
             }),
         })
+

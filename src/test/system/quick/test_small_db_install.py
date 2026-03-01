@@ -66,6 +66,22 @@ class TestSmallDbInstall(unittest.TestCase):
         self.assertFalse(os.path.isfile(f'{tmp_default_base_path}/_Cores/core.rbf'))
         self.assertTrue(os.path.isfile('/tmp/special_base_path/_Cores/core.rbf'))
 
+    def test_config_error___prints_user_friendly_message_and_exits_with_1(self):
+        print('test_config_error')
+        ini_path = "test/system/fixtures/small_db_install/config_error.ini"
+
+        test_env = os.environ.copy()
+        test_env[KENV_CURL_SSL] = ''
+        test_env[KENV_DEBUG] = 'true'
+        test_env[KENV_FAIL_ON_FILE_ERROR] = 'true'
+        test_env[KENV_DOWNLOADER_INI_PATH] = ini_path
+        test_env[KENV_DEFAULT_BASE_PATH] = tmp_default_base_path
+
+        result = subprocess.run(['python3', '__main__.py'], capture_output=True, text=True, env=test_env)
+
+        self.assertEqual(1, result.returncode)
+        self.assertEqual("Configuration error: Can't import db for section 'bad_db' without an url field\n", result.stdout)
+
     def assertRunOk(self, ini_path, save=True, from_scratch=True):
         env = debug_env()
         env['DEFAULT_BASE_PATH'] = tmp_default_base_path
