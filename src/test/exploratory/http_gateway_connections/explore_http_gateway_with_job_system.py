@@ -27,7 +27,7 @@ from typing import List, Tuple
 
 from downloader.config import default_config
 from downloader.file_system import FileSystemFactory
-from downloader.job_system import JobSystem, ProgressReporter, Job
+from downloader.job_system import JobSystem, ProgressReporter, Job, ActivityTracker
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.fetch_file_worker import FetchFileWorker
 from downloader.logger import PrintLogger, Logger
@@ -39,15 +39,15 @@ from test.fake_logger import DescribeNowDecorator
 
 def main() -> None:
     logger = DescribeNowDecorator(PrintLogger())
-    with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger) as gw:
-
-        fs = FileSystemFactory(default_config(), {}, logger=logger)
+    with HttpGateway(ssl_ctx=ssl.create_default_context(), read_timeout=180, logger=logger) as gw:
+        activity_tracker = ActivityTracker()
+        fs = FileSystemFactory(default_config(), {}, logger=logger, activity_tracker=activity_tracker)
         reporter = Reporter(fs, gw, logger=logger)
-        job_system = JobSystem(reporter=reporter, logger=logger, max_threads=20)
+        job_system = JobSystem(reporter=reporter, logger=logger, max_threads=20, activity_tracker=activity_tracker)
         job_system.set_interfering_signals([signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT])
 
         job_system.register_worker(FetchFileJob.type_id, FetchFileWorker(
-            progress_reporter=reporter, file_system=fs.create_for_system_scope(), http_gateway=gw, timeout=600
+            logger=logger, progress_reporter=reporter, file_system=fs.create_for_system_scope(), http_gateway=gw, timeout=600
         ))
 
         dir_path = f'{os.path.dirname(os.path.realpath(__file__))}/delme'
@@ -77,7 +77,7 @@ def main() -> None:
     print()
     print('Completed jobs: ')
     for completed in reporter.completed:
-        print(completed.info)
+        print(completed.source)
 
     print()
     print('Failed jobs: ')
@@ -108,11 +108,11 @@ class Reporter(ProgressReporter):
     cancelled: List[FetchFileJob] = []
 
     def notify_job_completed(self, job: FetchFileJob, next_jobs: List[Job]) -> None:  # type: ignore[override]
-        self._logger.print(f'>>>>>> COMPLETED! {job.info}')
+        self._logger.print(f'>>>>>> COMPLETED! {job.source}')
         self.completed.append(job)
 
     def notify_job_failed(self, job: FetchFileJob, exception: Exception) -> None:  # type: ignore[override]
-        self._logger.print(f'>>>>>> FAILED! {job.info}', exception)
+        self._logger.print(f'>>>>>> FAILED! {job.source}', exception)
         self.failed.append((job, exception))
 
     def notify_jobs_cancelled(self, jobs: List[FetchFileJob]) -> None:  # type: ignore[override]

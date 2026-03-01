@@ -33,7 +33,7 @@ class FileContext(FileContextRequired, total=False):
 
 class FakeHttpGateway(HttpGateway):
     def __init__(self, config, network_state):
-        super().__init__(ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT), 200, None)
+        super().__init__(ssl_ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT), read_timeout=200, logger=None)
         self._config = config
         self._network_state = network_state
         self._file_ctx: Optional[FileContext] = None

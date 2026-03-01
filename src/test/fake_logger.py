@@ -16,7 +16,9 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+import re
 import sys
+import time
 from typing import Any, List
 from downloader.config import Config
 from downloader.logger import FilelogManager, FilelogSaver, Logger, ConfigLogManager

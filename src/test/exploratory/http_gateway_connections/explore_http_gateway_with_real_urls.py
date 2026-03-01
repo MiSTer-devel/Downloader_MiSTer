@@ -86,7 +86,7 @@ def main() -> None:
     else:
         logger.print(f'  HTTPS Proxy: None (direct connection)')
 
-    with HttpGateway(ssl_ctx=ssl.create_default_context(), timeout=180, logger=logger, config=config) as gateway:
+    with HttpGateway(ssl_ctx=ssl.create_default_context(), read_timeout=180, logger=logger, config=config) as gateway:
         def fetch_url(input_url: str):
             nonlocal interrupted, gateway, dir_path
             with gateway.open(input_url) as (url, res):
