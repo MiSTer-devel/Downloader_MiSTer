@@ -95,7 +95,7 @@ class OnlineImporterWorkersFactory:
         load_local_store_job.add_tag(local_store_tag)
         for pkg in db_pkgs:
             transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
-            transfer_job.after_job = OpenDbJob(
+            transfer_job.after_job = OpenDbJob(  # type: ignore[union-attr]
                 transfer_job=transfer_job,
                 section=pkg.db_id,
                 ini_description=pkg.section,
@@ -293,7 +293,7 @@ class OnlineImporter:
             if transfer_job.db_id is None:
                 continue
 
-            if any(':zip:' in tag for tag in transfer_job.tags):
+            if any(isinstance(tag, str) and ':zip:' in tag for tag in transfer_job.tags):
                 continue
 
             box.add_failed_db(transfer_job.db_id)

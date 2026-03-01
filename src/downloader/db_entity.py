@@ -33,34 +33,34 @@ from downloader.path_package import PathPackage
 class DbEntity:
     def __init__(self, db_props: Any, section: str) -> None:
         if not isinstance(db_props, dict):
-            raise DbEntityValidationException(f'ERROR: Database "{section}" has improper format. The database maintainer should fix this.')
+            raise DbEntityValidationException(f'Database "{section}" has improper format. The database maintainer should fix this.')
 
-        if 'db_id' not in db_props: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "db_id" field. The database maintainer should fix this.')
-        if 'files' not in db_props: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "files" field. The database maintainer should fix this.')
-        if 'folders' not in db_props: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "folders" field. The database maintainer should fix this.')
-        if 'timestamp' not in db_props: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a "timestamp" field. The database maintainer should fix this.')
+        if 'db_id' not in db_props: raise DbEntityValidationException(f'Database "{section}" needs a "db_id" field. The database maintainer should fix this.')
+        if 'files' not in db_props: raise DbEntityValidationException(f'Database "{section}" needs a "files" field. The database maintainer should fix this.')
+        if 'folders' not in db_props: raise DbEntityValidationException(f'Database "{section}" needs a "folders" field. The database maintainer should fix this.')
+        if 'timestamp' not in db_props: raise DbEntityValidationException(f'Database "{section}" needs a "timestamp" field. The database maintainer should fix this.')
 
         self.version: int = db_props.get('v', 0)
-        if not isinstance(self.version, int) or self.version < 0: raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "v" field. The database maintainer should fix this.')
+        if not isinstance(self.version, int) or self.version < 0: raise DbEntityValidationException(f'Database "{section}" needs a valid "v" field. The database maintainer should fix this.')
         self.db_id: str = str(db_props['db_id']).lower()
-        if self.db_id != section.lower(): raise DbEntityValidationException(f'ERROR: Section "{section}" does not match database id "{self.db_id}". Fix your INI file.')
+        if self.db_id != section.lower(): raise DbEntityValidationException(f'Section "{section}" does not match database id "{self.db_id}". Fix your INI file.')
         self.timestamp: int = db_props['timestamp']
-        if not isinstance(self.timestamp, int): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "timestamp" field. The database maintainer should fix this.')
+        if not isinstance(self.timestamp, int): raise DbEntityValidationException(f'Database "{section}" needs a valid "timestamp" field. The database maintainer should fix this.')
         self.files: dict[str, Any] = db_props['files']
-        if not isinstance(self.files, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "files" field. The database maintainer should fix this.')
+        if not isinstance(self.files, dict): raise DbEntityValidationException(f'Database "{section}" needs a valid "files" field. The database maintainer should fix this.')
         self.folders: dict[str, Any] = db_props['folders']
-        if not isinstance(self.folders, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "folders" field. The database maintainer should fix this.')
+        if not isinstance(self.folders, dict): raise DbEntityValidationException(f'Database "{section}" needs a valid "folders" field. The database maintainer should fix this.')
 
         self.zips: dict[str, Any] = db_props.get('zips', {})
-        if not isinstance(self.zips, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "zips" field. The database maintainer should fix this.')
+        if not isinstance(self.zips, dict): raise DbEntityValidationException(f'Database "{section}" needs a valid "zips" field. The database maintainer should fix this.')
         self.base_files_url: str = db_props.get('base_files_url', '')
-        if not isinstance(self.base_files_url, str): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "base_files_url" field. The database maintainer should fix this.')
+        if not isinstance(self.base_files_url, str): raise DbEntityValidationException(f'Database "{section}" needs a valid "base_files_url" field. The database maintainer should fix this.')
         self.tag_dictionary: dict[str, int] = db_props.get('tag_dictionary', {})
-        if not isinstance(self.tag_dictionary, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "tag_dictionary" field. The database maintainer should fix this.')
+        if not isinstance(self.tag_dictionary, dict): raise DbEntityValidationException(f'Database "{section}" needs a valid "tag_dictionary" field. The database maintainer should fix this.')
         self.linux: Optional[dict[str, Any]] = db_props.get('linux', None)
-        if self.linux is not None and not isinstance(self.linux, dict): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "linux" field. The database maintainer should fix this.')
+        if self.linux is not None and not isinstance(self.linux, dict): raise DbEntityValidationException(f'Database "{section}" needs a valid "linux" field. The database maintainer should fix this.')
         self.header: list[str] = db_props.get('header', [])
-        if not isinstance(self.header, list): raise DbEntityValidationException(f'ERROR: Database "{section}" needs a valid "header" field. The database maintainer should fix this.')
+        if not isinstance(self.header, list): raise DbEntityValidationException(f'Database "{section}" needs a valid "header" field. The database maintainer should fix this.')
         self.default_options: DbOptions = DbOptions(db_props.get('default_options', None) or {})
         _fix_folders(self.folders)
 
@@ -96,7 +96,7 @@ class DbEntity:
             return None
 
         return DbVersionUnsupportedException(
-            f'ERROR: Database "{self.db_id}" version {self.version} requires a newer Downloader'
+            f'Database "{self.db_id}" version {self.version} requires a newer Downloader'
             f'(current one supports up to v{DATABASE_LATEST_SUPPORTED_VERSION}).'
             'Update Downloader or configure "db_url" to point to a supported database version.'
         )
@@ -124,46 +124,46 @@ class ZipIndexEntity:
             return None
 
         return DbVersionUnsupportedException(
-            f'ERROR: Database "{db_id}" version {self.version} requires a newer Downloader'
+            f'Database "{db_id}" version {self.version} requires a newer Downloader'
             f' (current one supports up to v{DATABASE_LATEST_SUPPORTED_VERSION}).'
             ' Update Downloader or configure "db_url" to point to a supported database version.'
         )
 
 def check_zip_description(desc: dict[str, Any], db_id: str, zip_id: str) -> None:
     if 'kind' not in desc or desc['kind'] not in ('extract_all_contents', 'extract_single_files'):
-        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "kind" field. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "kind" field. The database maintainer should fix this.')
     if 'description' not in desc or not isinstance(desc['description'], str):
-        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "description" field. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "description" field. The database maintainer should fix this.')
     if 'contents_file' not in desc or not isinstance(desc['contents_file'], dict):
-        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "contents_file" field. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "contents_file" field. The database maintainer should fix this.')
     if ('internal_summary' not in desc or not isinstance(desc['internal_summary'], dict)) and ('summary_file' not in desc or not isinstance(desc['summary_file'], dict)):
-        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid summary field. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid summary field. The database maintainer should fix this.')
 
     if 'hash' not in desc['contents_file'] or not isinstance(desc['contents_file']['hash'], str):
-        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Contents file needs a valid hash. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid zip "{zip_id}" for database: {db_id}. Contents file needs a valid hash. The database maintainer should fix this.')
     if 'size' not in desc['contents_file'] or not isinstance(desc['contents_file']['size'], int):
-        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Contents file needs a valid size. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid zip "{zip_id}" for database: {db_id}. Contents file needs a valid size. The database maintainer should fix this.')
     if 'url' not in desc['contents_file'] or not is_url_valid(desc['contents_file']['url']):
-        raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Contents file needs a valid url. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid zip "{zip_id}" for database: {db_id}. Contents file needs a valid url. The database maintainer should fix this.')
 
     if 'internal_summary' in desc:
         check_zip_summary(desc['internal_summary'], db_id, zip_id)
     if 'summary_file' in desc:
         if 'hash' not in desc['summary_file'] or not isinstance(desc['summary_file']['hash'], str):
-            raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Summary file needs a valid hash. The database maintainer should fix this.')
+            raise DbEntityValidationException(f'Invalid zip "{zip_id}" for database: {db_id}. Summary file needs a valid hash. The database maintainer should fix this.')
         if 'size' not in desc['summary_file'] or not isinstance(desc['summary_file']['size'], int):
-            raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Summary file needs a valid size. The database maintainer should fix this.')
+            raise DbEntityValidationException(f'Invalid zip "{zip_id}" for database: {db_id}. Summary file needs a valid size. The database maintainer should fix this.')
         if 'url' not in desc['summary_file'] or not is_url_valid(desc['summary_file']['url']):
-            raise DbEntityValidationException(f'ERROR: Invalid zip "{zip_id}" for database: {db_id}. Summary file needs a valid url. The database maintainer should fix this.')
+            raise DbEntityValidationException(f'Invalid zip "{zip_id}" for database: {db_id}. Summary file needs a valid url. The database maintainer should fix this.')
 
     if 'path' in desc and desc['path'] != 'pext':
         del desc['path']
 
 def check_zip_summary(summary: dict[str, Any], db_id: str, zip_id: str) -> None:
     if 'files' not in summary or not isinstance(summary['files'], dict):
-        raise DbEntityValidationException(f'ERROR: Invalid zip summary "{zip_id}" for database: {db_id}. Summary needs valid files dictionary. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid zip summary "{zip_id}" for database: {db_id}. Summary needs valid files dictionary. The database maintainer should fix this.')
     if 'folders' not in summary or not isinstance(summary['folders'], dict):
-        raise DbEntityValidationException(f'ERROR: Invalid zip summary "{zip_id}" for database: {db_id}. Summary needs valid folders dictionary. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid zip summary "{zip_id}" for database: {db_id}. Summary needs valid folders dictionary. The database maintainer should fix this.')
 
 def check_no_url_files(files: list[PathPackage], db_id: str) -> None:
     if len(files) == 0: return
@@ -172,22 +172,22 @@ def check_no_url_files(files: list[PathPackage], db_id: str) -> None:
         file_path, file_description = file_pkg.rel_path, file_pkg.description
         parts = _validate_and_extract_parts_from_path(db_id, file_path)
         if parts[0] in folders_with_non_overridable_files and file_description.get('overwrite', True):
-            raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. Can not override in that folder. The database maintainer should fix this.')
+            raise DbEntityValidationException(f'Invalid file "{file_path}" for database: {db_id}. Can not override in that folder. The database maintainer should fix this.')
 
-        if 'hash' not in file_description or not isinstance(file_description['hash'], str): raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. File needs a valid hash. The database maintainer should fix this.')
-        if 'size' not in file_description or not isinstance(file_description['size'], int): raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. File needs a valid size. The database maintainer should fix this.')
+        if 'hash' not in file_description or not isinstance(file_description['hash'], str): raise DbEntityValidationException(f'Invalid file "{file_path}" for database: {db_id}. File needs a valid hash. The database maintainer should fix this.')
+        if 'size' not in file_description or not isinstance(file_description['size'], int): raise DbEntityValidationException(f'Invalid file "{file_path}" for database: {db_id}. File needs a valid size. The database maintainer should fix this.')
 
 def check_file_pkg(file_pkg: PathPackage, db_id: str, url: Optional[str], /) -> None:
     file_path, file_description = file_pkg.rel_path, file_pkg.description
     if not is_url_valid(url or file_description.get('url', None)):
-        raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. Invalid url "{url}". The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid file "{file_path}" for database: {db_id}. Invalid url "{url}". The database maintainer should fix this.')
 
     parts = _validate_and_extract_parts_from_path(db_id, file_path)
     if parts[0] in folders_with_non_overridable_files and file_description.get('overwrite', True):
-        raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. Can not override in that folder. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid file "{file_path}" for database: {db_id}. Can not override in that folder. The database maintainer should fix this.')
 
-    if 'hash' not in file_description or not isinstance(file_description['hash'], str): raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. File needs a valid hash. The database maintainer should fix this.')
-    if 'size' not in file_description or not isinstance(file_description['size'], int): raise DbEntityValidationException(f'ERROR: Invalid file "{file_path}" for database: {db_id}. File needs a valid size. The database maintainer should fix this.')
+    if 'hash' not in file_description or not isinstance(file_description['hash'], str): raise DbEntityValidationException(f'Invalid file "{file_path}" for database: {db_id}. File needs a valid hash. The database maintainer should fix this.')
+    if 'size' not in file_description or not isinstance(file_description['size'], int): raise DbEntityValidationException(f'Invalid file "{file_path}" for database: {db_id}. File needs a valid size. The database maintainer should fix this.')
 
 def is_url_valid(url: str) -> bool:
     try:
@@ -253,10 +253,10 @@ def del_pext(desc: dict[str, Any]) -> dict[str, Any]:
 
 def _validate_and_extract_parts_from_path(db_id: str, path: str) -> list[str]:
     if not isinstance(path, str):
-        raise DbEntityValidationException(f'ERROR: Invalid file "{path}" for database: {db_id}. Path should be a string. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid file "{path}" for database: {db_id}. Path should be a string. The database maintainer should fix this.')
 
     if path == '' or path[0] == '/' or path[0] == '.' or path[0] == '\\':
-        raise DbEntityValidationException(f'ERROR: Invalid file "{path}" for database: {db_id}. Path should be valid. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid file "{path}" for database: {db_id}. Path should be valid. The database maintainer should fix this.')
 
     lower_path = path.lower()
     parts = lower_path.split('/')
@@ -268,13 +268,13 @@ def _validate_and_extract_parts_from_path(db_id: str, path: str) -> list[str]:
         return parts
 
     if lower_path in invalid_paths:
-        raise DbEntityValidationException(f'ERROR: Invalid file "{path}" for database: {db_id}. Path should not be illegal. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid file "{path}" for database: {db_id}. Path should not be illegal. The database maintainer should fix this.')
 
     if db_id != DISTRIBUTION_MISTER_DB_ID and lower_path in no_distribution_mister_invalid_paths:
-        raise DbEntityValidationException(f'ERROR: Invalid file "{path}" for database: {db_id}. Path should only valid for distribution_mister. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid file "{path}" for database: {db_id}. Path should only valid for distribution_mister. The database maintainer should fix this.')
 
     if '..' in parts or len(parts) == 0 or parts[0] in invalid_root_folders:
-        raise DbEntityValidationException(f'ERROR: Invalid file "{path}" for database: {db_id}. Path can\'t contain root folders. The database maintainer should fix this.')
+        raise DbEntityValidationException(f'Invalid file "{path}" for database: {db_id}. Path can\'t contain root folders. The database maintainer should fix this.')
 
     return parts
 

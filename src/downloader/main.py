@@ -84,8 +84,8 @@ def read_env(default_commit: Optional[str]) -> Environment:
         'SKIP_FREE_SPACE_CHECKS': os.getenv(KENV_SKIP_FREE_SPACE_CHECKS, None),
         'DEBUG': os.getenv(KENV_DEBUG, 'false').lower(),
         'FAIL_ON_FILE_ERROR': os.getenv(KENV_FAIL_ON_FILE_ERROR, 'false'),
-        'HTTP_PROXY': os.getenv(KENV_HTTP_PROXY) or os.getenv(KENV_LC_HTTP_PROXY),
-        'HTTPS_PROXY': os.getenv(KENV_HTTPS_PROXY) or os.getenv(KENV_LC_HTTPS_PROXY),
+        'HTTP_PROXY': os.getenv(KENV_HTTP_PROXY) or os.getenv(KENV_LC_HTTP_PROXY) or '',
+        'HTTPS_PROXY': os.getenv(KENV_HTTPS_PROXY) or os.getenv(KENV_LC_HTTPS_PROXY) or '',
         'ROTATE_LOGS': os.getenv(KENV_ROTATE_LOGS, 'true').lower()
     }
 

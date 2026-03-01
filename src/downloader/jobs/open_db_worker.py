@@ -23,7 +23,7 @@ from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_
 from downloader.db_entity import DbEntity
 from downloader.db_utils import build_db_config, can_skip_db
 from downloader.file_system import FileSystem
-from downloader.job_system import WorkerResult, JobContext, ProgressReporter
+from downloader.job_system import Job, WorkerResult, JobContext, ProgressReporter
 from downloader.jobs.load_local_store_sigs_job import local_store_sigs_tag
 from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.open_db_job import OpenDbJob
@@ -54,7 +54,7 @@ class OpenDbWorker(DownloaderWorker):
         # @TODO: Skip db before opening it, need to calculate the filter in other way for that and that's it. Around 300ms savings
 
         try:
-            db_props = self._file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())
+            db_props = self._file_system.load_dict_from_transfer(job.transfer_job.source, job.transfer_job.transfer())  # type: ignore[union-attr]
         except Exception as e:
             self._fail_ctx.swallow_error(e)
             return [], e
@@ -103,7 +103,7 @@ class OpenDbWorker(DownloaderWorker):
                     job.skipped = True
                     return [], None
 
-        jobs = []
+        jobs: list[Job] = []
         if not job.load_local_store_job.local_store and not self._returned_load_local_store_job:
             with self._lock:
                 if not self._returned_load_local_store_job:
