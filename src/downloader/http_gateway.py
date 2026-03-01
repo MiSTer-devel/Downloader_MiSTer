@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2025 José Manuel Barroso Galindo <theypsilon@gmail.com>
+# Copyright (c) 2021-2026 José Manuel Barroso Galindo <theypsilon@gmail.com>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@ import ssl
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 from contextlib import contextmanager
 from email.utils import parsedate_to_datetime
 from typing import Type, Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar, Generic, TypedDict
@@ -45,10 +46,12 @@ class HttpConfig(TypedDict):
 
 
 class HttpGateway:
-    def __init__(self, ssl_ctx: ssl.SSLContext, timeout: float, logger: Optional[HttpLogger] = None, config: Optional[dict[str, Any]] = None) -> None:
+    def __init__(self, read_timeout: float = 60, connect_timeout: float = 15, keep_alive_timeout: float = 120, ssl_ctx: Optional[ssl.SSLContext] = None, logger: Optional[HttpLogger] = None, config: Optional[dict[str, Any]] = None) -> None:
         now = time.monotonic()
-        self._ssl_ctx = ssl_ctx
-        self._timeout = timeout
+        self._ssl_ctx = ssl_ctx if ssl_ctx is not None else ssl.create_default_context()
+        self._read_timeout = read_timeout
+        self._connect_timeout = connect_timeout
+        self._keep_alive_timeout = keep_alive_timeout
         self._logger = logger
         self._config = config
         self._connections: Dict[_QueueId, _ConnectionQueue] = {}
@@ -123,7 +126,8 @@ class HttpGateway:
             conn = self._take_connection(queue_id)
             if self._out_of_service: raise HttpGatewayException(f'{HttpGateway.__name__} out of service.')
             try:
-                conn.do_request(method, str(urlunparse(parsed_url)), body, headers)
+                request_target = _build_request_target(parsed_url, use_absolute_form=conn.use_absolute_form)
+                conn.do_request(method, request_target, body, headers)
             except (TimeoutError, socket.timeout) as e:
                 conn.kill()
                 raise e
@@ -139,6 +143,7 @@ class HttpGateway:
                 if not is_resource_moved:
                     break  # If the resource is not moved, we got a final response already
 
+                method, body, headers = _maybe_redirect_method(conn.response.status, method, body, headers)
                 url, parsed_url = self._follow_move(conn, queue_id, url, parsed_url)
 
         return url, conn
@@ -186,7 +191,7 @@ class HttpGateway:
     def _take_connection(self, queue_id: '_QueueId') -> '_Connection':
         with self._connections_lock:
             if queue_id not in self._connections:
-                self._connections[queue_id] = _ConnectionQueue(queue_id, self._timeout, self._ssl_ctx, self._logger, self._config)
+                self._connections[queue_id] = _ConnectionQueue(queue_id, self._read_timeout, self._connect_timeout, self._keep_alive_timeout, self._ssl_ctx, self._logger, self._config)
             queue = self._connections[queue_id]
         return queue.pull()
 
@@ -265,6 +270,38 @@ _scheme_dict = {
     'https': 1
 }
 
+def _split_host_port(netloc: str, default_port: int) -> Tuple[str, int]:
+    parsed = urlparse(f"//{netloc}")
+    host = parsed.hostname or netloc
+    port = parsed.port or default_port
+    return host, port
+
+def _build_request_target(parsed_url: ParseResult, use_absolute_form: bool) -> str:
+    if use_absolute_form:
+        return urlunparse(parsed_url._replace(fragment=''))
+
+    path = parsed_url.path or '/'
+    if parsed_url.params:
+        path = f"{path};{parsed_url.params}"
+    if parsed_url.query:
+        path = f"{path}?{parsed_url.query}"
+    return path
+
+def _maybe_redirect_method(status: int, method: str, body: Any, headers: Any) -> Tuple[str, Any, Any]:
+    new_method = method
+    new_body = body
+    if status == 303:
+        new_method = 'GET'
+        new_body = None
+    elif status in (301, 302) and method not in ('GET', 'HEAD'):
+        new_method = 'GET'
+        new_body = None
+
+    if new_method != method and isinstance(headers, dict):
+        headers = {k: v for k, v in headers.items() if k.lower() not in ('content-length', 'content-type', 'transfer-encoding')}
+
+    return new_method, new_body, headers
+
 def http_config(http_proxy: Optional[str], https_proxy: Optional[str]) -> HttpConfig:
     config: HttpConfig = {
         "http_proxy": None,
@@ -334,25 +371,27 @@ def _redirect(input_arg: T, res_dict: Dict[T, _Redirect[T]], lock: threading.Loc
 
 
 class _Connection:
-    def __init__(self, conn_id: int, http: HTTPConnection, connection_queue: '_ConnectionQueue', logger: Optional[HttpLogger], timeout: float) -> None:
+    def __init__(self, conn_id: int, http: HTTPConnection, connection_queue: '_ConnectionQueue', logger: Optional[HttpLogger], read_timeout: float, keep_alive_timeout: float, use_absolute_form: bool) -> None:
         self.id = conn_id
         self._http = http
         self._connection_queue = connection_queue
         self._logger = logger
-        self._timeout: float = timeout
+        self._read_timeout: float = read_timeout
+        self._keep_alive_timeout: float = keep_alive_timeout
         self._last_use_time: float = 0.0
         self._uses: int = 0
         self._max_uses: int = sys.maxsize
         self._response: Optional[Union[HTTPResponse, '_FinishedResponse']] = None
         self._response_headers = _ResponseHeaders(logger)
+        self.use_absolute_form = use_absolute_form
 
     def is_expired(self, now_time: float) -> bool:
-        expire_time = self._last_use_time + self._timeout
+        expire_time = self._last_use_time + self._keep_alive_timeout
         return now_time > expire_time
 
     def do_request(self, method: str, url: str, body: Any, headers: Any) -> None:
         self._http.request(method, url, headers=headers, body=body)
-        self._http.sock.settimeout(self._timeout)
+        self._http.sock.settimeout(self._read_timeout)
         self._uses += 1
         self._response = self._http.getresponse()
         self._response_headers.set_headers(self._response.getheaders(), self._response.version)
@@ -362,7 +401,7 @@ class _Connection:
         self._close_response()
         self._http.close()
         self._last_use_time = 0
-        self._timeout = 0
+        self._keep_alive_timeout = 0
 
     @property
     def response(self) -> HTTPResponse:
@@ -392,7 +431,7 @@ class _Connection:
     def describe(self) -> str:
         return (
             f'[conn obj id={self._connection_queue.id[0]}://{self._connection_queue.id[1]}/{self.id}, '
-                f'uses={self._uses}, max_uses={self._max_uses}, timeout={self._timeout}, last_use_time={self._last_use_time}]\n'
+                f'uses={self._uses}, max_uses={self._max_uses}, read_timeout={self._read_timeout}, keep_alive_timeout={self._keep_alive_timeout}, last_use_time={self._last_use_time}]\n'
             f'Response HTTP Ver.{self.response.version} | Headers\n------------------------------\n'
             f'{self.response.headers}'
         )
@@ -405,16 +444,18 @@ class _Connection:
 
         self._last_use_time = time.monotonic()
         keep_alive_timeout, keep_alive_max = self.response_headers.keep_alive_params()
-        if keep_alive_timeout is not None: self._timeout = keep_alive_timeout
+        if keep_alive_timeout is not None and keep_alive_timeout >= 5: self._keep_alive_timeout = min(float(keep_alive_timeout), self._keep_alive_timeout)
         if keep_alive_max is not None: self._max_uses = keep_alive_max
 
 class _FinishedResponse: pass
 
 
 class _ConnectionQueue:
-    def __init__(self, queue_id: _QueueId, timeout: float, ctx: ssl.SSLContext, logger: Optional[HttpLogger], config: Optional[dict[str, Any]]) -> None:
+    def __init__(self, queue_id: _QueueId, read_timeout: float, connect_timeout: float, keep_alive_timeout: float, ctx: ssl.SSLContext, logger: Optional[HttpLogger], config: Optional[dict[str, Any]]) -> None:
         self.id = queue_id
-        self._timeout = timeout
+        self._read_timeout = read_timeout
+        self._connect_timeout = connect_timeout
+        self._keep_alive_timeout = keep_alive_timeout
         self._ctx = ctx
         self._logger = logger
         self._config = config
@@ -433,8 +474,8 @@ class _ConnectionQueue:
                 self._last_conn_id += 1
                 conn_id = self._last_conn_id
 
-        http_conn = create_http_connection(self.id[0], self.id[1], self._ctx, self._config)
-        conn = _Connection(conn_id=conn_id, http=http_conn, connection_queue=self, logger=self._logger, timeout=self._timeout)
+        http_conn, use_absolute_form = create_http_connection(self.id[0], self.id[1], self._ctx, self._config, self._connect_timeout)
+        conn = _Connection(conn_id=conn_id, http=http_conn, connection_queue=self, logger=self._logger, read_timeout=self._read_timeout, keep_alive_timeout=self._keep_alive_timeout, use_absolute_form=use_absolute_form)
         with self._lock:
             if self._queue_cleared:
                 http_conn.close()
@@ -473,26 +514,27 @@ class _ConnectionQueue:
             return expired_count
 
 
-def create_http_connection(scheme: str, netloc: str, ctx: ssl.SSLContext, config: Optional[dict[str, Any]]) -> HTTPConnection:
+def create_http_connection(scheme: str, netloc: str, ctx: ssl.SSLContext, config: Optional[dict[str, Any]], connect_timeout: float) -> Tuple[HTTPConnection, bool]:
     if scheme == 'http':
         if config and config['http_proxy']:
             proxy = config['http_proxy']
             proxy_host = proxy.hostname
             proxy_port = proxy.port or 80
             if proxy.scheme == 'https':
-                return HTTPSConnection(proxy_host, proxy_port, timeout=15, context=ctx)
-            return HTTPConnection(proxy_host, proxy_port, timeout=15)
-        return HTTPConnection(netloc, timeout=15)
+                return HTTPSConnection(proxy_host, proxy_port, timeout=connect_timeout, context=ctx), True
+            return HTTPConnection(proxy_host, proxy_port, timeout=connect_timeout), True
+        return HTTPConnection(netloc, timeout=connect_timeout), False
 
     elif scheme == 'https':
         if config and config['https_proxy']:
             proxy = config['https_proxy']
             proxy_host = proxy.hostname
             proxy_port = proxy.port or (443 if proxy.scheme == 'https' else 80)
-            conn = HTTPSConnection(proxy_host, proxy_port, timeout=15, context=ctx)
-            conn.set_tunnel(netloc, 443, headers=config.get('https_proxy_headers'))
-            return conn
-        return HTTPSConnection(netloc, timeout=15, context=ctx)
+            conn = HTTPSConnection(proxy_host, proxy_port, timeout=connect_timeout, context=ctx)
+            target_host, target_port = _split_host_port(netloc, 443)
+            conn.set_tunnel(target_host, target_port, headers=config.get('https_proxy_headers'))
+            return conn, False
+        return HTTPSConnection(netloc, timeout=connect_timeout, context=ctx), False
 
     else:
         raise HttpGatewayException(f"Scheme {scheme} not supported")
@@ -542,7 +584,14 @@ class _ResponseHeaders:
         expires = self._headers.get('expires', None)
         if expires is not None:
             try:
-                return new_url, parsedate_to_datetime(expires).timestamp()
+                expires_dt = parsedate_to_datetime(expires)
+                if expires_dt.tzinfo is None:
+                    expires_dt = expires_dt.replace(tzinfo=timezone.utc)
+                now_dt = datetime.now(timezone.utc)
+                delta = (expires_dt - now_dt).total_seconds()
+                if delta <= 0:
+                    return new_url, None
+                return new_url, time.monotonic() + delta
             except Exception as e:
                 if self._logger is not None: self._logger.debug(f"Could not parse Expires from {expires}", e)
 

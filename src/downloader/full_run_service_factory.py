@@ -68,15 +68,13 @@ class FullRunServiceFactory:
         store_migrator = StoreMigrator(migrations(config), self._logger)
         local_repository = LocalRepository(config, self._logger, system_file_system, store_migrator, external_drives_repository)
 
-        http_connection_timeout = HTTP_SOCKET_TIMEOUT
-
         ssl_ctx, ssl_err = context_from_curl_ssl(config['curl_ssl'])
         if ssl_err is not None:
             self._logger.debug(ssl_err)
             self._logger.print('WARNING! Ignoring SSL parameters...')
         http_gateway = HttpGateway(
             ssl_ctx=ssl_ctx,
-            timeout=http_connection_timeout,
+            read_timeout=HTTP_SOCKET_TIMEOUT,
             logger=DebugOnlyLoggerDecorator(self._logger) if config['http_logging'] else None,
             config=config['http_config']
         )

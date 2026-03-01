@@ -32,21 +32,6 @@ import threading
 import signal
 
 
-class ActivityTracker:
-    """Tracks worker activity to prevent false pipeline timeouts during long-running jobs."""
-
-    def __init__(self) -> None:
-        self._last_progress_time: Optional[float] = None
-
-    def track(self, progress_time: float) -> 'ActivityTracker':
-        self._last_progress_time = progress_time
-        return self
-
-    @property
-    def last_progress_time(self) -> Optional[float]:
-        return self._last_progress_time
-
-
 class JobContext(Protocol):
     """A context for workers to interact with the job system in a thread-safe manner."""
 
@@ -73,7 +58,7 @@ class JobSystem(JobContext):
         JobSystem._next_job_type_id += 1
         return JobSystem._next_job_type_id
 
-    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', activity_tracker: Optional[ActivityTracker] = None, time_monotonic: Callable[[], float] = time.monotonic, max_threads: int = 6, max_tries: int = 3, wait_time: float = 0.25, max_cycle: int = 3, max_timeout: float = 300, fail_policy: JobFailPolicy = JobFailPolicy.FAULT_TOLERANT) -> None:
+    def __init__(self, reporter: 'ProgressReporter', logger: 'JobSystemLogger', activity_tracker: Optional['ActivityTracker'] = None, time_monotonic: Callable[[], float] = time.monotonic, max_threads: int = 6, max_tries: int = 3, wait_time: float = 0.25, max_cycle: int = 3, max_timeout: float = 300, fail_policy: JobFailPolicy = JobFailPolicy.FAULT_TOLERANT) -> None:
         self._reporter: ProgressReporter = reporter
         self._logger: JobSystemLogger = logger
         self._activity_tracker: ActivityTracker = activity_tracker if activity_tracker is not None else ActivityTracker()
@@ -579,6 +564,22 @@ class CycleDetectedException(JobSystemAbortException): pass
 class JobSystemLogger(Protocol):
     def print(self, *args, sep: str='', end: str='\n', file=sys.stdout, flush: bool=True) -> None: """Prints a message to the logger."""
     def debug(self, *args, sep: str='', end: str='\n', flush: bool=True) -> None: """Prints a debug message to the logger."""
+
+
+class ActivityTracker:
+    """Tracks worker activity to prevent false pipeline timeouts during long-running jobs."""
+
+    def __init__(self) -> None:
+        self._last_progress_time: Optional[float] = None
+
+    def track(self, progress_time: float) -> 'ActivityTracker':
+        if self._last_progress_time is None or progress_time > self._last_progress_time:
+            self._last_progress_time = progress_time
+        return self
+
+    @property
+    def last_progress_time(self) -> Optional[float]:
+        return self._last_progress_time
 
 
 @dataclass(eq=False, order=False)
