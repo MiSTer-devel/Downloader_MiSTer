@@ -23,7 +23,7 @@ import locale
 from pathlib import Path
 from typing import Optional
 
-from downloader.config import Environment
+from downloader.config import Environment, InvalidConfigParameter
 from downloader.config_reader import ConfigReader
 from downloader.constants import KENV_LOGLEVEL, KENV_LC_HTTP_PROXY, KENV_HTTP_PROXY, KENV_HTTPS_PROXY, \
     KENV_LC_HTTPS_PROXY, KENV_ROTATE_LOGS, KENV_SKIP_FREE_SPACE_CHECKS
@@ -46,6 +46,10 @@ def main(env: Environment, start_time: float) -> int:
             ConfigReader(logger, env, start_time),
             sys.argv
         )
+    except InvalidConfigParameter as e:
+        logger.debug(e)
+        logger.print('Configuration error: %s' % str(e))
+        exit_code = 1
     except Exception as _:
         import traceback
         logger.print(traceback.format_exc())

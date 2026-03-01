@@ -18,9 +18,11 @@
 
 
 import configparser
+import glob
+import os
 import re
 from pathlib import Path
-from typing import Optional, TypeVar, Union, SupportsInt
+from typing import List, Optional, TypeVar, Union, SupportsInt
 
 
 from downloader.config import Environment, Config, default_config, InvalidConfigParameter, AllowReboot, \
@@ -116,6 +118,8 @@ class ConfigReader:
 
         self._logger.debug('Read sections done.')
 
+        self._load_drop_in_databases(config_path, result, default_db)
+
         if len(result['databases']) == 0:
             self._logger.debug('Reading default db')
             self._add_default_database(ini_config, result)
@@ -192,6 +196,58 @@ class ConfigReader:
             self._logger.print('Could not read ini file %s' % config_path)
             raise e
         return ini_config
+
+    def _load_drop_in_databases(self, config_path: str, result: Config, default_db: ConfigDatabaseSection) -> None:
+        drop_in_files = self._discover_drop_in_files(config_path)
+        if not drop_in_files:
+            return
+
+        self._logger.bench('ConfigReader Read drop-in databases start.')
+        db_sources = {db_id: config_path for db_id in result['databases']}
+        for drop_in_path in drop_in_files:
+            self._logger.debug('Reading drop-in:', drop_in_path)
+            drop_in_config = self._load_drop_in_ini(drop_in_path)
+
+            sections = drop_in_config.sections()
+            if len(sections) == 0:
+                self._logger.print('WARNING: Drop-in file %s contains no sections, skipping.' % drop_in_path)
+                result['ignored_databases'].append({'file': drop_in_path, 'reason': 'empty'})
+                continue
+
+            if len(sections) > 1:
+                raise InvalidConfigParameter("Drop-in file '%s' contains multiple sections. Each drop-in must have exactly one section." % drop_in_path)
+
+            section = sections[0]
+            section_id = section.lower()
+
+            if section_id == 'mister':
+                raise InvalidConfigParameter("Drop-in file '%s' contains a [MiSTer] section. Global settings are only allowed in the base downloader.ini." % drop_in_path)
+
+            if section_id in result['databases']:
+                self._logger.print("WARNING: Drop-in file '%s' defines database '%s' which is already defined in '%s', skipping." % (drop_in_path, section_id, db_sources[section_id]))
+                result['ignored_databases'].append({'file': drop_in_path, 'db_id': section_id, 'reason': 'duplicate', 'ctx': db_sources[section_id]})
+                continue
+
+            parser = IniParser(drop_in_config[section])
+            result['databases'][section_id] = self._parse_database_section(default_db, parser, section_id)
+            db_sources[section_id] = drop_in_path
+
+        self._logger.bench('ConfigReader Read drop-in databases end.')
+
+    def _discover_drop_in_files(self, config_path: str) -> List[str]:
+        config_dir = str(Path(config_path).parent)
+        d_dir = os.path.join(config_dir, 'downloader.d')
+
+        d_files = []
+        if os.path.isdir(d_dir):
+            d_files = [f for f in glob.glob(os.path.join(d_dir, '*.ini')) if _is_eligible_drop_in(f)]
+
+        star_files = [f for f in glob.glob(os.path.join(config_dir, 'downloader_*.ini')) if _is_eligible_drop_in(f)]
+
+        return sorted(d_files) + sorted(star_files)
+
+    def _load_drop_in_ini(self, drop_in_path: str) -> configparser.ConfigParser:
+        return self._load_ini_config(drop_in_path)
 
     def _add_default_database(self, ini_config: configparser.ConfigParser, result: Config) -> None:
         default_db = self._default_db_config()
@@ -320,6 +376,14 @@ class ConfigReader:
         else:
             self._logger.print(f'WARNING: file_checking value "{parameter}" is not recognized. Defaulting to "balanced".\n      See the documentation for valid options.')
             return FileChecking.BALANCED
+
+
+def _is_eligible_drop_in(path: str) -> bool:
+    basename = os.path.basename(path)
+    if basename.startswith('.'):
+        return False
+    return basename.endswith('.ini')
+
 
 TOptStr = TypeVar('TOptStr', str, Optional[str])
 TOptInt = TypeVar('TOptInt', int, Optional[int])
