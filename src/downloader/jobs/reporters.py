@@ -399,7 +399,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         self._logger = logger
         self._interrupts = interrupts
         self._session_logger = FileDownloadSessionLoggerImpl(logger, waiter)
-        self._report: Optional[InstallationReportImpl] = None
+        self._report: InstallationReportImpl = InstallationReportImpl()
 
     def installation_report(self) -> InstallationReport: return self._report
     def session_logger(self) -> FileDownloadSessionLogger: return self._session_logger

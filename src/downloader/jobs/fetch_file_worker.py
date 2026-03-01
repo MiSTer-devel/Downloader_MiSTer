@@ -21,7 +21,7 @@ from downloader.file_system import FileSystem
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.fetch_file_job import FetchFileJob
-from downloader.jobs.errors import FileDownloadError, FileValidationError
+from downloader.jobs.errors import GetFileError, FileDownloadError, FileValidationError
 import socket
 from urllib.error import URLError
 from http.client import HTTPException
@@ -81,7 +81,7 @@ class FileFetcher:
         self._file_system = file_system
         self._timeout = timeout
 
-    def fetch_file(self, url: str, download_path: str) -> tuple[int, str, Optional[FileDownloadError]]:
+    def fetch_file(self, url: str, download_path: str) -> tuple[int, str, Optional[GetFileError]]:
         try:
             with self._http_gateway.open(url) as (final_url, in_stream):
                 if in_stream.status != 200:

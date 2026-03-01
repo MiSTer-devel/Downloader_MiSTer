@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Any, Optional, cast
+from typing import Any, Optional, Union, cast
 
 from downloader.db_entity import check_zip_description, ZipIndexEntity
 from downloader.job_system import WorkerResult, Job, ProgressReporter
@@ -82,7 +82,7 @@ class ProcessDbMainWorker(DownloaderWorker):
                 zip_job_tags=zip_job_tags
             )
 
-            next_jobs = [*zip_jobs, waiter_job]
+            next_jobs: list[Job] = [*zip_jobs, waiter_job]  # type: ignore[list-item]
         else:
             index_job = ProcessDbIndexJob(
                 db=db,
@@ -123,7 +123,7 @@ def _make_zip_job(stored_index: Optional[StoreFragmentZipSummary], z: ZipJobCont
     return job, None
 
 
-def _make_process_zip_job_from_ctx(z: ZipJobContext, zip_summary: dict[str, Any], has_new_zip_summary: bool):
+def _make_process_zip_job_from_ctx(z: ZipJobContext, zip_summary: Union[dict[str, Any], StoreFragmentZipSummary], has_new_zip_summary: bool):  # @TODO: Simplify Union once callers use a common type
     base_files_url = z.job.db.base_files_url
     if 'base_files_url' in z.zip_description:
         base_files_url = z.zip_description['base_files_url']
@@ -131,7 +131,7 @@ def _make_process_zip_job_from_ctx(z: ZipJobContext, zip_summary: dict[str, Any]
     zip_index = ZipIndexEntity(
         files=zip_summary['files'],
         folders=zip_summary['folders'],
-        base_files_url=zip_summary.get('base_files_url', base_files_url),
+        base_files_url=zip_summary.get('base_files_url', base_files_url),  # type: ignore[arg-type]
         version=z.job.db.version,
         description=z.zip_description
     )

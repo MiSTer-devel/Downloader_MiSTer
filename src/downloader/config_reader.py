@@ -34,7 +34,7 @@ from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, 
     STORAGE_PRIORITY_PREFER_EXTERNAL, EXIT_ERROR_WRONG_SETUP, K_BENCH, K_HTTP_PROXY, FILE_CHECKING_FASTEST, \
     FILE_CHECKING_BALANCED, FILE_CHECKING_EXHAUSTIVE, FILE_CHECKING_VERIFY_INTEGRITY
 from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
-from downloader.http_gateway import http_config
+from downloader.http_gateway import http_config, HttpGatewayException
 from downloader.logger import Logger
 
 
@@ -169,12 +169,15 @@ class ConfigReader:
             result['base_path'] = self._env['FORCED_BASE_PATH']
             result['base_system_path'] = self._env['FORCED_BASE_PATH']
 
-        result['skip_free_space_checks'] = self._env['SKIP_FREE_SPACE_CHECKS'] or result['is_pc_launcher']
+        result['skip_free_space_checks'] = strtobool(self._env['SKIP_FREE_SPACE_CHECKS']) or result['is_pc_launcher']
 
-        if self._env['HTTP_PROXY'] or self._env['HTTPS_PROXY']:
-            result['http_config'] = http_config(http_proxy=self._env['HTTP_PROXY'], https_proxy=self._env['HTTPS_PROXY'])
-        elif result['http_proxy'] != '':
-            result['http_config'] = http_config(http_proxy=result['http_proxy'], https_proxy=None)
+        try:
+            if self._env['HTTP_PROXY'] or self._env['HTTPS_PROXY']:
+                result['http_config'] = http_config(http_proxy=self._env['HTTP_PROXY'], https_proxy=self._env['HTTPS_PROXY'])
+            elif result['http_proxy'] != '':
+                result['http_config'] = http_config(http_proxy=result['http_proxy'], https_proxy=None)
+        except HttpGatewayException as e:
+            raise InvalidConfigParameter(f'Invalid http_config: {e}') from e
 
         result['environment'] = self._env
 
@@ -420,7 +423,9 @@ def to_int(n: Union[str, TInt], default: TOptInt) -> Union[int, TOptInt]:
         return default
 
 
-def strtobool(val: str) -> bool:
+def strtobool(val: Optional[str]) -> bool:
+    if val is None:
+        return False
     val = val.lower()
     if val in ('y', 'yes', 't', 'true', 'on', '1'):
         return True

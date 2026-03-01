@@ -24,7 +24,7 @@ import time
 from datetime import datetime, timezone
 from contextlib import contextmanager
 from email.utils import parsedate_to_datetime
-from typing import Type, Any, Optional, Generator, Union, Protocol, TypeVar, Generic, TypedDict
+from typing import Literal, Type, Any, Optional, Generator, Union, Protocol, TypeVar, Generic, TypedDict
 from urllib.parse import urlparse, ParseResult, urlunparse
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
 from types import TracebackType
@@ -38,15 +38,20 @@ class HttpLogger(Protocol):
     def debug(self, *args: Any) -> None: ...
 
 
+class ProxyInfo(TypedDict):
+    hostname: str
+    port: int
+    scheme: Literal['http', 'https']
+
 class HttpConfig(TypedDict):
-    http_proxy: Optional[ParseResult]
-    https_proxy: Optional[ParseResult]
+    http_proxy: Optional[ProxyInfo]
+    https_proxy: Optional[ProxyInfo]
     http_proxy_headers: Optional[dict[str, str]]
     https_proxy_headers: Optional[dict[str, str]]
 
 
 class HttpGateway:
-    def __init__(self, read_timeout: float = 60, connect_timeout: float = 15, keep_alive_timeout: float = 120, ssl_ctx: Optional[ssl.SSLContext] = None, logger: Optional[HttpLogger] = None, config: Optional[dict[str, Any]] = None) -> None:
+    def __init__(self, read_timeout: float = 60, connect_timeout: float = 15, keep_alive_timeout: float = 120, ssl_ctx: Optional[ssl.SSLContext] = None, logger: Optional[HttpLogger] = None, config: Optional[HttpConfig] = None) -> None:
         now = time.monotonic()
         self._ssl_ctx = ssl_ctx if ssl_ctx is not None else ssl.create_default_context()
         self._read_timeout = read_timeout
@@ -314,24 +319,36 @@ def http_config(http_proxy: Optional[str], https_proxy: Optional[str]) -> HttpCo
 
     if http_proxy:
         parsed = urlparse(http_proxy)
-        if parsed.hostname and parsed.scheme in ('http', 'https'):
-            config['http_proxy'] = parsed
-            auth_header = _make_proxy_auth_header(parsed)
-            if auth_header:
-                config['http_proxy_headers'] = {'Proxy-Authorization': auth_header}
+        config['http_proxy'] = _parse_proxy_info(parsed, http_proxy, 'HTTP')
+        auth_header = _make_proxy_auth_header(parsed)
+        if auth_header:
+            config['http_proxy_headers'] = {'Proxy-Authorization': auth_header}
 
     if not https_proxy and http_proxy:
         https_proxy = http_proxy
 
     if https_proxy:
         parsed = urlparse(https_proxy)
-        if parsed.hostname and parsed.scheme in ('http', 'https'):
-            config['https_proxy'] = parsed
-            auth_header = _make_proxy_auth_header(parsed)
-            if auth_header:
-                config['https_proxy_headers'] = {'Proxy-Authorization': auth_header}
+        config['https_proxy'] = _parse_proxy_info(parsed, https_proxy, 'HTTPS')
+        auth_header = _make_proxy_auth_header(parsed)
+        if auth_header:
+            config['https_proxy_headers'] = {'Proxy-Authorization': auth_header}
 
     return config
+
+
+def _parse_proxy_info(parsed: ParseResult, raw_url: str, label: str) -> ProxyInfo:
+    scheme: Literal['http', 'https']
+    if parsed.scheme == 'http':
+        scheme = 'http'
+    elif parsed.scheme == 'https':
+        scheme = 'https'
+    else:
+        raise HttpGatewayException(f"{label} proxy has unsupported scheme: {raw_url}")
+    if not parsed.hostname:
+        raise HttpGatewayException(f"{label} proxy has no hostname: {raw_url}")
+    default_port = 443 if scheme == 'https' else 80
+    return ProxyInfo(hostname=parsed.hostname, port=parsed.port or default_port, scheme=scheme)
 
 
 def _make_proxy_auth_header(proxy: ParseResult) -> Optional[str]:
@@ -451,7 +468,7 @@ class _FinishedResponse: pass
 
 
 class _ConnectionQueue:
-    def __init__(self, queue_id: _QueueId, read_timeout: float, connect_timeout: float, keep_alive_timeout: float, ctx: ssl.SSLContext, logger: Optional[HttpLogger], config: Optional[dict[str, Any]]) -> None:
+    def __init__(self, queue_id: _QueueId, read_timeout: float, connect_timeout: float, keep_alive_timeout: float, ctx: ssl.SSLContext, logger: Optional[HttpLogger], config: Optional[HttpConfig]) -> None:
         self.id = queue_id
         self._read_timeout = read_timeout
         self._connect_timeout = connect_timeout
@@ -514,23 +531,19 @@ class _ConnectionQueue:
             return expired_count
 
 
-def create_http_connection(scheme: str, netloc: str, ctx: ssl.SSLContext, config: Optional[dict[str, Any]], connect_timeout: float) -> tuple[HTTPConnection, bool]:
+def create_http_connection(scheme: str, netloc: str, ctx: ssl.SSLContext, config: Optional[HttpConfig], connect_timeout: float) -> tuple[HTTPConnection, bool]:
     if scheme == 'http':
         if config and config['http_proxy']:
             proxy = config['http_proxy']
-            proxy_host = proxy.hostname
-            proxy_port = proxy.port or 80
-            if proxy.scheme == 'https':
-                return HTTPSConnection(proxy_host, proxy_port, timeout=connect_timeout, context=ctx), True
-            return HTTPConnection(proxy_host, proxy_port, timeout=connect_timeout), True
+            if proxy['scheme'] == 'https':
+                return HTTPSConnection(proxy['hostname'], proxy['port'], timeout=connect_timeout, context=ctx), True
+            return HTTPConnection(proxy['hostname'], proxy['port'], timeout=connect_timeout), True
         return HTTPConnection(netloc, timeout=connect_timeout), False
 
     elif scheme == 'https':
         if config and config['https_proxy']:
             proxy = config['https_proxy']
-            proxy_host = proxy.hostname
-            proxy_port = proxy.port or (443 if proxy.scheme == 'https' else 80)
-            conn = HTTPSConnection(proxy_host, proxy_port, timeout=connect_timeout, context=ctx)
+            conn = HTTPSConnection(proxy['hostname'], proxy['port'], timeout=connect_timeout, context=ctx)
             target_host, target_port = _split_host_port(netloc, 443)
             conn.set_tunnel(target_host, target_port, headers=config.get('https_proxy_headers'))
             return conn, False
@@ -571,13 +584,13 @@ class _ResponseHeaders:
                 if max_age <= 0:
                     return new_url, None
 
-                age: int = self._headers.get('age', 0)  # type: ignore[assignment]  # str will be converted to int
-                if age != 0:
-                    try:
-                        age = int(age)
-                    except Exception as e:
-                        if self._logger is not None: self._logger.debug(f"Could not parse Age from {age}", e)
-                        age = 0
+                age = 0
+                age_raw = self._headers.get('age')
+                if age_raw is not None:
+                    if age_raw.isdigit():
+                        age = int(age_raw)
+                    elif self._logger is not None:
+                        self._logger.debug(f"Could not parse Age from {age_raw}")
 
                 return new_url, time.monotonic() + max_age - age
 
@@ -637,10 +650,14 @@ class _ParamsParser:
 
     def int(self, key: str) -> Optional[int]:
         if key not in self._data: return None
+        value = self._data[key]
+        if not isinstance(value, str):
+            if self._logger is not None: self._logger.debug(f"ERROR! Could not parse int '{key}' from: {value}")
+            return None
         try:
-            return int(self._data[key].strip('\"\''))  # type: ignore[union-attr]
+            return int(value.strip('\"\''))
         except Exception as e:
-            if self._logger is not None: self._logger.debug(f"ERROR! Could not parse int '{key}' from: {self._data[key]}", e)
+            if self._logger is not None: self._logger.debug(f"ERROR! Could not parse int '{key}' from: {value}", e)
             return None
 
     def str(self, key: str) -> Optional[str]:

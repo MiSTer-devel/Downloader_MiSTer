@@ -269,7 +269,7 @@ class LocalRepository(FilelogSaver):
         try:
             self._file_system.make_dirs_parent(self._storage_save_path)
             self._logger.bench('LocalRepository Write store json start.')
-            self._file_system.save_json(local_store, self._storage_save_path)
+            self._file_system.save_json(local_store, self._storage_save_path)  # type: ignore[arg-type]
             self._logger.bench('LocalRepository Write store main end.')
             self._file_system.save_json(local_store.get('db_sigs', {}), self._store_sigs_path)
             self._logger.bench('LocalRepository Write store db_sigs end.')

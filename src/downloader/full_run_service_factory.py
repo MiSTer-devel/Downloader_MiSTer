@@ -96,7 +96,7 @@ class FullRunServiceFactory:
         linux_updater = LinuxUpdater(self._logger, waiter, config, system_file_system, safe_file_fetcher)
         base_path_relocator = BasePathRelocator(config, file_system_factory, waiter, self._logger)
 
-        old_pext_paths = set()  # @TODO: Should end up empty. Remove when we have 100% in not having pext paths anymore.
+        old_pext_paths: set[str] = set()  # @TODO: Should end up empty. Remove when we have 100% in not having pext paths anymore.
         fail_ctx = FailCtx(self._logger)
         online_importer_workers_factory = OnlineImporterWorkersFactory(
             worker_context=job_system,
