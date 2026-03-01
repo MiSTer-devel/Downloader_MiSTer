@@ -24,7 +24,7 @@ import time
 from datetime import datetime, timezone
 from contextlib import contextmanager
 from email.utils import parsedate_to_datetime
-from typing import Type, Tuple, Any, Optional, Generator, List, Dict, Union, Protocol, TypeVar, Generic, TypedDict
+from typing import Type, Any, Optional, Generator, Union, Protocol, TypeVar, Generic, TypedDict
 from urllib.parse import urlparse, ParseResult, urlunparse
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
 from types import TracebackType
@@ -41,8 +41,8 @@ class HttpLogger(Protocol):
 class HttpConfig(TypedDict):
     http_proxy: Optional[ParseResult]
     https_proxy: Optional[ParseResult]
-    http_proxy_headers: Optional[Dict[str, str]]
-    https_proxy_headers: Optional[Dict[str, str]]
+    http_proxy_headers: Optional[dict[str, str]]
+    https_proxy_headers: Optional[dict[str, str]]
 
 
 class HttpGateway:
@@ -54,15 +54,15 @@ class HttpGateway:
         self._keep_alive_timeout = keep_alive_timeout
         self._logger = logger
         self._config = config
-        self._connections: Dict[_QueueId, _ConnectionQueue] = {}
+        self._connections: dict[_QueueId, _ConnectionQueue] = {}
         self._connections_lock = threading.Lock()
         self._clean_timeout_connections_timer = now
         self._clean_timeout_connections_lock = threading.Lock()
-        self._queue_redirects: Dict[_QueueId, _Redirect[_QueueId]] = {}
+        self._queue_redirects: dict[_QueueId, _Redirect[_QueueId]] = {}
         self._queue_redirects_lock = threading.Lock()
-        self._url_redirects: Dict[str, _Redirect[str]] = {}
+        self._url_redirects: dict[str, _Redirect[str]] = {}
         self._url_redirects_lock = threading.Lock()
-        self._redirects_swap: Dict[Any, _Redirect[Any]] = {}
+        self._redirects_swap: dict[Any, _Redirect[Any]] = {}
         self._clean_timeout_redirects_timer = now
         self._clean_timeout_redirects_lock = threading.Lock()
         self._out_of_service = False
@@ -76,7 +76,7 @@ class HttpGateway:
         self.cleanup()
 
     @contextmanager
-    def open(self, url: str, method: Optional[str] = None, body: Any = None, headers: Any = None) -> Generator[Tuple[str, HTTPResponse], None, None]:
+    def open(self, url: str, method: Optional[str] = None, body: Any = None, headers: Any = None) -> Generator[tuple[str, HTTPResponse], None, None]:
         now = time.monotonic()
         self._clean_timeout_connections(now)
         self._clean_timeout_redirects(now)
@@ -120,7 +120,7 @@ class HttpGateway:
         with self._queue_redirects_lock: self._queue_redirects.clear()
         with self._url_redirects_lock: self._url_redirects.clear()
 
-    def _request(self, url: str, parsed_url: ParseResult, method: str, body: Any, headers: Any) -> Tuple[str, '_Connection']:
+    def _request(self, url: str, parsed_url: ParseResult, method: str, body: Any, headers: Any) -> tuple[str, '_Connection']:
         for retry in range(11):
             queue_id: _QueueId = self._process_queue_id((parsed_url.scheme, parsed_url.netloc))
             conn = self._take_connection(queue_id)
@@ -148,7 +148,7 @@ class HttpGateway:
 
         return url, conn
 
-    def _follow_move(self, conn: '_Connection', queue_id: '_QueueId', url: str, parsed_url: ParseResult) -> Tuple[str, ParseResult]:
+    def _follow_move(self, conn: '_Connection', queue_id: '_QueueId', url: str, parsed_url: ParseResult) -> tuple[str, ParseResult]:
         location, redirect_timeout = conn.response_headers.redirect_params(conn.response.status)
         if location is None:
             if self._logger is not None: self._logger.debug(f"Invalid header on resource moved response at: {url}")
@@ -209,7 +209,7 @@ class HttpGateway:
             self._clean_timeout_connections_timer = now
             if self._logger is not None: self._logger.debug('Checking keep-alive timeouts...')
 
-            connection_items: List[Tuple[Tuple[str, str], _ConnectionQueue]]
+            connection_items: list[tuple[tuple[str, str], _ConnectionQueue]]
             with self._connections_lock:
                 connection_items = list(self._connections.items())
 
@@ -246,12 +246,12 @@ class HttpGateway:
         finally:
             self._clean_timeout_redirects_lock.release()
 
-    def _fill_redirects_swap(self, now: float, lock: threading.Lock, redirects: Dict[T, '_Redirect[T]']) -> bool:
+    def _fill_redirects_swap(self, now: float, lock: threading.Lock, redirects: dict[T, '_Redirect[T]']) -> bool:
         # We are minimizing lock time, by doing most of the operations in redirect_items and self._redirects_swap.
         # If we see that redirects needs to change, we return True to indicate that it needs to be swapped outside.
 
         self._redirects_swap.clear()
-        redirect_items: List[Tuple[T, _Redirect[T]]]
+        redirect_items: list[tuple[T, _Redirect[T]]]
 
         with lock:
             size = len(redirects)
@@ -270,7 +270,7 @@ _scheme_dict = {
     'https': 1
 }
 
-def _split_host_port(netloc: str, default_port: int) -> Tuple[str, int]:
+def _split_host_port(netloc: str, default_port: int) -> tuple[str, int]:
     parsed = urlparse(f"//{netloc}")
     host = parsed.hostname or netloc
     port = parsed.port or default_port
@@ -287,7 +287,7 @@ def _build_request_target(parsed_url: ParseResult, use_absolute_form: bool) -> s
         path = f"{path}?{parsed_url.query}"
     return path
 
-def _maybe_redirect_method(status: int, method: str, body: Any, headers: Any) -> Tuple[str, Any, Any]:
+def _maybe_redirect_method(status: int, method: str, body: Any, headers: Any) -> tuple[str, Any, Any]:
     new_method = method
     new_body = body
     if status == 303:
@@ -346,7 +346,7 @@ USER_AGENT = 'Downloader/2.X (Linux; theypsilon@gmail.com)'
 _default_headers = {'User-Agent': USER_AGENT, 'Connection': 'keep-alive', 'Keep-Alive': 'timeout=120'}
 
 
-_QueueId = Tuple[str, str]
+_QueueId = tuple[str, str]
 
 class _Redirect(Generic[T]):
     def __init__(self, target: T, timeout: float) -> None:
@@ -356,7 +356,7 @@ class _Redirect(Generic[T]):
     def is_expired(self, now: float) -> bool:
         return now > self.timeout
 
-def _redirect(input_arg: T, res_dict: Dict[T, _Redirect[T]], lock: threading.Lock) -> T:
+def _redirect(input_arg: T, res_dict: dict[T, _Redirect[T]], lock: threading.Lock) -> T:
     redirects = 0
     arg = input_arg
     with lock:
@@ -459,12 +459,12 @@ class _ConnectionQueue:
         self._ctx = ctx
         self._logger = logger
         self._config = config
-        self._queue: List[_Connection] = []
-        self._queue_swap: List[_Connection] = []
+        self._queue: list[_Connection] = []
+        self._queue_swap: list[_Connection] = []
         self._lock = threading.Lock()
         self._last_conn_id = -1
         self._queue_cleared = False
-        self._all_connections: List[_Connection] = []  # Track all connections (idle and active)
+        self._all_connections: list[_Connection] = []  # Track all connections (idle and active)
 
     def pull(self) -> _Connection:
         with self._lock:
@@ -514,7 +514,7 @@ class _ConnectionQueue:
             return expired_count
 
 
-def create_http_connection(scheme: str, netloc: str, ctx: ssl.SSLContext, config: Optional[dict[str, Any]], connect_timeout: float) -> Tuple[HTTPConnection, bool]:
+def create_http_connection(scheme: str, netloc: str, ctx: ssl.SSLContext, config: Optional[dict[str, Any]], connect_timeout: float) -> tuple[HTTPConnection, bool]:
     if scheme == 'http':
         if config and config['http_proxy']:
             proxy = config['http_proxy']
@@ -543,11 +543,11 @@ def create_http_connection(scheme: str, netloc: str, ctx: ssl.SSLContext, config
 class _ResponseHeaders:
     def __init__(self, logger: Optional[HttpLogger]) -> None:
         self._logger = logger
-        self._headers: Dict[str, str] = {}
+        self._headers: dict[str, str] = {}
         self._version = 11
         self._params_parser = _ParamsParser(logger)
 
-    def set_headers(self, headers: List[Tuple[str, str]], version: int) -> None:
+    def set_headers(self, headers: list[tuple[str, str]], version: int) -> None:
         self._headers.clear()
         for k, v in headers:
             k = k.lower()
@@ -555,7 +555,7 @@ class _ResponseHeaders:
             self._headers[k] = self._headers[k] + ',' + v if k in self._headers else v
         self._version = version
 
-    def redirect_params(self, status: int) -> Tuple[Optional[str], Optional[float]]:
+    def redirect_params(self, status: int) -> tuple[Optional[str], Optional[float]]:
         new_url = self._headers.get('location', None)
         if new_url is None:
             return None, None
@@ -605,7 +605,7 @@ class _ResponseHeaders:
         is_keep_alive = (self._version == 10 and connection == 'keep-alive') or (self._version >= 11 and connection != 'close')
         return is_keep_alive
 
-    def keep_alive_params(self) -> Tuple[Optional[int], Optional[int]]:
+    def keep_alive_params(self) -> tuple[Optional[int], Optional[int]]:
         keep_alive_header = self._headers.get('keep-alive', None)
         if keep_alive_header is None: return None, None
         self._params_parser.parse(keep_alive_header)
@@ -617,7 +617,7 @@ _used_headers = {'location', 'cache-control', 'age', 'expires', 'connection', 'k
 class _ParamsParser:
     def __init__(self, logger: Optional[HttpLogger]) -> None:
         self._logger = logger
-        self._data: Dict[str, Union[bool, str, None]] = dict()
+        self._data: dict[str, Union[bool, str, None]] = dict()
 
     def parse(self, source: Optional[str]) -> '_ParamsParser':
         if source is None: return self

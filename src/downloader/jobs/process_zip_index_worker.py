@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from downloader.db_entity import check_no_url_files
 from downloader.job_system import WorkerResult, Job, ProgressReporter
@@ -80,7 +80,7 @@ class ProcessZipIndexWorker(DownloaderWorker):
         self._logger.bench('ProcessZipIndexWorker done: ', db.db_id, zip_id)
         return next_jobs, None
 
-    def _make_open_zip_contents_job(self, job: ProcessZipIndexJob, unzip_file_pkgs: List[PathPackage], store: ReadOnlyStoreAdapter) -> Tuple[List[Job], Optional[Exception]]:
+    def _make_open_zip_contents_job(self, job: ProcessZipIndexJob, unzip_file_pkgs: list[PathPackage], store: ReadOnlyStoreAdapter) -> tuple[list[Job], Optional[Exception]]:
         if len(unzip_file_pkgs) == 0:
             return [], None
 
@@ -126,7 +126,7 @@ class ProcessZipIndexWorker(DownloaderWorker):
         return [data_job], None  # type: ignore[list-item]
 
     @staticmethod
-    def _create_target_package(calculator: TargetPathsCalculator, kind: ZipKind, description: Dict[str, Any]) -> Tuple[Optional[PathPackage], Optional[Exception]]:
+    def _create_target_package(calculator: TargetPathsCalculator, kind: ZipKind, description: dict[str, Any]) -> tuple[Optional[PathPackage], Optional[Exception]]:
         if kind == ZipKind.EXTRACT_ALL_CONTENTS:
             if 'target_folder_path' not in description or not isinstance(description['target_folder_path'], str):
                 return None, Exception('extract_all_contents zip requires string "target_folder_path".')

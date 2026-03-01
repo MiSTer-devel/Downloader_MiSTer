@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import ssl
-from typing import Dict, Tuple, Optional
+from typing import Optional
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config
@@ -59,7 +59,7 @@ class FullRunServiceFactory:
         return FullRunServiceFactory(top_logger, top_logger.file_logger, top_logger)
 
     def create(self, config: Config):
-        path_dictionary: Dict[str, str] = dict()
+        path_dictionary: dict[str, str] = dict()
         waiter = Waiter()
         activity_tracker = ActivityTracker()
         file_system_factory = FileSystemFactory(config, path_dictionary, self._logger, activity_tracker)
@@ -145,7 +145,7 @@ class FullRunServiceFactory:
         return instance
 
 
-def context_from_curl_ssl(curl_ssl) -> Tuple[ssl.SSLContext, Optional[Exception]]:
+def context_from_curl_ssl(curl_ssl) -> tuple[ssl.SSLContext, Optional[Exception]]:
     try:
         context = ssl.create_default_context()
 

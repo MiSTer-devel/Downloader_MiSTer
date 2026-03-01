@@ -21,7 +21,7 @@ import json
 import sys
 import tempfile
 import os.path
-from typing import Dict, List, Any
+from typing import Any
 from downloader.config import Config
 from downloader.constants import FILE_7z_util_uninstalled, FILE_7z_util_uninstalled_description, FILE_Linux_uninstalled, FILE_downloader_needs_reboot_after_linux_update, FILE_MiSTer_version, FILE_7z_util, FILE_Linux_user_files
 from downloader.db_entity import DbEntity
@@ -41,12 +41,12 @@ class LinuxUpdater:
         self._linux_descriptions: list[dict[str, Any]] = []
         self._user_files: list[tuple[str, str]] = []
 
-    def update_linux(self, dbs: List[DbEntity]) -> None:
+    def update_linux(self, dbs: list[DbEntity]) -> None:
         self._logger.bench('LinuxUpdater Update Linux start.')
         self._update_linux_impl(dbs)
         self._logger.bench('LinuxUpdater Update Linux done.')
 
-    def _update_linux_impl(self, dbs: List[DbEntity]) -> None:
+    def _update_linux_impl(self, dbs: list[DbEntity]) -> None:
         for db in dbs:
             if db.linux is not None:
                 self._linux_descriptions.append({
@@ -109,7 +109,7 @@ class LinuxUpdater:
     def get_current_linux_version(self):
         return self._file_system.read_file_contents(FILE_MiSTer_version) if self._file_system.is_file(FILE_MiSTer_version) else 'unknown'
 
-    def _run_subprocesses(self, linux: Dict[str, str]) -> None:
+    def _run_subprocesses(self, linux: dict[str, str]) -> None:
         if self._file_system.is_file(FILE_7z_util_uninstalled):
             sys.stdout.flush()
             result = subprocess.run(f'gunzip "{FILE_7z_util_uninstalled}"', shell=True, stderr=subprocess.STDOUT)

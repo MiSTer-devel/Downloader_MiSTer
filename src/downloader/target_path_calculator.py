@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import ItemsView, Dict, Any, List, Optional, Tuple, Union
+from typing import ItemsView, Any, Optional, Union
 import os
 import threading
 from itertools import repeat
@@ -44,19 +44,19 @@ class TargetPathsCalculatorFactory:
 
 
 class TargetPathsCalculator:
-    def __init__(self, file_system: FileSystem, config: Config, drives: List[str], old_pext_paths: set[str], lock: threading.Lock) -> None:
+    def __init__(self, file_system: FileSystem, config: Config, drives: list[str], old_pext_paths: set[str], lock: threading.Lock) -> None:
         self._file_system = file_system
         self._config = config
         self._drives = drives
         self._old_pext_paths = old_pext_paths
         self._lock = lock
-        self._priority_top_folders: Dict[str, StoragePriorityRegistryEntry] = dict()
+        self._priority_top_folders: dict[str, StoragePriorityRegistryEntry] = dict()
 
-    def deduce_target_path(self, path: str, description: Dict[str, Any], path_type: PathType) -> Tuple[PathPackage, Optional['StoragePriorityError']]:
+    def deduce_target_path(self, path: str, description: dict[str, Any], path_type: PathType) -> tuple[PathPackage, Optional['StoragePriorityError']]:
         result, errors = self.create_path_packages([(path, description)], path_type)
         return result[0], errors[0] if len(errors) > 0 else None
 
-    def create_path_packages(self, packages: Union[ItemsView[str, dict[str, Any]], list[Tuple[str, dict[str, Any]]]], ty: PathType, /) -> Tuple[list[PathPackage], list['StoragePriorityError']]:
+    def create_path_packages(self, packages: Union[ItemsView[str, dict[str, Any]], list[tuple[str, dict[str, Any]]]], ty: PathType, /) -> tuple[list[PathPackage], list['StoragePriorityError']]:
         errors: list[StoragePriorityError] = []
 
         new = object.__new__
@@ -118,7 +118,7 @@ class TargetPathsCalculator:
 
         return result_pkgs, errors
 
-    def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> Tuple[Tuple[str, PextPathProps], Optional['StoragePriorityError']]:
+    def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> tuple[tuple[str, PextPathProps], Optional['StoragePriorityError']]:
         path_obj = Path(path)
         parts_len = len(path_obj.parts)
         if path_type == PATH_TYPE_FOLDER and parts_len <= 1:
@@ -134,7 +134,7 @@ class TargetPathsCalculator:
         else:
             return self._deduce_external_target_path_from_priority(source_path=path, path_obj=path_obj), None
 
-    def _deduce_external_target_path_from_priority(self, source_path: str, path_obj: Path) -> Tuple[str, PextPathProps]:
+    def _deduce_external_target_path_from_priority(self, source_path: str, path_obj: Path) -> tuple[str, PextPathProps]:
         first_folder, second_folder, *_ = path_obj.parts
         first_two_folders = '%s/%s' % (first_folder, second_folder)
 
@@ -158,7 +158,7 @@ class TargetPathsCalculator:
             len(path_obj.parts) == 2,  # is_subfolder
         )
 
-    def _search_drive_for_directory(self, first_folder: str, second_folder: str) -> Tuple[str, PextKind, Tuple[str, ...]]:
+    def _search_drive_for_directory(self, first_folder: str, second_folder: str) -> tuple[str, PextKind, tuple[str, ...]]:
         base_path, priority = self._config['base_path'], self._config['storage_priority']
 
         if priority == STORAGE_PRIORITY_OFF:
@@ -187,7 +187,7 @@ class TargetPathsCalculator:
         else:
             raise StoragePriorityError('%s "%s" not valid!' % (K_STORAGE_PRIORITY, priority))
 
-    def _first_drive_with_existing_directory_prefer_sd(self, directory: str) -> Tuple[Optional[str], Tuple[str, ...]]:
+    def _first_drive_with_existing_directory_prefer_sd(self, directory: str) -> tuple[Optional[str], tuple[str, ...]]:
         result: Optional[str] = None
         others: Optional[list[str]] = None
         for drive in self._drives:
@@ -202,7 +202,7 @@ class TargetPathsCalculator:
 
         return result, tuple(others) if others is not None else ()
 
-    def _first_external_alternative(self) -> Tuple[Optional[str], Tuple[str, ...]]:
+    def _first_external_alternative(self) -> tuple[Optional[str], tuple[str, ...]]:
         result = None
         others = None
 

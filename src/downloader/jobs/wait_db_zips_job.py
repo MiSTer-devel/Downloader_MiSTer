@@ -17,7 +17,6 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from dataclasses import field, dataclass
-from typing import List
 
 from downloader.config import Config, ConfigDatabaseSection
 from downloader.db_entity import DbEntity
@@ -33,6 +32,6 @@ class WaitDbZipsJob(Job):
     store: ReadOnlyStoreAdapter
     ini_description: ConfigDatabaseSection
     config: Config
-    zip_job_tags: List[str]
+    zip_job_tags: list[str]
 
     def retry_job(self): return None

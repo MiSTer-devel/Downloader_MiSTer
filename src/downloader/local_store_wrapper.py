@@ -22,7 +22,7 @@ from downloader.db_entity import ZipIndexEntity
 
 from downloader.error import DownloaderError
 from downloader.other import empty_store_without_base_path
-from typing import Any, Dict, Optional, Set, Tuple, List, TypedDict, cast
+from typing import Any, Optional, TypedDict, cast
 from types import MappingProxyType
 from collections import defaultdict, ChainMap
 
@@ -32,8 +32,8 @@ NO_HASH_IN_STORE_CODE = 'file_does_not_exist_so_cant_get_hash'
 
 
 class StoreFragmentPaths(TypedDict):
-    files: Dict[str, Any]
-    folders: Dict[str, Any]
+    files: dict[str, Any]
+    folders: dict[str, Any]
 
 class StoreFragmentZipSummary(StoreFragmentPaths, total=False):
     hash: str
@@ -43,7 +43,7 @@ def new_store_fragment_paths() -> StoreFragmentPaths: return {"files": dict(), "
 
 class StoreFragmentDrivePaths(TypedDict):
     base_paths: StoreFragmentPaths
-    external_paths: Dict[str, StoreFragmentPaths]
+    external_paths: dict[str, StoreFragmentPaths]
 
 def new_store_fragment_drive_paths(): return {"base_paths": new_store_fragment_paths(), "external_paths": dict()}
 
@@ -90,7 +90,7 @@ class ReadOnlyStoreException(DownloaderError): pass
 
 
 class StoreWrapper:
-    def __init__(self, store: Dict[str, Any], db_state_signature: DbStateSig, local_store_wrapper: Optional[LocalStoreWrapper], readonly: bool = False) -> None:
+    def __init__(self, store: dict[str, Any], db_state_signature: DbStateSig, local_store_wrapper: Optional[LocalStoreWrapper], readonly: bool = False) -> None:
         self._external_additions: StoreFragmentPaths = {'files': defaultdict(list), 'folders': defaultdict(list)}
         if 'external' in store:
             for drive, external in store['external'].items():
@@ -113,7 +113,7 @@ class StoreWrapper:
         self._read_only = ReadOnlyStoreAdapter(self._store, self._db_state_signature)
         self._write_only = None if readonly else WriteOnlyStoreAdapter(self._store, self._db_state_signature, local_store_wrapper, self._external_additions)
 
-    def unwrap_store(self) -> Dict[str, Any]:
+    def unwrap_store(self) -> dict[str, Any]:
         return self._store
 
     def write_only(self) -> 'WriteOnlyStoreAdapter':
@@ -441,7 +441,7 @@ class WriteOnlyStoreAdapter:
 
             self._top_wrapper.mark_force_save()
 
-    def add_zip_summary(self, zip_id: str, fragment: StoreFragmentDrivePaths, description: Dict[str, Any]) -> None:
+    def add_zip_summary(self, zip_id: str, fragment: StoreFragmentDrivePaths, description: dict[str, Any]) -> None:
         if zip_id in self._store['zips']:
             if not are_zip_descriptions_equal(self._store['zips'][zip_id], description):
                 self._store['zips'][zip_id] = description
@@ -471,7 +471,7 @@ class ReadOnlyStoreAdapter:
     def db_state_signature(self) -> DbStateSig:
         return cast(DbStateSig, MappingProxyType(self._db_state_signature))
 
-    def invalid_hashes(self, file_pkgs: List[PathPackage]) -> List[bool]:
+    def invalid_hashes(self, file_pkgs: list[PathPackage]) -> list[bool]:
         '''Returns a list of booleans indicating invalid hashes with the same order as the input.'''
         store_files = self._store['files']
         return [
@@ -547,7 +547,7 @@ class ReadOnlyStoreAdapter:
 
         return StoreWrapper(new_store, empty_db_state_signature(), None, readonly=True).read_only()
 
-    def deselect_all(self, indexes: List[ZipIndexEntity]) -> 'ReadOnlyStoreAdapter':
+    def deselect_all(self, indexes: list[ZipIndexEntity]) -> 'ReadOnlyStoreAdapter':
         # @TODO: Remove this | handling after we change the pext path format in the stores
         norm_files = {fp for index in indexes for fp in index.files}
         norm_folders = {dp for index in indexes for dp in index.folders}
@@ -572,11 +572,11 @@ class ReadOnlyStoreAdapter:
         return StoreWrapper(new_store, empty_db_state_signature(), None, readonly=True).read_only()
 
     @property
-    def zips(self) -> Dict[str, Dict[str, Any]]:
+    def zips(self) -> dict[str, dict[str, Any]]:
         return self._store['zips']
 
     @property
-    def files(self) -> Dict[str, Dict[str, Any]]:
+    def files(self) -> dict[str, dict[str, Any]]:
         return self._store['files']
 
     def all_files(self):
@@ -586,7 +586,7 @@ class ReadOnlyStoreAdapter:
         return ChainMap(self._store['files'], *[external['files'] for external in self._store['external'].values() if 'files' in external])
 
     @property
-    def folders(self) -> Dict[str, Dict[str, Any]]:
+    def folders(self) -> dict[str, dict[str, Any]]:
         return self._store['folders']
 
     def all_folders(self):
@@ -600,7 +600,7 @@ class ReadOnlyStoreAdapter:
         return 'external' in self._store
 
     @property
-    def external_drives(self) -> List[str]:
+    def external_drives(self) -> list[str]:
         return list(self._store['external'])
 
     @property
@@ -610,7 +610,7 @@ class ReadOnlyStoreAdapter:
     def has_base_path(self) -> bool:
         return K_BASE_PATH in self._store
 
-    def list_other_drives_for_file(self, file_path: str, drive: Optional[str]) -> List[Tuple[bool, str]]:
+    def list_other_drives_for_file(self, file_path: str, drive: Optional[str]) -> list[tuple[bool, str]]:
         if drive is None: drive = self.base_path
         if 'external' in self._store:
             result = [
@@ -626,7 +626,7 @@ class ReadOnlyStoreAdapter:
 
         return result
 
-    def list_other_drives_for_folder(self, folder_pkg: PathPackage) -> List[Tuple[bool, str]]:
+    def list_other_drives_for_folder(self, folder_pkg: PathPackage) -> list[tuple[bool, str]]:
         folder_path, drive = folder_pkg.rel_path, folder_pkg.drive
         if 'external' in self._store:
             result = [
@@ -695,11 +695,11 @@ def equal_values(a, b):
     return a == b
 
 
-def zip_description_keys(desc: Dict[str, Any]) -> Set[str]:
+def zip_description_keys(desc: dict[str, Any]) -> set[str]:
     return set(desc.keys()) - {'internal_summary'}
 
 
-def are_zip_descriptions_equal(desc1: Dict[str, Any], desc2: Dict[str, Any]) -> bool:
+def are_zip_descriptions_equal(desc1: dict[str, Any], desc2: dict[str, Any]) -> bool:
     if zip_description_keys(desc1) != zip_description_keys(desc2):
         return False
 

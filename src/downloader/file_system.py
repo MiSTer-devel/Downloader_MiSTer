@@ -27,7 +27,7 @@ import time
 import zipfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Final, List, Optional, Set, Dict, Any, Tuple, Union, IO, BinaryIO
+from typing import Callable, Final, Optional, Any, Union, IO, BinaryIO
 
 from downloader.config import Config
 from downloader.constants import HASH_file_does_not_exist, STORAGE_PATHS_SET
@@ -49,13 +49,13 @@ COPY_BUFSIZE: Final = 256 * 1024
 
 
 class FileSystemFactory:
-    def __init__(self, config: Config, path_dictionary: Dict[str, str], logger: Logger, activity_tracker: ActivityTracker, time_monotonic: Callable[[], float] = time.monotonic) -> None:
+    def __init__(self, config: Config, path_dictionary: dict[str, str], logger: Logger, activity_tracker: ActivityTracker, time_monotonic: Callable[[], float] = time.monotonic) -> None:
         self._config = config
         self._path_dictionary = path_dictionary
         self._logger = logger
         self._activity_tracker = activity_tracker
         self._time_monotonic = time_monotonic
-        self._unique_temp_filenames: Set[Optional[str]] = set()
+        self._unique_temp_filenames: set[Optional[str]] = set()
         self._unique_temp_filenames.add(None)
         self._shared_state = FsSharedState()
         self._lazy_json_init = False
@@ -104,7 +104,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def are_files(self, file_pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
+    def are_files(self, file_pkgs: list[PathPackage]) -> tuple[list[PathPackage], list[PathPackage]]:
         """interface"""
 
     @abstractmethod
@@ -116,7 +116,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def precache_is_file_with_folders(self, folders: List[PathPackage], recheck: bool = False) -> None:
+    def precache_is_file_with_folders(self, folders: list[PathPackage], recheck: bool = False) -> None:
         """interface"""
 
     @abstractmethod
@@ -180,7 +180,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> Tuple[io.BytesIO, str]:
+    def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> tuple[io.BytesIO, str]:
         """interface"""
 
     @abstractmethod
@@ -188,23 +188,23 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def load_dict_from_transfer(self, source: str, transfer: Union[str, io.BytesIO], /) -> Dict[str, Any]:
+    def load_dict_from_transfer(self, source: str, transfer: Union[str, io.BytesIO], /) -> dict[str, Any]:
         """interface"""
 
     @abstractmethod
-    def load_dict_from_file(self, file: str) -> Dict[str, Any]:
+    def load_dict_from_file(self, file: str) -> dict[str, Any]:
         """interface"""
 
     @abstractmethod
-    def save_json_on_zip(self, db: Dict[str, Any], path: str) -> None:
+    def save_json_on_zip(self, db: dict[str, Any], path: str) -> None:
         """interface"""
 
     @abstractmethod
-    def save_json(self, db: Dict[str, Any], path: str) -> None:
+    def save_json(self, db: dict[str, Any], path: str) -> None:
         """interface"""
 
     @abstractmethod
-    def unzip_contents(self, transfer: Union[str, io.BytesIO], target_path: Union[str, Dict[str, str]], test_info: Any, /) -> None:
+    def unzip_contents(self, transfer: Union[str, io.BytesIO], target_path: Union[str, dict[str, str]], test_info: Any, /) -> None:
         """interface"""
 
     @abstractmethod
@@ -219,13 +219,13 @@ class ReadOnlyFileSystem:
     def is_file(self, path):
         return self._fs.is_file(path)
 
-    def are_files(self, file_pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
+    def are_files(self, file_pkgs: list[PathPackage]) -> tuple[list[PathPackage], list[PathPackage]]:
         return self._fs.are_files(file_pkgs)
 
     def is_folder(self, path):
         return self._fs.is_folder(path)
 
-    def precache_is_file_with_folders(self, folders: List[PathPackage], recheck: bool = False):
+    def precache_is_file_with_folders(self, folders: list[PathPackage], recheck: bool = False):
         return self._fs.precache_is_file_with_folders(folders, recheck)
 
     def download_target_path(self, path):
@@ -237,7 +237,7 @@ class ReadOnlyFileSystem:
     def read_file_bytes(self, path: str) -> io.BytesIO:
         return self._fs.read_file_bytes(path)
 
-    def load_dict_from_file(self, file: str) -> Dict[str, Any]:
+    def load_dict_from_file(self, file: str) -> dict[str, Any]:
         return self._fs.load_dict_from_file(file)
 
     def load_dict_from_transfer(self, source: str, transfer):
@@ -266,7 +266,7 @@ class FileWriteError(FsError): pass
 class FsTimeoutError(FsError): pass
 
 class _FileSystem(FileSystem):
-    def __init__(self, base_path: str, path_dictionary: Dict[str, str], logger: Logger, unique_temp_filenames: Set[Optional[str]], shared_state: 'FsSharedState', activity_tracker: ActivityTracker, time_monotonic: Callable[[], float] = time.monotonic) -> None:
+    def __init__(self, base_path: str, path_dictionary: dict[str, str], logger: Logger, unique_temp_filenames: set[Optional[str]], shared_state: 'FsSharedState', activity_tracker: ActivityTracker, time_monotonic: Callable[[], float] = time.monotonic) -> None:
         self._base_path = base_path
         self._path_dictionary = path_dictionary
         self._logger = logger
@@ -311,7 +311,7 @@ class _FileSystem(FileSystem):
 
         return False
 
-    def are_files(self, file_pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
+    def are_files(self, file_pkgs: list[PathPackage]) -> tuple[list[PathPackage], list[PathPackage]]:
         are, not_sure = self._shared_state.contained_file_pkgs(file_pkgs)
         bulk_add = []
         nope = []
@@ -330,7 +330,7 @@ class _FileSystem(FileSystem):
     def is_folder(self, path: str) -> bool:
         return os.path.isdir(self._path(path))
 
-    def precache_is_file_with_folders(self, folders: List[PathPackage], recheck: bool = False) -> None:
+    def precache_is_file_with_folders(self, folders: list[PathPackage], recheck: bool = False) -> None:
         not_checked_folders = folders if recheck else self._shared_state.consult_not_checked_folders(folders)
         files = []
         for folder_pkg in not_checked_folders:
@@ -499,7 +499,7 @@ class _FileSystem(FileSystem):
 
         return file_size, md5_hasher.hexdigest()
 
-    def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> Tuple[io.BytesIO, str]:
+    def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> tuple[io.BytesIO, str]:
         last_data_time = self._time_monotonic()
         buf = io.BytesIO()
         md5_hasher = hashlib.md5() if calc_md5 else None
@@ -530,7 +530,7 @@ class _FileSystem(FileSystem):
         verbose = verbose and not path.startswith('/tmp/')
         return self._unlink(path, verbose)
 
-    def load_dict_from_transfer(self, source: str, transfer: Union[str, io.BytesIO]) -> Dict[str, Any]:
+    def load_dict_from_transfer(self, source: str, transfer: Union[str, io.BytesIO]) -> dict[str, Any]:
         if isinstance(transfer, str):
             try:
                 return self.load_dict_from_file(transfer)
@@ -538,7 +538,7 @@ class _FileSystem(FileSystem):
                 self._unlink(transfer, False)
         else: return self._load_dict_from_data(source, transfer)
 
-    def load_dict_from_file(self, path: str) -> Dict[str, Any]:
+    def load_dict_from_file(self, path: str) -> dict[str, Any]:
         full_path = self._path(path)
         self._debug_log('Loading dict from file', (path, full_path))
 
@@ -551,7 +551,7 @@ class _FileSystem(FileSystem):
         else:
             raise FileReadError('File type "%s" not supported' % suffix)
 
-    def _load_dict_from_data(self, source: str, data: io.BytesIO) -> Dict[str, Any]:
+    def _load_dict_from_data(self, source: str, data: io.BytesIO) -> dict[str, Any]:
         self._logger.debug('Loading dict from data: ', source)
 
         suffix = Path(source).suffix.lower()
@@ -562,7 +562,7 @@ class _FileSystem(FileSystem):
         else:
             raise FileReadError('File type "%s" not supported: %s' % (suffix, source))
 
-    def save_json_on_zip(self, db: Dict[str, Any], path: str) -> None:
+    def save_json_on_zip(self, db: dict[str, Any], path: str) -> None:
         full_path = self._path(path)
         json_name = Path(path).stem
         zip_path = Path(full_path).absolute()
@@ -572,13 +572,13 @@ class _FileSystem(FileSystem):
         with zipfile.ZipFile(zip_path, 'w') as zipf:
             zipf.writestr(json_name, _json_dump_binary(db))
 
-    def save_json(self, db: Dict[str, Any], path: str) -> None:
+    def save_json(self, db: dict[str, Any], path: str) -> None:
         full_path = self._path(path)
         self._debug_log('Saving json', (path, full_path))
         with open(full_path, 'wb') as f:
             _json_dump_to_file(db, f)
 
-    def unzip_contents(self, zip_file: Union[str, io.BytesIO], target_path: Union[str, Dict[str, str]], test_info: Any, /) -> None:
+    def unzip_contents(self, zip_file: Union[str, io.BytesIO], target_path: Union[str, dict[str, str]], test_info: Any, /) -> None:
         if not isinstance(zip_file, str):
             self._logger.debug('Unzipping contents from io.BytesIO.')
         else:
@@ -614,7 +614,7 @@ class _FileSystem(FileSystem):
             if isinstance(zip_file, str):
                 self._unlink(zip_file, verbose=False)
 
-    def _debug_log(self, message: str, path: Tuple[str, str], target: Optional[Tuple[str, str]] = None) -> None:
+    def _debug_log(self, message: str, path: tuple[str, str], target: Optional[tuple[str, str]] = None) -> None:
         if path[0][0] == '/':
             if target is None:
                 self._logger.debug('%s "%s"', message, path[0])
@@ -668,7 +668,7 @@ def absolute_parent_folder(absolute_path: str) -> str:
     return str(Path(absolute_path).parent)
 
 
-def load_json_from_zip(input: Union[str, io.BytesIO]) -> Dict[str, Any]:
+def load_json_from_zip(input: Union[str, io.BytesIO]) -> dict[str, Any]:
     with zipfile.ZipFile(input) as jsonzipf:
         namelist = jsonzipf.namelist()
         if len(namelist) != 1:
@@ -685,7 +685,7 @@ class FsSharedState:
         self._cached_folders: set[str] = set()
         self._cached_folders_lock = threading.Lock()
 
-    def consult_not_checked_folders(self, folders: List[PathPackage]) -> List[PathPackage]:
+    def consult_not_checked_folders(self, folders: list[PathPackage]) -> list[PathPackage]:
         precaching_folders = []
         with self._cached_folders_lock:
             for folder_pkg in folders:
@@ -699,7 +699,7 @@ class FsSharedState:
         with self._files_lock:
             return path in self._files
 
-    def contained_file_pkgs(self, pkgs: List[PathPackage]) -> Tuple[List[PathPackage], List[PathPackage]]:
+    def contained_file_pkgs(self, pkgs: list[PathPackage]) -> tuple[list[PathPackage], list[PathPackage]]:
         if len(pkgs) == 0: return [], []
         contained = []
         foreigns = []
@@ -711,7 +711,7 @@ class FsSharedState:
                     foreigns.append(p)
         return contained, foreigns
 
-    def add_many_files(self, paths: List[str]) -> None:
+    def add_many_files(self, paths: list[str]) -> None:
         if len(paths) == 0: return
         with self._files_lock:
             self._files.update(paths)
@@ -724,22 +724,22 @@ class FsSharedState:
         with self._files_lock:
             self._files.discard(path)
 
-def _json_load_from_bytesio(data: io.BytesIO) -> Dict[str, Any]:
+def _json_load_from_bytesio(data: io.BytesIO) -> dict[str, Any]:
     #if HAS_ORJSON: return orjson.loads(data.getvalue())
     return json.loads(data.getvalue().decode("utf-8"))
 
-def _json_loads_from_iobytes(data: IO[bytes]) -> Dict[str, Any]:
+def _json_loads_from_iobytes(data: IO[bytes]) -> dict[str, Any]:
     #if HAS_ORJSON: return orjson.loads(data.read())
     return json.loads(data.read().decode("utf-8"))
 
-def _json_loads_from_binaryio(data: BinaryIO) -> Dict[str, Any]:
+def _json_loads_from_binaryio(data: BinaryIO) -> dict[str, Any]:
     #if HAS_ORJSON: return orjson.loads(data.read())
     return json.loads(data.read().decode("utf-8"))
 
-def _json_dump_binary(obj: Dict[str, Any]) -> bytes:
+def _json_dump_binary(obj: dict[str, Any]) -> bytes:
     #if HAS_ORJSON: return orjson.dumps(obj)
     return json.dumps(obj).encode()
 
-def _json_dump_to_file(obj: Dict[str, Any], f: BinaryIO) -> int:
+def _json_dump_to_file(obj: dict[str, Any], f: BinaryIO) -> int:
     #if HAS_ORJSON: return f.write(orjson.dumps(obj))
     return f.write(json.dumps(obj).encode())
