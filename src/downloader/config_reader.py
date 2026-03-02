@@ -217,29 +217,26 @@ class ConfigReader:
                 result['ignored_databases'].append({'file': drop_in_path, 'reason': 'empty'})
                 continue
 
-            if len(sections) > 1:
-                raise InvalidConfigParameter("Drop-in file '%s' contains multiple sections. Each drop-in must have exactly one section." % drop_in_path)
+            for section in sections:
+                section_id = section.lower()
 
-            section = sections[0]
-            section_id = section.lower()
+                if section_id == 'mister':
+                    raise InvalidConfigParameter("Drop-in file '%s' contains a [MiSTer] section. Global settings are only allowed in the base downloader.ini." % drop_in_path)
 
-            if section_id == 'mister':
-                raise InvalidConfigParameter("Drop-in file '%s' contains a [MiSTer] section. Global settings are only allowed in the base downloader.ini." % drop_in_path)
+                if section_id in result['databases']:
+                    self._logger.print("WARNING: Drop-in file '%s' defines database '%s' which is already defined in '%s', skipping." % (drop_in_path, section_id, db_sources[section_id]))
+                    result['ignored_databases'].append({'file': drop_in_path, 'db_id': section_id, 'reason': 'duplicate', 'ctx': db_sources[section_id]})
+                    continue
 
-            if section_id in result['databases']:
-                self._logger.print("WARNING: Drop-in file '%s' defines database '%s' which is already defined in '%s', skipping." % (drop_in_path, section_id, db_sources[section_id]))
-                result['ignored_databases'].append({'file': drop_in_path, 'db_id': section_id, 'reason': 'duplicate', 'ctx': db_sources[section_id]})
-                continue
-
-            parser = IniParser(drop_in_config[section])
-            result['databases'][section_id] = self._parse_database_section(default_db, parser, section_id)
-            db_sources[section_id] = drop_in_path
+                parser = IniParser(drop_in_config[section])
+                result['databases'][section_id] = self._parse_database_section(default_db, parser, section_id)
+                db_sources[section_id] = drop_in_path
 
         self._logger.bench('ConfigReader Read drop-in databases end.')
 
     def _discover_drop_in_files(self, config_path: str) -> list[str]:
         config_dir = str(Path(config_path).parent)
-        d_dir = os.path.join(config_dir, 'downloader.d')
+        d_dir = os.path.join(config_dir, 'downloader')
 
         d_files = []
         if os.path.isdir(d_dir):

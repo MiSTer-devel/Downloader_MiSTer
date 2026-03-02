@@ -16,13 +16,11 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import configparser
 import unittest
 
-from downloader.config import InvalidConfigParameter, ConfigDatabaseSection
-from downloader.config_reader import ConfigReader
-from test.fake_logger import NoLogger
-from test.objects import default_env, ini
+from downloader.config import InvalidConfigParameter
+from test.fake_config_reader import ConfigReader
+from test.objects import ini
 
 
 base_id = 'base_db'
@@ -37,51 +35,13 @@ db2_id = 'db2'
 db2 = {'db_url': 'https://2.com'}
 
 
-class FakeConfigReader(ConfigReader):
-    def __init__(self, file_contents: dict):
-        super().__init__(NoLogger(), default_env(), 0)
-        self._file_contents = file_contents
-
-    def _load_ini_config(self, config_path) -> configparser.ConfigParser:
-        ini_config = configparser.ConfigParser(inline_comment_prefixes=(';', '#'))
-        content = self._file_contents.get(config_path, '')
-        ini_config.read_string(content)
-        return ini_config
-
-    def _discover_drop_in_files(self, config_path: str) -> list[str]:
-        base_name = config_path.rsplit('/', 1)[0] if '/' in config_path else ''
-        prefix = (base_name + '/') if base_name else ''
-
-        d_files = []
-        star_files = []
-        for path in self._file_contents:
-            if path == config_path:
-                continue
-            rel = path[len(prefix):] if path.startswith(prefix) else path
-            basename = rel.rsplit('/', 1)[-1]
-            if not basename.endswith('.ini') or basename.startswith('.'):
-                continue
-            if rel.startswith('downloader.d/'):
-                d_files.append(path)
-            elif rel.startswith('downloader_'):
-                star_files.append(path)
-
-        return sorted(d_files) + sorted(star_files)
-
-    def _load_drop_in_ini(self, drop_in_path: str) -> configparser.ConfigParser:
-        ini_config = configparser.ConfigParser(inline_comment_prefixes=(';', '#'))
-        content = self._file_contents.get(drop_in_path, '')
-        ini_config.read_string(content)
-        return ini_config
-
-
 class TestConfigReaderDownloaderIniExtensions(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
 
     def read_config(self, files: dict):
         config_path = next(iter(files))
-        reader = FakeConfigReader(files)
+        reader = ConfigReader(file_contents=files)
         result = reader.read_config(config_path)
         result['databases'] = _make_comparable(result['databases'])
         return result
@@ -99,7 +59,7 @@ class TestConfigReaderDownloaderIniExtensions(unittest.TestCase):
     def test_read_config___with_one_drop_in___returns_base_plus_drop_in_database(self):
         sut = self.read_config(fs({
             'downloader.ini': ini({base_id: base_db}),
-            'downloader.d/extra.ini': ini({extra_id: extra_db}),
+            'downloader/extra.ini': ini({extra_id: extra_db}),
         }))
 
         self.assertEqual(databases({base_id: base_db, extra_id: extra_db}), sut['databases'])
@@ -108,8 +68,8 @@ class TestConfigReaderDownloaderIniExtensions(unittest.TestCase):
     def test_read_config___with_multiple_drop_ins___returns_all_databases(self):
         sut = self.read_config(fs({
             'downloader.ini': ini({base_id: base_db}),
-            'downloader.d/extra.ini': ini({extra_id: extra_db}),
-            'downloader.d/arcade.ini': ini({arcade_id: arcade_db}),
+            'downloader/extra.ini': ini({extra_id: extra_db}),
+            'downloader/arcade.ini': ini({arcade_id: arcade_db}),
         }))
 
         self.assertEqual(databases({base_id: base_db, extra_id: extra_db, arcade_id: arcade_db}), sut['databases'])
@@ -119,7 +79,7 @@ class TestConfigReaderDownloaderIniExtensions(unittest.TestCase):
         sut = self.read_config(fs({
             'downloader.ini': ini({base_id: base_db}),
             'downloader_star.ini': ini({db2_id: db2}),
-            'downloader.d/extra.ini': ini({db1_id: db1}),
+            'downloader/extra.ini': ini({db1_id: db1}),
         }))
 
         self.assertEqual(list(sut['databases'].keys()), [base_id, db1_id, db2_id])
@@ -139,7 +99,7 @@ class TestConfigReaderDownloaderIniExtensions(unittest.TestCase):
             with self.subTest(f'{filename} ({reason})'):
                 sut = self.read_config(fs({
                     'downloader.ini': ini({base_id: base_db}),
-                    f'downloader.d/{filename}': ini({extra_id: extra_db}),
+                    f'downloader/{filename}': ini({extra_id: extra_db}),
                 }))
 
                 self.assertEqual(databases({base_id: base_db}), sut['databases'])
@@ -147,63 +107,108 @@ class TestConfigReaderDownloaderIniExtensions(unittest.TestCase):
 
     # --- Drop-in Validation ---
 
-    def test_read_config___with_drop_in_containing_multiple_sections___raises_error(self):
-        self.assertRaises(InvalidConfigParameter, lambda: self.read_config(fs({
+    def test_read_config___with_drop_in_containing_multiple_sections___returns_all_databases(self):
+        sut = self.read_config(fs({
             'downloader.ini': ini({base_id: base_db}),
-            'downloader.d/extra.ini': ini({
+            'downloader/extra.ini': ini({
                 db1_id: db1,
                 db2_id: db2,
             }),
-        })))
+        }))
+
+        self.assertEqual(databases({base_id: base_db, db1_id: db1, db2_id: db2}), sut['databases'])
+        self.assertEqual([], sut['ignored_databases'])
 
     def test_read_config___with_drop_in_containing_mister_section___raises_error(self):
-        self.assertRaises(InvalidConfigParameter, lambda: self.read_config(fs({
-            'downloader.ini': ini({base_id: base_db}),
-            'downloader.d/bad.ini': ini({'mister': {'verbose': 'true'}}),
-        })))
+        cases = [
+            ('single section', ini({'mister': {'verbose': 'true'}})),
+            ('multi section', ini({'mister': {'verbose': 'true'}, db1_id: db1})),
+        ]
+        for label, drop_in in cases:
+            with self.subTest(label):
+                self.assertRaises(InvalidConfigParameter, lambda: self.read_config(fs({
+                    'downloader.ini': ini({base_id: base_db}),
+                    'downloader/bad.ini': drop_in,
+                })))
 
     def test_read_config___with_drop_in_missing_db_url___raises_invalid_config_parameter(self):
-        self.assertRaises(InvalidConfigParameter, lambda: self.read_config(fs({
+        cases = [
+            ('single section', ini({'some_db': {'filter': 'arcade'}})),
+            ('multi section', ini({db1_id: db1, 'some_db': {'filter': 'arcade'}})),
+        ]
+        for label, drop_in in cases:
+            with self.subTest(label):
+                self.assertRaises(InvalidConfigParameter, lambda: self.read_config(fs({
+                    'downloader.ini': ini({base_id: base_db}),
+                    'downloader/bad.ini': drop_in,
+                })))
+
+    def test_read_config___with_star_drop_in___returns_base_plus_drop_in_database(self):
+        sut = self.read_config(fs({
             'downloader.ini': ini({base_id: base_db}),
-            'downloader.d/bad.ini': ini({'some_db': {'filter': 'arcade'}}),
-        })))
+            'downloader_extra.ini': ini({extra_id: extra_db}),
+        }))
+
+        self.assertEqual(databases({base_id: base_db, extra_id: extra_db}), sut['databases'])
+        self.assertEqual([], sut['ignored_databases'])
 
     def test_read_config___with_drop_in_containing_zero_sections___adds_to_ignored_databases_with_no_db_id(self):
         sut = self.read_config(fs({
             'downloader.ini': ini({base_id: base_db}),
-            'downloader.d/commented_out.ini': '# [arcade/db]\n# db_url = https://arcade.com\n',
+            'downloader/commented_out.ini': '# [arcade/db]\n# db_url = https://arcade.com\n',
         }))
 
         self.assertEqual(databases({base_id: base_db}), sut['databases'])
-        self.assertEqual([{'file': 'downloader.d/commented_out.ini', 'reason': 'empty'}], sut['ignored_databases'])
+        self.assertEqual([{'file': 'downloader/commented_out.ini', 'reason': 'empty'}], sut['ignored_databases'])
 
     # --- Duplicate Database ID ---
 
     def test_read_config___with_duplicate_id_from_base___keeps_base_and_adds_to_ignored_databases(self):
         sut = self.read_config(fs({
             'downloader.ini': ini({base_id: base_db}),
-            'downloader.d/extra.ini': ini({base_id: extra_db}),
+            'downloader/extra.ini': ini({base_id: extra_db}),
         }))
 
         self.assertEqual(databases({base_id: base_db}), sut['databases'])
-        self.assertEqual([{'file': 'downloader.d/extra.ini', 'db_id': base_id, 'reason': 'duplicate', 'ctx': 'downloader.ini'}], sut['ignored_databases'])
+        self.assertEqual([{'file': 'downloader/extra.ini', 'db_id': base_id, 'reason': 'duplicate', 'ctx': 'downloader.ini'}], sut['ignored_databases'])
 
     def test_read_config___with_duplicate_id_from_earlier_drop_in___keeps_first_and_adds_to_ignored_databases(self):
         sut = self.read_config(fs({
             'downloader.ini': ini({base_id: base_db}),
-            'downloader.d/a_extra.ini': ini({extra_id: extra_db}),
-            'downloader.d/b_extra.ini': ini({extra_id: db1}),
+            'downloader/a_extra.ini': ini({extra_id: extra_db}),
+            'downloader/b_extra.ini': ini({extra_id: db1}),
         }))
 
         self.assertEqual(databases({base_id: base_db, extra_id: extra_db}), sut['databases'])
-        self.assertEqual([{'file': 'downloader.d/b_extra.ini', 'db_id': extra_id, 'reason': 'duplicate', 'ctx': 'downloader.d/a_extra.ini'}], sut['ignored_databases'])
+        self.assertEqual([{'file': 'downloader/b_extra.ini', 'db_id': extra_id, 'reason': 'duplicate', 'ctx': 'downloader/a_extra.ini'}], sut['ignored_databases'])
+
+    def test_read_config___with_multi_section_drop_in_where_one_duplicates_base___keeps_new_and_ignores_duplicate(self):
+        sut = self.read_config(fs({
+            'downloader.ini': ini({base_id: base_db}),
+            'downloader/mixed.ini': ini({base_id: extra_db, db1_id: db1}),
+        }))
+
+        self.assertEqual(databases({base_id: base_db, db1_id: db1}), sut['databases'])
+        self.assertEqual([{'file': 'downloader/mixed.ini', 'db_id': base_id, 'reason': 'duplicate', 'ctx': 'downloader.ini'}], sut['ignored_databases'])
+
+    def test_read_config___with_multi_section_drop_in_where_all_duplicate_base___ignores_all(self):
+        sut = self.read_config(fs({
+            'downloader.ini': ini({base_id: base_db, db1_id: db1}),
+            'downloader/mixed.ini': ini({base_id: extra_db, db1_id: db2}),
+        }))
+
+        self.assertEqual(databases({base_id: base_db, db1_id: db1}), sut['databases'])
+        self.assertEqual([
+            {'file': 'downloader/mixed.ini', 'db_id': base_id, 'reason': 'duplicate', 'ctx': 'downloader.ini'},
+            {'file': 'downloader/mixed.ini', 'db_id': db1_id, 'reason': 'duplicate', 'ctx': 'downloader.ini'},
+        ], sut['ignored_databases'])
 
     # --- Drop-in Database Parsing ---
 
     def test_read_config___with_drop_in_having_db_url_and_filter___returns_database_with_options(self):
         sut = self.read_config(fs({
             'downloader.ini': ini({base_id: base_db}),
-            'downloader.d/arcade.ini': ini({arcade_id: arcade_db}),
+            'downloader/arcade.ini': ini({arcade_id: arcade_db}),
         }))
 
         self.assertEqual(databases({base_id: base_db, arcade_id: arcade_db}), sut['databases'])
@@ -213,7 +218,7 @@ class TestConfigReaderDownloaderIniExtensions(unittest.TestCase):
         slash_db = db('https://arcade.com')
         sut = self.read_config(fs({
             'downloader.ini': ini({base_id: base_db}),
-            'downloader.d/arcade.ini': ini({slash_id: slash_db}),
+            'downloader/arcade.ini': ini({slash_id: slash_db}),
         }))
 
         self.assertEqual(databases({base_id: base_db, slash_id: slash_db}), sut['databases'])
