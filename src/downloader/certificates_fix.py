@@ -44,6 +44,11 @@ class CertificatesFix:
 
     def _fix_certificates_if_needed_impl(self) -> bool:
         curl_ssl = self._config['curl_ssl'].strip().lower()
+        if curl_ssl == '':
+            ssl_cert_file = self._config['ssl_cert_file']
+            if ssl_cert_file != '':
+                return self._check_ssl_cert_file(ssl_cert_file)
+
         if curl_ssl != DEFAULT_CURL_SSL_OPTIONS.strip().lower():
             return True
 
@@ -57,6 +62,14 @@ class CertificatesFix:
 
         self._logger.print('WARNING: cacert file at "%s" seems to be missing!' % cacert_path)
         self._get_new_cacert(cacert_path)
+        return True
+
+    def _check_ssl_cert_file(self, ssl_cert_file: str) -> bool:
+        if self._file_system.is_file(ssl_cert_file):
+            return self._check_cacert(ssl_cert_file)
+
+        self._logger.print('WARNING: SSL_CERT_FILE at "%s" seems to be missing!' % ssl_cert_file)
+        self._get_new_cacert(ssl_cert_file)
         return True
 
     def _check_cacert(self, cacert_path) -> bool:

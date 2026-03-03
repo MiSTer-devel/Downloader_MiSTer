@@ -48,6 +48,7 @@ class Environment(TypedDict):
     HTTP_PROXY: str
     HTTPS_PROXY: str
     ROTATE_LOGS: str
+    SSL_CERT_FILE: str
 
 
 @unique
@@ -129,6 +130,7 @@ class ConfigRequired(ConfigMisterSection):
     commit: str
     fail_on_file_error: bool
     curl_ssl: str
+    ssl_cert_file: str
     http_logging: bool
     http_config: Optional[HttpConfig]
     rotate_logs: bool
@@ -146,6 +148,7 @@ def config_with_base_path(config: Config, base_path: str) -> Config:
 def default_config() -> Config:
     return {
         'curl_ssl': '',
+        'ssl_cert_file': '',
         'http_logging': False,
         'databases': {},
         'ignored_databases': [],

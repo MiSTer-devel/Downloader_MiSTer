@@ -25,8 +25,8 @@ from test.fake_certificates_fix import CertificatesFix
 
 class TestCertificatesFix(unittest.TestCase):
 
-    def test_fix_certificates_if_needed___when_is_not_needed_because_no_curl_ssl_options___it_doesnt_download_anything(self):
-        sut = CertificatesFix(config={K_CURL_SSL: '', K_BASE_PATH: MEDIA_FAT})
+    def test_fix_certificates_if_needed___when_is_not_needed_because_no_curl_ssl_options_and_no_ssl_cert_file___it_doesnt_download_anything(self):
+        sut = CertificatesFix(config={K_CURL_SSL: '', 'ssl_cert_file': '', K_BASE_PATH: MEDIA_FAT})
         sut.fix_certificates_if_needed()
         self.assertFalse(sut.download_ran)
 
@@ -62,4 +62,45 @@ class TestCertificatesFix(unittest.TestCase):
         sut.fix_certificates_if_needed()
         self.assertTrue(sut.download_ran)
         self.assertTrue(sut.test_query_ran)
+        self.assertEqual(fs_data(), sut.file_system.data)
+
+    def test_fix_certificates_if_needed___when_no_curl_ssl_and_ssl_cert_file_exists_and_is_valid___it_doesnt_download_anything(self):
+        ssl_cert_path = '/media/fat/Scripts/.config/downloader/cacert.pem'
+        sut = CertificatesFix(
+            config={K_CURL_SSL: '', 'ssl_cert_file': ssl_cert_path, K_BASE_PATH: MEDIA_FAT},
+            file_system_factory=FileSystemFactory.from_state(files={ssl_cert_path: {}})
+        )
+        sut.fix_certificates_if_needed()
+        self.assertFalse(sut.download_ran)
+        self.assertTrue(sut.test_query_ran)
+
+    def test_fix_certificates_if_needed___when_no_curl_ssl_and_ssl_cert_file_is_missing___it_downloads_new_cacert(self):
+        ssl_cert_path = '/media/fat/Scripts/.config/downloader/cacert.pem'
+        sut = CertificatesFix(
+            config={K_CURL_SSL: '', 'ssl_cert_file': ssl_cert_path, K_BASE_PATH: MEDIA_FAT},
+        )
+        sut.fix_certificates_if_needed()
+        self.assertTrue(sut.download_ran)
+        self.assertEqual(fs_data(files={ssl_cert_path: {'hash': ssl_cert_path, 'size': 1}}), sut.file_system.data)
+
+    def test_fix_certificates_if_needed___when_no_curl_ssl_and_ssl_cert_file_exists_but_test_fails___it_downloads_new_cacert(self):
+        ssl_cert_path = '/media/fat/Scripts/.config/downloader/cacert.pem'
+        sut = CertificatesFix(
+            config={K_CURL_SSL: '', 'ssl_cert_file': ssl_cert_path, K_BASE_PATH: MEDIA_FAT},
+            test_query_fails=True,
+            file_system_factory=FileSystemFactory.from_state(files={ssl_cert_path: {'hash': 'old'}})
+        )
+        sut.fix_certificates_if_needed()
+        self.assertTrue(sut.download_ran)
+        self.assertTrue(sut.test_query_ran)
+        self.assertEqual(fs_data(files={ssl_cert_path: {'hash': ssl_cert_path, 'size': 1}}), sut.file_system.data)
+
+    def test_fix_certificates_if_needed___when_no_curl_ssl_and_ssl_cert_file_is_missing_and_download_fails___it_tries_but_doesnt_install(self):
+        ssl_cert_path = '/media/fat/Scripts/.config/downloader/cacert.pem'
+        sut = CertificatesFix(
+            config={K_CURL_SSL: '', 'ssl_cert_file': ssl_cert_path, K_BASE_PATH: MEDIA_FAT},
+            download_fails=True,
+        )
+        sut.fix_certificates_if_needed()
+        self.assertTrue(sut.download_ran)
         self.assertEqual(fs_data(), sut.file_system.data)

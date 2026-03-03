@@ -26,7 +26,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     MEDIA_USB1, MEDIA_USB2, KENV_FAIL_ON_FILE_ERROR, KENV_UPDATE_LINUX, KENV_CURL_SSL, KENV_COMMIT, DEFAULT_CURL_SSL_OPTIONS, \
     K_DEFAULT_DB_ID, MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, K_DB_URL, K_SECTION, K_OPTIONS, K_USER_DEFINED_OPTIONS, KENV_FORCED_BASE_PATH, \
     K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
-    K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_old
+    K_ZIP_ACCUMULATED_MB_THRESHOLD, FILE_MiSTer_old, KENV_SSL_CERT_FILE
 from downloader.db_options import DbOptions
 from downloader.other import empty_store_without_base_path
 from downloader.db_entity import DbEntity
@@ -786,6 +786,7 @@ def default_env() -> Environment:
         KENV_LOGFILE: None,
         KENV_LOGLEVEL: '',
         KENV_PC_LAUNCHER: None,
+        KENV_SSL_CERT_FILE: ''
     }
 
 

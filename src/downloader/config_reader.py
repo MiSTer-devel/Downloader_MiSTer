@@ -128,6 +128,7 @@ class ConfigReader:
             result['allow_reboot'] = AllowReboot(int(self._env['ALLOW_REBOOT']))
 
         result['curl_ssl'] = self._valid_max_length('CURL_SSL', self._env['CURL_SSL'], 50)
+        result['ssl_cert_file'] = self._env['SSL_CERT_FILE'].strip()
         if self._env['UPDATE_LINUX'] != DEFAULT_UPDATE_LINUX_ENV:
             result['update_linux'] = self._env['UPDATE_LINUX'] == 'true'
 
