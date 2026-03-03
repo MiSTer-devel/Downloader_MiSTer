@@ -17,7 +17,6 @@
 
 import ipaddress
 import os
-import re
 from dataclasses import dataclass
 from typing import Any, Final, Optional
 from urllib.parse import urlparse
@@ -275,7 +274,7 @@ def _validate_and_extract_parts_from_path(db_id: str, path: str) -> list[str]:
     if db_id != DISTRIBUTION_MISTER_DB_ID and lower_path in no_distribution_mister_invalid_paths:
         raise DbEntityValidationException(f'Invalid file "{path}" for database: {db_id}. Path should only valid for distribution_mister. The database maintainer should fix this.')
 
-    if len(parts) == 1 and lower_path.startswith(FOLDER_downloader) and re.search(f'^{FOLDER_downloader}_.+\.ini$', lower_path):
+    if len(parts) == 1 and lower_path.startswith(FOLDER_downloader + '_') and lower_path.endswith('.ini'):
         raise DbEntityValidationException(f'Invalid file "{path}" for database: {db_id}. Path should not be illegal. The database maintainer should fix this.')
 
     if '..' in parts or len(parts) == 0 or parts[0] in invalid_root_folders:
