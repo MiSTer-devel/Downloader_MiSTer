@@ -17,6 +17,7 @@
 
 import ipaddress
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, Final, Optional
 from urllib.parse import urlparse
@@ -25,7 +26,7 @@ from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FI
     FILE_downloader_launcher_script, FILE_MiSTer_alt_3_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, \
     FILE_MiSTer_new, FOLDER_linux, FOLDER_saves, FOLDER_savestates, FOLDER_screenshots, FILE_PDFViewer, FILE_lesskey, \
     FILE_glow, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, DISTRIBUTION_MISTER_DB_ID, FILE_gamecontrollerdb_user, \
-    FILE_yc_txt, DATABASE_LATEST_SUPPORTED_VERSION, FILE_downloader_ini
+    FILE_yc_txt, DATABASE_LATEST_SUPPORTED_VERSION, FILE_downloader_ini, FOLDER_downloader
 from downloader.db_options import DbOptions
 from downloader.error import DownloaderError
 from downloader.path_package import PathPackage
@@ -274,6 +275,9 @@ def _validate_and_extract_parts_from_path(db_id: str, path: str) -> list[str]:
     if db_id != DISTRIBUTION_MISTER_DB_ID and lower_path in no_distribution_mister_invalid_paths:
         raise DbEntityValidationException(f'Invalid file "{path}" for database: {db_id}. Path should only valid for distribution_mister. The database maintainer should fix this.')
 
+    if len(parts) == 1 and lower_path.startswith(FOLDER_downloader) and re.search(f'^{FOLDER_downloader}_.+\.ini$', lower_path):
+        raise DbEntityValidationException(f'Invalid file "{path}" for database: {db_id}. Path should not be illegal. The database maintainer should fix this.')
+
     if '..' in parts or len(parts) == 0 or parts[0] in invalid_root_folders:
         raise DbEntityValidationException(f'Invalid file "{path}" for database: {db_id}. Path can\'t contain root folders. The database maintainer should fix this.')
 
@@ -281,7 +285,7 @@ def _validate_and_extract_parts_from_path(db_id: str, path: str) -> list[str]:
 
 no_distribution_mister_invalid_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FILE_MiSTer, FILE_menu_rbf, FILE_downloader_launcher_script])
 invalid_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FILE_MiSTer_ini, FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, FILE_MiSTer_new, os.path.basename(FILE_downloader_ini)])
-invalid_root_folders: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_screenshots, FOLDER_savestates])
+invalid_root_folders: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_screenshots, FOLDER_savestates, FOLDER_downloader])
 folders_with_non_overridable_files: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_saves])
 exceptional_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, FILE_gamecontrollerdb_user, FILE_yc_txt])
 distribution_mister_exceptional_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow])

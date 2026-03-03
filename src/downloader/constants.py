@@ -66,6 +66,8 @@ FILE_gamecontrollerdb: Final[str] = 'linux/gamecontrollerdb/gamecontrollerdb.txt
 FILE_gamecontrollerdb_user: Final[str] = 'linux/gamecontrollerdb/gamecontrollerdb_user.txt'
 FILE_yc_txt: Final[str] = 'yc.txt'
 
+FOLDER_downloader: Final[str] = 'downloader'
+
 # Downloader files
 FILE_downloader_storage_zip: Final[str] = 'Scripts/.config/downloader/downloader.json.zip'
 FILE_downloader_storage_json: Final[str] = 'Scripts/.config/downloader/downloader.json'
