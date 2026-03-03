@@ -27,7 +27,7 @@ from typing import Optional, TypeVar, Union, SupportsInt
 
 from downloader.config import Environment, Config, default_config, InvalidConfigParameter, AllowReboot, \
     ConfigDatabaseSection, ConfigMisterSection, AllowDelete, FileChecking
-from downloader.constants import FILE_downloader_ini, DEFAULT_UPDATE_LINUX_ENV, K_DEFAULT_DB_ID, K_BASE_PATH, \
+from downloader.constants import FILE_downloader_ini, FOLDER_downloader, DEFAULT_UPDATE_LINUX_ENV, K_DEFAULT_DB_ID, K_BASE_PATH, \
     K_DB_URL, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER, K_BASE_SYSTEM_PATH, \
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, \
@@ -236,7 +236,7 @@ class ConfigReader:
 
     def _discover_drop_in_files(self, config_path: str) -> list[str]:
         config_dir = str(Path(config_path).parent)
-        d_dir = os.path.join(config_dir, 'downloader')
+        d_dir = os.path.join(config_dir, FOLDER_downloader)
 
         d_files = []
         if os.path.isdir(d_dir):

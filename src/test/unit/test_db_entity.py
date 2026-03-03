@@ -138,6 +138,21 @@ class TestDbEntity(unittest.TestCase):
     def test_construct_db_entity___with_downloader_ini___raises_error(self):
         self.assertRaises(DbEntityValidationException, lambda: check_file_pkg(pkg(os.path.basename(FILE_downloader_ini), file_a_descr()), db_test, None))
 
+    def test_construct_db_entity___with_file_in_downloader_folder___raises_error(self):
+        self.assertRaises(DbEntityValidationException, lambda: check_file_pkg(pkg('downloader/extra.ini', file_a_descr()), db_test, None))
+
+    def test_construct_db_entity___with_downloader_star_ini___raises_error(self):
+        cases = [
+            'downloader_extra.ini',
+            'downloader_plus.ini',
+        ]
+        for path in cases:
+            with self.subTest(path):
+                self.assertRaises(DbEntityValidationException, lambda: check_file_pkg(pkg(path, file_a_descr()), db_test, None))
+
+    def test_construct_db_entity___with_downloader_folder___raises_error(self):
+        self.assertRaises(DbEntityValidationException, lambda: check_folder_paths(['downloader'], db_test))
+
     def test_construct_db_entity___valid_folders___does_not_raise_an_error(self):
         invalids = (FOLDER_linux, FOLDER_gamecontrollerdb)
         for wrong_path in invalids:
