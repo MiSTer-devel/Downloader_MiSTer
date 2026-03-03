@@ -16,6 +16,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import ipaddress
+import os
 from dataclasses import dataclass
 from typing import Any, Final, Optional
 from urllib.parse import urlparse
@@ -24,7 +25,7 @@ from downloader.constants import FILE_MiSTer, FILE_menu_rbf, FILE_MiSTer_ini, FI
     FILE_downloader_launcher_script, FILE_MiSTer_alt_3_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, \
     FILE_MiSTer_new, FOLDER_linux, FOLDER_saves, FOLDER_savestates, FOLDER_screenshots, FILE_PDFViewer, FILE_lesskey, \
     FILE_glow, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, DISTRIBUTION_MISTER_DB_ID, FILE_gamecontrollerdb_user, \
-    FILE_yc_txt, DATABASE_LATEST_SUPPORTED_VERSION
+    FILE_yc_txt, DATABASE_LATEST_SUPPORTED_VERSION, FILE_downloader_ini
 from downloader.db_options import DbOptions
 from downloader.error import DownloaderError
 from downloader.path_package import PathPackage
@@ -279,7 +280,7 @@ def _validate_and_extract_parts_from_path(db_id: str, path: str) -> list[str]:
     return parts
 
 no_distribution_mister_invalid_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FILE_MiSTer, FILE_menu_rbf, FILE_downloader_launcher_script])
-invalid_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FILE_MiSTer_ini, FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, FILE_MiSTer_new])
+invalid_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FILE_MiSTer_ini, FILE_MiSTer_alt_ini, FILE_MiSTer_alt_1_ini, FILE_MiSTer_alt_2_ini, FILE_MiSTer_alt_3_ini, FILE_MiSTer_new, os.path.basename(FILE_downloader_ini)])
 invalid_root_folders: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_screenshots, FOLDER_savestates])
 folders_with_non_overridable_files: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_saves])
 exceptional_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, FILE_gamecontrollerdb_user, FILE_yc_txt])

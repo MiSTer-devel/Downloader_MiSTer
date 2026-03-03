@@ -16,11 +16,12 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+import os
 from typing import Any, Optional
 import unittest
 
 from downloader.config import default_config
-from downloader.constants import FILE_MiSTer, FOLDER_gamecontrollerdb, FOLDER_linux, FILE_gamecontrollerdb, \
+from downloader.constants import FILE_MiSTer, FILE_downloader_ini, FOLDER_gamecontrollerdb, FOLDER_linux, FILE_gamecontrollerdb, \
     FILE_gamecontrollerdb_user, DISTRIBUTION_MISTER_DB_ID
 from downloader.db_entity import DbEntityValidationException, check_file_pkg, check_folder_paths, invalid_paths, \
     no_distribution_mister_invalid_paths, invalid_root_folders, distribution_mister_exceptional_paths, \
@@ -133,6 +134,9 @@ class TestDbEntity(unittest.TestCase):
 
     def test_construct_db_entity___with_mister_file___raises_invalid_downloader_path_exception(self):
         self.assertRaises(DbEntityValidationException, lambda: check_file_pkg(pkg(FILE_MiSTer, file_mister_descr()), db_test, None))
+
+    def test_construct_db_entity___with_downloader_ini___raises_error(self):
+        self.assertRaises(DbEntityValidationException, lambda: check_file_pkg(pkg(os.path.basename(FILE_downloader_ini), file_a_descr()), db_test, None))
 
     def test_construct_db_entity___valid_folders___does_not_raise_an_error(self):
         invalids = (FOLDER_linux, FOLDER_gamecontrollerdb)
