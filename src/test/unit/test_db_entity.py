@@ -145,6 +145,7 @@ class TestDbEntity(unittest.TestCase):
         cases = [
             'downloader_extra.ini',
             'downloader_plus.ini',
+            'downloader_.ini',
         ]
         for path in cases:
             with self.subTest(path):
