@@ -60,8 +60,6 @@ class DbEntity:
         if not isinstance(self.tag_dictionary, dict): raise DbEntityValidationException(f'Database "{section}" needs a valid "tag_dictionary" field. The database maintainer should fix this.')
         self.linux: Optional[dict[str, Any]] = db_props.get('linux', None)
         if self.linux is not None and not isinstance(self.linux, dict): raise DbEntityValidationException(f'Database "{section}" needs a valid "linux" field. The database maintainer should fix this.')
-        self.header: list[str] = db_props.get('header', [])
-        if not isinstance(self.header, list): raise DbEntityValidationException(f'Database "{section}" needs a valid "header" field. The database maintainer should fix this.')
         self.default_options: DbOptions = DbOptions(db_props.get('default_options', None) or {})
         _fix_folders(self.folders)
 
@@ -70,8 +68,6 @@ class DbEntity:
         result['default_options'] = result['default_options'].unwrap_props()
         if result['linux'] is None:
             result.pop('linux')
-        if result['header'] is None:
-            result.pop('header')
         return result
 
     def needs_migration(self) -> bool:

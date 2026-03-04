@@ -24,6 +24,7 @@ from typing import Optional, Type, TypeVar, Generic, Protocol, Union
 
 from downloader.db_entity import DbEntity
 from downloader.interruptions import Interruptions
+from downloader.other import screen_columns
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.path_package import PathPackage
@@ -286,6 +287,7 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._needs_newline: bool = False
         self._need_clear_header: bool = False
         self._symbols: list[str] = []
+        self._columns: int = screen_columns()
 
     def _deactivate(self) -> None:
         self._deactivated = True
@@ -350,33 +352,11 @@ class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
         self._print_symbols()
         first_line = '\n' if self._needs_newline else ''
         self._needs_newline = False
-        if len(db.header):
-            count_float = 0
-            for line in db.header:
-                if isinstance(line, float):
-                    count_float += 1
-            if count_float > 100:
-                self._deactivate()
-
-            text = first_line
-
-            for line in db.header:
-                if isinstance(line, float):
-                    if len(text) > 0:
-                        self._logger.print(text)
-                        text = ''
-                    self._waiter.sleep(line)
-                else:
-                    text += line
-
-            if len(text) > 0: self._logger.print(text)
-
-        else:
-            self._logger.print(
-                first_line +
-                '################################################################################\n' +
-                f'SECTION: {db.db_id}\n'
-            )
+        self._logger.print(
+            first_line +
+            '#' * self._columns + '\n' +
+            f'SECTION: {db.db_id}\n'
+        )
 
         self._need_clear_header = True
         self._check_time = time.monotonic() + 2.0

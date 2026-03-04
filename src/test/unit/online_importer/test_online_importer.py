@@ -369,22 +369,6 @@ class TestOnlineImporter(OnlineImporterTestBase):
         self.assertEqual(fs_data(folders=['a', 'b', 'x']), sut.fs_data)
         self.assertReportsNothing(sut, save=True)
 
-    def test_db_header___when_existing___send_the_lines_to_logger_and_waiter_accordingly(self):
-        expected_log = 'this_is_the_logger_expected_log'
-        expected_wait = 9999999.9
-
-        waiter = NoWaiter()
-        logger = SpyLoggerDecorator(NoLogger())
-
-        db = db_test_being_empty_descr()
-        db.header.append(expected_log)
-        db.header.append(expected_wait)
-
-        OnlineImporter(waiter=waiter, logger=logger).add_db(db, empty_test_store()).download()
-
-        self.assertIn(expected_wait, waiter.registeredWaits)
-        self.assertIn(expected_log, [line for call in logger.printCalls for line in call[0].split('\n') if line])
-
     def test_download_system_abc_db___after_already_been_installed___does_nothing(self):
         def store_file_abc(): return store_descr(files={file_abc: file_system_abc_descr()}, folders={folder_a: path_system(), folder_ab: path_system()})
         def fs_files_abc_on_usb0(): return {media_usb0(file_abc): file_c_descr()}

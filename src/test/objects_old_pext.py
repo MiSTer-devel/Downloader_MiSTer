@@ -368,7 +368,7 @@ def db_description(db_url: str = None, section: str = None, options: DbOptions =
     return description
 
 
-def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, default_options=None, timestamp=None, linux=None, header=None, section=None, tag_dictionary=None):
+def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, default_options=None, timestamp=None, linux=None, section=None, tag_dictionary=None):
     db_props = {
         'db_id': db_id if db_id is not None else db_test,
         'db_files': db_files if db_files is not None else [],
@@ -383,8 +383,6 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
         db_props['tag_dictionary'] = tag_dictionary
     if linux is not None:
         db_props['linux'] = linux
-    if header is not None:
-        db_props['header'] = header
     entity = DbEntity(db_props, section if section is not None else db_id if db_id is not None else db_test)
 
     if not entity.needs_migration():
