@@ -36,7 +36,7 @@ from downloader.local_repository import LocalRepository
 from downloader.logger import FilelogManager, Logger, ConfigLogManager
 from downloader.online_importer import OnlineImporter, InstallationBox, NetworkProblems
 from downloader.os_utils import OsUtils
-from downloader.other import format_files_message, format_folders_message, format_zips_message
+from downloader.other import format_files_message, format_folders_message, format_zips_message, screen_columns
 from downloader.reboot_calculator import RebootCalculator
 from downloader.waiter import Waiter
 
@@ -240,7 +240,7 @@ class FinalReporter:
         run_time = str(datetime.timedelta(seconds=time.monotonic() - self._config['start_time']))[2:-4]
 
         self._logger.print()
-        self._logger.print('===========================')
+        self._logger.print('=' * screen_columns())
         self._logger.print(f'Downloader 2.3 ({self._config["commit"][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
         self._logger.debug('Commit: %s', self._config["commit"])
         self._logger.print(f'Log: {self._local_repository.logfile_path}')

@@ -17,11 +17,19 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+import shutil
 import urllib
 from typing import Optional, Any
 
 from pathlib import Path
 from downloader.constants import FILE_MiSTer
+
+
+def screen_columns() -> int:
+    try:
+        return shutil.get_terminal_size().columns
+    except Exception:
+        return 40
 
 
 def empty_store_without_base_path() -> dict[str, Any]:
