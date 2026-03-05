@@ -296,7 +296,7 @@ class FakeFileSystem(ProductionFileSystem):
     def download_target_path(self, path):
         return self._path(path)
 
-    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /) -> tuple[int, str]:
+    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /, fsync: bool = True) -> tuple[int, str]:
         if in_stream.storing_problems:
             return 0, ''
 

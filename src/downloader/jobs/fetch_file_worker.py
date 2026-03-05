@@ -53,7 +53,7 @@ class FetchFileWorker(DownloaderWorker):
             self._file_system.copy(target_path, backup_path)
 
         file_path = temp_path or target_path
-        file_size, file_hash, error = self._fetcher.fetch_file(source, file_path)
+        file_size, file_hash, error = self._fetcher.fetch_file(source, file_path, fsync=temp_path is not None)
         if error is not None:
             return [], error
 
@@ -81,13 +81,13 @@ class FileFetcher:
         self._file_system = file_system
         self._timeout = timeout
 
-    def fetch_file(self, url: str, download_path: str) -> tuple[int, str, Optional[GetFileError]]:
+    def fetch_file(self, url: str, download_path: str, fsync: bool = True) -> tuple[int, str, Optional[GetFileError]]:
         try:
             with self._http_gateway.open(url) as (final_url, in_stream):
                 if in_stream.status != 200:
                     return 0, '', FileDownloadError(f'Bad http status! {final_url}: {in_stream.status}')
 
-                file_size, file_hash = self._file_system.write_incoming_stream(in_stream, download_path, self._timeout)
+                file_size, file_hash = self._file_system.write_incoming_stream(in_stream, download_path, self._timeout, fsync=fsync)
 
         except socket.gaierror as e: return 0, '', FileDownloadError(f'Socket Address Error! {url}: {str(e)}', e)
         except socket.timeout as e: return 0, '', FileDownloadError(f'Socket Connection Timed Out! {url}: {str(e)}', e)

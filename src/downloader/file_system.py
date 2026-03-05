@@ -176,7 +176,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /) -> tuple[int, str]:
+    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /, fsync: bool = True) -> tuple[int, str]:
         """interface"""
 
     @abstractmethod
@@ -473,7 +473,7 @@ class _FileSystem(FileSystem):
     def download_target_path(self, path: str) -> str:
         return self._path(path)
 
-    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /) -> tuple[int, str]:
+    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /, fsync: bool = True) -> tuple[int, str]:
         last_data_time = self._time_monotonic()
         md5_hasher = hashlib.md5()
         file_size = 0
@@ -497,8 +497,9 @@ class _FileSystem(FileSystem):
                     if elapsed_time > timeout:
                         raise FsTimeoutError(f"Copy operation timed after being stalled for {timeout} seconds.")
 
-            out_file.flush()
-            os.fsync(out_file.fileno())
+            if fsync:
+                out_file.flush()
+                os.fsync(out_file.fileno())
 
         return file_size, md5_hasher.hexdigest()
 
