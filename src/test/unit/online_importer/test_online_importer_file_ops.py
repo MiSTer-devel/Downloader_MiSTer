@@ -138,7 +138,7 @@ class TestOnlineImporterFileOps(unittest.TestCase):
         self.assertEqual(hash_MiSTer_old, self.file_system.hash(on_installed_system(FILE_MiSTer_old)))
         self.assertEqual(fs_records([
             {'scope': 'write_incoming_stream', 'data': on_installed_system(FILE_MiSTer_new)},
-            {'scope': 'move', 'data': (on_installed_system(FILE_MiSTer), on_installed_system(FILE_MiSTer_old))},
+            {'scope': 'copy', 'data': (on_installed_system(FILE_MiSTer), on_installed_system(FILE_MiSTer_old))},
             {'scope': 'move', 'data': (on_installed_system(FILE_MiSTer_new), on_installed_system(FILE_MiSTer))},
         ]), self.file_system.write_records)
 

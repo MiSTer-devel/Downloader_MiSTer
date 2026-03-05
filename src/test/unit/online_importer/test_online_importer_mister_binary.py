@@ -59,7 +59,7 @@ class TestOnlineImporterMiSTerBinary(OnlineImporterTestBase):
         ), sut.fs_data)
         self.assertEqual(fs_records([
             {'scope': 'write_incoming_stream', 'data': media_usb0(FILE_MiSTer_new)},
-            {'scope': 'move', 'data': (media_usb0(FILE_MiSTer), media_usb0(FILE_MiSTer_old))},
+            {'scope': 'copy', 'data': (media_usb0(FILE_MiSTer), media_usb0(FILE_MiSTer_old))},
             {'scope': 'move', 'data': (media_usb0(FILE_MiSTer_new), media_usb0(FILE_MiSTer))},
         ]), sut.fs_records)
         self.assertReports(sut, [FILE_MiSTer], needs_reboot=True)

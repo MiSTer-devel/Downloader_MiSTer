@@ -66,7 +66,7 @@ class FetchFileWorker(DownloaderWorker):
 
             if file_path != target_path:
                 if backup_path is not None and self._file_system.is_file(target_path, use_cache=False):  # @TODO: See if use_cache is needed
-                    self._file_system.move(target_path, backup_path)
+                    self._file_system.copy(target_path, backup_path)
                 self._file_system.move(file_path, target_path)
 
         except Exception as e:
