@@ -497,6 +497,9 @@ class _FileSystem(FileSystem):
                     if elapsed_time > timeout:
                         raise FsTimeoutError(f"Copy operation timed after being stalled for {timeout} seconds.")
 
+            out_file.flush()
+            os.fsync(out_file.fileno())
+
         return file_size, md5_hasher.hexdigest()
 
     def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> tuple[io.BytesIO, str]:
