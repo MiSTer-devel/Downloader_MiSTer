@@ -62,10 +62,11 @@ minimum_system_free_space_mb = 512
 ;   Reducing this value is highly discouraged.
 minimum_external_free_space_mb = 128
 
-; downloader_timeout: Can be tweaked to increase the timeout time in seconds
+; downloader_timeout: Can be tweaked to increase the stalled-connection timeout in seconds
 ;   It is useful to increase this value for users with slow connections.
+;   The minimum effective value is 60 seconds.
 ;   Reducing this value is highly discouraged.
-downloader_timeout = 300
+downloader_timeout = 180
 
 ; downloader_retries: Can be tweaked to increase the retries per failed download
 ;   It is useful to increase this value for users with very unstable connections.
@@ -134,6 +135,10 @@ More information about *Download Filters* [here](docs/download-filters.md).
 *Custom Databases* give users the ability to download [more file collections](docs/custom-databases.md).
 
 NOTE: If you manually add custom databases, you might want to make sure that you also have a [distribution_mister] section. That way you'll still be downloading the content from [MiSTer Distribution](https://github.com/MiSTer-devel/Distribution_MiSTer) together with the content from the custom database/s that you introduced.
+
+### Drop-in Database Files
+
+*Drop-in database files* extend `downloader.ini` by letting you [add databases in separate files](docs/drop-in-databases.md), without editing the main configuration. Just copy a `.ini` file to your SD card and the downloader picks it up automatically.
 
 ### Custom INI file
 

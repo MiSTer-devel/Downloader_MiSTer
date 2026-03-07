@@ -18,7 +18,7 @@
 
 from downloader.constants import K_BASE_PATH
 from test.objects_old_pext import zip_desc, file_nes_palette_a, tweak_descr, folder_games_nes, folder_games, \
-    folder_games_nes_palettes, file_nes_palette_a_descr, zipped_nes_palettes_id
+    folder_games_nes_palettes, file_nes_palette_a_descr, archive_nes_palettes_id
 
 # @TODO: Remove this file when support for the old pext syntax '|' is removed
 
@@ -30,16 +30,16 @@ cheats_folder_id = 'cheats_id'
 cheats_folder_name = 'Cheats'
 
 
-def zipped_nes_palettes_desc(summary_internal_zip_id=None, url: bool = True, tags: bool = False, zipped_files: bool = True, summary: bool = True):
+def archive_nes_palettes_desc(summary_internal_zip_id=None, url: bool = True, tags: bool = False, zipped_files: bool = True, summary: bool = True):
     return zip_desc(
         "Extracting Palettes",
         folder_games_nes + '/',
         summary={
             "files": {file_nes_palette_a: file_nes_palette_a_descr_zipped(url=url, tags=tags)},
             "folders": {
-                folder_games: tweak_descr({"zip_id": zipped_nes_palettes_id, "tags": ["games"]}, tags=tags),
-                folder_games_nes: tweak_descr({"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes"]}, tags=tags),
-                folder_games_nes_palettes: tweak_descr({"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes", "palette"]}, tags=tags),
+                folder_games: tweak_descr({"zip_id": archive_nes_palettes_id, "tags": ["games"]}, tags=tags),
+                folder_games_nes: tweak_descr({"zip_id": archive_nes_palettes_id, "tags": ["games", "nes"]}, tags=tags),
+                folder_games_nes_palettes: tweak_descr({"zip_id": archive_nes_palettes_id, "tags": ["games", "nes", "palette"]}, tags=tags),
             }
         } if summary else None,
         zipped_files={
@@ -151,9 +151,9 @@ def cheats_folder_descr(zip_id=True, tags=True):
 
 def folders_games_nes_palettes(zip_id=True):
     return {
-        folder_games: tweak_descr({'zip_id': zipped_nes_palettes_id}, zip_id=zip_id),
-        folder_games_nes: tweak_descr({'zip_id': zipped_nes_palettes_id}, zip_id=zip_id),
-        folder_games_nes_palettes: tweak_descr({'zip_id': zipped_nes_palettes_id}, zip_id=zip_id),
+        folder_games: tweak_descr({'zip_id': archive_nes_palettes_id}, zip_id=zip_id),
+        folder_games_nes: tweak_descr({'zip_id': archive_nes_palettes_id}, zip_id=zip_id),
+        folder_games_nes_palettes: tweak_descr({'zip_id': archive_nes_palettes_id}, zip_id=zip_id),
     }
 
 
@@ -191,7 +191,7 @@ def summary_json_from_cheats_folder():
     }
 
 
-def zipped_files_from_cheats_folder():
+def archive_files_from_cheats_folder():
     return {
         'files': cheats_folder_files(url=False, zip_id=False, tags=False, zip_path=True),
         'folders': cheats_folder_folders(),

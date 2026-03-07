@@ -17,12 +17,12 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import default_config
-from test.objects import store_descr, zipped_nes_palettes_id, zip_desc, folder_games_nes, empty_test_store
+from test.objects import store_descr, archive_nes_palettes_id, zip_desc, folder_games_nes, empty_test_store
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
-from test.objects_old_pext import db_test_descr as db_test_descr_old_pext, zipped_nes_palettes_id as zipped_nes_palettes_id_old_pext
+from test.objects_old_pext import db_test_descr as db_test_descr_old_pext, archive_nes_palettes_id as archive_nes_palettes_id_old_pext
 from test.zip_objects_old_pext import files_nes_palettes as files_nes_palettes_old_pext, with_installed_nes_palettes_on_fs as with_installed_nes_palettes_on_fs_old_pext, \
-    zipped_nes_palettes_desc as zipped_nes_palettes_desc_old_pext, cheats_folder_zip_desc as cheats_folder_zip_desc_old_pext, \
-    summary_json_from_cheats_folder as summary_json_from_cheats_folder_old_pext, zipped_files_from_cheats_folder as zipped_files_from_cheats_folder_old_pext, \
+    archive_nes_palettes_desc as archive_nes_palettes_desc_old_pext, cheats_folder_zip_desc as cheats_folder_zip_desc_old_pext, \
+    summary_json_from_cheats_folder as summary_json_from_cheats_folder_old_pext, archive_files_from_cheats_folder as archive_files_from_cheats_folder_old_pext, \
     cheats_folder_id as cheats_folder_id_old_pext, cheats_folder_files as cheats_folder_files_old_pext, with_installed_cheats_folder_on_fs as with_installed_cheats_folder_on_fs_old_pext
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
@@ -31,7 +31,7 @@ from test.zip_objects import cheats_folder_id, cheats_folder_zip_desc, cheats_fo
 
 
 # @TODO: Remove this file when support for the old pext syntax '|' is removed
-class TestOnlineImporterWithZipsOldPext(OnlineImporterTestBase):
+class TestOnlineImporterWithArchivesOldPext(OnlineImporterTestBase):
 
     def setUp(self) -> None:
         self.config = default_config()
@@ -47,13 +47,13 @@ class TestOnlineImporterWithZipsOldPext(OnlineImporterTestBase):
         self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
 
         store = self.download(db_test_descr_old_pext(zips={
-            zipped_nes_palettes_id_old_pext: zipped_nes_palettes_desc_old_pext(url=False),
-            cheats_folder_id_old_pext: cheats_folder_zip_desc_old_pext(zipped_files=zipped_files_from_cheats_folder_old_pext(), summary=summary_json_from_cheats_folder_old_pext()),
+            archive_nes_palettes_id_old_pext: archive_nes_palettes_desc_old_pext(url=False),
+            cheats_folder_id_old_pext: cheats_folder_zip_desc_old_pext(zipped_files=archive_files_from_cheats_folder_old_pext(), summary=summary_json_from_cheats_folder_old_pext()),
         }), empty_test_store())
 
         self.assertEqual(store_descr(
             zips={
-                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/', is_pext=True),
+                archive_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/', is_pext=True),
                 cheats_folder_id: cheats_folder_zip_desc()
             },
             files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},
@@ -68,11 +68,11 @@ class TestOnlineImporterWithZipsOldPext(OnlineImporterTestBase):
         self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
 
         store = self.download(db_test_descr_old_pext(zips={
-            zipped_nes_palettes_id_old_pext: zipped_nes_palettes_desc_old_pext(url=False),
-            cheats_folder_id_old_pext: cheats_folder_zip_desc_old_pext(zipped_files=zipped_files_from_cheats_folder_old_pext(), summary=summary_json_from_cheats_folder_old_pext()),
+            archive_nes_palettes_id_old_pext: archive_nes_palettes_desc_old_pext(url=False),
+            cheats_folder_id_old_pext: cheats_folder_zip_desc_old_pext(zipped_files=archive_files_from_cheats_folder_old_pext(), summary=summary_json_from_cheats_folder_old_pext()),
         }), store_descr(
             zips={
-                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/', is_pext=True),
+                archive_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/', is_pext=True),
                 cheats_folder_id: cheats_folder_zip_desc()
             },
             files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},
@@ -81,7 +81,7 @@ class TestOnlineImporterWithZipsOldPext(OnlineImporterTestBase):
 
         self.assertEqual(store_descr(
             zips={
-                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/', is_pext=True),
+                archive_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/', is_pext=True),
                 cheats_folder_id: cheats_folder_zip_desc()
             },
             files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},

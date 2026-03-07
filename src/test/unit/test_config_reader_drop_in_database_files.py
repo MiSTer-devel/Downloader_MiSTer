@@ -19,6 +19,7 @@
 import unittest
 
 from downloader.config import InvalidConfigParameter
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL
 from test.fake_config_reader import ConfigReader
 from test.objects import ini
 
@@ -131,6 +132,26 @@ class TestConfigReaderDownloaderIniExtensions(unittest.TestCase):
                     'downloader/bad.ini': drop_in,
                 })))
 
+    def test_read_config___with_drop_in_containing_distribution_mister_section___raises_error(self):
+        distribution_db = {'db_url': 'https://distribution.com'}
+        cases = [
+            ('single section', ini({DISTRIBUTION_MISTER_DB_ID: distribution_db})),
+            ('multi section', ini({DISTRIBUTION_MISTER_DB_ID: distribution_db, db1_id: db1})),
+        ]
+        for label, drop_in in cases:
+            with self.subTest(label):
+                self.assertRaises(InvalidConfigParameter, lambda: self.read_config(fs({
+                    'downloader.ini': ini({base_id: base_db}),
+                    'downloader/bad.ini': drop_in,
+                })))
+
+    def test_read_config___with_drop_in_containing_distribution_mister_section___raises_error_also_for_star_pattern(self):
+        distribution_db = {'db_url': 'https://distribution.com'}
+        self.assertRaises(InvalidConfigParameter, lambda: self.read_config(fs({
+            'downloader.ini': ini({base_id: base_db}),
+            'downloader_bad.ini': ini({DISTRIBUTION_MISTER_DB_ID: distribution_db}),
+        })))
+
     def test_read_config___with_drop_in_missing_db_url___raises_invalid_config_parameter(self):
         cases = [
             ('single section', ini({'some_db': {'filter': 'arcade'}})),
@@ -202,6 +223,26 @@ class TestConfigReaderDownloaderIniExtensions(unittest.TestCase):
             {'file': 'downloader/mixed.ini', 'db_id': base_id, 'reason': 'duplicate', 'ctx': 'downloader.ini'},
             {'file': 'downloader/mixed.ini', 'db_id': db1_id, 'reason': 'duplicate', 'ctx': 'downloader.ini'},
         ], sut['ignored_databases'])
+
+    # --- Default Distribution Database ---
+
+    def test_read_config___with_no_databases_in_base_ini_but_drop_in_present___adds_default_distribution_db(self):
+        sut = self.read_config(fs({
+            'downloader.ini': '',
+            'downloader/extra.ini': ini({extra_id: extra_db}),
+        }))
+
+        distribution_db = {'db_url': DISTRIBUTION_MISTER_DB_URL}
+        self.assertEqual(databases({DISTRIBUTION_MISTER_DB_ID: distribution_db, extra_id: extra_db}), sut['databases'])
+
+    def test_read_config___with_database_in_base_ini_and_drop_in___does_not_add_default_distribution_db(self):
+        sut = self.read_config(fs({
+            'downloader.ini': ini({base_id: base_db}),
+            'downloader/extra.ini': ini({extra_id: extra_db}),
+        }))
+
+        self.assertNotIn(DISTRIBUTION_MISTER_DB_ID, sut['databases'])
+        self.assertEqual(databases({base_id: base_db, extra_id: extra_db}), sut['databases'])
 
     # --- Drop-in Database Parsing ---
 

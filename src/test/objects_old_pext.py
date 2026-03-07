@@ -594,7 +594,7 @@ def file_nes_palette_a_descr(url: bool = True, zip_id: bool = False, tags: bool 
         "hash": file_nes_palette_a[1:],
         "size": 2905020,
         "url": "https://a.pal",
-        "zip_id": zipped_nes_palettes_id,
+        "zip_id": archive_nes_palettes_id,
         "zip_path": file_nes_palette_a.removeprefix(folder_games_nes + '/'),
         "tags": [
             "games",
@@ -667,7 +667,7 @@ def file_descr(hash_code=None, size=None, url=None, reboot=None, path=None, tags
     return result
 
 
-def zipped_file_a_descr(zip_id, url=False):
+def archive_file_a_descr(zip_id, url=False):
     o = {
         "hash": file_a,
         "size": 2915040,
@@ -798,4 +798,4 @@ def path_with(path, added_part):
     return '%s/%s' % (path, added_part)
 
 
-zipped_nes_palettes_id = 'zipped_nes_palettes_id'
+archive_nes_palettes_id = 'archive_nes_palettes_id'

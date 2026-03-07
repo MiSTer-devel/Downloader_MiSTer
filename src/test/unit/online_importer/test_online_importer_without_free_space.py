@@ -31,7 +31,7 @@ from test.objects import file_a, folder_a, db_test_with_file_a, empty_test_store
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 from test.unit.online_importer.online_importer_with_priority_storage_test_base import fs_files_smb1_on_usb1, fs_files_sonic_on_usb1, store_smb1_on_usb1, store_sonic_on_usb1, \
     store_sonic_on_usb1_but_just_folders, store_smb1_on_usb1_but_just_folders
-from test.zip_objects import cheats_folder_id, cheats_folder_zip_desc, zipped_files_from_cheats_folder, summary_json_from_cheats_folder, store_with_unzipped_cheats, cheats_folder_folders, \
+from test.zip_objects import cheats_folder_id, cheats_folder_zip_desc, archive_files_from_cheats_folder, summary_json_from_cheats_folder, store_with_unzipped_cheats, cheats_folder_folders, \
     cheats_folder_nes_file_path, cheats_folder_sms_file_path, cheats_folder_nes_file_size, cheats_folder_sms_file_size
 
 
@@ -304,7 +304,7 @@ class TestOnlineImporterWithoutFreeSpace(OnlineImporterTestBase):
             fs() if with_fs is None else with_fs,
             [db_test_descr(zips={
                 cheats_folder_id: cheats_folder_zip_desc(
-                    zipped_files=zipped_files_from_cheats_folder(),
+                    zipped_files=archive_files_from_cheats_folder(),
                     summary=summary_json_from_cheats_folder()
                 )
             })],

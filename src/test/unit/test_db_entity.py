@@ -29,15 +29,15 @@ from downloader.db_entity import DbEntityValidationException, check_file_pkg, ch
 from downloader.db_options import DbOptionsValidationException
 from downloader.path_package import PathPackage, PathPackageKind, PathType
 from downloader.db_entity import DbEntity
-from test.objects import zipped_nes_palettes_id
+from test.objects import archive_nes_palettes_id
 from test.objects import db_test, raw_db_empty_descr, db_empty, file_mister_descr, db_with_folders, file_a_descr, \
     db_test_with_file, db_entity, file_save_psx_castlevania, file_save_psx_castlevania_descr, folder_save_psx, file_a, \
     folder_a, file_nes_smb1, file_nes_smb1_descr, folder_games, folder_games_nes, zip_index_entity
 from test.objects_old_pext import file_nes_smb1 as file_nes_smb1_old_pext, \
     db_entity as db_entity_old_pext, file_nes_smb1_descr as file_nes_smb1_descr_old_pext, \
     folder_games as folder_games_old_pext, folder_games_nes as folder_games_nes_old_pext
-from test.zip_objects_old_pext import zipped_nes_palettes_desc as zipped_nes_palettes_desc_old_pext, zipped_nes_palettes_id as zipped_nes_palettes_id_old_pext
-from test.zip_objects import zipped_nes_palettes_desc
+from test.zip_objects_old_pext import archive_nes_palettes_desc as archive_nes_palettes_desc_old_pext, archive_nes_palettes_id as archive_nes_palettes_id_old_pext
+from test.zip_objects import nes_palettes_desc
 
 
 class TestDbEntity(unittest.TestCase):
@@ -216,7 +216,7 @@ class TestDbEntity(unittest.TestCase):
         self.assertIsInstance(zip_index.migrate(db_test), DbVersionUnsupportedException)
 
     def test_migrate_db_with_internal_zip_summary___on_db_from_v0_to_v1___returns_expected_db(self):
-        db_v0 = db_entity_old_pext(zips={zipped_nes_palettes_id_old_pext: zipped_nes_palettes_desc_old_pext(summary_internal_zip_id=zipped_nes_palettes_id_old_pext)})
+        db_v0 = db_entity_old_pext(zips={archive_nes_palettes_id_old_pext: archive_nes_palettes_desc_old_pext(summary_internal_zip_id=archive_nes_palettes_id_old_pext)})
 
         self.assertTrue(db_v0.needs_migration())
         error = db_v0.migrate()
@@ -224,9 +224,9 @@ class TestDbEntity(unittest.TestCase):
         self.assertFalse(db_v0.needs_migration())
 
         actual = db_v0.extract_props()
-        expected = db_entity(zips={zipped_nes_palettes_id: zipped_nes_palettes_desc(summary_internal_zip_id=zipped_nes_palettes_id)}).extract_props()
-        del actual['zips'][zipped_nes_palettes_id]['contents_file']['zipped_files']
-        del expected['zips'][zipped_nes_palettes_id]['contents_file']['zipped_files']
+        expected = db_entity(zips={archive_nes_palettes_id: nes_palettes_desc(summary_internal_id=archive_nes_palettes_id, zip_fields=True)}).extract_props()
+        del actual['zips'][archive_nes_palettes_id]['contents_file']['zipped_files']
+        del expected['zips'][archive_nes_palettes_id]['contents_file']['zipped_files']
         self.assertEqual(expected, actual)
 
 

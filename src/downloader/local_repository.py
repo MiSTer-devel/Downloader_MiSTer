@@ -308,6 +308,7 @@ class LocalRepository(FilelogSaver):
     def rotate_logs(self) -> None:
         if not self._config['rotate_logs']:
             self._logger.debug('Skipping log rotation.')
+            return
 
         self._logger.bench('LocalRepository rotate logs start.')
         try:

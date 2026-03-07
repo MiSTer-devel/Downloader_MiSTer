@@ -60,9 +60,43 @@ class TestFileLogger(unittest.TestCase):
         self.logger.print(print_line, end='')
         self.assertNotEqual(print_line, Path(self.local_repository.logfile_path).read_text())
 
-    def configure_and_initialize_file_logger(self):
+    def test_file_logger___with_rotate_logs_enabled___rotates_existing_logs(self):
+        self.configure_and_initialize_file_logger()
+        log_path = self.local_repository.logfile_path
+        log_root, log_ext = os.path.splitext(log_path)
+        old1_path = f'{log_root}_old1{log_ext}'
+        old2_path = f'{log_root}_old2{log_ext}'
+
+        Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(log_path).write_text('current log')
+        Path(old1_path).write_text('old log 1')
+
+        self.local_repository.rotate_logs()
+
+        self.assertFalse(os.path.isfile(log_path))
+        self.assertEqual('current log', Path(old1_path).read_text())
+        self.assertEqual('old log 1', Path(old2_path).read_text())
+
+    def test_file_logger___with_rotate_logs_disabled___does_not_rotate_existing_logs(self):
+        self.configure_and_initialize_file_logger(rotate_logs=False)
+        log_path = self.local_repository.logfile_path
+        log_root, log_ext = os.path.splitext(log_path)
+        old1_path = f'{log_root}_old1{log_ext}'
+
+        Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(log_path).write_text('current log')
+        Path(old1_path).write_text('old log 1')
+
+        self.local_repository.rotate_logs()
+
+        self.assertTrue(os.path.isfile(log_path))
+        self.assertEqual('current log', Path(log_path).read_text())
+        self.assertTrue(os.path.isfile(old1_path))
+        self.assertEqual('old log 1', Path(old1_path).read_text())
+
+    def configure_and_initialize_file_logger(self, rotate_logs=True):
         self.logger = FileLogger()
-        config = config_with(base_path=self.tempdir.name, base_system_path=self.tempdir.name)
+        config = config_with(base_path=self.tempdir.name, base_system_path=self.tempdir.name, rotate_logs=rotate_logs)
         file_system = make_production_filesystem_factory(config=config).create_for_system_scope()
         self.local_repository = LocalRepository(config=config, file_system=file_system, external_drive_repository=ExternalDrivesRepositoryStub([self.tempdir.name]))
         self.logger.set_local_repository(self.local_repository)

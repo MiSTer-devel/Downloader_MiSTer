@@ -45,7 +45,7 @@ def run(commands, env=None, cwd=None):
     log(' '.join(commands))
     if env is not None: log('with env:', env)
     if cwd is not None: log('with cwd:', cwd)
-    subprocess.run(commands, cwd=cwd, env=env, check=True, stderr=subprocess.STDOUT)
+    subprocess.run(commands, cwd=cwd, env=None if env is None else {**os.environ, **env}, check=True, stderr=subprocess.STDOUT)
 
 def curl(url, output_path):
     log(f'Downloading {url} to {output_path}')

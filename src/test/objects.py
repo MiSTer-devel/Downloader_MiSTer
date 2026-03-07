@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from downloader.config import default_config, Environment
+from downloader.db_entity import rename_archive_to_zip_fields, rename_archive_summaries_to_zip_fields
 from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, KENV_LOGLEVEL, FILE_MiSTer_new, \
     K_BASE_PATH, \
     K_FILTER, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_ALLOW_REBOOT, KENV_DEBUG, MEDIA_FAT, \
@@ -164,6 +165,7 @@ def config_with(
         minimum_free_space=None,
         file_checking=None,
         allow_delete=None,
+        rotate_logs=None,
 
         databases: dict[str, Any] = None):
 
@@ -196,6 +198,8 @@ def config_with(
         config['file_checking'] = file_checking
     if allow_delete is not None:
         config['allow_delete'] = allow_delete
+    if rotate_logs is not None:
+        config['rotate_logs'] = rotate_logs
     return config
 
 
@@ -228,33 +232,35 @@ def temp_name():
         return temp.name
 
 
-def zip_desc(description, target_folder_path, kind=None, is_pext=None, zipped_files=None, summary=None, summary_hash=None, summary_size=None, contents_hash=None, contents_size=None, summary_internal_zip_id=None):
+def archive_desc(description, target_folder=None, extract=None, is_pext=None, zipped_files=None, summary=None, summary_hash=None, summary_size=None, archive_hash=None, archive_size=None, summary_internal_archive_id=None):
     json = {
-        "kind": kind or "extract_all_contents",
+        "format": "zip",
+        "extract": extract or "all",
         "base_files_url": "https://base_files_url",
         "description": description,
-        "contents_file": {
-            "hash": contents_hash if contents_hash is not None else "4d2bf07e5d567196d9c666f1816e86e6",
-            "size": contents_size if contents_size is not None else 7316038,
+        "archive_file": {
+            "hash": archive_hash if archive_hash is not None else "4d2bf07e5d567196d9c666f1816e86e6",
+            "size": archive_size if archive_size is not None else 7316038,
             "url": "https://contents_file"
         },
-        "target_folder_path": target_folder_path,
     }
+    if target_folder is not None:
+        json["target_folder"] = target_folder
     if is_pext is True:
         json['path'] = 'pext'
-    if summary_internal_zip_id is not None:
-        json['internal_summary'] = {} if summary is None else {
+    if summary_internal_archive_id is not None:
+        json['summary_inline'] = {} if summary is None else {
             'files': {
                 file_path: {
                     **file_description,
-                    'zip_id': summary_internal_zip_id,
-                    **({} if 'zip_path' not in file_description else {'zip_path': file_description['zip_path']})
+                    'arc_id': summary_internal_archive_id,
+                    **({} if 'zip_path' not in file_description else {'arc_at': file_description['zip_path']})
                 } for file_path, file_description in summary['files'].items()
             },
             'folders': {
                 folder_path: {
                     **folder_description,
-                    'zip_id': summary_internal_zip_id,
+                    'arc_id': summary_internal_archive_id,
                 } for folder_path, folder_description in summary['folders'].items()
             },
         }
@@ -268,9 +274,19 @@ def zip_desc(description, target_folder_path, kind=None, is_pext=None, zipped_fi
             json['summary_file']['unzipped_json'] = summary
 
     if zipped_files is not None:
-        json['contents_file']['zipped_files'] = zipped_files
+        json['archive_file']['zipped_files'] = zipped_files
 
     return json
+
+
+def zip_desc(description, target_folder_path, extract=None, is_pext=None, zipped_files=None, summary=None, summary_hash=None, summary_size=None, contents_hash=None, contents_size=None, summary_internal_zip_id=None):
+    desc = archive_desc(description, target_folder=target_folder_path, extract=extract, is_pext=is_pext, zipped_files=zipped_files, summary=summary, summary_hash=summary_hash, summary_size=summary_size, archive_hash=contents_hash, archive_size=contents_size, summary_internal_archive_id=summary_internal_zip_id)
+    result = rename_archive_to_zip_fields(desc)
+    if 'internal_summary' in result:
+        rename_archive_summaries_to_zip_fields(result['internal_summary'])
+    if 'summary_file' in result and 'unzipped_json' in result['summary_file']:
+        rename_archive_summaries_to_zip_fields(result['summary_file']['unzipped_json'])
+    return result
 
 
 def clean_zip_test_fields(store):
@@ -297,7 +313,7 @@ def db_test_with_default_filter_descr(db_default_option_filter=None):
     )
 
 
-def db_test_descr(db_id=None, zips=None, folders=None, files=None, db_files=None, tag_dictionary=None):
+def db_test_descr(db_id=None, zips=None, archives=None, folders=None, files=None, db_files=None, tag_dictionary=None):
     return db_entity(
         db_id=db_id or db_test,
         db_files=db_files if db_files is not None else [],
@@ -305,19 +321,21 @@ def db_test_descr(db_id=None, zips=None, folders=None, files=None, db_files=None
         folders=folders if folders is not None else {},
         base_files_url='https://',
         zips=zips if zips is not None else {},
+        archives=archives,
         default_options={},
         timestamp=0,
         tag_dictionary=tag_dictionary,
     )
 
 
-def store_descr(zips=None, folders=None, files=None, folders_usb0=None, files_usb0=None, folders_usb1=None, files_usb1=None, folders_usb2=None, files_usb2=None, db_files=None, db_id=None, timestamp=None, base_path=None, filtered_zip_data=None):
+def store_descr(zips=None, archives=None, folders=None, files=None, folders_usb0=None, files_usb0=None, folders_usb1=None, files_usb1=None, folders_usb2=None, files_usb2=None, db_files=None, db_id=None, timestamp=None, base_path=None, filtered_zip_data=None):
     store = db_to_store(db_entity(
         db_id=db_id,
         db_files=db_files,
         files=remove_all_priority_paths(files),
         folders=remove_all_priority_paths(folders),
         zips=zips,
+        archives=archives,
         timestamp=timestamp
     ), base_path=base_path)
     _add_external_drive_to_store(store, '/media/usb0', folders_usb0, files_usb0)
@@ -385,7 +403,7 @@ def db_description(db_url: str = None, section: str = None, options: DbOptions =
     return description
 
 
-def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, default_options=None, timestamp=None, linux=None, section=None, tag_dictionary=None, version=None) -> DbEntity:
+def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_url=None, zips=None, archives=None, default_options=None, timestamp=None, linux=None, section=None, tag_dictionary=None, version=None) -> DbEntity:
     db_props = {
         'db_id': db_id if db_id is not None else db_test,
         'db_files': db_files if db_files is not None else [],
@@ -397,6 +415,8 @@ def db_entity(db_id=None, db_files=None, files=None, folders=None, base_files_ur
         'timestamp': timestamp if timestamp is not None else 0,
         'v': version if version is not None else DATABASE_LATEST_SUPPORTED_VERSION
     }
+    if archives is not None:
+        db_props['archives'] = archives
     if tag_dictionary is not None:
         db_props['tag_dictionary'] = tag_dictionary
     if linux is not None:
@@ -415,7 +435,7 @@ def zip_index_entity(files=None, folders=None, base_files_url=None, version=None
         base_files_url=base_files_url if base_files_url is not None else '',
         version=version if version is not None else DATABASE_LATEST_SUPPORTED_VERSION,
         description=description if description is not None \
-            else zip_desc("Description", '.', kind='extract_single_files')
+            else zip_desc("Description", '.', extract='selective')
     )
 
 def raw_db_empty_with_linux_descr():
@@ -626,7 +646,7 @@ def file_nes_palette_a_descr(url: bool = True, zip_id: bool = False, tags: bool 
         "size": 2905020,
         "path": "pext",
         "url": "https://a.pal",
-        "zip_id": zipped_nes_palettes_id,
+        "zip_id": archive_nes_palettes_id,
         "zip_path": file_nes_palette_a.removeprefix(folder_games_nes + '/'),
         "tags": [
             "games",
@@ -754,7 +774,7 @@ def file_descr(hash_code=None, size=None, url=None, reboot=None, path=None, tags
     return result
 
 
-def zipped_file_a_descr(zip_id, url=False):
+def archive_file_a_descr(zip_id, url=False):
     o = {
         "hash": file_a,
         "size": 2915040,
@@ -915,7 +935,7 @@ def path_with(path, added_part):
     return '%s/%s' % (path, added_part)
 
 
-zipped_nes_palettes_id = 'zipped_nes_palettes_id'
+archive_nes_palettes_id = 'archive_nes_palettes_id'
 
 
 def ini(sections: dict) -> str:

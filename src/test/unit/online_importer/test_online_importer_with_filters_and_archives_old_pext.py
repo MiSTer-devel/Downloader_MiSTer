@@ -18,7 +18,7 @@
 
 import unittest
 from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_FILTER
-from test.objects import empty_test_store, store_descr, zipped_nes_palettes_id, folder_games, file_nes_palette_a, \
+from test.objects import empty_test_store, store_descr, archive_nes_palettes_id, folder_games, file_nes_palette_a, \
     folder_games_nes_palettes, folder_games_nes
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data
@@ -27,14 +27,14 @@ from test.objects_old_pext import db_test_descr as db_test_descr_old_pext, \
     folder_games as folder_games_old_pext, folder_games_nes as folder_games_nes_old_pext, \
     file_nes_palette_a as file_nes_palette_a_old_pext
 from test.zip_objects_old_pext import file_nes_palette_a_descr_zipped as file_nes_palette_a_descr_zipped_old_pext, \
-    zipped_nes_palettes_desc as zipped_nes_palettes_desc_old_pext, \
-    zipped_nes_palettes_id as zipped_nes_palettes_id_old_pext, \
+    archive_nes_palettes_desc as archive_nes_palettes_desc_old_pext, \
+    archive_nes_palettes_id as archive_nes_palettes_id_old_pext, \
     folder_games_nes_palettes as folder_games_nes_palettes_old_pext
-from test.zip_objects import zipped_nes_palettes_desc, file_nes_palette_a_descr_zipped
+from test.zip_objects import nes_palettes_desc, file_nes_palette_a_descr_zipped
 
 
 # @TODO: Remove this file when support for the old pext syntax '|' is removed
-class TestOnlineImporterWithFiltersAndZipsOldPext(unittest.TestCase):
+class TestOnlineImporterWithFiltersAndArchivesOldPext(unittest.TestCase):
     def test_download_zipped_nes_palettes_folder___with_empty_store_and_negative_nes_filter___installs_filtered_nes_zip_data_and_nothing_in_fs(self):
         actual_store = self.download_zipped_nes_palettes_folder(empty_test_store(), '!nes')
         self.assertEqual(store_with_filtered_nes_palette_zip_data(), actual_store)
@@ -58,7 +58,7 @@ class TestOnlineImporterWithFiltersAndZipsOldPext(unittest.TestCase):
         self.sut = OnlineImporter.from_implicit_inputs(implicit_inputs)
 
         self.sut.add_db(db_test_descr_old_pext(zips={
-            zipped_nes_palettes_id_old_pext: zipped_nes_palettes_desc_old_pext(url=False, tags=True)
+            archive_nes_palettes_id_old_pext: archive_nes_palettes_desc_old_pext(url=False, tags=True)
         }), store).download()
 
         return store
@@ -75,15 +75,15 @@ class TestOnlineImporterWithFiltersAndZipsOldPext(unittest.TestCase):
 def store_with_filtered_nes_palette_zip_data():
     return store_descr(
         zips={
-            zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False, zipped_files=False, summary=False),
+            archive_nes_palettes_id: nes_palettes_desc(url=False, zipped_files=False, summary=False, zip_fields=True),
         },
-        folders={folder_games: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games"]}},
+        folders={folder_games: {"path": "pext", "zip_id": archive_nes_palettes_id, "tags": ["games"]}},
         filtered_zip_data={
-            zipped_nes_palettes_id: {
+            archive_nes_palettes_id: {
                 "files": {file_nes_palette_a: file_nes_palette_a_descr_zipped(tags=True, url=False)},
                 "folders": {
-                    folder_games_nes_palettes: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games", "nes", "palette"]},
-                    folder_games_nes: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games", "nes"]}
+                    folder_games_nes_palettes: {"path": "pext", "zip_id": archive_nes_palettes_id, "tags": ["games", "nes", "palette"]},
+                    folder_games_nes: {"path": "pext", "zip_id": archive_nes_palettes_id, "tags": ["games", "nes"]}
                 }
             }
         }
@@ -93,12 +93,12 @@ def store_with_filtered_nes_palette_zip_data():
 def store_with_nes_palette_zip():
     return store_descr(
         zips={
-            zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False, zipped_files=False, summary=False),
+            archive_nes_palettes_id: nes_palettes_desc(url=False, zipped_files=False, summary=False, zip_fields=True),
         },
         files={file_nes_palette_a: file_nes_palette_a_descr_zipped(tags=True, url=False)},
         folders={
-            folder_games: {"zip_id": zipped_nes_palettes_id, "tags": ["games"], "path": "pext"},
-            folder_games_nes: {"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes"], "path": "pext"},
-            folder_games_nes_palettes: {"zip_id": zipped_nes_palettes_id, "tags": ["games", "nes", "palette"], "path": "pext"},
+            folder_games: {"zip_id": archive_nes_palettes_id, "tags": ["games"], "path": "pext"},
+            folder_games_nes: {"zip_id": archive_nes_palettes_id, "tags": ["games", "nes"], "path": "pext"},
+            folder_games_nes_palettes: {"zip_id": archive_nes_palettes_id, "tags": ["games", "nes", "palette"], "path": "pext"},
         }
     )

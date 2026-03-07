@@ -21,16 +21,16 @@ from downloader.constants import K_BASE_PATH
 from downloader.fail_policy import FailPolicy
 from test.fake_file_system_factory import fs_data
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
-from test.objects import db_test_descr, empty_zip_summary, folder_games_nes, store_descr, empty_test_store, media_fat, db_entity, file_a, zipped_file_a_descr, zip_desc, zipped_nes_palettes_id
+from test.objects import db_test_descr, empty_zip_summary, folder_games_nes, store_descr, empty_test_store, media_fat, db_entity, file_a, archive_file_a_descr, archive_desc, zip_desc, archive_nes_palettes_id
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 from test.zip_objects import files_nes_palettes, folders_games_nes_palettes, with_installed_nes_palettes_on_fs, \
-    zipped_nes_palettes_desc, store_with_unzipped_cheats, cheats_folder_zip_desc, \
-    cheats_folder_nes_file_path, summary_json_from_cheats_folder, zipped_files_from_cheats_folder, cheats_folder_id, cheats_folder_sms_file_path, cheats_folder_folders, \
+    nes_palettes_desc, store_with_unzipped_cheats, cheats_folder_archive_desc, \
+    cheats_folder_nes_file_path, summary_json_from_cheats_folder, archive_files_from_cheats_folder, cheats_folder_id, cheats_folder_sms_file_path, cheats_folder_folders, \
     cheats_folder_files, with_installed_cheats_folder_on_fs
 
 
-class TestOnlineImporterWithZips(OnlineImporterTestBase):
+class TestOnlineImporterWithArchives(OnlineImporterTestBase):
     """
     Specification for zip archive handling and selective file extraction.
 
@@ -127,9 +127,9 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         different_zip_id = 'a_different_id'
         different_folder = "Different"
 
-        store = self.download(db_test_descr(zips={
-            different_zip_id: zip_desc(different_folder, "../", summary={
-                "files": {file_a: zipped_file_a_descr(different_zip_id)},
+        store = self.download(db_test_descr(archives={
+            different_zip_id: archive_desc(different_folder, target_folder="../", summary={
+                "files": {file_a: archive_file_a_descr(different_zip_id)},
                 "folders": {different_folder: {"zip_id": different_zip_id}},
             })
         }), store_with_unzipped_cheats())
@@ -137,7 +137,7 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         self.assertSutReports([file_a])
         self.assertEqual({
             K_BASE_PATH: "/media/fat",
-            "files": {file_a: zipped_file_a_descr(different_zip_id)},
+            "files": {file_a: archive_file_a_descr(different_zip_id)},
             "folders": {different_folder: {"zip_id": different_zip_id}},
             "zips": {different_zip_id: zip_desc(different_folder, "../")}
         }, store)
@@ -159,17 +159,17 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         previous_store = store_with_unzipped_cheats(url=False)
         expected_store = store_with_unzipped_cheats(url=False, summary_hash="something_new")
 
-        actual_store = self.download(db_test_descr(zips={
-            cheats_folder_id: cheats_folder_zip_desc(summary_hash="something_new", summary=summary_json_from_cheats_folder())
+        actual_store = self.download(db_test_descr(archives={
+            cheats_folder_id: cheats_folder_archive_desc(summary_hash="something_new", summary=summary_json_from_cheats_folder())
         }), previous_store)
 
         self.assertEqual(expected_store, actual_store)
         self.assertSutReports([])
 
     def test_download_zip_summary_without_files___for_the_first_time___adds_zip_id_to_store(self):
-        zip_descriptions = {cheats_folder_id: cheats_folder_zip_desc(summary=empty_zip_summary())}
-        expected_store = store_descr(zips=zip_descriptions)
-        actual_store = self.download(db_test_descr(zips=zip_descriptions), empty_test_store())
+        archive_descriptions = {cheats_folder_id: cheats_folder_archive_desc(summary=empty_zip_summary())}
+        expected_store = store_descr(archives=archive_descriptions)
+        actual_store = self.download(db_test_descr(archives=archive_descriptions), empty_test_store())
         self.assertEqual(expected_store, actual_store)
         self.assertSutReports([])
 
@@ -178,9 +178,9 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         self.implicit_inputs.network_state.remote_failures['https://summary_file'] = 99
         self.assertEqual(fs_data(), self.sut.fs_data)
 
-        store = self.download(db_test_descr(zips={
-            cheats_folder_id: cheats_folder_zip_desc(
-                zipped_files=zipped_files_from_cheats_folder(),
+        store = self.download(db_test_descr(archives={
+            cheats_folder_id: cheats_folder_archive_desc(
+                zipped_files=archive_files_from_cheats_folder(),
                 summary=summary_json_from_cheats_folder()
             )
         }), store_with_unzipped_cheats(url=False, summary_hash='old'))
@@ -195,9 +195,9 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
     def test_download_zipped_cheats_folder___on_empty_store_when_file_count_threshold_is_surpassed_but_network_fails___reports_error_and_installs_nothing(self):
         self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
         self.implicit_inputs.network_state.remote_failures['https://summary_file'] = 99
-        store = self.download(db_test_descr(zips={
-            cheats_folder_id: cheats_folder_zip_desc(
-                zipped_files=zipped_files_from_cheats_folder(),
+        store = self.download(db_test_descr(archives={
+            cheats_folder_id: cheats_folder_archive_desc(
+                zipped_files=archive_files_from_cheats_folder(),
                 summary=summary_json_from_cheats_folder()
             )
         }), empty_test_store())
@@ -280,15 +280,15 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
     def test_download_two_zips_in_one_db___on_empty_store__installs_both_zips_in_the_store_and_reports_them(self):
         self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
 
-        store = self.download(db_test_descr(zips={
-            zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False),
-            cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files_from_cheats_folder(), summary=summary_json_from_cheats_folder()),
+        store = self.download(db_test_descr(archives={
+            archive_nes_palettes_id: nes_palettes_desc(url=False),
+            cheats_folder_id: cheats_folder_archive_desc(zipped_files=archive_files_from_cheats_folder(), summary=summary_json_from_cheats_folder()),
         }), empty_test_store())
 
         self.assertEqual(store_descr(
-            zips={
-                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes + '/', is_pext=True),
-                cheats_folder_id: cheats_folder_zip_desc()
+            archives={
+                archive_nes_palettes_id: archive_desc("Extracting Palettes", target_folder=folder_games_nes + '/', is_pext=True),
+                cheats_folder_id: cheats_folder_archive_desc()
             },
             files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},
             folders={**cheats_folder_folders(), **folders_games_nes_palettes()}
@@ -301,22 +301,22 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
 
         self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
 
-        store = self.download(db_test_descr(zips={
-            zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False),
-            cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files_from_cheats_folder(), summary=summary_json_from_cheats_folder()),
+        store = self.download(db_test_descr(archives={
+            archive_nes_palettes_id: nes_palettes_desc(url=False),
+            cheats_folder_id: cheats_folder_archive_desc(zipped_files=archive_files_from_cheats_folder(), summary=summary_json_from_cheats_folder()),
         }), store_descr(
-            zips={
-                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes, is_pext=True),
-                cheats_folder_id: cheats_folder_zip_desc()
+            archives={
+                archive_nes_palettes_id: archive_desc("Extracting Palettes", target_folder=folder_games_nes, is_pext=True),
+                cheats_folder_id: cheats_folder_archive_desc()
             },
             files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},
             folders={**cheats_folder_folders(), **folders_games_nes_palettes()}
         ))
 
         self.assertEqual(store_descr(
-            zips={
-                zipped_nes_palettes_id: zip_desc("Extracting Palettes", folder_games_nes, is_pext=True),
-                cheats_folder_id: cheats_folder_zip_desc()
+            archives={
+                archive_nes_palettes_id: archive_desc("Extracting Palettes", target_folder=folder_games_nes, is_pext=True),
+                cheats_folder_id: cheats_folder_archive_desc()
             },
             files={**cheats_folder_files(url=False), **files_nes_palettes(url=False)},
             folders={**cheats_folder_folders(), **folders_games_nes_palettes()}
@@ -325,12 +325,28 @@ class TestOnlineImporterWithZips(OnlineImporterTestBase):
         self.assertSutReports([], save=False)
 
 
-    def download_zipped_cheats_folder(self, input_store, from_zip_content, is_internal_summary=False, save=True):
-        summary_internal_zip_id = cheats_folder_id if is_internal_summary else None
-        zipped_files = zipped_files_from_cheats_folder() if from_zip_content else None
+    def test_download_selective_archive_with_summary_file___on_empty_store___extracts_file_from_zip(self):
+        store = self.download(db_test_descr(archives={
+            'sel_bios': archive_desc("Extracting BIOS", extract="selective", summary={
+                "files": {'games/NeoGeo/bios.rom': {"hash": "aabb", "size": 1024, "arc_id": "sel_bios", "arc_at": "bios.rom"}},
+                "folders": {"games": {}, "games/NeoGeo": {}},
+            }, zipped_files={
+                "files": {"bios.rom": {"hash": "aabb", "size": 1024}},
+                "folders": {}
+            })
+        }), empty_test_store())
 
-        return self.download(db_test_descr(zips={
-            cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files, summary=summary_json_from_cheats_folder(), summary_internal_zip_id=summary_internal_zip_id)
+        self.assertIn('games/NeoGeo/bios.rom', store['files'])
+        self.assertEqual('sel_bios', store['files']['games/NeoGeo/bios.rom']['zip_id'])
+        self.assertEqual('extract_single_files', store['zips']['sel_bios']['kind'])
+        self.assertSutReports(['games/NeoGeo/bios.rom'])
+
+    def download_zipped_cheats_folder(self, input_store, from_zip_content, is_internal_summary=False, save=True):
+        summary_internal_archive_id = cheats_folder_id if is_internal_summary else None
+        zipped_files = archive_files_from_cheats_folder() if from_zip_content else None
+
+        return self.download(db_test_descr(archives={
+            cheats_folder_id: cheats_folder_archive_desc(zipped_files=zipped_files, summary=summary_json_from_cheats_folder(), summary_internal_archive_id=summary_internal_archive_id)
         }), input_store)
 
     def assertSutReports(self, installed, errors=None, needs_reboot=False, save=True):
@@ -362,22 +378,23 @@ def db_with_unibios_from_official_url():
             'games': {},
             'games/NeoGeo': {}
         },
-        zips={
+        archives={
             'neogeo_unibios': {
-                "kind": "extract_single_files",
+                "format": "zip",
+                "extract": "selective",
                 "description": "Extracting NeoGeo UniBios from http://unibios.free.fr",
-                "internal_summary": {
+                "summary_inline": {
                     "files": {
                         'games/NeoGeo/uni-bios.rom': {
                             "hash": "4f0aeda8d2d145f596826b62d563c4ef",
                             "size": 131072,
-                            "zip_id": "neogeo_unibios",
-                            "zip_path": "uni-bios.rom",
+                            "arc_id": "neogeo_unibios",
+                            "arc_at": "uni-bios.rom",
                         }
                     },
                     "folders": {}
                 },
-                "contents_file": {
+                "archive_file": {
                     "hash": "1986c39676354d19ae648a914bd914f7",
                     "size": 101498,
                     "url": "http://unibios.free.fr/download/uni-bios-40.zip",
@@ -407,7 +424,8 @@ def store_with_unibios_from_zip():
                                               'zip_id': 'neogeo_unibios',
                                               'zip_path': 'uni-bios.rom'}},
             'folders': {'games': {}, 'games/NeoGeo': {}},
-            'zips': {'neogeo_unibios': {'description': 'Extracting NeoGeo UniBios from http://unibios.free.fr',
+            'zips': {'neogeo_unibios': {'format': 'zip',
+                                        'description': 'Extracting NeoGeo UniBios from http://unibios.free.fr',
                                         'contents_file': {'hash': '1986c39676354d19ae648a914bd914f7',
                                                           'size': 101498,
                                                           'url': 'http://unibios.free.fr/download/uni-bios-40.zip'},

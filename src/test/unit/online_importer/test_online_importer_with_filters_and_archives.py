@@ -23,27 +23,27 @@ from test.fake_file_system_factory import fs_data, FileSystemFactory
 from test.objects import db_test_descr, store_descr, config_with_filter, empty_test_store, folder_games, \
     folder_games_nes, file_nes_palette_a
 from test.fake_online_importer import OnlineImporter
-from test.zip_objects import cheats_folder_zip_desc, cheats_folder_tag_dictionary, cheats_folder_id, \
+from test.zip_objects import cheats_folder_archive_desc, cheats_folder_zip_desc, cheats_folder_tag_dictionary, cheats_folder_id, \
     cheats_folder_nes_file_path, cheats_folder_nes_folder_name, cheats_folder_sms_file_path, \
     cheats_folder_sms_folder_name, \
-    zipped_files_from_cheats_folder, summary_json_from_cheats_folder, cheats_folder_name, \
+    archive_files_from_cheats_folder, summary_json_from_cheats_folder, cheats_folder_name, \
     cheats_folder_files, cheats_folder_folders, cheats_folder_sms_file_descr, cheats_folder_sms_folder_descr, \
     cheats_folder_descr, cheats_folder_nes_file_descr, cheats_folder_nes_folder_descr, cheats_folder_nes_file_hash, \
     cheats_folder_nes_file_size, cheats_folder_sms_file_hash, cheats_folder_sms_file_size, \
-    cheats_folder_nes_file_description, cheats_folder_sms_file_description, file_nes_palette_a_descr_zipped, zipped_nes_palettes_desc, \
-    zipped_nes_palettes_id, folder_games_nes_palettes
+    cheats_folder_nes_file_description, cheats_folder_sms_file_description, file_nes_palette_a_descr_zipped, nes_palettes_desc, \
+    archive_nes_palettes_id, folder_games_nes_palettes
 
 
 def db_with_cheats_zip():
-    return db_test_descr(zips={
-        cheats_folder_id: cheats_folder_zip_desc(
-            zipped_files=zipped_files_from_cheats_folder(),
+    return db_test_descr(archives={
+        cheats_folder_id: cheats_folder_archive_desc(
+            zipped_files=archive_files_from_cheats_folder(),
             summary=summary_json_from_cheats_folder()
         ),
     }, tag_dictionary=cheats_folder_tag_dictionary())
 
 
-class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
+class TestOnlineImporterWithFiltersAndArchives(unittest.TestCase):
 
     def test_download_zipped_cheats_folder___with_empty_store_and_negative_nes_filter___installs_filtered_nes_zip_data_and_only_sms_file(self):
         actual_store = self.download_zipped_cheats_folder(empty_test_store(), '!nes')
@@ -157,8 +157,8 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
 
         summary = summary_json_from_cheats_folder() if summary is None else summary
 
-        self.sut.add_db(db_test_descr(zips={
-            cheats_folder_id: cheats_folder_zip_desc(zipped_files=zipped_files_from_cheats_folder(), summary=summary, summary_hash=summary_hash)
+        self.sut.add_db(db_test_descr(archives={
+            cheats_folder_id: cheats_folder_archive_desc(zipped_files=archive_files_from_cheats_folder(), summary=summary, summary_hash=summary_hash)
         }, tag_dictionary=cheats_folder_tag_dictionary()), store).download()
 
         return store
@@ -215,8 +215,8 @@ class TestOnlineImporterWithFiltersAndZips(unittest.TestCase):
 
         self.sut = OnlineImporter.from_implicit_inputs(implicit_inputs)
 
-        self.sut.add_db(db_test_descr(zips={
-            zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False, tags=True)
+        self.sut.add_db(db_test_descr(archives={
+            archive_nes_palettes_id: nes_palettes_desc(url=False, tags=True)
         }), store).download()
 
         return store
@@ -242,8 +242,8 @@ def _append_tag_to_store(tag, store):
 
 
 def store_with_cheats_non_filtered():
-    store = store_descr(zips={
-        cheats_folder_id: cheats_folder_zip_desc()
+    store = store_descr(archives={
+        cheats_folder_id: cheats_folder_archive_desc()
     }, files={
         cheats_folder_sms_file_path: cheats_folder_sms_file_descr(url=False),
         cheats_folder_nes_file_path: cheats_folder_nes_file_descr(url=False)
@@ -263,16 +263,16 @@ def store_with_cheats_non_filtered_and_filter_x():
 
 
 def store_with_filtered_cheats_zip_data():
-    return store_descr(zips={
-        cheats_folder_id: cheats_folder_zip_desc()
+    return store_descr(archives={
+        cheats_folder_id: cheats_folder_archive_desc()
     }, filtered_zip_data={
         cheats_folder_id: summary_json_from_cheats_folder()
     })
 
 
 def store_with_filtered_cheats_nes_zip_data():
-    return store_descr(zips={
-        cheats_folder_id: cheats_folder_zip_desc()
+    return store_descr(archives={
+        cheats_folder_id: cheats_folder_archive_desc()
     }, files={
         cheats_folder_sms_file_path: cheats_folder_sms_file_descr(url=False)
     }, folders={
@@ -289,8 +289,8 @@ def store_with_filtered_cheats_nes_zip_data():
 
 
 def store_with_filtered_cheats_nes_zip_data_keeping_nes_folder():
-    return store_descr(zips={
-        cheats_folder_id: cheats_folder_zip_desc()
+    return store_descr(archives={
+        cheats_folder_id: cheats_folder_archive_desc()
     }, files={
         cheats_folder_sms_file_path: cheats_folder_sms_file_descr(url=False)
     }, folders={
@@ -308,8 +308,8 @@ def store_with_filtered_cheats_nes_zip_data_keeping_nes_folder():
 
 
 def store_with_filtered_cheats_sms_zip_data():
-    return store_descr(zips={
-        cheats_folder_id: cheats_folder_zip_desc()
+    return store_descr(archives={
+        cheats_folder_id: cheats_folder_archive_desc()
     }, files={
         cheats_folder_nes_file_path: cheats_folder_nes_file_descr(url=False)
     }, folders={
@@ -335,8 +335,8 @@ def store_with_cheats_sms_file_only():
 
 
 def store_with_installed_cheats_files_and_zips_but_no_filtered_data():
-    store = store_descr(zips={
-        cheats_folder_id: cheats_folder_zip_desc()
+    store = store_descr(archives={
+        cheats_folder_id: cheats_folder_archive_desc()
     }, files=cheats_folder_files(url=False), folders=cheats_folder_folders())
     return store
 
@@ -347,16 +347,16 @@ def store_with_installed_cheats_files_without_zips_and_no_filtered_data():
 
 def store_with_filtered_nes_palette_zip_data():
     return store_descr(
-        zips={
-            zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False, zipped_files=False, summary=False),
+        archives={
+            archive_nes_palettes_id: nes_palettes_desc(url=False, zipped_files=False, summary=False),
         },
-        folders={folder_games: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games"]}},
+        folders={folder_games: {"path": "pext", "zip_id": archive_nes_palettes_id, "tags": ["games"]}},
         filtered_zip_data={
-            zipped_nes_palettes_id: {
+            archive_nes_palettes_id: {
                 "files": {file_nes_palette_a: file_nes_palette_a_descr_zipped(tags=True, url=False)},
                 "folders": {
-                    folder_games_nes_palettes: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games", "nes", "palette"]},
-                    folder_games_nes: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games", "nes"]}
+                    folder_games_nes_palettes: {"path": "pext", "zip_id": archive_nes_palettes_id, "tags": ["games", "nes", "palette"]},
+                    folder_games_nes: {"path": "pext", "zip_id": archive_nes_palettes_id, "tags": ["games", "nes"]}
                 }
             }
         }
@@ -365,13 +365,13 @@ def store_with_filtered_nes_palette_zip_data():
 
 def store_with_nes_palette_zip():
     return store_descr(
-        zips={
-            zipped_nes_palettes_id: zipped_nes_palettes_desc(url=False, zipped_files=False, summary=False),
+        archives={
+            archive_nes_palettes_id: nes_palettes_desc(url=False, zipped_files=False, summary=False),
         },
         files={file_nes_palette_a: file_nes_palette_a_descr_zipped(tags=True, url=False)},
         folders={
-            folder_games: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games"]},
-            folder_games_nes: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games", "nes"]},
-            folder_games_nes_palettes: {"path": "pext", "zip_id": zipped_nes_palettes_id, "tags": ["games", "nes", "palette"]},
+            folder_games: {"path": "pext", "zip_id": archive_nes_palettes_id, "tags": ["games"]},
+            folder_games_nes: {"path": "pext", "zip_id": archive_nes_palettes_id, "tags": ["games", "nes"]},
+            folder_games_nes_palettes: {"path": "pext", "zip_id": archive_nes_palettes_id, "tags": ["games", "nes", "palette"]},
         }
     )

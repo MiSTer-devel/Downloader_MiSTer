@@ -189,7 +189,7 @@ The format of the aforementioned JSON file should be as follow:
     "db_files": [],
         
     /**
-     * [Optional] Databases can specify default options, like default filters, default downloader_timeout, etc... 
+     * [Optional] Databases can specify default options, like default filters, default downloader_timeout (minimum effective value: 60 seconds), etc... 
      */
     "default_options": {
         // Documented in the "Default Options" section of this page.
@@ -197,11 +197,11 @@ The format of the aforementioned JSON file should be as follow:
   
   
     /**
-     * [Optional] Databases can use ZIPs to download and install a big amount of files more efficiently.
+     * [Optional] Databases can bundle large file collections into compressed archives
+     *            for more efficient downloading and installation.
+     *            See docs/custom-databases-archives.md for the full specification.
      */
-    "zips": {
-        // TO BE DOCUMENTED
-    },
+    "archives": { ... },
 }
 ```
 
@@ -263,3 +263,7 @@ Here is an example that sets the **database-scoped default** for the "_filter_" 
 Any option not set by a user or a maintainer will continue to use it's [global value](https://github.com/MiSTer-devel/Downloader_MiSTer#options).
 
 Additionally, database default filters may inherit all the global filter terms by adding the special term `[mister]` in it. Filter inheritance is explained in the [Download Filters page](download-filters.md).
+
+### Archives
+
+Databases can bundle large file collections (MRAs, cheats, palettes) into compressed archives for efficient downloading and installation. See the [Archives specification](custom-databases-archives.md) for details.
