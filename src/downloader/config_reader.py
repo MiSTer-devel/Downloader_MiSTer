@@ -27,7 +27,7 @@ from typing import Optional, TypeVar, Union, SupportsInt
 
 from downloader.config import Environment, Config, default_config, InvalidConfigParameter, AllowReboot, \
     ConfigDatabaseSection, ConfigMisterSection, AllowDelete, FileChecking
-from downloader.constants import FILE_downloader_ini, FOLDER_downloader, DEFAULT_UPDATE_LINUX_ENV, K_DEFAULT_DB_ID, K_BASE_PATH, \
+from downloader.constants import FILE_downloader_ini, FOLDER_downloader, DEFAULT_UPDATE_LINUX_ENV, K_DEFAULT_DB_ID, K_BASE_PATH, DISTRIBUTION_MISTER_DB_ID, \
     K_DB_URL, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER, K_BASE_SYSTEM_PATH, \
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, \
@@ -118,11 +118,11 @@ class ConfigReader:
 
         self._logger.debug('Read sections done.')
 
-        self._load_drop_in_databases(config_path, result, default_db)
-
         if len(result['databases']) == 0:
             self._logger.debug('Reading default db')
             self._add_default_database(ini_config, result)
+
+        self._load_drop_in_databases(config_path, result, default_db)
 
         if self._env['ALLOW_REBOOT'] is not None:
             result['allow_reboot'] = AllowReboot(int(self._env['ALLOW_REBOOT']))
@@ -223,6 +223,9 @@ class ConfigReader:
 
                 if section_id == 'mister':
                     raise InvalidConfigParameter("Drop-in file '%s' contains a [MiSTer] section. Global settings are only allowed in the base downloader.ini." % drop_in_path)
+
+                if section_id == DISTRIBUTION_MISTER_DB_ID:
+                    raise InvalidConfigParameter("Drop-in file '%s' contains a [%s] section. The main distribution database is only allowed in the base downloader.ini." % (drop_in_path, DISTRIBUTION_MISTER_DB_ID))
 
                 if section_id in result['databases']:
                     self._logger.print("WARNING: Drop-in file '%s' defines database '%s' which is already defined in '%s', skipping." % (drop_in_path, section_id, db_sources[section_id]))

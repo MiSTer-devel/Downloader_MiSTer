@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from contextlib import contextmanager
 from email.utils import parsedate_to_datetime
 from typing import Literal, Type, Any, Optional, Generator, Union, Protocol, TypeVar, Generic, TypedDict
-from urllib.parse import urlparse, ParseResult, urlunparse
+from urllib.parse import urlparse, ParseResult, urlunparse, urljoin
 from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, HTTPException
 from types import TracebackType
 
@@ -162,10 +162,7 @@ class HttpGateway:
         if self._logger is not None: self._logger.debug(f'HTTP {conn.response.status}! Resource moved: {url} -> {location}\n\n')
         conn.finish_response()
 
-        if location[0] == '/':
-            location = f'{parsed_url.scheme}://{parsed_url.netloc}{location}'
-
-        location = self._process_url(location)
+        location = self._process_url(urljoin(url, location))
         parsed_location = urlparse(location)
         if parsed_location.scheme not in {'http', 'https'}:
             if self._logger is not None: self._logger.debug(f"Location URL '{location}' has wrong scheme '{parsed_location.scheme}'. Ignoring it.")

@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Version 2.4 - 2026-03-07
+
+### Added
+- Drop-in database files: extend `downloader.ini` by adding databases in separate `.ini` files, without editing the main configuration. Supported patterns are `downloader_*.ini` files (e.g. `downloader_arcade.ini`) and files inside the `downloader/` folder (e.g. `downloader/arcade.ini`). Each file uses the same INI format with database sections (e.g. `[arcade_db]` with a `db_url` entry). Only database sections are allowed; `[MiSTer]` global settings must remain in the main `downloader.ini`. See [docs/drop-in-databases.md](docs/drop-in-databases.md) for details.
+- Big file downloads (hundreds of MBs to a few GBs) are now supported. The `downloader_timeout` (now defaulting to 180s, with a minimum effective value of 60s) only affects stalled connections, so large file downloads are no longer interrupted by timeouts.
+- New `archives` database field, which publicly documents a mechanism that has been used internally for a while but was not previously specified. It allows bundling large file collections into compressed downloads. Currently only the ZIP format is supported. See [docs/custom-databases-archives.md](docs/custom-databases-archives.md) for the full specification.
+- File entanglement feature. Different file versions that represent the same functional entity can now be declared as entangled via the `tangle` property in database files. When a newer version fails to download, the older version is preserved instead of being deleted. For example, `PSX_20250101.rbf` and `PSX_20250202.rbf` are both the PSX core at different points in time — if the newer one fails to download, the older one is kept so the core remains working.
+- Verify Integrity report displayed in the end summary when using `file_checking = verify_integrity`. It shows the number of files verified, how many passed, and how many failed verification and were reinstalled.
+- Log rotation. Previous log files are now preserved across runs, keeping up to 5 older copies (e.g. `downloader.log`, `downloader_old1.log`, ..., `downloader_old5.log`). Enabled by default, can be disabled with `rotate_logs = false`.
+### Changed
+- Free space checks are no longer performed on the PC launcher, improving compatibility across different operating systems and situations.
+- HTTP client improvements: the single `timeout` has been split into `read_timeout` (60s), `connect_timeout` (15s), and `keep_alive_timeout` (120s) for finer control over connection behavior. Also improved redirect handling and HTTP proxy support.
+- Cross-platform build and launcher testing in CI workflows.
+- Section header and end summary separator lines now adapt to the terminal width.
+- Databases are now blocked from installing `downloader.ini` or drop-in INI files.
+- Restricted `allow_delete` to the online importer. This fixes a bug where some temp files could be left behind when `allow_delete` was set to a non-default value.
+- Improved SSL certificate handling with `SSL_CERT_FILE` support.
+- Improved file download resilience against unexpected power loss on exFAT SD cards.
+- Various bug fixes and minor improvements.
+
+### Removed
+- The `header` database property is no longer supported.
+
 ## Version 2.3 - 2025-11-21
 
 ### Added

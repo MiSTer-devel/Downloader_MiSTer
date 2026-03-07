@@ -51,9 +51,18 @@ class DbEntity:
         if not isinstance(self.files, dict): raise DbEntityValidationException(f'Database "{section}" needs a valid "files" field. The database maintainer should fix this.')
         self.folders: dict[str, Any] = db_props['folders']
         if not isinstance(self.folders, dict): raise DbEntityValidationException(f'Database "{section}" needs a valid "folders" field. The database maintainer should fix this.')
-
         self.zips: dict[str, Any] = db_props.get('zips', {})
         if not isinstance(self.zips, dict): raise DbEntityValidationException(f'Database "{section}" needs a valid "zips" field. The database maintainer should fix this.')
+
+        # @TODO: We should do all of this processing to a later stage in the online importer workers sequence
+        # PROCESSING BLOCK BEGIN
+        for zip_desc in self.zips.values():
+            zip_desc['format'] = 'zip'
+        archives: dict[str, Any] = db_props.get('archives', {})
+        if not isinstance(archives, dict): raise DbEntityValidationException(f'Database "{section}" needs a valid "archives" field. The database maintainer should fix this.')
+        self.zips.update({k: rename_archive_to_zip_fields(v) for k, v in archives.items()})
+        # PROCESSING BLOCK END
+
         self.base_files_url: str = db_props.get('base_files_url', '')
         if not isinstance(self.base_files_url, str): raise DbEntityValidationException(f'Database "{section}" needs a valid "base_files_url" field. The database maintainer should fix this.')
         self.tag_dictionary: dict[str, int] = db_props.get('tag_dictionary', {})
@@ -127,6 +136,8 @@ class ZipIndexEntity:
         )
 
 def check_zip_description(desc: dict[str, Any], db_id: str, zip_id: str) -> None:
+    if 'format' not in desc or desc['format'] != 'zip':
+        raise DbEntityValidationException(f'Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "format" field. The database maintainer should fix this.')
     if 'kind' not in desc or desc['kind'] not in ('extract_all_contents', 'extract_single_files'):
         raise DbEntityValidationException(f'Invalid zip "{zip_id}" for database: {db_id}. It needs to contain a valid "kind" field. The database maintainer should fix this.')
     if 'description' not in desc or not isinstance(desc['description'], str):
@@ -157,6 +168,7 @@ def check_zip_description(desc: dict[str, Any], db_id: str, zip_id: str) -> None
         del desc['path']
 
 def check_zip_summary(summary: dict[str, Any], db_id: str, zip_id: str) -> None:
+    rename_archive_summaries_to_zip_fields(summary)  # @TODO: Remove this once we migrate the fields in the store, and we forbid dbs with zips
     if 'files' not in summary or not isinstance(summary['files'], dict):
         raise DbEntityValidationException(f'Invalid zip summary "{zip_id}" for database: {db_id}. Summary needs valid files dictionary. The database maintainer should fix this.')
     if 'folders' not in summary or not isinstance(summary['folders'], dict):
@@ -284,6 +296,43 @@ invalid_root_folders: Final[tuple[str, ...]] = tuple(item.lower() for item in [F
 folders_with_non_overridable_files: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_saves])
 exceptional_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FOLDER_linux, FOLDER_gamecontrollerdb, FILE_gamecontrollerdb, FILE_gamecontrollerdb_user, FILE_yc_txt])
 distribution_mister_exceptional_paths: Final[tuple[str, ...]] = tuple(item.lower() for item in [FILE_PDFViewer, FILE_lesskey, FILE_glow])
+
+_ARCHIVE_FIELD_RENAMES: Final[dict[str, str]] = {
+    'archive_file': 'contents_file',
+    'summary_inline': 'internal_summary',
+    'target_folder': 'target_folder_path',
+}
+
+_ARCHIVE_EXTRACT_RENAMES: Final[dict[str, str]] = {
+    'all': 'extract_all_contents',
+    'selective': 'extract_single_files',
+}
+
+def rename_archive_summaries_to_zip_fields(summary: dict[str, Any]) -> None:
+    for entry in summary.get('files', {}).values():
+        if 'arc_id' in entry:
+            entry['zip_id'] = entry.pop('arc_id')
+        if 'arc_at' in entry:
+            entry['zip_path'] = entry.pop('arc_at')
+    for entry in summary.get('folders', {}).values():
+        if 'arc_id' in entry:
+            entry['zip_id'] = entry.pop('arc_id')
+
+def rename_archive_to_zip_fields(desc: dict[str, Any]) -> dict[str, Any]:
+    result = {**desc}
+    for new_name, old_name in _ARCHIVE_FIELD_RENAMES.items():
+        if new_name in result:
+            result[old_name] = result.pop(new_name)
+
+    if 'extract' in result:
+        extract_value = result.pop('extract')
+        if extract_value in _ARCHIVE_EXTRACT_RENAMES:
+            result['kind'] = _ARCHIVE_EXTRACT_RENAMES[extract_value]
+        else:
+            result['kind'] = extract_value
+    return result
+
+
 
 class DbEntityValidationException(DownloaderError): pass
 class DbVersionUnsupportedException(DownloaderError): pass

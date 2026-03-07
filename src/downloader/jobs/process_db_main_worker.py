@@ -55,7 +55,7 @@ class ProcessDbMainWorker(DownloaderWorker):
 
             job.removed_zips.append(zip_id)
 
-        if len(db.zips) > 0:
+        if db.zips:
             zip_jobs = []
             zip_job_tags = []
 
