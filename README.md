@@ -140,12 +140,6 @@ NOTE: If you manually add custom databases, you might want to make sure that you
 
 *Drop-in database files* extend `downloader.ini` by letting you [add databases in separate files](docs/drop-in-databases.md), without editing the main configuration. Just copy a `.ini` file to your SD card and the downloader picks it up automatically.
 
-### Custom INI file
-
-You can use a different INI file by renaming the launcher `update.sh` to your preferred name. After renaming the launcher, it will use an INI file with the same name but with the .ini extension. For instance, if you rename the launcher to `/media/fat/Scripts/my_custom_name.sh`, it will use the INI file `/media/fat/my_custom_name.ini` instead of `/media/fat/downloader.ini`.
-
-This flexibility allows for various use cases, such as running a specific database in isolation.
-
 ### How to avoid executing remote code altogether
 
 If you're concerned about executing a build that the launcher fetches from the web, you can avoid this by manually installing the latest version of Downloader's build. Just get [this file](https://github.com/MiSTer-devel/Downloader_MiSTer/releases/download/latest/dont_download.zip) and save it at `/media/fat/Scripts/.config/downloader/downloader_latest.zip` (remember to rename the file as instructed). You can verify the file's integrity using the provided MD5 checksum [here](https://github.com/MiSTer-devel/Downloader_MiSTer/releases/tag/latest).
