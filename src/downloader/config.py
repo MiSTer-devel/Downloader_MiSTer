@@ -31,6 +31,7 @@ from downloader.http_gateway import HttpConfig
 class Environment(TypedDict):
     DOWNLOADER_LAUNCHER_PATH: Optional[str]
     DOWNLOADER_INI_PATH: Optional[str]
+    EXTRA_DROP_IN_DATABASE_FILES: str
     LOGFILE: Optional[str]
     LOGLEVEL: str
     CURL_SSL: str
@@ -191,4 +192,3 @@ def download_sensitive_configs() -> list[str]:
 
 class InvalidConfigParameter(DownloaderError):
     pass
-

@@ -64,13 +64,14 @@ def read_env(default_commit: Optional[str]) -> Environment:
     # The default_commit should be coming from the commit.py file which is produced by the building process.
     # It's not under version control, so if it's not present, it will come as "None".
     from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, DEFAULT_CURL_SSL_OPTIONS, \
-    KENV_DOWNLOADER_INI_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, KENV_CURL_SSL, KENV_COMMIT, KENV_ALLOW_REBOOT, \
+    KENV_DOWNLOADER_INI_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, KENV_EXTRA_DROP_IN_DATABASE_FILES, KENV_CURL_SSL, KENV_COMMIT, KENV_ALLOW_REBOOT, \
     KENV_UPDATE_LINUX, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_DEBUG, \
     KENV_FAIL_ON_FILE_ERROR, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, KENV_FORCED_BASE_PATH, \
     KENV_SSL_CERT_FILE
     return {
         'DOWNLOADER_LAUNCHER_PATH': os.getenv(KENV_DOWNLOADER_LAUNCHER_PATH, None),
         'DOWNLOADER_INI_PATH': os.getenv(KENV_DOWNLOADER_INI_PATH, None),
+        'EXTRA_DROP_IN_DATABASE_FILES': os.getenv(KENV_EXTRA_DROP_IN_DATABASE_FILES, ''),
         'LOGFILE': os.getenv(KENV_LOGFILE, None),
         'LOGLEVEL': os.getenv(KENV_LOGLEVEL, '').lower(),  # info | debug, http
         'CURL_SSL': os.getenv(KENV_CURL_SSL, DEFAULT_CURL_SSL_OPTIONS),

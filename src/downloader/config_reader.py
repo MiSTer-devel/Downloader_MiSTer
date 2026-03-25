@@ -32,7 +32,7 @@ from downloader.constants import FILE_downloader_ini, FOLDER_downloader, DEFAULT
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, \
     STORAGE_PRIORITY_PREFER_EXTERNAL, EXIT_ERROR_WRONG_SETUP, K_BENCH, K_HTTP_PROXY, FILE_CHECKING_FASTEST, \
-    FILE_CHECKING_BALANCED, FILE_CHECKING_EXHAUSTIVE, FILE_CHECKING_VERIFY_INTEGRITY
+    FILE_CHECKING_BALANCED, FILE_CHECKING_EXHAUSTIVE, FILE_CHECKING_VERIFY_INTEGRITY, KENV_EXTRA_DROP_IN_DATABASE_FILES
 from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
 from downloader.http_gateway import http_config, HttpGatewayException
 from downloader.logger import Logger
@@ -239,6 +239,9 @@ class ConfigReader:
         self._logger.bench('ConfigReader Read drop-in databases end.')
 
     def _discover_drop_in_files(self, config_path: str) -> list[str]:
+        return _deduplicate_drop_in_files(self._discover_fs_drop_in_files(config_path) + self._discover_extra_drop_in_files())
+
+    def _discover_fs_drop_in_files(self, config_path: str) -> list[str]:
         config_dir = str(Path(config_path).parent)
         d_dir = os.path.join(config_dir, FOLDER_downloader)
 
@@ -249,6 +252,17 @@ class ConfigReader:
         star_files = [f for f in glob.glob(os.path.join(config_dir, 'downloader_*.ini')) if _is_eligible_drop_in(f)]
 
         return sorted(d_files) + sorted(star_files)
+
+    def _discover_extra_drop_in_files(self) -> list[str]:
+        extra_drop_ins = []
+        for part in self._env.get(KENV_EXTRA_DROP_IN_DATABASE_FILES, '').split(' '):
+            path = part.strip().lower()
+            if not path.endswith('.ini'):
+                continue
+            if not os.path.isfile(path):
+                continue
+            extra_drop_ins.append(path)
+        return extra_drop_ins
 
     def _load_drop_in_ini(self, drop_in_path: str) -> configparser.ConfigParser:
         return self._load_ini_config(drop_in_path)
@@ -387,6 +401,17 @@ def _is_eligible_drop_in(path: str) -> bool:
     if basename.startswith('.'):
         return False
     return basename.endswith('.ini')
+
+
+def _deduplicate_drop_in_files(paths: list[str]) -> list[str]:
+    result = []
+    seen = set()
+    for path in paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        result.append(path)
+    return result
 
 
 TOptStr = TypeVar('TOptStr', str, Optional[str])
