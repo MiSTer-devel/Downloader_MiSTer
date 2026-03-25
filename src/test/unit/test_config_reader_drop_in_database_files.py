@@ -19,9 +19,9 @@
 import unittest
 
 from downloader.config import InvalidConfigParameter
-from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, KENV_EXTRA_DROP_IN_DATABASE_FILES
 from test.fake_config_reader import ConfigReader
-from test.objects import ini
+from test.objects import ini, default_env
 
 
 base_id = 'base_db'
@@ -40,9 +40,9 @@ class TestConfigReaderDownloaderIniExtensions(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
 
-    def read_config(self, files: dict):
+    def read_config(self, files: dict, env=None):
         config_path = next(iter(files))
-        reader = ConfigReader(file_contents=files)
+        reader = ConfigReader(env=env or default_env(), file_contents=files)
         result = reader.read_config(config_path)
         result['databases'] = _make_comparable(result['databases'])
         return result
@@ -84,6 +84,30 @@ class TestConfigReaderDownloaderIniExtensions(unittest.TestCase):
         }))
 
         self.assertEqual(list(sut['databases'].keys()), [base_id, db1_id, db2_id])
+
+    def test_read_config___with_extra_drop_in_env___adds_existing_non_scanned_ini_files(self):
+        env = default_env()
+        env[KENV_EXTRA_DROP_IN_DATABASE_FILES] = '  EXTRAS/CUSTOM.INI   missing.ini   notes.txt  '
+
+        sut = self.read_config(fs({
+            'downloader.ini': ini({base_id: base_db}),
+            'extras/custom.ini': ini({extra_id: extra_db}),
+        }), env=env)
+
+        self.assertEqual(databases({base_id: base_db, extra_id: extra_db}), sut['databases'])
+        self.assertEqual([], sut['ignored_databases'])
+
+    def test_read_config___with_extra_drop_in_env_matching_scanned_file___deduplicates_the_file(self):
+        env = default_env()
+        env[KENV_EXTRA_DROP_IN_DATABASE_FILES] = 'downloader/extra.ini downloader/extra.ini'
+
+        sut = self.read_config(fs({
+            'downloader.ini': ini({base_id: base_db}),
+            'downloader/extra.ini': ini({extra_id: extra_db}),
+        }), env=env)
+
+        self.assertEqual(databases({base_id: base_db, extra_id: extra_db}), sut['databases'])
+        self.assertEqual([], sut['ignored_databases'])
 
     # --- File Eligibility Filter ---
 

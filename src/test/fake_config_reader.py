@@ -19,6 +19,7 @@
 import configparser
 from typing import Optional
 
+from downloader.constants import KENV_EXTRA_DROP_IN_DATABASE_FILES
 from downloader.config_reader import ConfigReader as ProductionConfigReader
 from test.fake_logger import NoLogger
 from test.objects import default_env
@@ -36,9 +37,9 @@ class ConfigReader(ProductionConfigReader):
         ini_config.read_string(self._file_contents.get(config_path, ''))
         return ini_config
 
-    def _discover_drop_in_files(self, config_path: str) -> list[str]:
+    def _discover_fs_drop_in_files(self, config_path: str) -> list[str]:
         if self._file_contents is None:
-            return super()._discover_drop_in_files(config_path)
+            return super()._discover_fs_drop_in_files(config_path)
         base_name = config_path.rsplit('/', 1)[0] if '/' in config_path else ''
         prefix = (base_name + '/') if base_name else ''
 
@@ -57,6 +58,19 @@ class ConfigReader(ProductionConfigReader):
                 star_files.append(path)
 
         return sorted(d_files) + sorted(star_files)
+
+    def _discover_extra_drop_in_files(self) -> list[str]:
+        if self._file_contents is None:
+            return super()._discover_extra_drop_in_files()
+        extra_drop_ins = []
+        for part in self._env.get(KENV_EXTRA_DROP_IN_DATABASE_FILES, '').split(' '):
+            path = part.strip().lower()
+            if not path.endswith('.ini'):
+                continue
+            if path not in self._file_contents:
+                continue
+            extra_drop_ins.append(path)
+        return extra_drop_ins
 
     def _load_drop_in_ini(self, drop_in_path: str) -> configparser.ConfigParser:
         if self._file_contents is None:
