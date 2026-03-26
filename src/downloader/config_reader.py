@@ -254,14 +254,20 @@ class ConfigReader:
         return sorted(d_files) + sorted(star_files)
 
     def _discover_extra_drop_in_files(self) -> list[str]:
+        extra_drop_in_db_files = self._env.get(KENV_EXTRA_DROP_IN_DATABASE_FILES, '').strip()
+        if not extra_drop_in_db_files:
+            return []
+
         extra_drop_ins = []
-        for part in self._env.get(KENV_EXTRA_DROP_IN_DATABASE_FILES, '').split(' '):
+        self._logger.debug(f'Processing extra drop-in db files parts: {extra_drop_in_db_files}')
+        for part in extra_drop_in_db_files.split(' '):
             path = part.strip().lower()
             if not path.endswith('.ini'):
                 continue
             if not os.path.isfile(path):
                 continue
             extra_drop_ins.append(path)
+        self._logger.debug(f'Extra drop-in database files:', extra_drop_ins)
         return extra_drop_ins
 
     def _load_drop_in_ini(self, drop_in_path: str) -> configparser.ConfigParser:
