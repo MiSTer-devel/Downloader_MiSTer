@@ -189,7 +189,7 @@ The format of the aforementioned JSON file should be as follow:
     "db_files": [],
         
     /**
-     * [Optional] Databases can specify default options, like default filters, default downloader_timeout (minimum effective value: 60 seconds), etc... 
+     * [Optional] Databases can specify default options, like default filters.
      */
     "default_options": {
         // Documented in the "Default Options" section of this page.
