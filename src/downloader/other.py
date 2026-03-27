@@ -64,7 +64,10 @@ def format_files_message(file_list: list[str]) -> str:
         printable = [Path(file).name for file in (rbfs + mras)] + urls
 
     if len(alts) > 0:
-        printable.append('MRA Alternatives')
+        if len(printable) > 6 or len(alts) > 20:
+            printable.append('MRA Alternatives')
+        else:
+            printable = printable + alts
 
     there_are_other_files = False
     if len(printable) == 0:
