@@ -21,6 +21,7 @@ from downloader.constants import K_BASE_PATH
 from downloader.fail_policy import FailPolicy
 from test.fake_file_system_factory import fs_data
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
+from test.fake_logger import NoLogger, SpyLoggerDecorator
 from test.objects import db_test_descr, empty_zip_summary, folder_games_nes, store_descr, empty_test_store, media_fat, db_entity, file_a, archive_file_a_descr, archive_desc, zip_desc, archive_nes_palettes_id
 from test.fake_online_importer import OnlineImporter
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
@@ -354,6 +355,29 @@ class TestOnlineImporterWithArchives(OnlineImporterTestBase):
         self.assertIn('games/NeoGeo/bios.rom', store['files'])
         self.assertEqual(1, self.sut.jobs_tracks().get('job_started', {}).get('FetchFileJob', 0))
         self.assertSutReports(['games/NeoGeo/bios.rom'])
+
+    def test_download_selective_archive_with_missing_zip_member_path___logs_clear_debug_context(self):
+        logger = SpyLoggerDecorator(NoLogger())
+        sut = OnlineImporter.from_implicit_inputs(self.implicit_inputs, logger=logger)
+
+        archive = archive_desc("Extracting BIOS", extract="selective", summary={
+            "files": {'games/NeoGeo/bios.rom': {"hash": "aabb", "size": 1024, "zip_path": "wrong/bios.rom"}},
+            "folders": {"games": {}, "games/NeoGeo": {}},
+        }, zipped_files={
+            "files": {"bios.rom": {"hash": "aabb", "size": 1024}},
+            "folders": {}
+        }, summary_internal_archive_id='sel_bios')
+        archive.pop('base_files_url')
+        db = db_test_descr(archives={'sel_bios': archive})
+        db.base_files_url = ''
+        store = empty_test_store()
+
+        sut.add_db(db, store).download()
+
+        self.assertReports(sut, [], errors=['games/NeoGeo/bios.rom'])
+        debug_messages = [''.join(str(part) for part in call) for call in logger.debugCalls]
+        self.assertTrue(any('missing extracted files' in message and 'wrong/bios.rom' in message for message in debug_messages))
+        self.assertTrue(any('unrecoverable extracted files' in message and 'base_files_url' in message for message in debug_messages))
 
     def download_zipped_cheats_folder(self, input_store, from_zip_content, is_internal_summary=False, save=True):
         summary_internal_archive_id = cheats_folder_id if is_internal_summary else None

@@ -82,12 +82,27 @@ class OpenZipContentsWorker(DownloaderWorker):
 
         self._logger.bench('OpenZipContentsWorker validating...', job.db.db_id, job.zip_id)
 
-        existing_files, invalid_files = self._process_index_ctx.file_system.are_files(job.files_to_unzip)
+        existing_files, missing_files = self._process_index_ctx.file_system.are_files(job.files_to_unzip)
+        if len(missing_files) > 0:
+            self._logger.debug(
+                f'OpenZipContentsWorker missing extracted files for db "{job.db.db_id}" zip "{job.zip_id}". '
+                f'count: {len(missing_files)} requested_members: ', target_path
+            )
+
+        hash_mismatched_files: list[PathPackage] = []
         for file_pkg in existing_files:
-            if self._process_index_ctx.file_system.hash(file_pkg.full_path) == file_pkg.description['hash']:
+            fs_hash = self._process_index_ctx.file_system.hash(file_pkg.full_path)
+            if fs_hash == file_pkg.description['hash']:
                 job.validated_files.append(file_pkg)
             else:
-                invalid_files.append(file_pkg)
+                self._logger.debug(
+                    f'OpenZipContentsWorker extracted file hash mismatch for db "{job.db.db_id}" zip "{job.zip_id}". '
+                    f'rel_path: "{file_pkg.rel_path}" '
+                    f'fs_hash: "{fs_hash}" desc_hash: "{file_pkg.description["hash"]}"'
+                )
+                hash_mismatched_files.append(file_pkg)
+
+        invalid_files = missing_files + hash_mismatched_files
 
         self._logger.bench('OpenZipContentsWorker validation done...', job.db.db_id, job.zip_id)
 
@@ -95,6 +110,12 @@ class OpenZipContentsWorker(DownloaderWorker):
             return [], None
 
         recoverable_files, unrecoverable_files = self._split_invalid_files_by_recovery_source(invalid_files, job.zip_base_files_url)
+        if len(unrecoverable_files) > 0:
+            self._logger.debug(
+                f'OpenZipContentsWorker unrecoverable extracted files for db "{job.db.db_id}" zip "{job.zip_id}" '
+                f'because neither file urls nor base_files_url are available. '
+                f'count: {len(unrecoverable_files)} requested_members: ', target_path
+            )
         job.failed_files.extend(unrecoverable_files)
 
         if len(recoverable_files) == 0:
