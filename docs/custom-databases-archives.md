@@ -36,7 +36,7 @@ A full archive descriptor has the following fields:
         // OR
         "summary_file": { ... },
 
-        "base_files_url": "https://raw.githubusercontent.com/...", // [Optional] Base URL for individual file downloads
+        "base_files_url": "https://raw.githubusercontent.com/...", // [Optional] Base URL for per-file fallback downloads
         "path": "pext"                                             // [Optional] Enable external storage (see custom-databases.md)
     }
 }
@@ -48,6 +48,7 @@ Every archive descriptor must include exactly one of `summary_inline` or `summar
 
 - When `extract` is `"all"`, the summary is used to track installed files for hash verification and cleanup of removed entries on subsequent runs.
 - When `extract` is `"selective"`, the summary determines **which** files will be extracted from the archive, and is also used for tracking.
+- Files listed in archive summaries may omit both `url` and the archive `base_files_url`. If no database-level `base_files_url` is available either, Downloader can only install them by extracting from `archive_file`; if extraction or post-extraction validation fails, there is no per-file fallback download.
 
 > **Note:** If both `summary_inline` and `summary_file` are provided, `summary_file` takes priority and `summary_inline` is ignored.
 
