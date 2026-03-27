@@ -326,19 +326,33 @@ class TestOnlineImporterWithArchives(OnlineImporterTestBase):
 
 
     def test_download_selective_archive_with_summary_file___on_empty_store___extracts_file_from_zip(self):
-        store = self.download(db_test_descr(archives={
-            'sel_bios': archive_desc("Extracting BIOS", extract="selective", summary={
-                "files": {'games/NeoGeo/bios.rom': {"hash": "aabb", "size": 1024, "arc_id": "sel_bios", "arc_at": "bios.rom"}},
-                "folders": {"games": {}, "games/NeoGeo": {}},
-            }, zipped_files={
-                "files": {"bios.rom": {"hash": "aabb", "size": 1024}},
-                "folders": {}
-            })
-        }), empty_test_store())
+        store = self.download(db_test_descr(archives={'sel_bios': _selective_bios_archive_desc()}), empty_test_store())
 
         self.assertIn('games/NeoGeo/bios.rom', store['files'])
         self.assertEqual('sel_bios', store['files']['games/NeoGeo/bios.rom']['zip_id'])
         self.assertEqual('extract_single_files', store['zips']['sel_bios']['kind'])
+        self.assertSutReports(['games/NeoGeo/bios.rom'])
+
+    def test_download_selective_archive_with_summary_file_and_no_file_urls_or_archive_base_files_url___on_empty_store___extracts_file_from_zip(self):
+        selective_archive = _selective_bios_archive_desc()
+        selective_archive.pop('base_files_url')
+        db = db_test_descr(archives={'sel_bios': selective_archive})
+        db.base_files_url = ''
+
+        store = self.download(db, empty_test_store())
+
+        self.assertIn('games/NeoGeo/bios.rom', store['files'])
+        self.assertNotIn('base_files_url', store['zips']['sel_bios'])
+        self.assertSutReports(['games/NeoGeo/bios.rom'])
+
+    def test_download_selective_archive_with_summary_file_and_only_db_base_files_url___on_invalid_extracted_file___falls_back_without_reporting_failure(self):
+        selective_archive = _selective_bios_archive_desc(zipped_file_hash='wrong')
+        selective_archive.pop('base_files_url')
+
+        store = self.download(db_test_descr(archives={'sel_bios': selective_archive}), empty_test_store())
+
+        self.assertIn('games/NeoGeo/bios.rom', store['files'])
+        self.assertEqual(1, self.sut.jobs_tracks().get('job_started', {}).get('FetchFileJob', 0))
         self.assertSutReports(['games/NeoGeo/bios.rom'])
 
     def download_zipped_cheats_folder(self, input_store, from_zip_content, is_internal_summary=False, save=True):
@@ -411,6 +425,16 @@ def db_with_unibios_from_official_url():
             }
         }
     )
+
+
+def _selective_bios_archive_desc(zipped_file_hash: str = 'aabb'):
+    return archive_desc("Extracting BIOS", extract="selective", summary={
+        "files": {'games/NeoGeo/bios.rom': {"hash": "aabb", "size": 1024, "arc_id": "sel_bios", "arc_at": "bios.rom"}},
+        "folders": {"games": {}, "games/NeoGeo": {}},
+    }, zipped_files={
+        "files": {"bios.rom": {"hash": zipped_file_hash, "size": 1024}},
+        "folders": {}
+    })
 
 
 def store_with_unibios_from_zip():

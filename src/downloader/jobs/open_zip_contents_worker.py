@@ -94,11 +94,26 @@ class OpenZipContentsWorker(DownloaderWorker):
         if len(invalid_files) == 0:
             return [], None
 
-        if job.zip_base_files_url == '':
-            for file_pkg in invalid_files:
-                if 'url' not in file_pkg.description:
-                    job.failed_files.append(file_pkg)
+        recoverable_files, unrecoverable_files = self._split_invalid_files_by_recovery_source(invalid_files, job.zip_base_files_url)
+        job.failed_files.extend(unrecoverable_files)
+
+        if len(recoverable_files) == 0:
+            return [], None
 
         self._logger.bench('OpenZipContentsWorker launching recovery process index...', job.db.db_id, job.zip_id)
 
-        return create_fetch_jobs(self._process_index_ctx, job.db.db_id, invalid_files, [], set(), job.zip_description.get('base_files_url', job.db.base_files_url)), None
+        return create_fetch_jobs(self._process_index_ctx, job.db.db_id, recoverable_files, [], set(), job.zip_base_files_url), None
+
+    @staticmethod
+    def _split_invalid_files_by_recovery_source(file_pkgs: list[PathPackage], base_files_url: str) -> tuple[list[PathPackage], list[PathPackage]]:
+        recoverable_files: list[PathPackage] = []
+        unrecoverable_files: list[PathPackage] = []
+        has_base_files_url = base_files_url != ''
+
+        for file_pkg in file_pkgs:
+            if has_base_files_url or 'url' in file_pkg.description:
+                recoverable_files.append(file_pkg)
+            else:
+                unrecoverable_files.append(file_pkg)
+
+        return recoverable_files, unrecoverable_files
