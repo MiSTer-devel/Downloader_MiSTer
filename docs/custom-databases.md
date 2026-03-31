@@ -178,15 +178,6 @@ The format of the aforementioned JSON file should be as follow:
         "sometag": 0,
         "othertag": 1
     }
-  
-  
-    /**
-     * [Optional] Local databases to import before fecthing the online databases.
-     *            During the local import, nothing is fetched. Only the local store is updated if the files
-     *            from the local databases matches with the files on the filesystem.
-     *            These loccal databases will be imported just once, then the file will be removed.
-     */
-    "db_files": [],
         
     /**
      * [Optional] Databases can specify default options, like default filters.
