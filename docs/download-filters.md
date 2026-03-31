@@ -8,7 +8,7 @@ By default **downloader** will download everything that's available, based on yo
 
 1. Edit the file at `/media/fat/downloader.ini`
 1. Add a line that starts with `filter =` under the `[mister]` section (if it doesn't exist, just create it).
-1. Then, after `filter =`, add the filter terms themselves (also known as "tags").
+1. Then, after `filter =`, add the filter terms themselves. Filter terms are also known as tags.
 
   - A list of official MiSTer filter terms [is available here](https://github.com/MiSTer-devel/Distribution_MiSTer?tab=readme-ov-file#tags-that-you-may-use-with-download-filters-feature)
   - You can also find terms for [Jotego Cores](https://github.com/jotego/jtcores_mister?tab=readme-ov-file#list-of-tags-that-you-may-use-with-the-downloader-filters).
