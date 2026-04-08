@@ -190,7 +190,7 @@ class TestSandboxedInstall(SandboxTestBase):
 
         self.assertExecutesCorrectly('test/system/fixtures/sandboxed_install/relocated_db/sandbox.ini', {
             'local_store': {
-                'db_sigs': {},
+                'db_fingerprints': {},
                 'dbs': {
                     'sandbox': {
                         K_BASE_PATH: '/tmp/delme_relocated',

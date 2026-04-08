@@ -48,9 +48,12 @@ class TestWriteIncomingStream(unittest.TestCase):
         data = b'hello world'
         stream = io.BytesIO(data)
         fs = self.sut()
-        size, md5 = fs.write_incoming_stream(stream, self.target(), 180)
+        target = self.target()
+        size = fs.write_incoming_stream(stream, target, 180)
         self.assertEqual(size, len(data))
         self.assertEqual(size, fs.size(self.target()))
+
+        md5 = fs.hash(target)
         self.assertEqual(md5, hashlib.md5(data).hexdigest())
         self.assertEqual(md5, fs.hash(self.target()))
 
@@ -72,9 +75,13 @@ class TestWriteIncomingStream(unittest.TestCase):
 
         data = b'hello world'
         stream = StallOnceStream(data)
-        size, md5 = self.sut(time_monotonic=fake_monotonic).write_incoming_stream(stream, self.target(), 180)
+        fs = self.sut(time_monotonic=fake_monotonic)
+        target = self.target()
+        size = fs.write_incoming_stream(stream, target, 180)
         self.assertEqual(size, len(data))
-        self.assertEqual(md5, hashlib.md5(data).hexdigest())
+
+        md5 = fs.hash(target)
+        self.assertEqual(md5, fs.hash(target))
 
 
 

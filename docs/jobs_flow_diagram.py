@@ -22,7 +22,7 @@ dot.node('SKIP1', 'SKIP', shape='ellipse', fillcolor='#77DD77')
 dot.node('SKIP2', 'SKIP', shape='ellipse', fillcolor='#77DD77')
 dot.node('ABORT', 'ABORT', shape='ellipse', fillcolor='#ff8f8f')
 dot.node('A', 'FetchDataJob [db]')
-dot.node('B', 'LoadLocalStoreSigsJob', fillcolor='#ffefd5')
+dot.node('B', 'LoadLocalStoreFingerprintsJob', fillcolor='#ffefd5')
 dot.node('C', 'LoadLocalStoreJob', fillcolor='#ffefd5')
 dot.node('D', 'OpenDbJob', fillcolor='#B0E0E6')
 dot.node('E', 'MixStoreAndDbJob', fillcolor='#B0E0E6')
@@ -39,7 +39,7 @@ dot.edge('START', 'A', label='1:N')
 dot.edge('START', 'B')
 
 dot.edge('A', 'D', weight='10')
-dot.edge('D', 'C', weight='5', constraint='false', label=' N:1, if any db sig != store sig')
+dot.edge('D', 'C', weight='5', constraint='false', label=' N:1, if any db figp != store figp')
 dot.edge('D', 'E', weight='10', label=' db')
 dot.edge('E', 'F', weight='10', label=' db + store')
 dot.edge('F', 'G', weight='10', label=' if no zips')
@@ -47,7 +47,7 @@ dot.edge('F', 'G', weight='10', label=' if no zips')
 dot.edge('G', 'H', label=' 1:N')
 
 dot.edge('C', 'E', style='dotted', constraint='true', label='wait\nstore', dir='back')
-dot.edge('B', 'D', style='dotted', constraint='true', label='wait\nstore sig', dir='back')
+dot.edge('B', 'D', style='dotted', constraint='true', label='wait\nstore figp', dir='back')
 
 # Position SKIP1 at same rank as OpenDbJob (D)
 with dot.subgraph() as s:
@@ -76,8 +76,8 @@ dot.edge('H', 'H', label=' retry', style='dashed', constraint='false')
 
 dot.edge('H', 'END', weight='20', constraint='true')
 dot.edge('C', 'ABORT', weight='20', constraint='true', label=' if always fails', style='dashed', color=BACKUP_COLOR, fontcolor=BACKUP_COLOR)
-dot.edge('D', 'SKIP1', weight='1', constraint='false', label=' if db sig == store sig')
-dot.edge('E', 'SKIP2', weight='1', constraint='false', label=' if db sig == store sig')
+dot.edge('D', 'SKIP1', weight='1', constraint='false', label=' if db figp == store figp')
+dot.edge('E', 'SKIP2', weight='1', constraint='false', label=' if db figp == store figp')
 
 dot.render('jobs_diagram', format='png', cleanup=True)
 

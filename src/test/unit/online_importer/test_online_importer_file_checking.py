@@ -19,7 +19,7 @@
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data
 from test.objects import file_a_descr, file_a, folder_a, store_test_with_file_a_descr, db_test_with_file_a, config_with, \
-    db_test, sig_db_0, sig_db_1
+    db_test, figp_db_0, figp_db_1
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 from downloader.config import FileChecking
 
@@ -33,15 +33,15 @@ class TestOnlineImporterFileChecking(OnlineImporterTestBase):
 
     - FileChecking.VERIFY_INTEGRITY: Verify hash of all installed files, re-download corrupted ones
     - FileChecking.EXHAUSTIVE: Check file existence, install missing files even if in store
-    - FileChecking.FASTEST: Skip database processing if signature matches, fastest but may miss manual deletions
+    - FileChecking.FASTEST: Skip database processing if fingerprint matches, fastest but may miss manual deletions
 
     These modes balance between download speed and file integrity verification. FASTEST mode
-    uses database signatures to skip processing when nothing changed. VERIFY_INTEGRITY provides
+    uses database fingerprints to skip processing when nothing changed. VERIFY_INTEGRITY provides
     maximum protection against file corruption at the cost of hash computation overhead.
 
-    Note: For detailed coverage of the signature matching mechanism used by FASTEST mode, see
-    test_online_importer_skip_db_processing.py which tests edge cases around signature components,
-    invalid signatures, and filter changes.
+    Note: For detailed coverage of the fingerprint matching mechanism used by FASTEST mode, see
+    test_online_importer_skip_db_processing.py which tests edge cases around fingerprint components,
+    invalid fingerprints, and filter changes.
     """
 
     def test_download_on_verify_integrity___on_installed_db___verifies_successfully_that_file_and_nothing_else(self):
@@ -89,19 +89,19 @@ class TestOnlineImporterFileChecking(OnlineImporterTestBase):
         self.assertEqual(store_test_with_file_a_descr(), store)
         self.assertReports(sut, [], save=False, skipped_dbs=[db_test])
 
-    def test_download_on_fastest___not_matching_sig_on_installed_db___installs_missing_file_and_saves_store(self):
+    def test_download_on_fastest___not_matching_figp_on_installed_db___installs_missing_file_and_saves_store(self):
         store = store_test_with_file_a_descr()
 
-        sut = self.download_db_test(store, fs(fc=FileChecking.FASTEST, folders=[folder_a]), matching_sig=False)
+        sut = self.download_db_test(store, fs(fc=FileChecking.FASTEST, folders=[folder_a]), matching_fingerprint=False)
 
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_test_with_file_a_descr(), store)
         self.assertReports(sut, [file_a], save=True)
 
-    def download_db_test(self, store, fs_inputs, matching_sig=True):
-        db_sig = sig_db_0()
-        store_sig = sig_db_0() if matching_sig else sig_db_1()
-        return self._download_db(db_test_with_file_a(), store, fs_inputs, store_sig=store_sig, db_sig=db_sig)
+    def download_db_test(self, store, fs_inputs, matching_fingerprint=True):
+        db_fingerprint = figp_db_0()
+        store_figp = figp_db_0() if matching_fingerprint else figp_db_1()
+        return self._download_db(db_test_with_file_a(), store, fs_inputs, store_fingerprint=store_figp, db_fingerprint=db_fingerprint)
 
 def fs(files=None, folders=None, fc=None):
     return ImporterImplicitInputs(files=files, folders=folders, config=config_with(file_checking=fc))

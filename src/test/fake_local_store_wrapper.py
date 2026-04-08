@@ -17,7 +17,7 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 from typing import Any
 from downloader.local_store_wrapper import LocalStoreWrapper as ProductionLocalStoreWrapper, \
-    StoreWrapper as ProductionStoreWrapper, empty_db_state_signature
+    StoreWrapper as ProductionStoreWrapper, empty_db_state_fingerprint
 
 
 class LocalStoreWrapper(ProductionLocalStoreWrapper):
@@ -35,9 +35,9 @@ class LocalStoreWrapper(ProductionLocalStoreWrapper):
 
 class StoreWrapper(ProductionStoreWrapper):
     def __init__(self, store, top_wrapper=None, crate=None):
-        self._top_wrapper = top_wrapper or LocalStoreWrapper({'dbs': {}, 'db_sigs': {}}, crate)
-        super().__init__(store, empty_db_state_signature(), self._top_wrapper)
+        self._top_wrapper = top_wrapper or LocalStoreWrapper({'dbs': {}, 'db_fingerprints': {}}, crate)
+        super().__init__(store, empty_db_state_fingerprint(), self._top_wrapper)
 
 
 def local_store_wrapper(dbs: dict[str, dict[str, Any]]) -> LocalStoreWrapper:
-    return LocalStoreWrapper({'dbs': dbs, 'db_sigs': {}})
+    return LocalStoreWrapper({'dbs': dbs, 'db_fingerprints': {}})

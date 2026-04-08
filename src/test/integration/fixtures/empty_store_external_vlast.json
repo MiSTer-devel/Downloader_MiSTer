@@ -1,5 +1,5 @@
 {
-  "db_sigs": {},
+  "db_fingerprints": {},
   "dbs": {
     "distribution_mister": {
       "base_path": "/media/fat/",

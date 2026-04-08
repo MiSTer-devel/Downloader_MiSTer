@@ -21,11 +21,11 @@ from typing import Optional
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
     FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json, \
     FILE_downloader_storage_sigs_json, FILE_downloader_previous_free_space_json, \
-    FILE_downloader_storage_backup_pext
+    FILE_downloader_storage_backup_pext, FILE_downloader_storage_fingerprints_json
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.fail_policy import FailPolicy
 from downloader.file_system import FileSystem, FsError
-from downloader.local_store_wrapper import LocalStoreWrapper, DbStateSig
+from downloader.local_store_wrapper import LocalStoreWrapper, DbStateFingerprint
 from downloader.logger import FilelogSaver, Logger
 from downloader.other import empty_store_without_base_path
 from downloader.store_migrator import make_new_local_store, StoreMigrator
@@ -44,6 +44,7 @@ class LocalRepository(FilelogSaver):
         self._storage_path_old_value: Optional[str] = None
         self._storage_path_load_value: Optional[str] = None
         self._store_sigs_path_value: Optional[str] = None
+        self._store_fingerprints_path_value: Optional[str] = None
         self._previous_free_spaces_path_value: Optional[str] = None
         self._last_successful_run_value: Optional[str] = None
         self._logfile_path_value: Optional[str] = None
@@ -83,6 +84,12 @@ class LocalRepository(FilelogSaver):
         if self._store_sigs_path_value is None:
             self._store_sigs_path_value = os.path.join(self._config['base_system_path'], FILE_downloader_storage_sigs_json)
         return self._store_sigs_path_value
+
+    @property
+    def _store_fingerprints_path(self) -> str:
+        if self._store_fingerprints_path_value is None:
+            self._store_fingerprints_path_value = os.path.join(self._config['base_system_path'], FILE_downloader_storage_fingerprints_json)
+        return self._store_fingerprints_path_value
 
     @property
     def _previous_free_spaces_path(self) -> str:
@@ -162,10 +169,12 @@ class LocalRepository(FilelogSaver):
         finally:
             self._logger.bench('LocalRepository Load store done.')
 
-    def load_store_sigs(self) -> Optional[dict[str, DbStateSig]]:
-        self._logger.bench('LocalRepository Load store sigs start.')
+    def load_store_fingerprints(self) -> Optional[dict[str, DbStateFingerprint]]:
+        self._logger.bench('LocalRepository Load store fingerprints start.')
         try:
-            if self._file_system.is_file(self._store_sigs_path):
+            if self._file_system.is_file(self._store_fingerprints_path):
+                return self._file_system.load_dict_from_file(self._store_fingerprints_path)
+            elif self._file_system.is_file(self._store_sigs_path):
                 return self._file_system.load_dict_from_file(self._store_sigs_path)
             else:
                 return None
@@ -252,6 +261,12 @@ class LocalRepository(FilelogSaver):
 
         self._logger.bench('LocalRepository Save store start.')
         local_store = local_store_wrapper.unwrap_local_store()
+        store_replicas = local_store_wrapper.replicas()
+        for replica_db_id, replica_file in store_replicas.items():
+            if replica_db_id in local_store['dbs']:
+                self._file_system.make_dirs_parent(replica_file)
+                self._file_system.save_json(local_store['dbs'][replica_db_id], replica_file)
+
         external_stores = {}
         for db_id, store in local_store['dbs'].items():
             if 'external' not in store:
@@ -271,8 +286,8 @@ class LocalRepository(FilelogSaver):
             self._logger.bench('LocalRepository Write store json start.')
             self._file_system.save_json(local_store, self._storage_save_path)  # type: ignore[arg-type]
             self._logger.bench('LocalRepository Write store main end.')
-            self._file_system.save_json(local_store.get('db_sigs', {}), self._store_sigs_path)
-            self._logger.bench('LocalRepository Write store db_sigs end.')
+            self._file_system.save_json(local_store.get('db_fingerprints', {}), self._store_fingerprints_path)
+            self._logger.bench('LocalRepository Write store db_fingerprints end.')
             if self._file_system.is_file(self._storage_old_path) and \
                     self._file_system.is_file(self._storage_save_path, use_cache=False):
                 self._file_system.unlink(self._storage_old_path)

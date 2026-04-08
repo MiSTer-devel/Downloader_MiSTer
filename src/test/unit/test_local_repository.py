@@ -18,7 +18,8 @@
 import json
 import unittest
 
-from downloader.constants import MEDIA_FAT, MEDIA_USB0, FILE_downloader_storage_zip, FILE_downloader_external_storage, FILE_downloader_storage_json, FILE_downloader_storage_sigs_json
+from downloader.constants import MEDIA_FAT, MEDIA_USB0, FILE_downloader_storage_zip, FILE_downloader_external_storage, \
+    FILE_downloader_storage_json, FILE_downloader_storage_fingerprints_json
 from downloader.fail_policy import FailPolicy
 from downloader.local_store_wrapper import LocalStoreWrapper
 from downloader.store_migrator import make_new_local_store
@@ -30,10 +31,11 @@ from test.fake_file_system_factory import FileSystemFactory
 from test.fake_importer_implicit_inputs import FileSystemState
 from test.fake_local_repository import LocalRepository
 
+abs_replica_file = media_fat('Scripts/.config/downloader/replica.json'.lower())
 
 internal_db_fat_zip_file = media_fat(FILE_downloader_storage_zip).lower()
 internal_db_fat_json_file = media_fat(FILE_downloader_storage_json).lower()
-internal_db_fat_sigs_file = media_fat(FILE_downloader_storage_sigs_json).lower()
+internal_db_fat_fingerprints_file = media_fat(FILE_downloader_storage_fingerprints_json).lower()
 usb0_db_json_file = media_usb0(FILE_downloader_external_storage).lower()
 
 
@@ -43,6 +45,7 @@ def db_files_internal_a_usb0_b(): return {**db_files_internal_a(), **db_files_us
 def db_files_internal_a_docs_usb0_b_games(): return {**db_files_internal_a_docs(), **db_files_usb0_b_games()}
 def db_files_internal_empty(): return {internal_db_fat_json_file: {}}
 def db_files_internal_a(): return {internal_db_fat_json_file: store_internal_a()}
+def db_files_internal_a_with_replica(): return {internal_db_fat_json_file: store_internal_a(), abs_replica_file: store_internal_a()[db_test]}
 def db_files_internal_zip_a(): return {internal_db_fat_zip_file: store_internal_a()}
 def db_files_internal_a_docs(): return {internal_db_fat_json_file: store_to_db_files(store_usb0_b_games_internal_a_docs())[MEDIA_FAT]}
 def files_a(): return {file_a: file_a_descr()}
@@ -138,33 +141,40 @@ class TestLocalRepository(unittest.TestCase):
         store = load_store(fs_objects)
         self.assertEqual({}, store)
 
-    def test_save_store_sigs___on_empty_fs___saves_the_data_on_the_fs(self):
-        actual = save_store_with_sigs(fs(), LocalStoreWrapper({**local_store(), 'db_sigs': some_store_sigs()}))
-        self.assertEqual(some_store_sigs(), actual)
+    def test_save_store_fingerprints___on_empty_fs___saves_the_data_on_the_fs(self):
+        actual = save_store_with_fingerprints(fs(), LocalStoreWrapper({**local_store(), 'db_fingerprints': some_store_fingerprints()}))
+        self.assertEqual(some_store_fingerprints(), actual)
 
-    def test_load_store_sigs___on_an_empty_drive___returns_none(self):
-        sigs = load_store_sigs(fs())
-        self.assertIsNone(sigs)
+    def test_load_store_fingerprints___on_an_empty_drive___returns_none(self):
+        fingerprints = load_store_fingerprints(fs())
+        self.assertIsNone(fingerprints)
 
-    def test_load_store_sigs___after_saving_a_store___returns_some_store_sigs(self):
-        sigs = load_store_sigs(fs(files={internal_db_fat_sigs_file: some_store_sigs()}))
-        self.assertEqual(some_store_sigs(), sigs)
+    def test_load_store_fingerprints___after_saving_a_store___returns_some_store_fingerprints(self):
+        fingerprints = load_store_fingerprints(fs(files={internal_db_fat_fingerprints_file: some_store_fingerprints()}))
+        self.assertEqual(some_store_fingerprints(), fingerprints)
+
+    def test_save_store___on_empty_fs_with_input_store_internal_a_with_replica___stores_internal_a_and_replica(self):
+        store = LocalStoreWrapper(local_store(store_internal_a()))
+        store.mark_force_save()
+        store.set_replica(db_test, abs_replica_file)
+        actual = save_store_wrapper(fs(), store)
+        self.assertEqual(db_files_internal_a_with_replica(), actual)
 
 
-def save_store_with_sigs(fs_objects, local_store_wrapper):
+def save_store_with_fingerprints(fs_objects, local_store_wrapper):
     file_system, fs_state = fs_objects
     sut = LocalRepository(config=fs_state.config, file_system=file_system)
     local_store_wrapper.mark_force_save()
     sut.save_store(local_store_wrapper)
-    return file_system.load_dict_from_file(internal_db_fat_sigs_file)
+    return file_system.load_dict_from_file(internal_db_fat_fingerprints_file)
 
-def load_store_sigs(fs_objects):
+def load_store_fingerprints(fs_objects):
     file_system, fs_state = fs_objects
     sut = LocalRepository(config=fs_state.config, file_system=file_system)
-    return sut.load_store_sigs()
+    return sut.load_store_fingerprints()
 
 
-def some_store_sigs():
+def some_store_fingerprints():
     return {
         db_test: {
             'hash': 'test_hash_123',
@@ -176,19 +186,24 @@ def some_store_sigs():
 
 
 def save_store(fs_objects, input_local_store):
-    file_system, fs_state = fs_objects
-    sut = LocalRepository(config=fs_state.config, file_system=file_system)
     local_store_wrapper = LocalStoreWrapper(input_local_store)
     local_store_wrapper.mark_force_save()
-    sut.save_store(local_store_wrapper)
+    return save_store_wrapper(fs_objects, local_store_wrapper)
+
+def save_store_wrapper(fs_objects, input_wrapper):
+    file_system, fs_state = fs_objects
+    sut = LocalRepository(config=fs_state.config, file_system=file_system)
+    sut.save_store(input_wrapper)
     files = {}
     for file_path, file_description in file_system.data['files'].items():
-        if 'last_successful_run' in file_path or file_path.endswith(internal_db_fat_sigs_file):
+        if 'last_successful_run' in file_path or file_path.endswith(internal_db_fat_fingerprints_file):
             continue
 
-        files[file_path] = file_system.load_dict_from_file(file_path)['dbs']
+        db_store = file_system.load_dict_from_file(file_path)
+        if 'dbs' in db_store:
+            db_store = db_store['dbs']
+        files[file_path] = db_store
     return files
-
 
 def load_store(fs_objects, fail_policy=None):
     file_system, fs_state = fs_objects
@@ -202,7 +217,7 @@ def fs(files=None, folders=None):
     file_system = FileSystemFactory(state=fs_state).create_for_system_scope()
 
     for file_path, content in files.items():
-        if file_path == internal_db_fat_sigs_file:
+        if file_path == internal_db_fat_fingerprints_file:
             file_system.save_json(content, file_path)
             continue
 

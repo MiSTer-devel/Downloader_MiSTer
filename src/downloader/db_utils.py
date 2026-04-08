@@ -20,9 +20,9 @@
 from dataclasses import dataclass
 
 from downloader.config import Config, ConfigDatabaseSection, FileChecking
-from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, DB_STATE_SIGNATURE_NO_TIMESTAMP
+from downloader.constants import DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE, DB_STATE_FINGERPRINT_NO_TIMESTAMP
 from downloader.db_entity import DbEntity
-from downloader.local_store_wrapper import DbStateSig
+from downloader.local_store_wrapper import DbStateFingerprint
 
 
 @dataclass
@@ -64,9 +64,9 @@ def build_db_config(input_config: Config, db: DbEntity, ini_description: ConfigD
 
     return result
 
-def can_skip_db(file_checking: FileChecking, sig: DbStateSig, db_hash: str, db_size: int, user_filter: str) -> bool:
+def can_skip_db(file_checking: FileChecking, figp: DbStateFingerprint, db_hash: str, db_size: int, user_filter: str) -> bool:
     return file_checking == FileChecking.FASTEST \
-        and sig['hash'] == db_hash and sig['hash'] != DB_STATE_SIGNATURE_NO_HASH \
-        and sig['size'] == db_size and sig['size'] != DB_STATE_SIGNATURE_NO_SIZE \
-        and sig['filter'] == user_filter
-# Not really needed because collisions are very improbable, but if we are paranoid we can add: and sig['timestamp'] == db.timestamp and sig['timestamp'] != DB_STATE_SIGNATURE_NO_TIMESTAMP \
+        and figp['hash'] == db_hash and figp['hash'] != DB_STATE_FINGERPRINT_NO_HASH \
+        and figp['size'] == db_size and figp['size'] != DB_STATE_FINGERPRINT_NO_SIZE \
+        and figp['filter'] == user_filter
+# Not really needed because collisions are very improbable, but if we are paranoid we can add: and figp['timestamp'] == db.timestamp and figp['timestamp'] != DB_STATE_FINGERPRINT_NO_TIMESTAMP \

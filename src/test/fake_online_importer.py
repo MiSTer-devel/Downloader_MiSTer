@@ -23,7 +23,7 @@ from itertools import groupby
 from operator import itemgetter
 from typing import Any, Optional
 from downloader.config import Config, ConfigDatabaseSection
-from downloader.constants import MEDIA_USB0, DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, \
+from downloader.constants import MEDIA_USB0, DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE, \
     FILE_downloader_storage_json
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
@@ -33,12 +33,12 @@ from downloader.interruptions import Interruptions
 from downloader.job_system import JobFailPolicy, JobSystem, ProgressReporter
 from downloader.jobs.copy_data_job import CopyDataJob
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob
-from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
+from downloader.jobs.load_local_store_fingerprints_job import LoadLocalStoreFingerprintsJob
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import FailCtx
 from downloader.fail_policy import FailPolicy
-from downloader.local_store_wrapper import StoreWrapper, empty_db_state_signature
+from downloader.local_store_wrapper import StoreWrapper, empty_db_state_fingerprint
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter, InstallationBox
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.logger import Logger
@@ -160,12 +160,12 @@ class OnlineImporter(ProductionOnlineImporter):
             new_db_pkgs = []
             for pkg in db_pkgs:
                 expanded_pkgs[pkg.db_id] = {"section": pkg.section}
-            for db, store, ini_description, store_sig, db_sig in self.dbs:
+            for db, store, ini_description, store_fingerprint, db_fingerprint in self.dbs:
                 expanded_pkgs[db.db_id]["db"] = db
-                expanded_pkgs[db.db_id]["db_sig"] = db_sig or {}
+                expanded_pkgs[db.db_id]["db_fingerprints"] = db_fingerprint or {}
 
-            load_local_store_sigs_job = LoadLocalStoreSigsJob()
-            load_local_store_sigs_job.local_store_sigs = empty_db_state_signature()
+            load_local_store_fingerprints_job = LoadLocalStoreFingerprintsJob()
+            load_local_store_fingerprints_job.local_store_fingerprints = empty_db_state_fingerprint()
             load_local_store_job = LoadLocalStoreJob(new_db_pkgs, self._config)
 
             jobs = []
@@ -174,10 +174,10 @@ class OnlineImporter(ProductionOnlineImporter):
                 section: ConfigDatabaseSection = data["section"]
                 new_db_pkgs.append(DbSectionPackage(db_id=db.db_id, section=section))
 
-                db_sig = data["db_sig"]
+                db_fingerprint = data["db_fingerprints"]
                 calcs = {
-                    "hash": db_sig.get('hash', DB_STATE_SIGNATURE_NO_HASH),
-                    "size": db_sig.get('size', DB_STATE_SIGNATURE_NO_SIZE)
+                    "hash": db_fingerprint.get('hash', DB_STATE_FINGERPRINT_NO_HASH),
+                    "size": db_fingerprint.get('size', DB_STATE_FINGERPRINT_NO_SIZE)
                 }
                 transfer_job = CopyDataJob('db.json', {}, calcs, db.db_id)
                 if isinstance(self.file_system, FakeFileSystem):
@@ -189,7 +189,7 @@ class OnlineImporter(ProductionOnlineImporter):
                     transfer_job=transfer_job,
                     section=db.db_id,
                     ini_description=section,
-                    load_local_store_sigs_job=load_local_store_sigs_job,
+                    load_local_store_fingerprints_job=load_local_store_fingerprints_job,
                     load_local_store_job=load_local_store_job,
                 ))
 
@@ -254,15 +254,15 @@ class OnlineImporter(ProductionOnlineImporter):
 
     def download(self):
         db_pkgs: list[DbSectionPackage] = []
-        for db, store, ini_description, store_sig, db_sig in self.dbs:
-            self._add_store(db.db_id, store, store_sig=store_sig)
+        for db, store, ini_description, store_fingerprint, db_fingerprint in self.dbs:
+            self._add_store(db.db_id, store, store_fingerprint=store_fingerprint)
             db_pkgs.append(DbSectionPackage(db_id=db.db_id, section=ini_description))
         self._box, self._error = self.download_dbs_contents(db_pkgs)
         return self
 
     def add_db(self, db: DbEntity, store: StoreWrapper = None, description: ConfigDatabaseSection = None,
-               store_sig=None, db_sig=None):
-        self.dbs.append((db, store, {} if description is None else description, store_sig, db_sig))
+               store_fingerprint=None, db_fingerprint=None):
+        self.dbs.append((db, store, {} if description is None else description, store_fingerprint, db_fingerprint))
         return self
 
     def download_db(self, db, store):
@@ -271,15 +271,15 @@ class OnlineImporter(ProductionOnlineImporter):
         self._clean_store(store)
         return store
 
-    def _add_store(self, db_id: str, store=None, store_sig=None):
+    def _add_store(self, db_id: str, store=None, store_fingerprint=None):
         if self._local_store is None:
             self._local_store = local_store_wrapper({})
 
         if store is not None:
             self._local_store.unwrap_local_store()['dbs'][db_id] = store
 
-        if store_sig is not None:
-            self._local_store.unwrap_local_store()['db_sigs'][db_id] = store_sig
+        if store_fingerprint is not None:
+            self._local_store.unwrap_local_store()['db_fingerprints'][db_id] = store_fingerprint
 
     def free_space(self):
         actual_remaining_space = dict(self._free_space_reservation.free_space())

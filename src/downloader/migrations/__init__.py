@@ -19,8 +19,6 @@
 from downloader.config import Config
 
 from downloader.migrations.migration_v1 import MigrationV1
-from downloader.migrations.migration_v10 import MigrationV10
-from downloader.migrations.migration_v11 import MigrationV11
 from downloader.migrations.migration_v2 import MigrationV2
 from downloader.migrations.migration_v3 import MigrationV3
 from downloader.migrations.migration_v4 import MigrationV4
@@ -29,7 +27,9 @@ from downloader.migrations.migration_v6 import MigrationV6
 from downloader.migrations.migration_v7 import MigrationV7
 from downloader.migrations.migration_v8 import MigrationV8
 from downloader.migrations.migration_v9 import MigrationV9
-
+from downloader.migrations.migration_v10 import MigrationV10
+from downloader.migrations.migration_v11 import MigrationV11
+from downloader.migrations.migration_v12 import MigrationV12
 
 def migrations(config: Config):
     return [
@@ -43,5 +43,6 @@ def migrations(config: Config):
         MigrationV8(),
         MigrationV9(),
         MigrationV10(),
-        MigrationV11()
+        MigrationV11(),
+        MigrationV12()
     ]

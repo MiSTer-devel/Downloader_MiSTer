@@ -24,7 +24,7 @@ from downloader.interruptions import Interruptions
 from downloader.job_system import JobSystem, Worker, Job
 from downloader.jobs.check_db_job import CheckDbJob
 from downloader.jobs.jobs_factory import make_transfer_job
-from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob, local_store_sigs_tag
+from downloader.jobs.load_local_store_fingerprints_job import LoadLocalStoreFingerprintsJob, local_store_fingerprints_tag
 from downloader.jobs.reporters import FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import DownloaderWorkerContext
 from downloader.logger import Logger

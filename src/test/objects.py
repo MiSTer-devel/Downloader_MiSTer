@@ -877,8 +877,8 @@ def db_test_with_psx_20250202_and_nes_20250202_rbf(db_id=None):
     })
 
 
-def sig_db_0(): return {'hash': 34, 'filter': '', 'size': 1, 'timestamp': 0}
-def sig_db_1():  return {'hash': 3434, 'filter': '', 'size': 11, 'timestamp': 0}
+def figp_db_0(): return {'hash': 34, 'filter': '', 'size': 1, 'timestamp': 0}
+def figp_db_1():  return {'hash': 3434, 'filter': '', 'size': 11, 'timestamp': 0}
 
 def store_test_with_file_a_descr(descr=None): return db_to_store(db_test_with_file_a(descr=descr))
 def store_test_with_file_b_descr(descr=None): return db_to_store(db_test_with_file_b(descr=descr))

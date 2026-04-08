@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import SafeFetchInfo
+from downloader.constants import SafeFetchInfo, HASH_file_does_not_exist
 from downloader.file_system import FileSystem
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import WorkerResult, ProgressReporter
@@ -53,9 +53,13 @@ class FetchFileWorker(DownloaderWorker):
             self._file_system.copy(target_path, backup_path)
 
         file_path = temp_path or target_path
-        file_size, file_hash, error = self._fetcher.fetch_file(source, file_path, fsync=temp_path is not None)
+        _file_size, error = self._fetcher.fetch_file(source, file_path, fsync=temp_path is not None)
         if error is not None:
             return [], error
+
+        file_hash = self._file_system.hash(file_path)
+        if file_hash == HASH_file_does_not_exist:
+            return [], FileDownloadError(f'File {file_path} could not be fetched.')
 
         try:
             if file_hash != desc['hash']:
@@ -81,26 +85,23 @@ class FileFetcher:
         self._file_system = file_system
         self._timeout = timeout
 
-    def fetch_file(self, url: str, download_path: str, fsync: bool = True) -> tuple[int, str, Optional[GetFileError]]:
+    def fetch_file(self, url: str, download_path: str, fsync: bool = True) -> tuple[int, Optional[GetFileError]]:
         try:
             with self._http_gateway.open(url) as (final_url, in_stream):
                 if in_stream.status != 200:
-                    return 0, '', FileDownloadError(f'Bad http status! {final_url}: {in_stream.status}')
+                    return 0, FileDownloadError(f'Bad http status! {final_url}: {in_stream.status}')
 
-                file_size, file_hash = self._file_system.write_incoming_stream(in_stream, download_path, self._timeout, fsync=fsync)
+                file_size = self._file_system.write_incoming_stream(in_stream, download_path, self._timeout, fsync=fsync)
 
-        except socket.gaierror as e: return 0, '', FileDownloadError(f'Socket Address Error! {url}: {str(e)}', e)
-        except socket.timeout as e: return 0, '', FileDownloadError(f'Socket Connection Timed Out! {url}: {str(e)}', e)
-        except URLError as e: return 0, '', FileDownloadError(f'URL Error! {url}: {e.reason}', e)
-        except HTTPException as e: return 0, '', FileDownloadError(f'HTTP Error! {url}: {str(e)}', e)
-        except ConnectionResetError as e: return 0, '', FileDownloadError(f'Connection reset error! {url}: {str(e)}', e)
-        except OSError as e: return 0, '', FileDownloadError(f'OS Error! {url}: {e.errno} {str(e)}', e)
-        except BaseException as e: return 0, '', FileDownloadError(f'Exception during download! {url}: {str(e)}')
+        except socket.gaierror as e: return 0, FileDownloadError(f'Socket Address Error! {url}: {str(e)}', e)
+        except socket.timeout as e: return 0, FileDownloadError(f'Socket Connection Timed Out! {url}: {str(e)}', e)
+        except URLError as e: return 0, FileDownloadError(f'URL Error! {url}: {e.reason}', e)
+        except HTTPException as e: return 0, FileDownloadError(f'HTTP Error! {url}: {str(e)}', e)
+        except ConnectionResetError as e: return 0, FileDownloadError(f'Connection reset error! {url}: {str(e)}', e)
+        except OSError as e: return 0, FileDownloadError(f'OS Error! {url}: {e.errno} {str(e)}', e)
+        except BaseException as e: return 0, FileDownloadError(f'Exception during download! {url}: {str(e)}')
 
-        if not self._file_system.is_file(download_path, use_cache=False):
-            return 0, '', FileDownloadError(f'File from {url} could not be stored.')
-
-        return file_size, file_hash, None
+        return file_size, None
 
 
 class SafeFetcherConfig(TypedDict):
@@ -118,12 +119,18 @@ class SafeFileFetcher:
     def fetch_file(self, description: SafeFetchInfo, path: str) -> Optional[Exception]:
         i = self._retries
         while True:
-            file_size, file_hash, error = self._fetcher.fetch_file(description['url'], path)
+            _file_size, error = self._fetcher.fetch_file(description['url'], path)
             if error is None:
+                if not self._file_system.is_file(path, use_cache=False):
+                    error = FileDownloadError(f'File from {description["url"]} could not be stored.')
+
+            if error is None:
+                file_hash = self._file_system.hash(path)
                 if file_hash != description['hash']:
                     error = FileValidationError(f'Hash mismatch! {description["url"]}: calculated hash {file_hash} != {description["hash"]}')
 
             if error is None:
+                file_size = self._file_system.size(path)
                 if file_size != description['size']:
                     error = FileValidationError(f'Size mismatch! {description["url"]}: calculated size {file_size} != {description["size"]}')
 

@@ -60,7 +60,7 @@ class TestMiSTerFirmwareRealInstall(OnlineImporterWithPriorityStorageTestBase):
 
         local_store = LocalStoreWrapper({
             "dbs": {DISTRIBUTION_MISTER_DB_ID: store_descr(base_path=base_path, files={FILE_MiSTer: file_mister_descr(hash_code=old_mister_hash)})},
-            "db_sigs": {},
+            "db_fingerprints": {},
             "migration_version": StoreMigrator().latest_migration_version()
         })
         store_path = os.path.join(base_system_path, FILE_downloader_storage_json)
