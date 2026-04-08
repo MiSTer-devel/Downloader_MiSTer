@@ -19,7 +19,7 @@
 from dataclasses import field, dataclass
 
 from downloader.config import Config, default_config, ConfigDatabaseSection
-from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
+from downloader.constants import DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE
 from downloader.db_entity import DbEntity
 from downloader.job_system import Job, JobSystem
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob
@@ -33,8 +33,8 @@ class MixStoreAndDbJob(Job):
     ini_description: ConfigDatabaseSection
     load_local_store_job: LoadLocalStoreJob
     config: Config = field(default_factory=default_config)
-    db_hash: str = field(default=DB_STATE_SIGNATURE_NO_HASH)
-    db_size: int = field(default=DB_STATE_SIGNATURE_NO_SIZE)
+    db_hash: str = field(default=DB_STATE_FINGERPRINT_NO_HASH)
+    db_size: int = field(default=DB_STATE_FINGERPRINT_NO_SIZE)
 
     def retry_job(self): return None
 

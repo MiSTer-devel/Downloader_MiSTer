@@ -1,5 +1,5 @@
 # Copyright (c) 2021-2026 José Manuel Barroso Galindo <theypsilon@gmail.com>
-
+import os
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -23,6 +23,7 @@ from downloader.error import DownloaderError
 
 class DbOptionsProps(TypedDict, total=False):
     filter: str
+    store_replica: str
 
 
 class DbOptions:
@@ -49,6 +50,17 @@ class DbOptions:
             self.filter = props['filter'].strip().lower()
         else:
             self.filter = None
+
+        self.store_replica: Optional[str]
+        if 'store_replica' in props:
+            if not isinstance(props['store_replica'], str):
+                raise DbOptionsValidationException(['store_replica'])
+            present.add('store_replica')
+            self.store_replica = props['store_replica'].strip().lower()
+            if not os.path.isabs(self.store_replica):
+                raise DbOptionsValidationException(['store_replica'])
+        else:
+            self.store_replica = None
 
         if len(present) != len(props):
             raise DbOptionsValidationException([o for o in props if o not in present])

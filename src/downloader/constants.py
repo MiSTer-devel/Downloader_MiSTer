@@ -73,6 +73,7 @@ FILE_downloader_storage_zip: Final[str] = 'Scripts/.config/downloader/downloader
 FILE_downloader_storage_json: Final[str] = 'Scripts/.config/downloader/downloader.json'
 FILE_downloader_storage_backup_pext: Final[str] = 'Scripts/.config/downloader/downloader_backup_pext.json'
 FILE_downloader_storage_sigs_json: Final[str] = 'Scripts/.config/downloader/downloader_sigs.json'
+FILE_downloader_storage_fingerprints_json: Final[str] = 'Scripts/.config/downloader/downloader_fingerprints.json'
 FILE_downloader_previous_free_space_json: Final[str] = 'Scripts/.config/downloader/previous_free_space.json'
 FILE_downloader_external_storage: Final[str] = '.downloader_db.json'
 FILE_downloader_last_successful_run: Final[str] = 'Scripts/.config/downloader/%s.last_successful_run'
@@ -213,11 +214,11 @@ KENV_LC_HTTPS_PROXY: Final[str] = 'https_proxy'
 KENV_ROTATE_LOGS: Final[str] = 'ROTATE_LOGS'
 KENV_SSL_CERT_FILE: Final[str] = 'SSL_CERT_FILE'
 
-# Db State Signature
-DB_STATE_SIGNATURE_NO_HASH: Final[str] = 'non_initialized_hash'
-DB_STATE_SIGNATURE_NO_SIZE: Final[int] = -123
-DB_STATE_SIGNATURE_NO_TIMESTAMP: Final[int] = 0
-DB_STATE_SIGNATURE_NO_FILTER: Final[str] = ''
+# Db State Fingerprint
+DB_STATE_FINGERPRINT_NO_HASH: Final[str] = 'non_initialized_hash'
+DB_STATE_FINGERPRINT_NO_SIZE: Final[int] = -123
+DB_STATE_FINGERPRINT_NO_TIMESTAMP: Final[int] = 0
+DB_STATE_FINGERPRINT_NO_FILTER: Final[str] = ''
 
 # Exit error codes
 EXIT_ERROR_WRONG_SETUP: Final[int] = 10

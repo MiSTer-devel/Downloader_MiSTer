@@ -53,8 +53,8 @@ class MixStoreAndDbWorker(DownloaderWorker):
         if not read_only_store.has_base_path():  # @TODO: should remove this from here at some point.
             store.write_only().set_base_path(job.config['base_path'])  # After that, all worker stores will be read-only.
 
-        sig = read_only_store.db_state_signature()
-        if can_skip_db(job.config['file_checking'], sig, job.db_hash, job.db_size, job.config['filter']):  # @TODO: Eventually we can remove this check altogether and just rely in the one from the previous step
+        figp = read_only_store.db_state_fingerprint()
+        if can_skip_db(job.config['file_checking'], figp, job.db_hash, job.db_size, job.config['filter']):  # @TODO: Eventually we can remove this check altogether and just rely in the one from the previous step
             self._logger.debug('Skipping db process. No changes detected for: ', job.db.db_id)
             job.skipped = True
             return [], None

@@ -40,8 +40,8 @@ from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.fetch_file_worker import FetchFileWorker
 from downloader.jobs.jobs_factory import make_transfer_job
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob, local_store_tag
-from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob, local_store_sigs_tag
-from downloader.jobs.load_local_store_sigs_worker import LoadLocalStoreSigsWorker
+from downloader.jobs.load_local_store_fingerprints_job import LoadLocalStoreFingerprintsJob, local_store_fingerprints_tag
+from downloader.jobs.load_local_store_fingerprints_worker import LoadLocalStoreFingerprintsWorker
 from downloader.jobs.load_local_store_worker import LoadLocalStoreWorker
 from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.mix_store_and_db_worker import MixStoreAndDbWorker
@@ -89,8 +89,8 @@ class OnlineImporterWorkersFactory:
 
     def create_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]:
         jobs: list[Job] = []
-        load_local_store_sigs_job = LoadLocalStoreSigsJob()
-        load_local_store_sigs_job.add_tag(local_store_sigs_tag)
+        load_local_store_fingerprints_job = LoadLocalStoreFingerprintsJob()
+        load_local_store_fingerprints_job.add_tag(local_store_fingerprints_tag)
         load_local_store_job = LoadLocalStoreJob(db_pkgs, self._config)
         load_local_store_job.add_tag(local_store_tag)
         for pkg in db_pkgs:
@@ -99,11 +99,11 @@ class OnlineImporterWorkersFactory:
                 transfer_job=transfer_job,
                 section=pkg.db_id,
                 ini_description=pkg.section,
-                load_local_store_sigs_job=load_local_store_sigs_job,
+                load_local_store_fingerprints_job=load_local_store_fingerprints_job,
                 load_local_store_job=load_local_store_job,
             )
             jobs.append(transfer_job)  # type: ignore[arg-type]
-        jobs.insert(int(len(jobs) / 2) + 1, load_local_store_sigs_job)
+        jobs.insert(int(len(jobs) / 2) + 1, load_local_store_fingerprints_job)
         return jobs
 
     def create_workers(self):
@@ -182,7 +182,7 @@ class OnlineImporterWorkersFactory:
                 fail_ctx=self._fail_ctx,
                 process_index_ctx=process_index_ctx,
             ),
-            LoadLocalStoreSigsWorker(
+            LoadLocalStoreFingerprintsWorker(
                 logger=self._logger,
                 local_repository=self._local_repository,
                 progress_reporter=self._progress_reporter,
@@ -418,6 +418,12 @@ class OnlineImporter:
             logger.bench('OnlineImporter could not progress without loaded store.')
             return box, local_store_err
 
+        for db_job in report.get_completed_jobs(ProcessDbMainJob):
+            if 'options' in db_job.ini_description:
+                store_replica = db_job.ini_description['options'].store_replica
+                if store_replica:
+                    local_store.set_replica(db_job.db.db_id, store_replica)
+
         box.set_local_store(local_store)
 
         write_stores = {}
@@ -429,8 +435,8 @@ class OnlineImporter:
             read_stores[db.db_id] = store.read_only()
             stores.append(store)
 
-        for db_entity, config, db_hash, db_size in box.installed_db_sigs():
-            write_stores[db_entity.db_id].set_db_state_signature(db_hash, db_size, db_entity.timestamp, config['filter'])
+        for db_entity, config, db_hash, db_size in box.installed_db_fingerprints():
+            write_stores[db_entity.db_id].set_db_state_fingerprint(db_hash, db_size, db_entity.timestamp, config['filter'])
 
         for db_id, zip_id in box.removed_zips():
             write_stores[db_id].remove_zip_id(zip_id)
@@ -647,7 +653,7 @@ class InstallationBox:
         self._directory_removals: dict[str, tuple[PathPackage, set[str]]] = dict()
         self._file_removals: dict[str, tuple[PathPackage, set[str]]] = dict()
         self._installed_dbs: list[DbEntity] = []
-        self._installed_db_sigs: list[tuple[DbEntity, Config, str, int]] = []
+        self._installed_db_fingerprints: list[tuple[DbEntity, Config, str, int]] = []
         self._failed_dbs: set[str] = set()
         self._duplicated_files: list[tuple[list[str], str]] = []
         self._non_duplicated_files: list[tuple[list[PathPackage], str]] = []
@@ -746,7 +752,7 @@ class InstallationBox:
                 self._full_partitions[partition.path] += failed_reserve
     def add_installed_db(self, db: DbEntity, config: Config, db_hash: str, db_size: int) -> None:
         self._installed_dbs.append(db)
-        self._installed_db_sigs.append((db, config, db_hash, db_size))
+        self._installed_db_fingerprints.append((db, config, db_hash, db_size))
     def add_filtered_zip_data(self, db_id: str, zip_id: str, filtered_data: FileFoldersHolder) -> None:
         self._filtered_zip_data[db_id][zip_id] = filtered_data
     def add_failed_db_options(self, exception: WrongDatabaseOptions) -> None:
@@ -786,7 +792,7 @@ class InstallationBox:
     def skipped_updated_files(self): return self._skipped_updated_files
     def filtered_zip_data(self): return self._filtered_zip_data
     def full_partitions(self) -> dict[str, int]: return self._full_partitions
-    def installed_db_sigs(self): return self._installed_db_sigs
+    def installed_db_fingerprints(self): return self._installed_db_fingerprints
     def installed_dbs(self) -> list[DbEntity]: return self._installed_dbs
     def updated_dbs(self) -> list[str]: return list(self._validated_files)
     def failed_dbs(self) -> list[str]: return list(self._failed_dbs)

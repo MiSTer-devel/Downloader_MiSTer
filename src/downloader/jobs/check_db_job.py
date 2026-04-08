@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 from downloader.config import ConfigDatabaseSection
 from downloader.job_system import Job, JobSystem
-from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
+from downloader.jobs.load_local_store_fingerprints_job import LoadLocalStoreFingerprintsJob
 from downloader.jobs.transfer_job import TransferJob
 
 
@@ -30,7 +30,7 @@ class CheckDbJob(Job):
     transfer_job: TransferJob # Job & Transferrer @TODO: Python 3.10
     section: str
     ini_description: ConfigDatabaseSection
-    load_local_store_sigs_job: LoadLocalStoreSigsJob
+    load_local_store_fingerprints_job: LoadLocalStoreFingerprintsJob
 
     def retry_job(self): return self.transfer_job
 

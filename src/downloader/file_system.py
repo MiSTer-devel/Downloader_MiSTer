@@ -176,7 +176,7 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
-    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /, fsync: bool = True) -> tuple[int, str]:
+    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /, fsync: bool = True) -> int:
         """interface"""
 
     @abstractmethod
@@ -473,9 +473,8 @@ class _FileSystem(FileSystem):
     def download_target_path(self, path: str) -> str:
         return self._path(path)
 
-    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /, fsync: bool = True) -> tuple[int, str]:
+    def write_incoming_stream(self, in_stream: Any, target_path: str, timeout: int, /, fsync: bool = True) -> int:
         last_data_time = self._time_monotonic()
-        md5_hasher = hashlib.md5()
         file_size = 0
         with open(target_path, 'wb') as out_file:
             while True:
@@ -490,7 +489,6 @@ class _FileSystem(FileSystem):
                     last_data_time = self._time_monotonic()
                     self._activity_tracker.track(last_data_time)
                     out_file.write(chunk)
-                    md5_hasher.update(chunk)
                     file_size += len(chunk)
                 except socket.timeout:
                     elapsed_time = self._time_monotonic() - last_data_time
@@ -501,7 +499,7 @@ class _FileSystem(FileSystem):
                 out_file.flush()
                 os.fsync(out_file.fileno())
 
-        return file_size, md5_hasher.hexdigest()
+        return file_size
 
     def write_stream_to_data(self, in_stream: Any, calc_md5: bool, timeout: int, /) -> tuple[io.BytesIO, str]:
         last_data_time = self._time_monotonic()

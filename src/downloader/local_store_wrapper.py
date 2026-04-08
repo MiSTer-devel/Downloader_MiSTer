@@ -1,4 +1,5 @@
 # Copyright (c) 2021-2026 José Manuel Barroso Galindo <theypsilon@gmail.com>
+import os
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,8 +17,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.constants import K_BASE_PATH, DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE, \
-    DB_STATE_SIGNATURE_NO_TIMESTAMP, DB_STATE_SIGNATURE_NO_FILTER
+from downloader.constants import K_BASE_PATH, DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE, \
+    DB_STATE_FINGERPRINT_NO_TIMESTAMP, DB_STATE_FINGERPRINT_NO_FILTER
 from downloader.db_entity import ZipIndexEntity
 
 from downloader.error import DownloaderError
@@ -47,23 +48,24 @@ class StoreFragmentDrivePaths(TypedDict):
 
 def new_store_fragment_drive_paths(): return {"base_paths": new_store_fragment_paths(), "external_paths": dict()}
 
-class DbStateSig(TypedDict):
+class DbStateFingerprint(TypedDict):
     hash: str
     size: int
     timestamp: int
     filter: str
 
-def empty_db_state_signature() -> DbStateSig: return {'hash': DB_STATE_SIGNATURE_NO_HASH, 'size': DB_STATE_SIGNATURE_NO_SIZE, 'timestamp': DB_STATE_SIGNATURE_NO_TIMESTAMP, 'filter': DB_STATE_SIGNATURE_NO_FILTER}
+def empty_db_state_fingerprint() -> DbStateFingerprint: return {'hash': DB_STATE_FINGERPRINT_NO_HASH, 'size': DB_STATE_FINGERPRINT_NO_SIZE, 'timestamp': DB_STATE_FINGERPRINT_NO_TIMESTAMP, 'filter': DB_STATE_FINGERPRINT_NO_FILTER}
 
 class LocalStore(TypedDict):
     dbs: dict[str, Any]
-    db_sigs: dict[str, Any]
+    db_fingerprints: dict[str, Any]
 
 class LocalStoreWrapper:
     def __init__(self, local_store: dict[str, Any]) -> None:
         if 'dbs' not in local_store or not isinstance(local_store['dbs'], dict): raise LocalStoreValidationException('dbs')
-        if 'db_sigs' not in local_store or not isinstance(local_store['db_sigs'], dict): raise LocalStoreValidationException('db_sigs')
+        if 'db_fingerprints' not in local_store or not isinstance(local_store['db_fingerprints'], dict): raise LocalStoreValidationException('db_fingerprints')
         self._local_store: LocalStore = cast(LocalStore, local_store)
+        self._replicas: dict[str, str] = {}
         self._dirty = False
 
     def unwrap_local_store(self) -> LocalStore:
@@ -76,13 +78,22 @@ class LocalStoreWrapper:
         if db_id not in self._local_store['dbs'] or self._local_store['dbs'] is None:
             self._local_store['dbs'][db_id] = empty_store_without_base_path()
 
-        if db_id not in self._local_store['db_sigs'] or self._local_store['db_sigs'] is None:
-            self._local_store['db_sigs'][db_id] = empty_db_state_signature()
+        if db_id not in self._local_store['db_fingerprints'] or self._local_store['db_fingerprints'] is None:
+            self._local_store['db_fingerprints'][db_id] = empty_db_state_fingerprint()
 
-        return StoreWrapper(self._local_store['dbs'][db_id], self._local_store['db_sigs'][db_id], self)
+        return StoreWrapper(self._local_store['dbs'][db_id], self._local_store['db_fingerprints'][db_id], self)
+
+    def set_replica(self, db_id: str, abs_file: str):
+        if db_id not in self._local_store['dbs']:
+            raise LocalStoreValidationException(f'{db_id} is not a valid database.')
+        if os.path.isabs(abs_file):
+            self._replicas[db_id] = abs_file
 
     def needs_save(self) -> bool:
         return self._dirty
+
+    def replicas(self) -> dict[str, str]:
+        return self._replicas
 
 
 class LocalStoreValidationException(DownloaderError): pass
@@ -90,7 +101,7 @@ class ReadOnlyStoreException(DownloaderError): pass
 
 
 class StoreWrapper:
-    def __init__(self, store: dict[str, Any], db_state_signature: DbStateSig, local_store_wrapper: Optional[LocalStoreWrapper], readonly: bool = False) -> None:
+    def __init__(self, store: dict[str, Any], db_state_fingerprint: DbStateFingerprint, local_store_wrapper: Optional[LocalStoreWrapper], readonly: bool = False) -> None:
         self._external_additions: StoreFragmentPaths = {'files': defaultdict(list), 'folders': defaultdict(list)}
         if 'external' in store:
             for drive, external in store['external'].items():
@@ -109,9 +120,9 @@ class StoreWrapper:
                         self._external_additions['folders'][folder_path].append(drive)
 
         self._store = store
-        self._db_state_signature = db_state_signature
-        self._read_only = ReadOnlyStoreAdapter(self._store, self._db_state_signature)
-        self._write_only = None if readonly else WriteOnlyStoreAdapter(self._store, self._db_state_signature, local_store_wrapper, self._external_additions)
+        self._db_state_fingerprint = db_state_fingerprint
+        self._read_only = ReadOnlyStoreAdapter(self._store, self._db_state_fingerprint)
+        self._write_only = None if readonly else WriteOnlyStoreAdapter(self._store, self._db_state_fingerprint, local_store_wrapper, self._external_additions)
 
     def unwrap_store(self) -> dict[str, Any]:
         return self._store
@@ -129,11 +140,11 @@ class StoreWrapper:
 
 
 class WriteOnlyStoreAdapter:
-    def __init__(self, store, db_state_signature, top_wrapper, external_additions) -> None:
+    def __init__(self, store, db_state_fingerprint, top_wrapper, external_additions) -> None:
         if top_wrapper is None:
             raise ReadOnlyStoreException('Cannot create write only store adapter without a top wrapper')
         self._store = store
-        self._db_state_signature = db_state_signature
+        self._db_state_fingerprint = db_state_fingerprint
         self._top_wrapper = top_wrapper
         self._external_additions = external_additions
 
@@ -320,21 +331,21 @@ class WriteOnlyStoreAdapter:
 
         self._store[K_BASE_PATH] = base_path
 
-    def set_db_state_signature(self, transfer_hash: str, transfer_size: int, timestamp: int, filter: str) -> None:
-        if self._db_state_signature['hash'] != transfer_hash:
-            self._db_state_signature['hash'] = transfer_hash
+    def set_db_state_fingerprint(self, transfer_hash: str, transfer_size: int, timestamp: int, filter: str) -> None:
+        if self._db_state_fingerprint['hash'] != transfer_hash:
+            self._db_state_fingerprint['hash'] = transfer_hash
             self._top_wrapper.mark_force_save()
 
-        if self._db_state_signature['size'] != transfer_size:
-            self._db_state_signature['size'] = transfer_size
+        if self._db_state_fingerprint['size'] != transfer_size:
+            self._db_state_fingerprint['size'] = transfer_size
             self._top_wrapper.mark_force_save()
 
-        if self._db_state_signature['timestamp'] != timestamp:
-            self._db_state_signature['timestamp'] = timestamp
+        if self._db_state_fingerprint['timestamp'] != timestamp:
+            self._db_state_fingerprint['timestamp'] = timestamp
             self._top_wrapper.mark_force_save()
 
-        if self._db_state_signature['filter'] != filter:
-            self._db_state_signature['filter'] = filter
+        if self._db_state_fingerprint['filter'] != filter:
+            self._db_state_fingerprint['filter'] = filter
             self._top_wrapper.mark_force_save()
 
 
@@ -464,12 +475,12 @@ class WriteOnlyStoreAdapter:
                 self.add_external_folder(drive, folder_path, folder_description)
 
 class ReadOnlyStoreAdapter:
-    def __init__(self, store, db_state_signature: DbStateSig) -> None:
+    def __init__(self, store, db_state_fingerprint: DbStateFingerprint) -> None:
         self._store = store
-        self._db_state_signature = db_state_signature
+        self._db_state_fingerprint = db_state_fingerprint
 
-    def db_state_signature(self) -> DbStateSig:
-        return cast(DbStateSig, MappingProxyType(self._db_state_signature))
+    def db_state_fingerprint(self) -> DbStateFingerprint:
+        return cast(DbStateFingerprint, MappingProxyType(self._db_state_fingerprint))
 
     def invalid_hashes(self, file_pkgs: list[PathPackage]) -> list[bool]:
         '''Returns a list of booleans indicating invalid hashes with the same order as the input.'''
@@ -545,7 +556,7 @@ class ReadOnlyStoreAdapter:
                 for drive, summary in self._store['external'].items()
             }
 
-        return StoreWrapper(new_store, empty_db_state_signature(), None, readonly=True).read_only()
+        return StoreWrapper(new_store, empty_db_state_fingerprint(), None, readonly=True).read_only()
 
     def deselect_all(self, indexes: list[ZipIndexEntity]) -> 'ReadOnlyStoreAdapter':
         # @TODO: Remove this | handling after we change the pext path format in the stores
@@ -569,7 +580,7 @@ class ReadOnlyStoreAdapter:
                 for drive, summary in self._store['external'].items()
             }
 
-        return StoreWrapper(new_store, empty_db_state_signature(), None, readonly=True).read_only()
+        return StoreWrapper(new_store, empty_db_state_fingerprint(), None, readonly=True).read_only()
 
     @property
     def zips(self) -> dict[str, dict[str, Any]]:

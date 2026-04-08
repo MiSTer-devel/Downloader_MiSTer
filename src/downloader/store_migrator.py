@@ -53,7 +53,7 @@ class StoreMigrator:
 def make_new_local_store(store_migrator) -> dict[str, Any]:
     return {
         'dbs': {},
-        'db_sigs': {},
+        'db_fingerprints': {},
         'migration_version': store_migrator.latest_migration_version(),
         'internal': True
     }

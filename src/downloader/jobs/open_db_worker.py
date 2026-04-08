@@ -19,12 +19,12 @@
 from threading import Lock
 
 from downloader.config import Config
-from downloader.constants import DB_STATE_SIGNATURE_NO_HASH, DB_STATE_SIGNATURE_NO_SIZE
+from downloader.constants import DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE
 from downloader.db_entity import DbEntity
 from downloader.db_utils import build_db_config, can_skip_db
 from downloader.file_system import FileSystem
 from downloader.job_system import Job, WorkerResult, JobContext, ProgressReporter
-from downloader.jobs.load_local_store_sigs_job import local_store_sigs_tag
+from downloader.jobs.load_local_store_fingerprints_job import local_store_fingerprints_tag
 from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
 from downloader.jobs.open_db_job import OpenDbJob
 from downloader.jobs.reporters import InstallationReportImpl, FileDownloadSessionLogger
@@ -82,11 +82,11 @@ class OpenDbWorker(DownloaderWorker):
             self._fail_ctx.swallow_error(Exception(f'OpenDbWorker [{db.db_id}] must receive a transfer_job with calcs not null.'))
             calcs = {}
 
-        db_hash = calcs.get('hash', DB_STATE_SIGNATURE_NO_HASH)
-        db_size = calcs.get('size', DB_STATE_SIGNATURE_NO_SIZE)
+        db_hash = calcs.get('hash', DB_STATE_FINGERPRINT_NO_HASH)
+        db_size = calcs.get('size', DB_STATE_FINGERPRINT_NO_SIZE)
 
-        while self._installation_report.any_in_progress_job_with_tags(_local_store_sigs_tags):
-            self._logger.bench('OpenDbWorker waiting for store sigs: ', job.section)
+        while self._installation_report.any_in_progress_job_with_tags(_local_store_fingerprints_tags):
+            self._logger.bench('OpenDbWorker waiting for store fingerprints: ', job.section)
             self._worker_context.wait_for_other_jobs(0.06)
 
         ini_description = job.ini_description
@@ -94,11 +94,11 @@ class OpenDbWorker(DownloaderWorker):
         self._logger.bench("OpenDbWorker Building db config: ", db.db_id)
         config = build_db_config(input_config=self._config, db=db, ini_description=ini_description)
 
-        sigs = job.load_local_store_sigs_job.local_store_sigs
-        if sigs is not None:
-            sig = sigs.get(job.section, None)
-            if sig is not None:
-                if can_skip_db(self._config['file_checking'], sig, db_hash, db_size, config['filter']):
+        fingerprints = job.load_local_store_fingerprints_job.local_store_fingerprints
+        if fingerprints is not None:
+            figp = fingerprints.get(job.section, None)
+            if figp is not None:
+                if can_skip_db(self._config['file_checking'], figp, db_hash, db_size, config['filter']):
                     self._logger.debug('Skipping db process. No changes detected for: ', db.db_id)
                     job.skipped = True
                     return [], None
@@ -123,4 +123,4 @@ class OpenDbWorker(DownloaderWorker):
         return jobs, None
 
 
-_local_store_sigs_tags = [local_store_sigs_tag]
+_local_store_fingerprints_tags = [local_store_fingerprints_tag]

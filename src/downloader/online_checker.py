@@ -22,7 +22,7 @@ from downloader.db_utils import DbSectionPackage
 from downloader.job_system import JobSystem, Worker, Job
 from downloader.jobs.check_db_job import CheckDbJob
 from downloader.jobs.jobs_factory import make_transfer_job
-from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob, local_store_sigs_tag
+from downloader.jobs.load_local_store_fingerprints_job import LoadLocalStoreFingerprintsJob, local_store_fingerprints_tag
 from downloader.jobs.reporters import InstallationReport
 from downloader.online_importer import OnlineImporterWorkersFactory
 from downloader.logger import Logger
@@ -40,18 +40,18 @@ class OnlineChecker:
 
     def _make_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]:
         jobs: list[Job] = []
-        load_local_store_sigs_job = LoadLocalStoreSigsJob()
-        load_local_store_sigs_job.add_tag(local_store_sigs_tag)
+        load_local_store_fingerprints_job = LoadLocalStoreFingerprintsJob()
+        load_local_store_fingerprints_job.add_tag(local_store_fingerprints_tag)
         for pkg in db_pkgs:
             transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
             transfer_job.after_job = CheckDbJob(  # type: ignore[union-attr]
                 transfer_job=transfer_job,
                 section=pkg.db_id,
                 ini_description=pkg.section,
-                load_local_store_sigs_job=load_local_store_sigs_job,
+                load_local_store_fingerprints_job=load_local_store_fingerprints_job,
             )
             jobs.append(transfer_job)  # type: ignore[arg-type]
-        jobs.insert(int(len(jobs) / 2) + 1, load_local_store_sigs_job)
+        jobs.insert(int(len(jobs) / 2) + 1, load_local_store_fingerprints_job)
         return jobs
 
     def check_dbs(self, db_pkgs: list[DbSectionPackage]) -> 'CheckBox':

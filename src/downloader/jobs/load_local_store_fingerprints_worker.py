@@ -17,23 +17,23 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.job_system import WorkerResult, ProgressReporter
-from downloader.jobs.load_local_store_sigs_job import LoadLocalStoreSigsJob
+from downloader.jobs.load_local_store_fingerprints_job import LoadLocalStoreFingerprintsJob
 from downloader.jobs.worker_context import DownloaderWorker
 from downloader.local_repository import LocalRepository
 from downloader.logger import Logger
 
 
-class LoadLocalStoreSigsWorker(DownloaderWorker):
+class LoadLocalStoreFingerprintsWorker(DownloaderWorker):
     def __init__(self, logger: Logger, local_repository: LocalRepository, progress_reporter: ProgressReporter) -> None:
         self._logger = logger
         self._local_repository = local_repository
         self._progress_reporter = progress_reporter
 
-    def job_type_id(self) -> int: return LoadLocalStoreSigsJob.type_id
+    def job_type_id(self) -> int: return LoadLocalStoreFingerprintsJob.type_id
     def reporter(self): return self._progress_reporter
 
-    def operate_on(self, job: LoadLocalStoreSigsJob) -> WorkerResult:  # type: ignore[override]
-        self._logger.bench('LoadLocalStoreSigsWorker start.')
-        job.local_store_sigs = self._local_repository.load_store_sigs()
-        self._logger.bench('LoadLocalStoreSigsWorker done.')
+    def operate_on(self, job: LoadLocalStoreFingerprintsJob) -> WorkerResult:  # type: ignore[override]
+        self._logger.bench('LoadLocalStoreFingerprintsWorker start.')
+        job.local_store_fingerprints = self._local_repository.load_store_fingerprints()
+        self._logger.bench('LoadLocalStoreFingerprintsWorker done.')
         return [], None
