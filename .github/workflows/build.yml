@@ -15,7 +15,7 @@ jobs:
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: ./.github/actions/setup-python
     - name: Unit Tests
       run: cd src && python3 -m unittest discover -s test/unit
@@ -23,7 +23,7 @@ jobs:
   integration-tests:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: ./.github/actions/setup-python
     - name: Integration Tests
       run: cd src && python3 -m unittest discover -s test/integration
@@ -31,7 +31,7 @@ jobs:
   system-quick-tests:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: ./.github/actions/setup-python
     - name: System Quick Tests
       run: cd src && python3 -m unittest discover -s test/system/quick -v
@@ -42,7 +42,7 @@ jobs:
       NEW_RELEASE: ${{ steps.check-changes.outputs.NEW_RELEASE }}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: ./.github/actions/setup-python
 
     - name: Check for changes
@@ -72,7 +72,7 @@ jobs:
     needs: check-changes
     if: needs.check-changes.outputs.NEW_RELEASE == 'yes'
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: ./.github/actions/setup-python
     - name: System Slow Tests
       run: cd src && python3 -m unittest discover -s test/system/slow -v
@@ -83,7 +83,7 @@ jobs:
     if: needs.check-changes.outputs.NEW_RELEASE == 'yes'
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: ./.github/actions/setup-python
 
     - name: Build
@@ -124,7 +124,7 @@ jobs:
             python-cmd: python
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Download build artifacts
       uses: actions/download-artifact@v4
@@ -148,7 +148,7 @@ jobs:
     - run: echo "owner_lc=$(echo "${GITHUB_REPOSITORY_OWNER,,}")" >> "$GITHUB_OUTPUT"
       id: vars
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
 
     - name: Download build artifacts
       uses: actions/download-artifact@v4

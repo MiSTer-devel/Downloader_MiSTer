@@ -8,7 +8,7 @@ jobs:
   type-check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: ./.github/actions/setup-python
     - run: |
         set -euo pipefail
@@ -41,7 +41,7 @@ jobs:
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: ./.github/actions/setup-python
     - name: Unit Tests
       run: cd src && python3 -m unittest discover -s test/unit
@@ -49,7 +49,7 @@ jobs:
   integration-tests:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: ./.github/actions/setup-python
     - name: Integration Tests
       run: cd src && python3 -m unittest discover -s test/integration
@@ -57,7 +57,7 @@ jobs:
   system-quick-tests:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: ./.github/actions/setup-python
     - name: System Quick Tests
       run: cd src && python3 -m unittest discover -s test/system/quick -v
@@ -65,7 +65,7 @@ jobs:
   system-slow-tests:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: ./.github/actions/setup-python
     - name: System Slow Tests
       run: cd src && python3 -m unittest discover -s test/system/slow -v
@@ -73,7 +73,7 @@ jobs:
   launcher-test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: ./.github/actions/setup-python
     - name: Full Run Launcher Test
       run: ./downloader.sh
@@ -96,7 +96,7 @@ jobs:
             python-cmd: python
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Full Run PC Launcher Test on ${{ matrix.os }}
       run: ${{ matrix.python-cmd }} src/pc_launcher.py
