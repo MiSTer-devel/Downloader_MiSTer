@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Validate Tester
       run: ./.github/downloader_test.py distribution_mister $(pwd)/src/test/system/fixtures/workflows/tiny_db.json
