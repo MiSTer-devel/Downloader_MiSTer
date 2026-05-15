@@ -20,3 +20,4 @@ downloader.json.zip
 downloader*.json
 *.log
 *.png
+.local_drv

@@ -42,6 +42,7 @@ from downloader.other import calculate_url
 from downloader.path_package import PathPackage, PathType, PEXT_KIND_EXTERNAL, \
     PEXT_KIND_STANDARD, PATH_PACKAGE_KIND_PEXT
 from downloader.target_path_calculator import TargetPathsCalculator, StoragePriorityError, TargetPathsCalculatorFactory
+from downloader.update_output import UpdateOutput
 
 _CheckFilePackage = PathPackage
 _FetchFilePackage = PathPackage
@@ -62,6 +63,7 @@ class ProcessIndexCtx:
     target_paths_calculator_factory: TargetPathsCalculatorFactory
     file_download_session_logger: FileDownloadSessionLogger
     free_space_reservation: FreeSpaceReservation
+    update_output: UpdateOutput
 
 
 class ProcessDbIndexWorker(DownloaderWorker):
@@ -353,16 +355,37 @@ def process_create_folder_packages(ctx: ProcessIndexCtx, create_folder_pkgs: lis
     installed_folders = [f for f in processing_folders if f.rel_path in db_folder_index]
     return folder_copies_to_be_removed, installed_folders, created_folders, errors
 
-def create_fetch_jobs(ctx: ProcessIndexCtx, db_id: str, non_existing_pkgs: list[_FetchFilePackage], need_update_pkgs: list[_FetchFilePackage], created_folders: set[str], base_files_url: str) -> list[Job]:
+def create_fetch_jobs(
+    ctx: ProcessIndexCtx,
+    db_id: str,
+    non_existing_pkgs: list[_FetchFilePackage],
+    need_update_pkgs: list[_FetchFilePackage],
+    created_folders: set[str],
+    base_files_url: str,
+    size_report_scope: str = 'db',
+    zip_id: str = '',
+    should_report_size: bool = True
+) -> list[Job]:
     if len(non_existing_pkgs) == 0 and len(need_update_pkgs) == 0:
         return []
 
-    return [
+    fetch_jobs = [
         job for job in chain(
             (_fetch_job(ctx, pkg, False, db_id, created_folders, base_files_url) for pkg in non_existing_pkgs),
             (_fetch_job(ctx, pkg,  True, db_id, created_folders, base_files_url) for pkg in need_update_pkgs)
         ) if job is not None
     ]
+    if should_report_size and fetch_jobs:
+        ctx.update_output.database_size_added(
+            db_id,
+            sum(job.pkg.description['size'] for job in fetch_jobs),
+            len(fetch_jobs),
+            size_report_scope,
+            zip_id
+        )
+    result: list[Job] = []
+    result.extend(fetch_jobs)
+    return result
 
 def _fetch_job(ctx: ProcessIndexCtx, pkg: PathPackage, exists: bool, db_id: str, created_folders: set[str], base_files_url: str, /) -> Optional[FetchFileJob]:
     source = _url(file_path=pkg.rel_path, file_description=pkg.description, base_files_url=base_files_url)

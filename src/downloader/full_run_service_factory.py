@@ -34,6 +34,7 @@ from downloader.jobs.fetch_file_worker import SafeFileFetcher
 from downloader.jobs.reporters import DownloaderProgressReporter, FileDownloadProgressReporter, InstallationReportImpl
 from downloader.jobs.worker_context import FailCtx
 from downloader.logger import DebugOnlyLoggerDecorator, Logger, FilelogManager, ConfigLogManager, TopLogger
+from downloader.update_output import UpdateOutput
 from downloader.os_utils import LinuxOsUtils
 from downloader.linux_updater import LinuxUpdater
 from downloader.local_repository import LocalRepository
@@ -47,16 +48,17 @@ import atexit
 
 
 class FullRunServiceFactory:
-    def __init__(self, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, external_drives_repository_factory=None) -> None:
+    def __init__(self, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, update_output: UpdateOutput, external_drives_repository_factory=None) -> None:
         self._logger = logger
         self._filelog_manager = filelog_manager
         self._printlog_manager = printlog_manager
+        self._update_output = update_output
         self._external_drives_repository_factory = external_drives_repository_factory or ExternalDrivesRepositoryFactory()
 
 
     @staticmethod
-    def for_main(top_logger: TopLogger):
-        return FullRunServiceFactory(top_logger, top_logger.file_logger, top_logger)
+    def for_main(top_logger: TopLogger, update_output: UpdateOutput):
+        return FullRunServiceFactory(top_logger, top_logger.file_logger, top_logger, update_output)
 
     def create(self, config: Config):
         path_dictionary: dict[str, str] = dict()
@@ -81,7 +83,7 @@ class FullRunServiceFactory:
         atexit.register(http_gateway.cleanup)
         safe_file_fetcher = SafeFileFetcher(config, system_file_system, self._logger, http_gateway, waiter)
         interrupts = Interruptions(file_system_factory)
-        file_download_reporter = FileDownloadProgressReporter(self._logger, waiter, interrupts)
+        file_download_reporter = FileDownloadProgressReporter(self._logger, interrupts, self._update_output)
         job_system = JobSystem(
             reporter=DownloaderProgressReporter(self._logger, [file_download_reporter]),
             logger=self._logger,
@@ -111,7 +113,8 @@ class FullRunServiceFactory:
             file_filter_factory=file_filter_factory,
             target_paths_calculator_factory=TargetPathsCalculatorFactory(system_file_system, external_drives_repository, old_pext_paths),
             fail_ctx=fail_ctx,
-            config=config
+            config=config,
+            update_output=self._update_output
         )
         online_importer = OnlineImporter(
             config=config,
@@ -140,6 +143,7 @@ class FullRunServiceFactory:
             LinuxOsUtils(),
             waiter,
             system_file_system,
+            self._update_output,
         )
         instance.configure_components()
         return instance

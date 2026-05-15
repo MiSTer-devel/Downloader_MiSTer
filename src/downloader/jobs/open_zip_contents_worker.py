@@ -123,7 +123,17 @@ class OpenZipContentsWorker(DownloaderWorker):
 
         self._logger.bench('OpenZipContentsWorker launching recovery process index...', job.db.db_id, job.zip_id)
 
-        return create_fetch_jobs(self._process_index_ctx, job.db.db_id, recoverable_files, [], set(), job.zip_base_files_url), None
+        return create_fetch_jobs(
+            self._process_index_ctx,
+            job.db.db_id,
+            recoverable_files,
+            [],
+            set(),
+            job.zip_base_files_url,
+            size_report_scope='zip',
+            zip_id=job.zip_id,
+            should_report_size=False
+        ), None
 
     @staticmethod
     def _split_invalid_files_by_recovery_source(file_pkgs: list[PathPackage], base_files_url: str) -> tuple[list[PathPackage], list[PathPackage]]:
