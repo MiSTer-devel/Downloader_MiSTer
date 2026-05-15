@@ -18,19 +18,18 @@
 
 import dataclasses
 import threading
-import time
 from collections import defaultdict
 from typing import Optional, Type, TypeVar, Generic, Protocol, Union
 
 from downloader.db_entity import DbEntity
 from downloader.interruptions import Interruptions
-from downloader.other import screen_columns
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_file_job import FetchFileJob
+from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
 from downloader.path_package import PathPackage
-from downloader.waiter import Waiter
 from downloader.job_system import ProgressReporter, Job
 from downloader.logger import Logger
+from downloader.update_output import UpdateOutput
 from types import TracebackType
 
 
@@ -277,143 +276,62 @@ class FileDownloadSessionLogger(Protocol):
         """Prints a header."""
 
 
-class FileDownloadSessionLoggerImpl(FileDownloadSessionLogger):
-
-    def __init__(self, logger: Logger, waiter: Waiter) -> None:
-        self._logger = logger
-        self._waiter = waiter
-        self._check_time: float = 0
-        self._deactivated: bool = False
-        self._needs_newline: bool = False
-        self._need_clear_header: bool = False
-        self._symbols: list[str] = []
-        self._columns: int = screen_columns()
-
-    def _deactivate(self) -> None:
-        self._deactivated = True
-
-    def print_job_started(self, job: Job) -> None:
-        if isinstance(job, FetchFileJob) and job.db_id is not None:
-            self._print_line(job.pkg.rel_path)
-        if isinstance(job, FetchDataJob):
-            self._logger.bench('FileDownloadSessionLoggerImpl FetchDataJob started: ', job.source)
-        self._check_time = time.monotonic() + 2.0
-
-    def print_work_in_progress(self) -> None:
-        if self._deactivated:
-            return
-        now = time.monotonic()
-        if self._check_time < now:
-            self._symbols.append('*')
-            self._print_symbols()
-
-    def print_jobs_cancelled(self, jobs: list[Job]) -> None:
-        self._logger.print(f"Cancelled {len(jobs)} jobs.")
-
-    def print_job_completed(self, job: Job, _next_jobs: list[Job]) -> None:
-        if isinstance(job, FetchFileJob) and job.db_id is not None:
-            self._symbols.append('.')
-            if self._needs_newline or self._check_time < time.monotonic():
-                self._print_symbols()
-        if isinstance(job, FetchDataJob):
-            self._logger.bench('FileDownloadSessionLoggerImpl FetchDataJob completed: ', job.source)
-
-    def _print_symbols(self) -> None:
-        if len(self._symbols) == 0:
-            return
-
-        last_is_asterisk = self._symbols[-1] == '*'
-
-        self._logger.print(('\n' if self._need_clear_header else '') + ''.join(self._symbols), end='')
-        self._symbols.clear()
-
-        self._need_clear_header = False
-        self._needs_newline = True
-        self._check_time = time.monotonic() + (1.0 if last_is_asterisk else 2.0)
-
-    def _print_line(self, line: str) -> None:
-        if self._need_clear_header: line = '\n' + line
-        if self._needs_newline: line = '\n' + line
-        self._logger.print(line)
-        self._needs_newline = False
-        self._need_clear_header = False
-
-    def print_progress_line(self, line: str) -> None:
-        self._print_line(line)
-        self._check_time = time.monotonic() + 2.0
-
-    def print_pending(self) -> None:
-        self._print_symbols()
-        if self._needs_newline:
-            self._logger.print()
-            self._needs_newline = False
-
-    def print_header(self, db: DbEntity) -> None:
-        self._print_symbols()
-        first_line = '\n' if self._needs_newline else ''
-        self._needs_newline = False
-        self._logger.print(
-            first_line +
-            '#' * self._columns + '\n' +
-            f'SECTION: {db.db_id}\n'
-        )
-
-        self._need_clear_header = True
-        self._check_time = time.monotonic() + 2.0
-
-    def print_job_failed(self, job: Job, exception: BaseException) -> None:
-        self._print_job_error(job, exception)
-
-    def print_job_retried(self, job: Job, _retry_job: Job, exception: BaseException) -> None:
-        self._print_job_error(job, exception)
-
-    def _print_job_error(self, job: Job, exception: BaseException) -> None:
-        if isinstance(job, FetchFileJob) and job.db_id is not None:
-            self._logger.debug(exception)
-            self._symbols.append('~')
-            self._print_symbols()
-
-
 class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
-    def __init__(self, logger: Logger, waiter: Waiter, interrupts: Interruptions) -> None:
+    def __init__(self, logger: Logger, interrupts: Interruptions, update_output: UpdateOutput) -> None:
         self._logger = logger
         self._interrupts = interrupts
-        self._session_logger = FileDownloadSessionLoggerImpl(logger, waiter)
+        self._update_output = update_output
         self._report: InstallationReportImpl = InstallationReportImpl()
 
     def installation_report(self) -> InstallationReport: return self._report
-    def session_logger(self) -> FileDownloadSessionLogger: return self._session_logger
+    def session_logger(self) -> FileDownloadSessionLogger: return self
 
     def set_installation_report(self, report: InstallationReportImpl):
         self._report = report
 
     def notify_job_started(self, job: Job) -> None:
         self._report.add_job_started(job)
-        self._session_logger.print_job_started(job)
+        if isinstance(job, FetchFileJob) and job.db_id is not None:
+            self._update_output.file_started(job.db_id, job.pkg.rel_path, job.pkg.description['size'])
+        if isinstance(job, FetchDataJob):
+            self._logger.bench('FileDownloadProgressReporter FetchDataJob started: ', job.source)
 
     def notify_work_in_progress(self) -> None:
-        self._session_logger.print_work_in_progress()
+        self._update_output.work_in_progress()
 
     def notify_job_completed(self, job: Job, next_jobs: list[Job]) -> None:
         self._report.add_job_completed(job, next_jobs)
-        self._session_logger.print_job_completed(job, next_jobs)
+        if isinstance(job, FetchFileJob) and job.db_id is not None:
+            self._update_output.file_completed(job.db_id, job.pkg.rel_path, job.pkg.description['size'])
+        if isinstance(job, OpenZipContentsJob):
+            for pkg in job.validated_files:
+                self._update_output.file_completed(job.db.db_id, pkg.rel_path, pkg.description['size'], job.zip_id)
+        if isinstance(job, FetchDataJob):
+            self._logger.bench('FileDownloadProgressReporter FetchDataJob completed: ', job.source)
 
     def notify_job_failed(self, job: Job, exception: BaseException) -> None:
         self._report.add_job_failed(job, exception)
-        self._session_logger.print_job_failed(job, exception)
+        if isinstance(job, FetchFileJob) and job.db_id is not None:
+            self._update_output.file_failed(job.db_id, job.pkg.rel_path, job.pkg.description['size'], type(exception).__name__)
+        if isinstance(job, OpenZipContentsJob):
+            for pkg in job.files_to_unzip:
+                self._update_output.file_failed(job.db.db_id, pkg.rel_path, pkg.description['size'], type(exception).__name__)
+        if isinstance(job, FetchFileJob) and job.db_id is not None:
+            self._logger.debug(exception)
 
     def notify_job_retried(self, job: Job, retry_job: Job, exception: BaseException) -> None:
         self._report.add_job_retried(job, retry_job, exception)
-        self._session_logger.print_job_retried(job, retry_job, exception)
+        if isinstance(job, FetchFileJob) and job.db_id is not None:
+            self._logger.debug(exception)
 
     def notify_jobs_cancelled(self, jobs: list[Job]) -> None:
         self._report.add_jobs_cancelled(jobs)
-        self._session_logger.print_jobs_cancelled(jobs)
+        self._update_output.jobs_cancelled(len(jobs))
         try:
             self._interrupts.interrupt()
         except Exception as e:
             self._logger.debug(e)
 
-    def print_progress_line(self, line: str) -> None: self._session_logger.print_progress_line(line)
-    def print_pending(self) -> None: self._session_logger.print_pending()
-    def print_header(self, db: DbEntity) -> None:  self._session_logger.print_header(db)
+    def print_progress_line(self, line: str) -> None: self._update_output.progress_line(line)
+    def print_pending(self) -> None: self._update_output.flush_pending()
+    def print_header(self, db: DbEntity) -> None:  self._update_output.database_started(db.db_id)

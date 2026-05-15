@@ -24,7 +24,7 @@ from typing import Optional
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config, FileChecking
-from downloader.constants import EXIT_ERROR_NO_CERTS, EXIT_ERROR_STORE_NOT_SAVED, EXIT_ERROR_FAILED_FILES, \
+from downloader.constants import DOWNLOADER_VERSION, EXIT_ERROR_NO_CERTS, EXIT_ERROR_STORE_NOT_SAVED, EXIT_ERROR_FAILED_FILES, \
     EXIT_ERROR_FAILED_DBS, EXIT_ERROR_STORE_NOT_LOADED, FILE_downloader_run_signal, REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE, \
     REBOOT_WAIT_TIME_STANDARD, FILE_CHECKING_SPACE_CHECK_TOLERANCE, MEDIA_FAT, EXIT_ERROR_NETWORK_PROBLEMS, \
     FILE_downloader_storage_backup_pext
@@ -39,10 +39,11 @@ from downloader.os_utils import OsUtils
 from downloader.other import format_files_message, format_folders_message, format_zips_message, screen_columns
 from downloader.reboot_calculator import RebootCalculator
 from downloader.waiter import Waiter
+from downloader.update_output import UpdateOutput
 
 
 class FullRunService:
-    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, local_repository: LocalRepository, online_importer: OnlineImporter, linux_updater: LinuxUpdater, reboot_calculator: RebootCalculator, base_path_relocator: BasePathRelocator, certificates_fix: CertificatesFix, external_drives_repository: ExternalDrivesRepository, os_utils: OsUtils, waiter: Waiter, file_system: FileSystem) -> None:
+    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, local_repository: LocalRepository, online_importer: OnlineImporter, linux_updater: LinuxUpdater, reboot_calculator: RebootCalculator, base_path_relocator: BasePathRelocator, certificates_fix: CertificatesFix, external_drives_repository: ExternalDrivesRepository, os_utils: OsUtils, waiter: Waiter, file_system: FileSystem, update_output: UpdateOutput) -> None:
         self._waiter = waiter
         self._os_utils = os_utils
         self._external_drives_repository = external_drives_repository
@@ -57,8 +58,9 @@ class FullRunService:
         self._printlog_manager = printlog_manager
         self._config = config
         self._file_system = file_system
+        self._update_output = update_output
         self._file_checking_mode_resolver = FileCheckingModeResolver(local_repository, file_system, logger)
-        self._final_reporter = FinalReporter(local_repository, config, logger, waiter)
+        self._final_reporter = FinalReporter(local_repository, config, logger, waiter, self._update_output)
 
     def configure_components(self) -> None:
         self._logger.bench('FullRunService configure_components start.')
@@ -85,7 +87,13 @@ class FullRunService:
         self._logger.bench('FullRunService Full Run done.')
         self._remove_run_signal()
 
-        if not self._config['is_pc_launcher'] and self._needs_reboot():
+        needs_reboot = False if self._config['is_pc_launcher'] else self._needs_reboot()
+        if needs_reboot:
+            self._update_output.reboot_required('linux' if self._linux_updater.needs_reboot() else 'standard')
+
+        self._update_output.run_finished(result)
+
+        if needs_reboot:
             self._logger.print()
             if self._linux_updater.needs_reboot():
                 self._logger.print(f"Rebooting in {REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE} seconds. Please do not turn off your device!")
@@ -106,8 +114,7 @@ class FullRunService:
         return result
 
     def _full_run_impl(self):
-        self._logger.print('START!')
-        self._logger.print()
+        self._update_output.run_started(DOWNLOADER_VERSION, self._config['commit'])
         self._logger.debug('Linux Version: %s' % self._linux_updater.get_current_linux_version())
 
         self._local_repository.ensure_base_paths()
@@ -129,7 +136,7 @@ class FullRunService:
                     self._final_reporter.display_no_certs_msg()
                     return EXIT_ERROR_NO_CERTS
 
-                self._logger.print('Retrying all connections...')
+                self._update_output.warning('network_retry', 'Retrying all connections...')
                 install_box, download_dbs_err = self._online_importer.download_dbs_contents(db_pkgs)
 
             if isinstance(download_dbs_err, NetworkProblems):
@@ -152,7 +159,7 @@ class FullRunService:
         self._final_reporter.display_end_summary(install_box)
 
         if save_store_err is not None:
-            self._logger.print('WARNING! Store could not be saved because of a File System Error!')
+            self._update_output.error('store_save', 'Store could not be saved because of a File System Error!')
             return EXIT_ERROR_STORE_NOT_SAVED
 
         if self._config['update_linux']:
@@ -230,18 +237,26 @@ class FileCheckingModeResolver:
 
 
 class FinalReporter:
-    def __init__(self, local_repository: LocalRepository, config: Config, logger: Logger, waiter: Waiter) -> None:
+    def __init__(self, local_repository: LocalRepository, config: Config, logger: Logger, waiter: Waiter, update_output: UpdateOutput) -> None:
         self._local_repository = local_repository
         self._config = config
         self._logger = logger
         self._waiter = waiter
+        self._update_output = update_output
 
     def display_end_summary(self, box: InstallationBox) -> None:
         run_time = str(datetime.timedelta(seconds=time.monotonic() - self._config['start_time']))[2:-4]
 
+        for db_id in box.failed_dbs():
+            self._update_output.database_failed(db_id)
+        for db_id, zip_id in box.failed_zips():
+            self._update_output.zip_failed(db_id, zip_id)
+        for folder in box.failed_folders():
+            self._update_output.folder_failed(folder)
+
         self._logger.print()
         self._logger.print('=' * screen_columns())
-        self._logger.print(f'Downloader 2.4 ({self._config["commit"][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        self._logger.print(f'Downloader {DOWNLOADER_VERSION} ({self._config["commit"][0:3]}) by theypsilon. Run time: {run_time}s at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
         self._logger.debug('Commit: %s', self._config["commit"])
         self._logger.print(f'Log: {self._local_repository.logfile_path}')
         if len(box.skipped_dbs()) == 0 and len(box.unused_filter_tags()) > 0:
@@ -282,11 +297,15 @@ class FinalReporter:
             self._logger.print()
             self._logger.print('Following new versions were not installed:')
             for db_id in new_files_not_installed:
+                for path in new_files_not_installed[db_id]:
+                    self._update_output.not_overwritten(db_id, path)
                 self._logger.print(' •%s: %s' % (db_id, ', '.join(new_files_not_installed[db_id])))
             self._logger.print()
             self._logger.print(' * Delete the file that you wish to upgrade from the previous list, and run this again.')
         if len(box.full_partitions()) > 0:
             full_partitions = [p for p, s in box.full_partitions().items()]
+            for partition, bytes_needed in box.full_partitions().items():
+                self._update_output.full_partition(partition, bytes_needed)
             has_system = any(partition == self._config['base_system_path'] for partition in full_partitions)
             has_external = any(partition != self._config['base_system_path'] for partition in full_partitions)
             self._logger.print()
@@ -317,13 +336,13 @@ class FinalReporter:
             self._logger.debug('Old pext paths: ' + ', '.join(old_pext_paths))
 
     def display_no_certs_msg(self) -> None:
-        self._logger.print("ERROR: Couldn't load certificates.")
+        self._update_output.error('no_certs', "Couldn't load certificates.")
         self._logger.print()
         self._logger.print("Please, reboot your system and try again.")
         self._waiter.sleep(50)
 
     def display_network_problems_msg(self) -> None:
-        self._logger.print("ERROR: Couldn't connect to the servers.")
+        self._update_output.error('network', "Couldn't connect to the servers.")
         self._logger.print()
         self._logger.print("Please, reboot your system and try again.")
         self._logger.print()
@@ -335,12 +354,12 @@ class FinalReporter:
         self._waiter.sleep(50)
 
     def display_no_store_msg(self) -> None:
-        self._logger.print('ERROR: Store could not be loaded because of a File System Error!')
+        self._update_output.error('store_load', 'Store could not be loaded because of a File System Error!')
         self._logger.print()
         self._logger.print("Please, reboot your system and try again.")
 
     def display_file_error_failures(self, box: InstallationBox) -> None:
-        self._logger.print('ERROR: Variable FAIL_ON_FILE_ERROR was set to true, and found the following errors.')
+        self._update_output.error('file_failures', 'Variable FAIL_ON_FILE_ERROR was set to true, and found the following errors.')
         self._logger.print()
         self._logger.print('Files that failed: %d' % len(box.failed_files()))
         self._logger.print('Folders that failed: %d' % len(box.failed_folders()))

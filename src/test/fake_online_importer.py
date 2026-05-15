@@ -42,7 +42,7 @@ from downloader.local_store_wrapper import StoreWrapper, empty_db_state_fingerpr
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter, InstallationBox
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.logger import Logger
-from downloader.waiter import Waiter
+from downloader.update_output import NoopUpdateOutput
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_data_worker import FetchDataWorker
@@ -59,7 +59,6 @@ from test.fake_local_store_wrapper import LocalStoreWrapper, local_store_wrapper
 from test.fake_external_drives_repository import ExternalDrivesRepository
 from test.fake_logger import NoLogger
 from test.objects import config_with
-from test.fake_waiter import NoWaiter
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs, FileSystemState, NetworkState
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_local_repository import LocalRepository
@@ -76,7 +75,6 @@ class OnlineImporter(ProductionOnlineImporter):
             config: Optional[Config] = None,
             file_system_factory: Optional[FileSystemFactory] = None,
             free_space_reservation: Optional[FreeSpaceReservation] = None,
-            waiter: Optional[Waiter] = None,
             logger: Optional[Logger] = None,
             file_filter_factory: Optional[FileFilterFactory] = None,
             local_repository: Optional[LocalRepository] = None,
@@ -101,12 +99,13 @@ class OnlineImporter(ProductionOnlineImporter):
 
         self.file_system = self.fs_factory.create_for_system_scope()
         self.network_state = network_state or NetworkState()
-        waiter = NoWaiter() if waiter is None else waiter
         logger = NoLogger() if logger is None else logger
+        update_output = NoopUpdateOutput()
         http_gateway = FakeHttpGateway(self._config, self.network_state)
-        self._file_download_reporter = FileDownloadProgressReporter(logger, waiter,
+        self._file_download_reporter = FileDownloadProgressReporter(logger,
                                                                     Interruptions(fs=file_system_factory,
-                                                                                  gw=http_gateway))
+                                                                                  gw=http_gateway),
+                                                                    update_output)
         self._report_tracker = progress_reporter or ProgressReporterTracker(self._file_download_reporter)
         self._job_system = job_system or JobSystem(self._report_tracker, logger=logger, max_threads=1,
                                                    fail_policy=job_fail_policy or JobFailPolicy.FAIL_FAST,
@@ -131,7 +130,8 @@ class OnlineImporter(ProductionOnlineImporter):
             file_filter_factory=file_filter_factory,
             target_paths_calculator_factory=TargetPathsCalculatorFactory(self.file_system, external_drives_repository, old_pext_paths),
             fail_ctx=FailCtx(logger, fail_policy=fail_policy or FailPolicy.FAIL_FAST),
-            config=self._config
+            config=self._config,
+            update_output=update_output
         )
         self._start_job_policy = start_job_policy
         self._local_store: Optional[LocalStoreWrapper] = None

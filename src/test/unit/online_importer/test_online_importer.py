@@ -21,7 +21,6 @@ from downloader.constants import FILE_PDFViewer, FOLDER_linux, \
 from test.fake_logger import NoLogger
 from test.fake_logger import SpyLoggerDecorator
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
-from test.fake_waiter import NoWaiter
 from test.fake_file_system_factory import fs_data
 from test.objects import store_with_folders, db_distribution_mister, db_test_being_empty_descr, file_boot_rom, \
     boot_rom_descr, with_overwrite, file_a_descr, file_a_updated_descr, \
@@ -483,4 +482,3 @@ class TestOnlineImporter(OnlineImporterTestBase):
 
 def fs(files=None, folders=None, base_path=None, config=None):
     return ImporterImplicitInputs(files=files, folders=folders, base_path=base_path, config=config)
-

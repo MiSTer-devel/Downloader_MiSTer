@@ -22,7 +22,8 @@ from downloader.config import AllowDelete, AllowReboot, InvalidConfigParameter
 from downloader.constants import K_BASE_PATH, K_BASE_SYSTEM_PATH, K_UPDATE_LINUX, K_ALLOW_REBOOT, K_ALLOW_DELETE, \
     K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_VERBOSE, K_DATABASES, \
     K_DB_URL, K_SECTION, K_OPTIONS, MEDIA_USB2, MEDIA_USB1, K_DOWNLOADER_THREADS_LIMIT, KENV_DEFAULT_DB_ID, \
-    KENV_DEFAULT_DB_URL
+    KENV_DEFAULT_DB_URL, KENV_DOWNLOADER_OUTPUT, KENV_LOGLEVEL, K_DOWNLOADER_OUTPUT, DOWNLOADER_OUTPUT_DLP1_LTSV, \
+    DOWNLOADER_OUTPUT_HUMAN
 from test.objects import not_found_ini, db_options, default_base_path, default_env
 from test.fake_config_reader import ConfigReader
 
@@ -157,6 +158,28 @@ class TestConfigReader(unittest.TestCase):
                 K_DB_URL: 'http://path/to/nowhere.json.zip',
                 K_SECTION: 'somethinguppercase',
             }}
+        }, env=env)
+
+    def test_config_reader___with_ltsv_downloader_output___returns_ltsv_downloader_output(self):
+        env = default_env()
+        env[KENV_DOWNLOADER_OUTPUT] = 'DLP1-LTSV'
+
+        self.assertConfig(not_found_ini(), {K_DOWNLOADER_OUTPUT: DOWNLOADER_OUTPUT_DLP1_LTSV}, env=env)
+
+    def test_config_reader___with_invalid_downloader_output___returns_human_downloader_output(self):
+        env = default_env()
+        env[KENV_DOWNLOADER_OUTPUT] = 'dlp1'
+
+        self.assertConfig(not_found_ini(), {K_DOWNLOADER_OUTPUT: DOWNLOADER_OUTPUT_HUMAN}, env=env)
+
+    def test_config_reader___with_loglevel___returns_logger_config_flags(self):
+        env = default_env()
+        env[KENV_LOGLEVEL] = 'debug,bench,http'
+
+        self.assertConfig(not_found_ini(), {
+            'verbose': True,
+            'bench': True,
+            'http_logging': True
         }, env=env)
 
     def test_config_reader___with_filter_inheritance___returns_expected_filter_value(self):

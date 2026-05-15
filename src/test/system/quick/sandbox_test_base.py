@@ -22,6 +22,7 @@ import time
 import json
 from pathlib import Path, PurePosixPath
 
+from downloader.config import default_config
 from downloader.config_reader import ConfigReader
 from downloader.constants import FILE_downloader_storage_json
 from downloader.external_drives_repository import ExternalDrivesRepositoryFactory
@@ -34,6 +35,7 @@ from test.fake_logger import NoLogger
 from test.fake_store_migrator import StoreMigrator
 from downloader.file_system import hash_file, is_windows
 from downloader.main import execute_full_run
+from downloader.update_output import NoopUpdateOutput
 from downloader.store_migrator import make_new_local_store
 
 
@@ -129,8 +131,12 @@ class SandboxTestBase(unittest.TestCase):
         env['DEFAULT_BASE_PATH'] = tmp_default_base_path
 
         config_reader = ConfigReader(logger, env, time.monotonic())
-        factory = FullRunServiceFactory(logger, NoLogger(), log_mgr, external_drives_repository_factory=external_drives_repository_factory)
-        return execute_full_run(factory, config_reader, argv or [])
+        factory = FullRunServiceFactory(logger, NoLogger(), log_mgr, NoopUpdateOutput(), external_drives_repository_factory=external_drives_repository_factory)
+        config_path = config_reader.calculate_config_path(str(Path().resolve()))
+        config = default_config()
+        config_reader.read_initial_env(config)
+        config_reader.read_rest_env_and_config_file(config_path, config)
+        return execute_full_run(factory, argv or [], config)
 
     def find_all_files(self, directory):
         return [(file.replace('\\', '/'), md5) for file, md5 in sorted(self._scan_files(directory), key=lambda t: t[0].lower())]

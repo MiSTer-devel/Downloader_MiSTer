@@ -16,7 +16,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from typing import Final, TypedDict
+from typing import Final, Literal, TypedDict
 
 class SafeFetchInfo(TypedDict):
     url: str
@@ -25,6 +25,7 @@ class SafeFetchInfo(TypedDict):
 
 # Database constants
 DATABASE_LATEST_SUPPORTED_VERSION: Final[int] = 1
+DOWNLOADER_VERSION: Final[str] = '2.4'
 
 # Pre-selected database
 DISTRIBUTION_MISTER_DB_URL: Final[str] = 'https://raw.githubusercontent.com/MiSTer-devel/Distribution_MiSTer/main/db.json.zip'
@@ -173,6 +174,7 @@ K_DB_URL: Final[str] = 'db_url'
 K_SECTION: Final[str] = 'section'
 K_OPTIONS: Final[str] = 'options'
 K_DEBUG: Final[str] = 'debug'
+K_DOWNLOADER_OUTPUT: Final[Literal['downloader_output']] = 'downloader_output'
 K_FAIL_ON_FILE_ERROR: Final[str] = 'fail_on_file_error'
 K_COMMIT: Final[str] = 'commit'
 K_DEFAULT_DB_ID: Final[str] = 'default_db_id'
@@ -188,6 +190,9 @@ DEFAULT_CURL_SSL_OPTIONS: Final[str] = '--cacert %s' % DEFAULT_CACERT_FILE
 DEFAULT_UPDATE_LINUX_ENV: Final[str] = 'undefined'
 DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB: Final[int] = 512
 DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB: Final[int] = 128
+DOWNLOADER_OUTPUT_HUMAN: Final[str] = 'human'
+DOWNLOADER_OUTPUT_DLP1_LTSV: Final[str] = 'dlp1-ltsv'
+DOWNLOADER_OUTPUTS: Final[tuple[str, ...]] = (DOWNLOADER_OUTPUT_HUMAN, DOWNLOADER_OUTPUT_DLP1_LTSV)
 
 # Env Dictionary Keys
 KENV_DOWNLOADER_LAUNCHER_PATH: Final[str] = 'DOWNLOADER_LAUNCHER_PATH'
@@ -207,6 +212,7 @@ KENV_DEBUG: Final[str] = 'DEBUG'
 KENV_FAIL_ON_FILE_ERROR: Final[str] = 'FAIL_ON_FILE_ERROR'
 KENV_LOGFILE: Final[str] = 'LOGFILE'
 KENV_LOGLEVEL: Final[str] = 'LOGLEVEL'
+KENV_DOWNLOADER_OUTPUT: Final[str] = 'DOWNLOADER_OUTPUT'
 KENV_HTTP_PROXY: Final[str] = 'HTTP_PROXY'
 KENV_LC_HTTP_PROXY: Final[str] = 'http_proxy'
 KENV_HTTPS_PROXY: Final[str] = 'HTTPS_PROXY'

@@ -19,8 +19,9 @@
 import unittest
 
 from downloader.config import default_config, AllowReboot
-from downloader.constants import K_ALLOW_REBOOT, K_CURL_SSL, K_DEBUG
+from downloader.constants import K_ALLOW_REBOOT, K_CURL_SSL, K_DEBUG, K_DOWNLOADER_OUTPUT, DOWNLOADER_OUTPUT_HUMAN
 from downloader.full_run_service_factory import FullRunServiceFactory
+from downloader.update_output import NoopUpdateOutput
 from test.fake_logger import NoLogger
 
 
@@ -28,11 +29,12 @@ class TestFullRunServiceFactory(unittest.TestCase):
 
     def test_make_full_run_service___with_proper_parameters___does_not_throw(self):
         try:
-            FullRunServiceFactory(NoLogger(), NoLogger(), NoLogger()).create({
+            FullRunServiceFactory(NoLogger(), NoLogger(), NoLogger(), NoopUpdateOutput()).create({
                 **default_config(),
                 K_ALLOW_REBOOT: AllowReboot.NEVER,
                 K_CURL_SSL: '',
-                K_DEBUG: False
+                K_DEBUG: False,
+                K_DOWNLOADER_OUTPUT: DOWNLOADER_OUTPUT_HUMAN
             })
         except TypeError:
             self.fail('TypeError during make_full_run_service, composition root failed!')

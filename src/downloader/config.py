@@ -22,7 +22,7 @@ from typing import Literal, TypedDict, Optional, Union
 
 from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, \
     MEDIA_FAT, DISTRIBUTION_MISTER_DB_ID, K_DOWNLOADER_THREADS_LIMIT, STORAGE_PRIORITY_PREFER_SD, \
-    DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB, DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB
+    DEFAULT_MINIMUM_SYSTEM_FREE_SPACE_MB, DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB, DOWNLOADER_OUTPUT_HUMAN
 from downloader.db_options import DbOptions
 from downloader.error import DownloaderError
 from downloader.http_gateway import HttpConfig
@@ -34,6 +34,7 @@ class Environment(TypedDict):
     EXTRA_DROP_IN_DATABASE_FILES: str
     LOGFILE: Optional[str]
     LOGLEVEL: str
+    DOWNLOADER_OUTPUT: str
     CURL_SSL: str
     COMMIT: str
     ALLOW_REBOOT: Optional[str]
@@ -135,6 +136,7 @@ class ConfigRequired(ConfigMisterSection):
     http_logging: bool
     http_config: Optional[HttpConfig]
     rotate_logs: bool
+    downloader_output: str
 
 class Config(ConfigRequired, total=False):
     environment: Environment  # This should never be used. It's there just to be debug-logged.
@@ -182,7 +184,8 @@ def default_config() -> Config:
         'minimum_external_free_space_mb': DEFAULT_MINIMUM_EXTERNAL_FREE_SPACE_MB,
         'http_proxy': '',
         'http_config': None,
-        'rotate_logs': True
+        'rotate_logs': True,
+        'downloader_output': DOWNLOADER_OUTPUT_HUMAN
     }
 
 

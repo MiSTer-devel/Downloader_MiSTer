@@ -67,12 +67,13 @@ from downloader.jobs.process_zip_index_job import ProcessZipIndexJob
 from downloader.local_store_wrapper import LocalStoreWrapper, StoreFragmentDrivePaths
 from downloader.path_package import PathPackage
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
+from downloader.update_output import UpdateOutput
 
 FILE_PROP_ENTANGLEMENTS = 'tangle'
 
 
 class OnlineImporterWorkersFactory:
-    def __init__(self, worker_context: JobContext, progress_reporter: ProgressReporter, file_system: FileSystem, http_gateway: HttpGateway, logger: Logger, file_download_reporter: FileDownloadProgressReporter, file_filter_factory: FileFilterFactory, target_paths_calculator_factory: TargetPathsCalculatorFactory, free_space_reservation: FreeSpaceReservation, local_repository: LocalRepository, base_path_relocator: BasePathRelocator, config: Config, fail_ctx: FailCtx):
+    def __init__(self, worker_context: JobContext, progress_reporter: ProgressReporter, file_system: FileSystem, http_gateway: HttpGateway, logger: Logger, file_download_reporter: FileDownloadProgressReporter, file_filter_factory: FileFilterFactory, target_paths_calculator_factory: TargetPathsCalculatorFactory, free_space_reservation: FreeSpaceReservation, local_repository: LocalRepository, base_path_relocator: BasePathRelocator, config: Config, fail_ctx: FailCtx, update_output: UpdateOutput):
         self._worker_context = worker_context
         self._progress_reporter = progress_reporter
         self._file_system = file_system
@@ -86,6 +87,7 @@ class OnlineImporterWorkersFactory:
         self._base_path_relocator = base_path_relocator
         self._config = config
         self._fail_ctx = fail_ctx
+        self._update_output = update_output
 
     def create_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]:
         jobs: list[Job] = []
@@ -118,6 +120,7 @@ class OnlineImporterWorkersFactory:
             target_paths_calculator_factory=self._target_paths_calculator_factory,
             file_download_session_logger=self._file_download_reporter,
             free_space_reservation=self._free_space_reservation,
+            update_output=self._update_output,
         )
         return [
             AbortWorker(

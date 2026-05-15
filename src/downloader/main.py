@@ -23,12 +23,13 @@ import locale
 from pathlib import Path
 from typing import Optional
 
-from downloader.config import Environment, InvalidConfigParameter
+from downloader.config import Config, Environment, InvalidConfigParameter, default_config
 from downloader.config_reader import ConfigReader
-from downloader.constants import KENV_LOGLEVEL, KENV_LC_HTTP_PROXY, KENV_HTTP_PROXY, KENV_HTTPS_PROXY, \
-    KENV_LC_HTTPS_PROXY, KENV_ROTATE_LOGS, KENV_SKIP_FREE_SPACE_CHECKS
-from downloader.logger import TopLogger
+from downloader.constants import KENV_LOGLEVEL, KENV_DOWNLOADER_OUTPUT, KENV_LC_HTTP_PROXY, KENV_HTTP_PROXY, KENV_HTTPS_PROXY, \
+    KENV_LC_HTTPS_PROXY, KENV_ROTATE_LOGS, KENV_SKIP_FREE_SPACE_CHECKS, DOWNLOADER_OUTPUT_HUMAN, K_DOWNLOADER_OUTPUT
+from downloader.logger import OffLogger, TopLogger
 from downloader.full_run_service_factory import FullRunServiceFactory
+from downloader.update_output import update_output_for_mode
 
 
 def main(env: Environment, start_time: float) -> int:
@@ -36,22 +37,30 @@ def main(env: Environment, start_time: float) -> int:
     # It should receive an 'env' dictionary produced by calling the "read_env" function below.
 
     locale.setlocale(locale.LC_CTYPE, "")
-    logger = TopLogger.for_main(env, start_time)
+    config_reader = ConfigReader(OffLogger(), env, start_time)
+    config = default_config()
+    config_reader.read_initial_env(config)
+    logger = TopLogger.for_main(config, start_time)
+    update_output = update_output_for_mode(config[K_DOWNLOADER_OUTPUT], logger)
+    config_reader.set_logger(logger)
     logger.bench('MAIN start.')
 
     # noinspection PyBroadException
     try:
+        config_path = config_reader.calculate_config_path(str(Path().resolve()))
+        config_reader.read_rest_env_and_config_file(config_path, config)
         exit_code = execute_full_run(
-            FullRunServiceFactory.for_main(logger),
-            ConfigReader(logger, env, start_time),
-            sys.argv
+            FullRunServiceFactory.for_main(logger, update_output),
+            sys.argv,
+            config
         )
     except InvalidConfigParameter as e:
         logger.debug(e)
-        logger.print('Configuration error: %s' % str(e))
+        update_output.error('config', 'Configuration error: %s' % str(e))
         exit_code = 1
     except Exception as _:
         import traceback
+        update_output.error('unexpected')
         logger.print(traceback.format_exc())
         exit_code = 1
 
@@ -74,6 +83,7 @@ def read_env(default_commit: Optional[str]) -> Environment:
         'EXTRA_DROP_IN_DATABASE_FILES': os.getenv(KENV_EXTRA_DROP_IN_DATABASE_FILES, ''),
         'LOGFILE': os.getenv(KENV_LOGFILE, None),
         'LOGLEVEL': os.getenv(KENV_LOGLEVEL, '').lower(),  # info | debug, http
+        'DOWNLOADER_OUTPUT': os.getenv(KENV_DOWNLOADER_OUTPUT, DOWNLOADER_OUTPUT_HUMAN).lower(),
         'CURL_SSL': os.getenv(KENV_CURL_SSL, DEFAULT_CURL_SSL_OPTIONS),
         'COMMIT': os.getenv(KENV_COMMIT, default_commit or 'unknown'),
         'ALLOW_REBOOT': os.getenv(KENV_ALLOW_REBOOT, None),
@@ -93,10 +103,7 @@ def read_env(default_commit: Optional[str]) -> Environment:
     }
 
 
-def execute_full_run(full_run_service_factory: FullRunServiceFactory, config_reader: ConfigReader, argv) -> int:
-    # The config will merge env inputs and 'downloader.ini' inputs, representing all configurable inputs.
-    config = config_reader.read_config(config_reader.calculate_config_path(str(Path().resolve())))
-
+def execute_full_run(full_run_service_factory: FullRunServiceFactory, argv, config: Config) -> int:
     # The factory instance is just creating the components of the system and passing the appropriate
     # dependencies to each one. Check directly full_run_service.py to see the program execution flow.
     runner = full_run_service_factory.create(config)

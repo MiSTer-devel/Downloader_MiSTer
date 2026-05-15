@@ -27,6 +27,11 @@ def run_compile2(**kwargs): exec_ssh(f'/media/fat/downloader_bin', **kwargs)
 def store_push(ws='', **kwargs): scp_file('downloader.json', f'/media/fat/{ws}Scripts/.config/downloader/downloader.json', **kwargs)
 def store_pull(ws='', **kwargs): scp_file(f'/media/fat/{ws}Scripts/.config/downloader/downloader.json', 'downloader.json', **kwargs)
 def log_pull(ws='', **kwargs): scp_file(f'/media/fat/{ws}Scripts/.config/downloader/downloader.log', 'downloader.log', **kwargs)
+def local_run(env=None, **_kwargs):
+    drv = Path(__file__).parent.parent / '.local_drv'
+    drv.mkdir(exist_ok=True)
+    local_env = {**(os.environ.copy() if env is None else env), 'DEFAULT_BASE_PATH': str(drv), 'DOWNLOADER_INI_PATH': str(drv / 'downloader.ini'), 'LOGFILE': str(drv / 'downloader.log'), 'CURL_SSL': '', 'DEBUG': 'true', 'UPDATE_LINUX': 'false', 'ALLOW_REBOOT': '0'}
+    subprocess.run(['python3', './src/__main__.py'], env=local_env, check=True, cwd=str(Path(__file__).parent.parent))
 
 def _skip_send(env=None, **_kwargs): return env is None or not env.get('SKIP_SEND', True)
 
@@ -70,6 +75,7 @@ def operations_dict(**kwargs):
         'launcher2': lambda: run_launcher2(**kwargs),
         'copy': lambda: [scp_file(sys.argv[2], f'/media/fat/{sys.argv[2]}'), print('OK')],
         'rcopy': lambda: [scp_file(f'/media/fat/{sys.argv[2]}', sys.argv[2]), print('OK')],
+        'local_run': lambda: local_run(**kwargs),
     }
 
 def _main():

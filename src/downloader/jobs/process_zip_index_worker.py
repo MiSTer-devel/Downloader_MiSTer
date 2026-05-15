@@ -68,7 +68,16 @@ class ProcessZipIndexWorker(DownloaderWorker):
 
         if not needs_extracting_single_files and less_file_count and less_accumulated_mbs:
             self._logger.debug('ProcessZipIndexWorker creating fetch jobs')
-            next_jobs = create_fetch_jobs(self._process_index_ctx, db.db_id, non_existing_pkgs, need_update_pkgs, created_folders, job.zip_index.base_files_url)
+            next_jobs = create_fetch_jobs(
+                self._process_index_ctx,
+                db.db_id,
+                non_existing_pkgs,
+                need_update_pkgs,
+                created_folders,
+                job.zip_index.base_files_url,
+                size_report_scope='zip',
+                zip_id=zip_id
+            )
 
         else:
             self._logger.debug('ProcessZipIndexWorker make open zip contents jobs')
@@ -102,6 +111,14 @@ class ProcessZipIndexWorker(DownloaderWorker):
         if target_error is not None:
             self._fail_ctx.swallow_error(target_error)
             return [], target_error
+
+        self._process_index_ctx.update_output.database_size_added(
+            job.db.db_id,
+            sum(pkg.description['size'] for pkg in unzip_file_pkgs),
+            len(unzip_file_pkgs),
+            'zip',
+            job.zip_id
+        )
 
         data_job = make_transfer_job(job.zip_index.description['contents_file']['url'], job.zip_index.description['contents_file'], False, job.db.db_id)
         open_zip_contents_job = OpenZipContentsJob(

@@ -32,7 +32,8 @@ from downloader.constants import FILE_downloader_ini, FOLDER_downloader, DEFAULT
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, \
     STORAGE_PRIORITY_PREFER_EXTERNAL, EXIT_ERROR_WRONG_SETUP, K_BENCH, K_HTTP_PROXY, FILE_CHECKING_FASTEST, \
-    FILE_CHECKING_BALANCED, FILE_CHECKING_EXHAUSTIVE, FILE_CHECKING_VERIFY_INTEGRITY, KENV_EXTRA_DROP_IN_DATABASE_FILES
+    FILE_CHECKING_BALANCED, FILE_CHECKING_EXHAUSTIVE, FILE_CHECKING_VERIFY_INTEGRITY, KENV_EXTRA_DROP_IN_DATABASE_FILES, \
+    DOWNLOADER_OUTPUTS, DOWNLOADER_OUTPUT_HUMAN, K_DOWNLOADER_OUTPUT
 from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
 from downloader.http_gateway import http_config, HttpGatewayException
 from downloader.logger import Logger
@@ -43,6 +44,26 @@ class ConfigReader:
         self._logger = logger
         self._env = env
         self._start_time = start_time
+
+    def set_logger(self, logger: Logger) -> None:
+        self._logger = logger
+
+    def read_initial_env(self, config: Config) -> None:
+        config[K_DOWNLOADER_OUTPUT] = self._valid_downloader_output(self._env['DOWNLOADER_OUTPUT'])
+        config['debug'] = self._env['DEBUG'] == 'true'
+        if config['debug']:
+            config['verbose'] = True
+        loglevel = self._env['LOGLEVEL']
+        if loglevel != '':
+            if 'info' in loglevel:
+                config['verbose'] = False
+            if 'debug' in loglevel:
+                config['verbose'] = True
+            if 'bench' in loglevel:
+                config['bench'] = True
+            if 'http' in loglevel:
+                config['http_logging'] = True
+        config['start_time'] = self._start_time
 
     def calculate_config_path(self, current_working_dir: str) -> str:
         if self._env['PC_LAUNCHER'] is not None:
@@ -75,26 +96,18 @@ class ConfigReader:
         return result.replace('/update.ini', '/downloader.ini')
 
     def read_config(self, config_path: str) -> Config:
-        result = default_config()
-        result['debug'] = self._env['DEBUG'] == 'true'
-        if result['debug']:
-            result['verbose'] = True
-        if self._env['LOGLEVEL'] != '':
-            if 'info' in self._env['LOGLEVEL']:
-                result['verbose'] = False
-            if 'debug' in self._env['LOGLEVEL']:
-                result['verbose'] = True
-            if 'bench' in self._env['LOGLEVEL']:
-                result['bench'] = True
-            if 'http' in self._env['LOGLEVEL']:
-                result['http_logging'] = True
+        config = default_config()
+        self.read_initial_env(config)
+        self.read_rest_env_and_config_file(config_path, config)
+        return config
 
+    def read_rest_env_and_config_file(self, config_path: str, config: Config) -> None:
         self._logger.debug('Reading file:', config_path)
         self._logger.bench('ConfigReader Read config start.')
 
         if self._env['DEFAULT_BASE_PATH'] is not None:
-            result['base_path'] = self._env['DEFAULT_BASE_PATH']
-            result['base_system_path'] = self._env['DEFAULT_BASE_PATH']
+            config['base_path'] = self._env['DEFAULT_BASE_PATH']
+            config['base_system_path'] = self._env['DEFAULT_BASE_PATH']
 
         ini_config = self._load_ini_config(config_path)
 
@@ -107,83 +120,82 @@ class ConfigReader:
 
             section_id = section.lower()
             if section_id == 'mister':
-                config_mister_section = self._parse_mister_section(result, parser)
-                result.update(config_mister_section)
+                config_mister_section = self._parse_mister_section(config, parser)
+                config.update(config_mister_section)
                 continue
-            elif section_id in result['databases']:
+            elif section_id in config['databases']:
                 raise InvalidConfigParameter("Can't import db for section '%s' twice" % section_id)
 
             self._logger.debug("Reading db section:", section)
-            result['databases'][section_id] = self._parse_database_section(default_db, parser, section_id)
+            config['databases'][section_id] = self._parse_database_section(default_db, parser, section_id)
 
         self._logger.debug('Read sections done.')
 
-        if len(result['databases']) == 0:
+        if len(config['databases']) == 0:
             self._logger.debug('Reading default db')
-            self._add_default_database(ini_config, result)
+            self._add_default_database(ini_config, config)
 
-        self._load_drop_in_databases(config_path, result, default_db)
+        self._load_drop_in_databases(config_path, config, default_db)
 
         if self._env['ALLOW_REBOOT'] is not None:
-            result['allow_reboot'] = AllowReboot(int(self._env['ALLOW_REBOOT']))
+            config['allow_reboot'] = AllowReboot(int(self._env['ALLOW_REBOOT']))
 
-        result['curl_ssl'] = self._valid_max_length('CURL_SSL', self._env['CURL_SSL'], 50)
-        result['ssl_cert_file'] = self._env['SSL_CERT_FILE'].strip()
+        config['curl_ssl'] = self._valid_max_length('CURL_SSL', self._env['CURL_SSL'], 50)
+        config['ssl_cert_file'] = self._env['SSL_CERT_FILE'].strip()
         if self._env['UPDATE_LINUX'] != DEFAULT_UPDATE_LINUX_ENV:
-            result['update_linux'] = self._env['UPDATE_LINUX'] == 'true'
+            config['update_linux'] = self._env['UPDATE_LINUX'] == 'true'
 
-        result['fail_on_file_error'] = self._env['FAIL_ON_FILE_ERROR'] == 'true'
-        result['commit'] = self._valid_max_length('COMMIT', self._env['COMMIT'], 50)
-        result['default_db_id'] = self._valid_db_id(K_DEFAULT_DB_ID, self._env['DEFAULT_DB_ID'])
-        result['start_time'] = self._start_time
-        result['logfile'] = self._env['LOGFILE']
-        result['config_path'] = Path(config_path)
+        config['fail_on_file_error'] = self._env['FAIL_ON_FILE_ERROR'] == 'true'
+        config['commit'] = self._valid_max_length('COMMIT', self._env['COMMIT'], 50)
+        config['default_db_id'] = self._valid_db_id(K_DEFAULT_DB_ID, self._env['DEFAULT_DB_ID'])
+        config['start_time'] = self._start_time
+        config['logfile'] = self._env['LOGFILE']
+        config['config_path'] = Path(config_path)
 
         if self._env['PC_LAUNCHER'] is not None:
-            result['is_pc_launcher'] = True
+            config['is_pc_launcher'] = True
             default_values = default_config()
             launcher_path = Path(self._env['PC_LAUNCHER'])
-            if result['base_path'] != default_values['base_path']:
+            if config['base_path'] != default_values['base_path']:
                 self._abort_pc_launcher_wrong_paths('base', 'base_path', 'MiSTer')
 
-            result['base_path'] = str(launcher_path.parent)
+            config['base_path'] = str(launcher_path.parent)
 
-            if result['base_system_path'] != default_values['base_system_path']:
+            if config['base_system_path'] != default_values['base_system_path']:
                 self._abort_pc_launcher_wrong_paths('base', 'base_system_path', 'MiSTer')
 
-            result['base_system_path'] = str(launcher_path.parent)
+            config['base_system_path'] = str(launcher_path.parent)
 
-            if result['storage_priority'] != default_values['storage_priority'] and result['storage_priority'] != 'off':
+            if config['storage_priority'] != default_values['storage_priority'] and config['storage_priority'] != 'off':
                 self._abort_pc_launcher_wrong_paths('external', 'storage_priority', 'MiSTer')
 
-            result['storage_priority'] = 'off'
-            result['allow_reboot'] = AllowReboot.NEVER
-            result['update_linux'] = False
-            result['logfile'] = str(launcher_path.with_suffix('.log'))
-            result['rotate_logs'] = self._env['ROTATE_LOGS'] != 'false'
-            result['curl_ssl'] = ''
+            config['storage_priority'] = 'off'
+            config['allow_reboot'] = AllowReboot.NEVER
+            config['update_linux'] = False
+            config['logfile'] = str(launcher_path.with_suffix('.log'))
+            config['rotate_logs'] = self._env['ROTATE_LOGS'] != 'false'
+            config['curl_ssl'] = ''
 
-            if result['file_checking'] != FileChecking.EXHAUSTIVE and result['file_checking'] != FileChecking.VERIFY_INTEGRITY:
-                result['file_checking'] = FileChecking.EXHAUSTIVE
+            if config['file_checking'] != FileChecking.EXHAUSTIVE and config['file_checking'] != FileChecking.VERIFY_INTEGRITY:
+                config['file_checking'] = FileChecking.EXHAUSTIVE
 
         if self._env['FORCED_BASE_PATH'] is not None:
-            result['base_path'] = self._env['FORCED_BASE_PATH']
-            result['base_system_path'] = self._env['FORCED_BASE_PATH']
+            config['base_path'] = self._env['FORCED_BASE_PATH']
+            config['base_system_path'] = self._env['FORCED_BASE_PATH']
 
-        result['skip_free_space_checks'] = strtobool(self._env['SKIP_FREE_SPACE_CHECKS']) or result['is_pc_launcher']
+        config['skip_free_space_checks'] = strtobool(self._env['SKIP_FREE_SPACE_CHECKS']) or config['is_pc_launcher']
 
         try:
             if self._env['HTTP_PROXY'] or self._env['HTTPS_PROXY']:
-                result['http_config'] = http_config(http_proxy=self._env['HTTP_PROXY'], https_proxy=self._env['HTTPS_PROXY'])
-            elif result['http_proxy'] != '':
-                result['http_config'] = http_config(http_proxy=result['http_proxy'], https_proxy=None)
+                config['http_config'] = http_config(http_proxy=self._env['HTTP_PROXY'], https_proxy=self._env['HTTPS_PROXY'])
+            elif config['http_proxy'] != '':
+                config['http_config'] = http_config(http_proxy=config['http_proxy'], https_proxy=None)
         except HttpGatewayException as e:
             raise InvalidConfigParameter(f'Invalid http_config: {e}') from e
 
-        result['environment'] = self._env
+        config['environment'] = self._env
 
         self._logger.bench('ConfigReader Read config done.')
-        return result
 
     @staticmethod
     def _abort_pc_launcher_wrong_paths(path_kind: str, path_variable: str, section: str) -> None:
@@ -387,6 +399,14 @@ class ConfigReader:
             return lower_parameter
         else:
             return self._valid_base_path(parameter, K_STORAGE_PRIORITY)
+
+    @staticmethod
+    def _valid_downloader_output(value: str) -> str:
+        value = value.lower()
+        if value in DOWNLOADER_OUTPUTS:
+            return value
+
+        return DOWNLOADER_OUTPUT_HUMAN
 
     def _validate_file_checking(self, parameter: Union[str, FileChecking]) -> FileChecking:
         if isinstance(parameter, FileChecking):

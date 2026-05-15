@@ -29,7 +29,7 @@ from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_
     MEDIA_USB3, KENV_LOGFILE, KENV_PC_LAUNCHER, DEFAULT_UPDATE_LINUX_ENV, K_DB_URL, K_SECTION, K_OPTIONS, \
     KENV_FORCED_BASE_PATH, \
     FILE_MiSTer_old, KENV_HTTP_PROXY, KENV_HTTPS_PROXY, DATABASE_LATEST_SUPPORTED_VERSION, KENV_SKIP_FREE_SPACE_CHECKS, \
-    KENV_SSL_CERT_FILE, KENV_EXTRA_DROP_IN_DATABASE_FILES
+    KENV_SSL_CERT_FILE, KENV_EXTRA_DROP_IN_DATABASE_FILES, KENV_DOWNLOADER_OUTPUT
 from downloader.db_options import DbOptions
 from downloader.other import empty_store_without_base_path
 from downloader.db_entity import DbEntity, ZipIndexEntity
@@ -918,6 +918,7 @@ def default_env() -> Environment:
         KENV_COMMIT: 'unknown',
         KENV_LOGFILE: None,
         KENV_LOGLEVEL: '',
+        KENV_DOWNLOADER_OUTPUT: 'human',
         KENV_PC_LAUNCHER: None,
         KENV_SKIP_FREE_SPACE_CHECKS: None,
         KENV_HTTP_PROXY: None,

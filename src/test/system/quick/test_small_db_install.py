@@ -80,7 +80,7 @@ class TestSmallDbInstall(unittest.TestCase):
         result = subprocess.run(['python3', '__main__.py'], capture_output=True, text=True, env=test_env)
 
         self.assertEqual(1, result.returncode)
-        self.assertEqual("Configuration error: Can't import db for section 'bad_db' without an url field\n", result.stdout)
+        self.assertTrue(result.stdout.endswith("ERROR: Configuration error: Can't import db for section 'bad_db' without an url field\n"))
 
     def assertRunOk(self, ini_path, save=True, from_scratch=True):
         env = debug_env()

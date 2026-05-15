@@ -45,17 +45,45 @@ class TestFinalReporter(unittest.TestCase):
 
         FinalReporter().display_end_summary(box)
 
-    def test_display_no_certs_msg___executes_without_error(self):
-        FinalReporter().display_no_certs_msg()
-
-    def test_display_network_problems_msg___executes_without_error(self):
-        FinalReporter().display_network_problems_msg()
-
-    def test_display_no_store_msg___executes_without_error(self):
-        FinalReporter().display_no_store_msg()
-
-    def test_display_file_error_failures___with_all_failure_types___executes_without_error(self):
+    def test_display_end_summary___with_failed_items___emits_semantic_failure_events(self):
         box = InstallationBox()
+        output = SpyUpdateOutput()
+        box.add_failed_db('db1')
+        box.add_failed_zip('db1', 'zip1')
+        box.add_failed_folders(['folder1'])
+
+        FinalReporter(update_output=output).display_end_summary(box)
+
+        self.assertEqual([
+            ('db_fail', 'db1'),
+            ('zip_fail', 'db1', 'zip1'),
+            ('folder_fail', 'folder1'),
+        ], output.events)
+
+    def test_display_no_certs_msg___emits_semantic_error_message(self):
+        output = SpyUpdateOutput()
+
+        FinalReporter(update_output=output).display_no_certs_msg()
+
+        self.assertEqual([('error', 'no_certs', "Couldn't load certificates.")], output.events)
+
+    def test_display_network_problems_msg___emits_semantic_error_message(self):
+        output = SpyUpdateOutput()
+
+        FinalReporter(update_output=output).display_network_problems_msg()
+
+        self.assertEqual([('error', 'network', "Couldn't connect to the servers.")], output.events)
+
+    def test_display_no_store_msg___emits_semantic_error_message(self):
+        output = SpyUpdateOutput()
+
+        FinalReporter(update_output=output).display_no_store_msg()
+
+        self.assertEqual([('error', 'store_load', 'Store could not be loaded because of a File System Error!')], output.events)
+
+    def test_display_file_error_failures___with_all_failure_types___emits_semantic_error_message(self):
+        box = InstallationBox()
+        output = SpyUpdateOutput()
         box.add_failed_file('failed1.txt')
         box.add_failed_file('failed2.txt')
         box.add_failed_folders(['folder1', 'folder2'])
@@ -64,7 +92,9 @@ class TestFinalReporter(unittest.TestCase):
         box.add_failed_db('db1')
         box.add_failed_db('db2')
 
-        FinalReporter().display_file_error_failures(box)
+        FinalReporter(update_output=output).display_file_error_failures(box)
+
+        self.assertEqual([('error', 'file_failures', 'Variable FAIL_ON_FILE_ERROR was set to true, and found the following errors.')], output.events)
 
 
 def make_path_pkg(rel_path):
@@ -76,3 +106,28 @@ def make_path_pkg(rel_path):
         kind=PATH_PACKAGE_KIND_STANDARD,
         pext_props=None
     )
+
+
+class SpyUpdateOutput:
+    def __init__(self):
+        self.events = []
+
+    def run_started(self, version: str, commit: str) -> None: pass
+    def database_started(self, db_id: str) -> None: pass
+    def database_size_added(self, db_id: str, bytes_added: int, files_added: int, source: str, zip_id: str = '') -> None: pass
+    def progress_line(self, line: str) -> None: pass
+    def work_in_progress(self) -> None: pass
+    def flush_pending(self) -> None: pass
+    def jobs_cancelled(self, count: int) -> None: pass
+    def file_started(self, db_id: str, path: str, size: int) -> None: pass
+    def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None: pass
+    def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
+    def not_overwritten(self, db_id: str, path: str) -> None: pass
+    def full_partition(self, path: str, bytes_needed: int) -> None: pass
+    def reboot_required(self, kind: str) -> None: pass
+    def warning(self, code: str, message: str) -> None: pass
+    def error(self, code: str, message: str = '') -> None: self.events.append(('error', code, message))
+    def database_failed(self, db_id: str) -> None: self.events.append(('db_fail', db_id))
+    def zip_failed(self, db_id: str, zip_id: str) -> None: self.events.append(('zip_fail', db_id, zip_id))
+    def folder_failed(self, path: str) -> None: self.events.append(('folder_fail', path))
+    def run_finished(self, exit_code: int) -> None: pass

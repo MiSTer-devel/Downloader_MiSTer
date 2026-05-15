@@ -18,6 +18,7 @@
 
 from downloader.config import default_config
 from downloader.full_run_service import FinalReporter as ProductionFinalReporter
+from downloader.update_output import NoopUpdateOutput
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_local_repository import LocalRepository
 from test.fake_logger import NoLogger
@@ -25,7 +26,7 @@ from test.fake_waiter import NoWaiter
 
 
 class FinalReporter(ProductionFinalReporter):
-    def __init__(self, local_repository=None, config=None):
+    def __init__(self, local_repository=None, config=None, update_output=None):
         config = default_config() if config is None else config
         local_repository = LocalRepository(file_system=FileSystemFactory(config=config).create_for_system_scope(), config=config) if local_repository is None else local_repository
-        super().__init__(local_repository, config, NoLogger(), NoWaiter())
+        super().__init__(local_repository, config, NoLogger(), NoWaiter(), update_output or NoopUpdateOutput())

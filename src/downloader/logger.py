@@ -23,7 +23,8 @@ import traceback
 from typing import Any, Optional, Protocol, TextIO, cast
 from pathlib import Path
 import json
-from downloader.config import Config, Environment
+from downloader.config import Config
+from downloader.constants import DOWNLOADER_OUTPUT_DLP1_LTSV, K_DOWNLOADER_OUTPUT
 
 
 class Logger(Protocol):
@@ -113,7 +114,7 @@ class ConfigLogManager(Protocol):
     def configure(self, config: Config) -> None: pass
 
 class TopLogger(Logger, ConfigLogManager):
-    def __init__(self, print_logger: PrintLogger, file_logger: FileLogger, verbose_mode: bool, bench_mode: bool, start_time: float) -> None:
+    def __init__(self, print_logger: Logger, file_logger: FileLogger, verbose_mode: bool, bench_mode: bool, start_time: float) -> None:
         self.print_logger = print_logger
         self.file_logger = file_logger
         self._verbose_mode = verbose_mode
@@ -122,16 +123,10 @@ class TopLogger(Logger, ConfigLogManager):
         self._received_exception = False
 
     @staticmethod
-    def for_main(env: Environment, start_time: float) -> 'TopLogger':
-        verbose_mode = False
-        bench_mode = False
-        if env['LOGLEVEL'] != '':
-            if 'info' in env['LOGLEVEL']:
-                verbose_mode = False
-            if 'debug' in env['LOGLEVEL']:
-                verbose_mode = True
-            bench_mode = 'bench' in env['LOGLEVEL']
-        return TopLogger(PrintLogger(), FileLogger(), verbose_mode, bench_mode, start_time)
+    def for_main(config: Config, start_time: float) -> 'TopLogger':
+        downloader_output = config[K_DOWNLOADER_OUTPUT]
+        print_logger: Logger = OffLogger() if downloader_output == DOWNLOADER_OUTPUT_DLP1_LTSV else PrintLogger()
+        return TopLogger(print_logger, FileLogger(), config['verbose'], config['bench'], start_time)
 
     def configure(self, config: Config) -> None:
         self._bench_mode = config['bench']

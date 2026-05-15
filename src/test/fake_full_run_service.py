@@ -21,6 +21,7 @@ from typing import Optional
 
 from downloader.config import default_config
 from downloader.full_run_service import FullRunService as ProductionFullRunService
+from downloader.update_output import NoopUpdateOutput
 from downloader.fail_policy import FailPolicy
 from downloader.job_system import JobFailPolicy
 from test.fake_os_utils import SpyOsUtils
@@ -72,7 +73,8 @@ class FullRunService(ProductionFullRunService):
                          external_drives_repository or ExternalDrivesRepository(file_system=system_file_system),
                          os_utils or SpyOsUtils(),
                          NoWaiter(),
-                         system_file_system
+                         system_file_system,
+                         NoopUpdateOutput(),
                 )
 
     @staticmethod
