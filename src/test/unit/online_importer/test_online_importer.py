@@ -230,6 +230,21 @@ class TestOnlineImporter(OnlineImporterTestBase):
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders={folder_a: {}}), sut.fs_data)
         self.assertReports(sut, [file_a])
 
+    def test_download_dbs_contents___when_duplicated_stored_file_is_removed_from_one_db___keeps_file_on_fs(self):
+        # See test_download_on_fastest___when_duplicated_stored_file_is_removed_from_one_db_and_other_db_is_skipped___keeps_file_on_fs.
+        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))
+        store_one = store_test_with_file_a_descr()
+        store_two = store_test_with_file_a_descr()
+
+        sut.add_db(db_entity(db_id='1'), store_one)
+        sut.add_db(db_test_with_file_a(db_id='2'), store_two)
+        sut.download()
+
+        self.assertEqual(empty_test_store(), store_one)
+        self.assertEqual(store_test_with_file_a_descr(), store_two)
+        self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
+        self.assertReports(sut, [], save=True)
+
     def test_download_dbs_contents___with_a_file_and_no_folders___still_creates_the_a_folder(self):
         sut = OnlineImporter()
         store = empty_test_store()

@@ -18,8 +18,9 @@
 
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data
+from test.fake_online_importer import OnlineImporter
 from test.objects import file_a_descr, file_a, folder_a, store_test_with_file_a_descr, db_test_with_file_a, config_with, \
-    db_test, figp_db_0, figp_db_1
+    db_test, figp_db_0, figp_db_1, db_entity, empty_test_store
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 from downloader.config import FileChecking
 
@@ -97,6 +98,21 @@ class TestOnlineImporterFileChecking(OnlineImporterTestBase):
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
         self.assertEqual(store_test_with_file_a_descr(), store)
         self.assertReports(sut, [file_a], save=True)
+
+    def test_download_on_fastest___when_duplicated_stored_file_is_removed_from_one_db_and_other_db_is_skipped___keeps_file_on_fs(self):
+        # See test_download_dbs_contents___when_duplicated_stored_file_is_removed_from_one_db___keeps_file_on_fs.
+        store_one = store_test_with_file_a_descr()
+        store_two = store_test_with_file_a_descr()
+
+        sut = OnlineImporter.from_implicit_inputs(fs(fc=FileChecking.FASTEST, files={file_a: file_a_descr()}, folders=[folder_a]))\
+            .add_db(db_entity(db_id='1'), store_one, store_fingerprint=figp_db_1(), db_fingerprint=figp_db_0())\
+            .add_db(db_test_with_file_a(db_id='2'), store_two, store_fingerprint=figp_db_0(), db_fingerprint=figp_db_0())\
+            .download()
+
+        self.assertEqual(empty_test_store(), store_one)
+        self.assertEqual(store_test_with_file_a_descr(), store_two)
+        self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders=[folder_a]), sut.fs_data)
+        self.assertReports(sut, [], save=True, skipped_dbs=['2'])
 
     def download_db_test(self, store, fs_inputs, matching_fingerprint=True):
         db_fingerprint = figp_db_0()

@@ -445,10 +445,15 @@ class OnlineImporter:
             write_stores[db_id].remove_zip_id(zip_id)
 
         self._file_system = self._file_system
+        skipped_db_ids = box.skipped_dbs()
 
         if len(files_to_consume := box.consume_files()) > 0:
             logger.bench('OnlineImporter files_to_consume start.')
             processed_file_names: set[str] = {file_pkg.rel_path for file_pkgs, db_id in box.non_duplicated_files() for file_pkg in file_pkgs}
+            if len(skipped_db_ids) > 0:
+                file_names_to_consume: set[str] = {pkg.rel_path for pkg, _dbs in files_to_consume}
+                for db_id in skipped_db_ids:
+                    processed_file_names.update(read_stores[db_id].all_files().keys() & file_names_to_consume)
             processed_files: dict[str, list[PathPackage]] = defaultdict(list)
             removed_files: list[tuple[PathPackage, set[str]]] = []
 
@@ -507,56 +512,63 @@ class OnlineImporter:
                 for file in duplicates:
                     logger.print(f'DUPLICATED: {file} [using {db_id_by_rel_path[file]} instead]')
 
-        for pkg, dbs in sorted(box.consume_directories(), key=lambda x: len(x[0].full_path), reverse=True):
-            if box.is_folder_installed(pkg.rel_path):
-                # If a folder got installed by any db...
-                # assert len(dbs) >=1
-                # The for-loop is for when two+ dbs used to have the same folder but one of them has removed it, it should be kept because
-                # one db still uses it. But it should be removed from the store in the other dbs.
+        if len(directories_to_consume := box.consume_directories()) > 0:
+            skipped_folder_names: set[str] = set()
+            if len(skipped_db_ids) > 0:
+                folder_names_to_consume: set[str] = {pkg.rel_path for pkg, _dbs in directories_to_consume}
+                for db_id in skipped_db_ids:
+                    skipped_folder_names.update(read_stores[db_id].all_folders().keys() & folder_names_to_consume)
+
+            for pkg, dbs in sorted(directories_to_consume, key=lambda x: len(x[0].full_path), reverse=True):
+                if box.is_folder_installed(pkg.rel_path) or pkg.rel_path in skipped_folder_names:
+                    # If a folder is still owned by any processed or skipped db...
+                    # assert len(dbs) >=1
+                    # The for-loop is for when two+ dbs used to have the same folder but one of them has removed it, it should be kept because
+                    # one db still uses it. But it should be removed from the store in the other dbs.
+                    for db_id in dbs:
+                        write_stores[db_id].remove_local_folder(pkg.rel_path)
+                        write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
+                    continue
+
+                if self._file_system.folder_has_items(pkg.full_path):
+                    continue
+
+                removing_folders = []
                 for db_id in dbs:
-                    write_stores[db_id].remove_local_folder(pkg.rel_path)
-                    write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
-                continue
+                    for is_external, drive in read_stores[db_id].list_other_drives_for_folder(pkg):
+                        if is_external:
+                            # @TODO: This count part blow is for checking if previously it was previously stored as "is_pext_external_subfolder", but since this information is lost, we need to do this. When we store "path" = "pext" we will have this information again, so we can do this much cleaner.
+                            if pkg.rel_path.count('/') >= 2 and pkg.rel_path.count('/') >= 2 \
+                                    and not self._file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
+                                write_stores[db_id].remove_external_folder(drive, pkg.rel_path)
+                                write_stores[db_id].remove_external_folder_from_zips(drive, pkg.rel_path)
+                                removing_folders.append(full_ext_path)
+                        else:
+                            if not self._file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
+                                removing_folders.append(full_ext_path)
+                                write_stores[db_id].remove_local_folder(pkg.rel_path)
+                                write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
 
-            if self._file_system.folder_has_items(pkg.full_path):
-                continue
+                    if pkg.is_pext_external() and pkg.drive is not None:
+                        if not pkg.is_pext_external_subfolder() and not pkg.is_pext_parent():
+                            removing_folders.append(pkg.full_path)
+                            write_stores[db_id].remove_external_folder(pkg.drive, pkg.rel_path)
+                            write_stores[db_id].remove_external_folder_from_zips(pkg.drive, pkg.rel_path)
 
-            removing_folders = []
-            for db_id in dbs:
-                for is_external, drive in read_stores[db_id].list_other_drives_for_folder(pkg):
-                    if is_external:
-                        # @TODO: This count part blow is for checking if previously it was previously stored as "is_pext_external_subfolder", but since this information is lost, we need to do this. When we store "path" = "pext" we will have this information again, so we can do this much cleaner.
-                        if pkg.rel_path.count('/') >= 2 and pkg.rel_path.count('/') >= 2 \
-                                and not self._file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
-                            write_stores[db_id].remove_external_folder(drive, pkg.rel_path)
-                            write_stores[db_id].remove_external_folder_from_zips(drive, pkg.rel_path)
-                            removing_folders.append(full_ext_path)
+                        removing_folders.append(os.path.join(self._config['base_path'], pkg.rel_path))
                     else:
-                        if not self._file_system.folder_has_items(full_ext_path := os.path.join(drive, pkg.rel_path)):
-                            removing_folders.append(full_ext_path)
-                            write_stores[db_id].remove_local_folder(pkg.rel_path)
-                            write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
-
-                if pkg.is_pext_external() and pkg.drive is not None:
-                    if not pkg.is_pext_external_subfolder() and not pkg.is_pext_parent():
                         removing_folders.append(pkg.full_path)
-                        write_stores[db_id].remove_external_folder(pkg.drive, pkg.rel_path)
-                        write_stores[db_id].remove_external_folder_from_zips(pkg.drive, pkg.rel_path)
+                        write_stores[db_id].remove_local_folder(pkg.rel_path)
+                        write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
 
-                    removing_folders.append(os.path.join(self._config['base_path'], pkg.rel_path))
+                if self._config['allow_delete'] == AllowDelete.ALL:
+                    for removing_dir in removing_folders:
+                        if self._file_system.is_folder(removing_dir) and not self._file_system.folder_has_items(removing_dir):
+                            err = self._file_system.remove_folder(removing_dir)
+                            if err is not None:
+                                self._logger.debug('WARNING: Online Importer could not remove folder ', removing_dir, err)
                 else:
-                    removing_folders.append(pkg.full_path)
-                    write_stores[db_id].remove_local_folder(pkg.rel_path)
-                    write_stores[db_id].remove_local_folder_from_zips(pkg.rel_path)
-
-            if self._config['allow_delete'] == AllowDelete.ALL:
-                for removing_dir in removing_folders:
-                    if self._file_system.is_folder(removing_dir) and not self._file_system.folder_has_items(removing_dir):
-                        err = self._file_system.remove_folder(removing_dir)
-                        if err is not None:
-                            self._logger.debug('WARNING: Online Importer could not remove folder ', removing_dir, err)
-            else:
-                self._logger.debug('Not removing empty folders because of != AllowDelete.ALL', removing_folders)
+                    self._logger.debug('Not removing empty folders because of != AllowDelete.ALL', removing_folders)
 
         for db_id, file_pkgs in box.installed_file_pkgs().items():
             for file_pkg in file_pkgs:
