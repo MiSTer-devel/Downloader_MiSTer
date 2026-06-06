@@ -119,7 +119,7 @@ class SpyUpdateOutput:
     def work_in_progress(self) -> None: pass
     def flush_pending(self) -> None: pass
     def jobs_cancelled(self, count: int) -> None: pass
-    def file_started(self, db_id: str, path: str, size: int) -> None: pass
+    def file_started(self, db_id: str, path: str, size: int, already_exists: bool = False) -> None: pass
     def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
     def not_overwritten(self, db_id: str, path: str) -> None: pass

@@ -25,6 +25,15 @@ from test.fake_logger import NoLogger, SpyLoggerDecorator
 
 class TestUpdateOutput(unittest.TestCase):
 
+    def test_ltsv_update_output___file_start___emits_already_exists(self):
+        stream = io.StringIO()
+        LtsvUpdateOutput(NoLogger(), stream).file_started('distribution_mister', '_Console/Genesis.rbf', 131072, True)
+
+        self.assertEqual(
+            'DLP1\tevent:file_start\tdb:distribution_mister\tsize:131072\tpath:_Console/Genesis.rbf\texists:true\n',
+            stream.getvalue()
+        )
+
     def test_ltsv_update_output___file_done___emits_dlp1_ltsv_line(self):
         stream = io.StringIO()
         LtsvUpdateOutput(NoLogger(), stream).file_completed('distribution_mister', '_Console/Genesis.rbf', 131072)
@@ -84,6 +93,13 @@ class TestUpdateOutput(unittest.TestCase):
         HumanUpdateOutput(logger).error('store_load', 'Store failed')
 
         self.assertEqual([('ERROR: Store failed',)], logger.printCalls)
+
+    def test_human_update_output___file_start_with_existing_file___prints_same_human_line(self):
+        logger = SpyLoggerDecorator(NoLogger())
+
+        HumanUpdateOutput(logger).file_started('distribution_mister', '_Console/Genesis.rbf', 131072, True)
+
+        self.assertEqual([('_Console/Genesis.rbf',)], logger.printCalls)
 
     def test_human_update_output___run_started___logs_human_message(self):
         logger = SpyLoggerDecorator(NoLogger())

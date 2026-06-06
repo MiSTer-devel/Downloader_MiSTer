@@ -33,7 +33,7 @@ class UpdateOutput(Protocol):
     def work_in_progress(self) -> None: pass
     def flush_pending(self) -> None: pass
     def jobs_cancelled(self, count: int) -> None: pass
-    def file_started(self, db_id: str, path: str, size: int) -> None: pass
+    def file_started(self, db_id: str, path: str, size: int, already_exists: bool = False) -> None: pass
     def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
     def not_overwritten(self, db_id: str, path: str) -> None: pass
@@ -55,7 +55,7 @@ class NoopUpdateOutput(UpdateOutput):
     def work_in_progress(self) -> None: pass
     def flush_pending(self) -> None: pass
     def jobs_cancelled(self, count: int) -> None: pass
-    def file_started(self, db_id: str, path: str, size: int) -> None: pass
+    def file_started(self, db_id: str, path: str, size: int, already_exists: bool = False) -> None: pass
     def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
     def not_overwritten(self, db_id: str, path: str) -> None: pass
@@ -116,7 +116,7 @@ class HumanUpdateOutput(UpdateOutput):
     def jobs_cancelled(self, count: int) -> None:
         self._logger.print(f"Cancelled {count} jobs.")
 
-    def file_started(self, db_id: str, path: str, size: int) -> None:
+    def file_started(self, db_id: str, path: str, size: int, already_exists: bool = False) -> None:
         self._print_line(path)
         self._check_time = time.monotonic() + 2.0
 
@@ -180,6 +180,9 @@ class HumanUpdateOutput(UpdateOutput):
         self._need_clear_header = False
 
 
+FieldValue = Union[str, int, bool]
+
+
 class LtsvUpdateOutput(UpdateOutput):
     def __init__(self, logger: Logger, stream: Optional[TextIO] = None) -> None:
         self._stream = sys.stdout if stream is None else stream
@@ -194,7 +197,7 @@ class LtsvUpdateOutput(UpdateOutput):
         self._human_output.database_started(db_id)
 
     def database_size_added(self, db_id: str, bytes_added: int, files_added: int, source: str, zip_id: str = '') -> None:
-        fields: dict[str, Union[str, int]] = {'db': db_id, 'bytes': bytes_added, 'files': files_added, 'src': source}
+        fields: dict[str, FieldValue] = {'db': db_id, 'bytes': bytes_added, 'files': files_added, 'src': source}
         if zip_id:
             fields['zip'] = zip_id
         self._emit('db_size_add', **fields)
@@ -211,12 +214,12 @@ class LtsvUpdateOutput(UpdateOutput):
     def jobs_cancelled(self, count: int) -> None:
         self._human_output.jobs_cancelled(count)
 
-    def file_started(self, db_id: str, path: str, size: int) -> None:
-        self._emit('file_start', db=db_id, size=size, path=path)
-        self._human_output.file_started(db_id, path, size)
+    def file_started(self, db_id: str, path: str, size: int, already_exists: bool = False) -> None:
+        self._emit('file_start', db=db_id, size=size, path=path, exists=already_exists)
+        self._human_output.file_started(db_id, path, size, already_exists)
 
     def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None:
-        fields: dict[str, Union[str, int]] = {'db': db_id, 'size': size, 'path': path}
+        fields: dict[str, FieldValue] = {'db': db_id, 'size': size, 'path': path}
         if zip_id:
             fields['zip'] = zip_id
         self._emit('file_done', **fields)
@@ -240,7 +243,7 @@ class LtsvUpdateOutput(UpdateOutput):
         self._human_output.warning(code, message)
 
     def error(self, code: str, message: str = '') -> None:
-        fields: dict[str, Union[str, int]] = {'code': code}
+        fields: dict[str, FieldValue] = {'code': code}
         if message:
             fields['message'] = message
         self._emit('error', **fields)
@@ -258,10 +261,10 @@ class LtsvUpdateOutput(UpdateOutput):
     def run_finished(self, exit_code: int) -> None:
         self._emit('run_finish', code=exit_code)
 
-    def _emit(self, event: str, **fields: Union[str, int]) -> None:
+    def _emit(self, event: str, **fields: FieldValue) -> None:
         line = ['DLP1', f'event:{_sanitize(event)}']
         for key, value in fields.items():
-            line.append(f'{_sanitize(key)}:{_sanitize(str(value))}')
+            line.append(f'{_sanitize(key)}:{_sanitize(_format_value(value))}')
         print('\t'.join(line), file=self._stream, flush=True)
 
 
@@ -271,3 +274,9 @@ def update_output_for_mode(mode: str, logger: Logger) -> UpdateOutput:
 
 def _sanitize(value: str) -> str:
     return value.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
+
+
+def _format_value(value: FieldValue) -> str:
+    if isinstance(value, bool):
+        return 'true' if value else 'false'
+    return str(value)
