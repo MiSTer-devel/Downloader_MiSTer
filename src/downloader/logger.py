@@ -61,6 +61,23 @@ class OffLogger(Logger):
     def bench(self, *args: Any) -> None: pass
 
 
+class DebugLtsvLogger(Logger):
+    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=False) -> None: pass
+
+    def debug(self, *args: Any, sep: str='', end: str='\n', flush: bool=True) -> None:
+        message = sep.join(['DEBUG| ', *(str(arg) for arg in args)])
+        if end != '\n':
+            message += end
+        line = ['DLP1', f'event:debug', f'message:{_sanitize_ltsv(message)}']
+        _do_print('\t'.join(line), sep='', end='\n', file=sys.stdout, flush=True)
+
+    def bench(self, *args: Any) -> None: pass
+
+
+def _sanitize_ltsv(value: str) -> str:
+    return value.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
+
+
 class FilelogSaver(Protocol):
     def rotate_logs(self) -> None: pass
     def set_temp_log_name(self, name: str) -> None: pass
@@ -125,7 +142,7 @@ class TopLogger(Logger, ConfigLogManager):
     @staticmethod
     def for_main(config: Config, start_time: float) -> 'TopLogger':
         downloader_output = config[K_DOWNLOADER_OUTPUT]
-        print_logger: Logger = OffLogger() if downloader_output == DOWNLOADER_OUTPUT_DLP1_LTSV else PrintLogger()
+        print_logger: Logger = DebugLtsvLogger() if downloader_output == DOWNLOADER_OUTPUT_DLP1_LTSV else PrintLogger()
         return TopLogger(print_logger, FileLogger(), config['verbose'], config['bench'], start_time)
 
     def configure(self, config: Config) -> None:
