@@ -212,13 +212,14 @@ class OnlineImporterWorkersFactory:
 
 
 class OnlineImporter:
-    def __init__(self, config: Config, logger: Logger, file_system: FileSystem, file_filter_factory: FileFilterFactory, file_download_reporter: FileDownloadProgressReporter, fail_ctx: FailCtx, job_system: JobSystem, worker_factory: OnlineImporterWorkersFactory, old_pext_paths: set[str]) -> None:
+    def __init__(self, config: Config, logger: Logger, file_system: FileSystem, file_filter_factory: FileFilterFactory, file_download_reporter: FileDownloadProgressReporter, fail_ctx: FailCtx, job_system: JobSystem, worker_factory: OnlineImporterWorkersFactory, old_pext_paths: set[str], update_output: UpdateOutput) -> None:
         self._config = config
         self._logger = logger
         self._file_system = file_system
         self._job_system = job_system
         self._worker_factory = worker_factory
         self._old_pext_paths = old_pext_paths
+        self._update_output = update_output
         self._file_filter_factory = file_filter_factory
         self._file_download_reporter = file_download_reporter
         self._fail_ctx = fail_ctx
@@ -455,18 +456,20 @@ class OnlineImporter:
                 for db_id in skipped_db_ids:
                     processed_file_names.update(read_stores[db_id].all_files().keys() & file_names_to_consume)
             processed_files: dict[str, list[PathPackage]] = defaultdict(list)
-            removed_files: list[tuple[PathPackage, set[str]]] = []
+            removed_files: list[tuple[PathPackage, list[str]]] = []
 
-            unlink_list = []
+            unlink_list: list[tuple[list[str], str, list[str]]] = []
             failed_entanglements = box.failed_file_entanglements()
             for pkg, dbs in files_to_consume:
                 if is_entangled_with(pkg, failed_entanglements):
                     continue
+                dbs = list(dbs)
+                tangles = pkg.description.get(FILE_PROP_ENTANGLEMENTS, [])
 
                 for db_id in dbs:
                     if pkg.rel_path in processed_file_names: continue
                     for is_external, drive in read_stores[db_id].list_other_drives_for_file(pkg.rel_path, pkg.drive):
-                        unlink_list.append(os.path.join(drive, pkg.rel_path))
+                        unlink_list.append((dbs, os.path.join(drive, pkg.rel_path), tangles))
 
                 for db_id in dbs:
                     write_stores[db_id].remove_file(pkg.rel_path)
@@ -474,25 +477,26 @@ class OnlineImporter:
 
                 if pkg.rel_path in processed_file_names: continue
                 if pkg.is_pext_external():
-                    unlink_list.append(os.path.join(self._config['base_path'], pkg.rel_path))
+                    unlink_list.append((dbs, os.path.join(self._config['base_path'], pkg.rel_path), tangles))
 
-                unlink_list.append(pkg.full_path)
-                processed_files[list(dbs)[0]].append(pkg)
+                unlink_list.append((dbs, pkg.full_path, tangles))
+                processed_files[dbs[0]].append(pkg)
                 processed_file_names.add(pkg.rel_path)
                 removed_files.append((pkg, dbs))
 
             if self._config['allow_delete'] == AllowDelete.ALL:
                 pass
             elif self._config['allow_delete'] == AllowDelete.OLD_RBF:
-                self._logger.debug('Not deleted files because AllowDelete.OLD_RBF: ', [uf for uf in unlink_list if uf[-4:].lower() != ".rbf"])
-                unlink_list = [uf for uf in unlink_list if uf[-4:].lower() == ".rbf"]
+                self._logger.debug('Not deleted files because AllowDelete.OLD_RBF: ', [uf for uf in unlink_list if uf[1][-4:].lower() != ".rbf"])
+                unlink_list = [uf for uf in unlink_list if uf[1][-4:].lower() == ".rbf"]
             else:
                 self._logger.debug('Not deleted files because AllowDelete.NONE: ', unlink_list)
                 unlink_list = []
 
-            for unlink_file in unlink_list:
+            for dbs, unlink_file, tangles in unlink_list:
                 if self._file_system.is_file(unlink_file):
-                    err = self._file_system.unlink(unlink_file)
+                    self._update_output.file_removed(dbs, unlink_file, tangles)
+                    err = self._file_system.unlink(unlink_file, verbose=False)
                     if err is not None:
                         self._logger.debug('WARNING: Online Importer could not remove ', unlink_file, err)
 
@@ -656,7 +660,7 @@ class InstallationBox:
         self._failed_zips: list[tuple[str, str]] = []
         self._full_partitions: dict[str, int] = dict()
         self._failed_db_options: list[WrongDatabaseOptions] = []
-        self._removed_files: list[tuple[PathPackage, set[str]]] = []
+        self._removed_files: list[tuple[PathPackage, list[str]]] = []
         self._removed_folders: list[tuple[str, PathPackage]] = []
         self._removed_zips: list[tuple[str, str]] = []
         self._skipped_updated_files: dict[str, list[str]] = dict()
@@ -772,7 +776,7 @@ class InstallationBox:
         self._filtered_zip_data[db_id][zip_id] = filtered_data
     def add_failed_db_options(self, exception: WrongDatabaseOptions) -> None:
         self._failed_db_options.append(exception)
-    def add_removed_files(self, files: list[tuple[PathPackage, set[str]]]) -> None:
+    def add_removed_files(self, files: list[tuple[PathPackage, list[str]]]) -> None:
         if len(files) == 0: return
         self._removed_files.extend(files)
     def add_removed_folders(self, folders: list[PathPackage], db_id: str) -> None:

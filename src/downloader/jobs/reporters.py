@@ -292,7 +292,7 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
     def notify_job_started(self, job: Job) -> None:
         self._report.add_job_started(job)
         if isinstance(job, FetchFileJob) and job.db_id is not None:
-            self._update_output.file_started(job.db_id, job.pkg.rel_path, job.pkg.description['size'], job.already_exists)
+            self._update_output.file_started(job.db_id, job.pkg.rel_path, job.pkg.description['size'], job.already_exists, job.pkg.description.get('tangle', []))
         if isinstance(job, FetchDataJob):
             self._logger.bench('FileDownloadProgressReporter FetchDataJob started: ', job.source)
 
