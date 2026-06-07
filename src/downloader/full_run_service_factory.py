@@ -125,7 +125,8 @@ class FullRunServiceFactory:
             fail_ctx=fail_ctx,
             job_system=job_system,
             worker_factory=online_importer_workers_factory,
-            old_pext_paths=old_pext_paths
+            old_pext_paths=old_pext_paths,
+            update_output=self._update_output
         )
 
         instance = FullRunService(

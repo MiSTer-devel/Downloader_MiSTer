@@ -42,7 +42,7 @@ from downloader.local_store_wrapper import StoreWrapper, empty_db_state_fingerpr
 from downloader.online_importer import OnlineImporter as ProductionOnlineImporter, InstallationBox
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.logger import Logger
-from downloader.update_output import NoopUpdateOutput
+from downloader.update_output import NoopUpdateOutput, UpdateOutput
 from downloader.job_system import WorkerResult, Job
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_data_worker import FetchDataWorker
@@ -87,6 +87,7 @@ class OnlineImporter(ProductionOnlineImporter):
             fail_policy: Optional[FailPolicy] = None,
             job_fail_policy: Optional[JobFailPolicy] = None,
             start_job_policy: StartJobPolicy = StartJobPolicy.OpeningDb,
+            update_output: Optional[UpdateOutput] = None,
     ):
         self._config = config or config_with(base_system_path=MEDIA_USB0)
         if isinstance(file_system_factory, FileSystemFactory):
@@ -100,7 +101,7 @@ class OnlineImporter(ProductionOnlineImporter):
         self.file_system = self.fs_factory.create_for_system_scope()
         self.network_state = network_state or NetworkState()
         logger = NoLogger() if logger is None else logger
-        update_output = NoopUpdateOutput()
+        update_output = NoopUpdateOutput() if update_output is None else update_output
         http_gateway = FakeHttpGateway(self._config, self.network_state)
         self._file_download_reporter = FileDownloadProgressReporter(logger,
                                                                     Interruptions(fs=file_system_factory,
@@ -144,7 +145,8 @@ class OnlineImporter(ProductionOnlineImporter):
             fail_ctx=FailCtx(logger, fail_policy=fail_policy or FailPolicy.FAIL_FAST),
             job_system=self._job_system,
             worker_factory=online_importer_workers_factory,
-            old_pext_paths=old_pext_paths
+            old_pext_paths=old_pext_paths,
+            update_output=update_output
         )
 
         self.dbs = []
@@ -212,7 +214,7 @@ class OnlineImporter(ProductionOnlineImporter):
 
     @staticmethod
     def from_implicit_inputs(implicit_inputs: ImporterImplicitInputs, free_space_reservation=None,
-                             fail_policy=FailPolicy.FAULT_TOLERANT_ON_CUSTOM_DOWNLOADER_ERRORS, logger=None):
+                             fail_policy=FailPolicy.FAULT_TOLERANT_ON_CUSTOM_DOWNLOADER_ERRORS, logger=None, update_output=None):
         config = implicit_inputs.config
         file_system_factory = FileSystemFactory(state=implicit_inputs.file_system_state, config=config)
         return OnlineImporter(
@@ -222,7 +224,8 @@ class OnlineImporter(ProductionOnlineImporter):
             network_state=implicit_inputs.network_state,
             file_system_state=implicit_inputs.file_system_state,
             fail_policy=fail_policy,
-            logger=logger
+            logger=logger,
+            update_output=update_output
         )
 
     @property

@@ -16,8 +16,8 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import time
 import sys
+import time
 from typing import Optional, Protocol, TextIO, Union
 
 from downloader.constants import DOWNLOADER_OUTPUT_DLP1_LTSV
@@ -33,8 +33,9 @@ class UpdateOutput(Protocol):
     def work_in_progress(self) -> None: pass
     def flush_pending(self) -> None: pass
     def jobs_cancelled(self, count: int) -> None: pass
-    def file_started(self, db_id: str, path: str, size: int, already_exists: bool = False) -> None: pass
+    def file_started(self, db_id: str, path: str, size: int, already_exists: bool, tangles: list[str]) -> None: pass
     def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None: pass
+    def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
     def not_overwritten(self, db_id: str, path: str) -> None: pass
     def full_partition(self, path: str, bytes_needed: int) -> None: pass
@@ -55,8 +56,9 @@ class NoopUpdateOutput(UpdateOutput):
     def work_in_progress(self) -> None: pass
     def flush_pending(self) -> None: pass
     def jobs_cancelled(self, count: int) -> None: pass
-    def file_started(self, db_id: str, path: str, size: int, already_exists: bool = False) -> None: pass
+    def file_started(self, db_id: str, path: str, size: int, already_exists: bool, tangles: list[str]) -> None: pass
     def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None: pass
+    def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
     def not_overwritten(self, db_id: str, path: str) -> None: pass
     def full_partition(self, path: str, bytes_needed: int) -> None: pass
@@ -116,7 +118,7 @@ class HumanUpdateOutput(UpdateOutput):
     def jobs_cancelled(self, count: int) -> None:
         self._logger.print(f"Cancelled {count} jobs.")
 
-    def file_started(self, db_id: str, path: str, size: int, already_exists: bool = False) -> None:
+    def file_started(self, db_id: str, path: str, size: int, already_exists: bool, tangles: list[str]) -> None:
         self._print_line(path)
         self._check_time = time.monotonic() + 2.0
 
@@ -124,6 +126,9 @@ class HumanUpdateOutput(UpdateOutput):
         self._symbols.append('.')
         if self._needs_newline or self._check_time < time.monotonic():
             self._print_symbols()
+
+    def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None:
+        self._print_line(f'Removing {path}')
 
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None:
         self._symbols.append('~')
@@ -180,9 +185,6 @@ class HumanUpdateOutput(UpdateOutput):
         self._need_clear_header = False
 
 
-FieldValue = Union[str, int, bool]
-
-
 class LtsvUpdateOutput(UpdateOutput):
     def __init__(self, logger: Logger, stream: Optional[TextIO] = None) -> None:
         self._stream = sys.stdout if stream is None else stream
@@ -197,7 +199,7 @@ class LtsvUpdateOutput(UpdateOutput):
         self._human_output.database_started(db_id)
 
     def database_size_added(self, db_id: str, bytes_added: int, files_added: int, source: str, zip_id: str = '') -> None:
-        fields: dict[str, FieldValue] = {'db': db_id, 'bytes': bytes_added, 'files': files_added, 'src': source}
+        fields: dict[str, Union[str, int]] = {'db': db_id, 'bytes': bytes_added, 'files': files_added, 'src': source}
         if zip_id:
             fields['zip'] = zip_id
         self._emit('db_size_add', **fields)
@@ -214,16 +216,34 @@ class LtsvUpdateOutput(UpdateOutput):
     def jobs_cancelled(self, count: int) -> None:
         self._human_output.jobs_cancelled(count)
 
-    def file_started(self, db_id: str, path: str, size: int, already_exists: bool = False) -> None:
-        self._emit('file_start', db=db_id, size=size, path=path, exists=already_exists)
-        self._human_output.file_started(db_id, path, size, already_exists)
+    def file_started(self, db_id: str, path: str, size: int, already_exists: bool, tangles: list[str]) -> None:
+        tangles = _valid_string_list(tangles)
+        fields: dict[str, Union[str, int]] = {
+            'db': db_id,
+            'size': size,
+            'path': path,
+            'target': 'existing' if already_exists else 'new',
+        }
+        if len(tangles) > 0:
+            fields['tangle'] = ','.join(tangles)
+        self._emit('file_start', **fields)
+        self._human_output.file_started(db_id, path, size, already_exists, tangles)
 
     def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None:
-        fields: dict[str, FieldValue] = {'db': db_id, 'size': size, 'path': path}
+        fields: dict[str, Union[str, int]] = {'db': db_id, 'size': size, 'path': path}
         if zip_id:
             fields['zip'] = zip_id
         self._emit('file_done', **fields)
         self._human_output.file_completed(db_id, path, size, zip_id)
+
+    def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None:
+        dbs = sorted(_valid_string_list(dbs))
+        tangles = _valid_string_list(tangles)
+        fields: dict[str, Union[str, int]] = {'dbs': ','.join(dbs), 'path': path}
+        if len(tangles) > 0:
+            fields['tangle'] = ','.join(tangles)
+        self._emit('file_remove', **fields)
+        self._human_output.file_removed(dbs, path, tangles)
 
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None:
         self._emit('file_fail', db=db_id, size=size, path=path, reason=reason)
@@ -243,7 +263,7 @@ class LtsvUpdateOutput(UpdateOutput):
         self._human_output.warning(code, message)
 
     def error(self, code: str, message: str = '') -> None:
-        fields: dict[str, FieldValue] = {'code': code}
+        fields: dict[str, Union[str, int]] = {'code': code}
         if message:
             fields['message'] = message
         self._emit('error', **fields)
@@ -261,10 +281,10 @@ class LtsvUpdateOutput(UpdateOutput):
     def run_finished(self, exit_code: int) -> None:
         self._emit('run_finish', code=exit_code)
 
-    def _emit(self, event: str, **fields: FieldValue) -> None:
+    def _emit(self, event: str, **fields: Union[str, int]) -> None:
         line = ['DLP1', f'event:{_sanitize(event)}']
         for key, value in fields.items():
-            line.append(f'{_sanitize(key)}:{_sanitize(_format_value(value))}')
+            line.append(f'{_sanitize(key)}:{_sanitize(str(value))}')
         print('\t'.join(line), file=self._stream, flush=True)
 
 
@@ -276,7 +296,5 @@ def _sanitize(value: str) -> str:
     return value.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
 
 
-def _format_value(value: FieldValue) -> str:
-    if isinstance(value, bool):
-        return 'true' if value else 'false'
-    return str(value)
+def _valid_string_list(values: list[str]) -> tuple[str, ...]:
+    return tuple(value for value in values if isinstance(value, str)) if isinstance(values, list) else ()

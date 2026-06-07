@@ -21,6 +21,7 @@ import unittest
 from downloader.jobs.process_db_index_worker import ProcessIndexCtx, create_fetch_jobs
 from downloader.path_package import PATH_PACKAGE_KIND_STANDARD, PATH_TYPE_FILE, PathPackage
 from test.fake_logger import NoLogger
+from test.fake_update_output import SpyUpdateOutput
 
 
 class TestProcessDbIndexWorkerOutput(unittest.TestCase):
@@ -92,11 +93,3 @@ class NoFailCtx:
 class NoFileSystem:
     def make_dirs(self, path):
         raise AssertionError('make_dirs should not be called in this test')
-
-
-class SpyUpdateOutput:
-    def __init__(self):
-        self.database_size_added_calls = []
-
-    def database_size_added(self, db_id: str, bytes_added: int, files_added: int, source: str, zip_id: str = '') -> None:
-        self.database_size_added_calls.append((db_id, bytes_added, files_added, source, zip_id))

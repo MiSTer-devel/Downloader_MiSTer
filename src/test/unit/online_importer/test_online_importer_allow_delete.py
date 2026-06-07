@@ -21,9 +21,11 @@ from downloader.config import AllowDelete
 
 from test.objects import store_test_with_file_a_descr, config_with, file_a, file_a_descr, folder_a, \
     db_test_being_empty_descr, empty_test_store, store_with_folders, store_test_with_x_rbf_descr, file_x_rbf, \
-    file_x_rbf_descr, folder_x
+    file_x_rbf_descr, folder_x, files_psx_20250101_rbf, store_test_with_psx_20250101_rbf_descr
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_file_system_factory import fs_data
+from test.fake_online_importer import OnlineImporter
+from test.fake_update_output import SpyUpdateOutput
 
 
 class TestOnlineImporterAllowDelete(OnlineImporterTestBase):
@@ -45,6 +47,34 @@ class TestOnlineImporterAllowDelete(OnlineImporterTestBase):
 
         sut = self.download_empty_db_test(store, fs(ad=AllowDelete.ALL, files={file_a: file_a_descr()}, folders=[folder_a]))
 
+        self.assertEqual(fs_data(), sut.fs_data)
+        self.assertEqual(empty_test_store(), store)
+        self.assertReports(sut, [])
+
+    def test_file_a_removed_from_db___on_allow_delete_all___emits_file_remove(self):
+        output = SpyUpdateOutput()
+        store = store_test_with_file_a_descr()
+
+        sut = OnlineImporter\
+            .from_implicit_inputs(fs(ad=AllowDelete.ALL, files={file_a: file_a_descr()}, folders=[folder_a]), update_output=output)\
+            .add_db(db_test_being_empty_descr(), store)\
+            .download()
+
+        self.assertEqual([(['test'], '/media/fat/a/A', [])], output.file_removed_calls)
+        self.assertEqual(fs_data(), sut.fs_data)
+        self.assertEqual(empty_test_store(), store)
+        self.assertReports(sut, [])
+
+    def test_entangled_file_removed_from_db___on_allow_delete_all___emits_file_remove_tangle(self):
+        output = SpyUpdateOutput()
+        store = store_test_with_psx_20250101_rbf_descr()
+
+        sut = OnlineImporter\
+            .from_implicit_inputs(fs(ad=AllowDelete.ALL, files=files_psx_20250101_rbf()), update_output=output)\
+            .add_db(db_test_being_empty_descr(), store)\
+            .download()
+
+        self.assertEqual([(['test'], '/media/fat/PSX_20250101.rbf', ['psx_core'])], output.file_removed_calls)
         self.assertEqual(fs_data(), sut.fs_data)
         self.assertEqual(empty_test_store(), store)
         self.assertReports(sut, [])

@@ -23,6 +23,7 @@ from downloader.free_space_reservation import Partition
 from downloader.online_importer import InstallationBox
 from downloader.path_package import PathPackage, PATH_TYPE_FILE, PATH_PACKAGE_KIND_STANDARD
 from test.fake_final_reporter import FinalReporter
+from test.fake_update_output import SpyUpdateOutput
 from test.objects import db_entity
 
 
@@ -106,28 +107,3 @@ def make_path_pkg(rel_path):
         kind=PATH_PACKAGE_KIND_STANDARD,
         pext_props=None
     )
-
-
-class SpyUpdateOutput:
-    def __init__(self):
-        self.events = []
-
-    def run_started(self, version: str, commit: str) -> None: pass
-    def database_started(self, db_id: str) -> None: pass
-    def database_size_added(self, db_id: str, bytes_added: int, files_added: int, source: str, zip_id: str = '') -> None: pass
-    def progress_line(self, line: str) -> None: pass
-    def work_in_progress(self) -> None: pass
-    def flush_pending(self) -> None: pass
-    def jobs_cancelled(self, count: int) -> None: pass
-    def file_started(self, db_id: str, path: str, size: int, already_exists: bool = False) -> None: pass
-    def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None: pass
-    def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
-    def not_overwritten(self, db_id: str, path: str) -> None: pass
-    def full_partition(self, path: str, bytes_needed: int) -> None: pass
-    def reboot_required(self, kind: str) -> None: pass
-    def warning(self, code: str, message: str) -> None: pass
-    def error(self, code: str, message: str = '') -> None: self.events.append(('error', code, message))
-    def database_failed(self, db_id: str) -> None: self.events.append(('db_fail', db_id))
-    def zip_failed(self, db_id: str, zip_id: str) -> None: self.events.append(('zip_fail', db_id, zip_id))
-    def folder_failed(self, path: str) -> None: self.events.append(('folder_fail', path))
-    def run_finished(self, exit_code: int) -> None: pass

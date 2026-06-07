@@ -25,12 +25,30 @@ from test.fake_logger import NoLogger, SpyLoggerDecorator
 
 class TestUpdateOutput(unittest.TestCase):
 
-    def test_ltsv_update_output___file_start___emits_already_exists(self):
+    def test_ltsv_update_output___file_start___emits_target_existing(self):
         stream = io.StringIO()
-        LtsvUpdateOutput(NoLogger(), stream).file_started('distribution_mister', '_Console/Genesis.rbf', 131072, True)
+        LtsvUpdateOutput(NoLogger(), stream).file_started('distribution_mister', '_Console/Genesis.rbf', 131072, True, [])
 
         self.assertEqual(
-            'DLP1\tevent:file_start\tdb:distribution_mister\tsize:131072\tpath:_Console/Genesis.rbf\texists:true\n',
+            'DLP1\tevent:file_start\tdb:distribution_mister\tsize:131072\tpath:_Console/Genesis.rbf\ttarget:existing\n',
+            stream.getvalue()
+        )
+
+    def test_ltsv_update_output___file_start_with_tangle___emits_target_new_and_tangle(self):
+        stream = io.StringIO()
+        LtsvUpdateOutput(NoLogger(), stream).file_started('distribution_mister', '_Console/PSX_20250202.rbf', 2915040, False, ['psx_core'])
+
+        self.assertEqual(
+            'DLP1\tevent:file_start\tdb:distribution_mister\tsize:2915040\tpath:_Console/PSX_20250202.rbf\ttarget:new\ttangle:psx_core\n',
+            stream.getvalue()
+        )
+
+    def test_ltsv_update_output___file_start_with_malformed_tangle___ignores_invalid_tangles(self):
+        stream = io.StringIO()
+        LtsvUpdateOutput(NoLogger(), stream).file_started('distribution_mister', '_Console/PSX_20250202.rbf', 2915040, False, ['psx_core', 1])
+
+        self.assertEqual(
+            'DLP1\tevent:file_start\tdb:distribution_mister\tsize:2915040\tpath:_Console/PSX_20250202.rbf\ttarget:new\ttangle:psx_core\n',
             stream.getvalue()
         )
 
@@ -40,6 +58,33 @@ class TestUpdateOutput(unittest.TestCase):
 
         self.assertEqual(
             'DLP1\tevent:file_done\tdb:distribution_mister\tsize:131072\tpath:_Console/Genesis.rbf\n',
+            stream.getvalue()
+        )
+
+    def test_ltsv_update_output___file_remove___emits_dlp1_ltsv_line(self):
+        stream = io.StringIO()
+        LtsvUpdateOutput(NoLogger(), stream).file_removed(['distribution_mister'], '/media/fat/_Console/Genesis.rbf', [])
+
+        self.assertEqual(
+            'DLP1\tevent:file_remove\tdbs:distribution_mister\tpath:/media/fat/_Console/Genesis.rbf\n',
+            stream.getvalue()
+        )
+
+    def test_ltsv_update_output___file_remove_with_tangle___emits_tangle(self):
+        stream = io.StringIO()
+        LtsvUpdateOutput(NoLogger(), stream).file_removed(['distribution_mister'], '/media/fat/PSX_20250101.rbf', ['psx_core'])
+
+        self.assertEqual(
+            'DLP1\tevent:file_remove\tdbs:distribution_mister\tpath:/media/fat/PSX_20250101.rbf\ttangle:psx_core\n',
+            stream.getvalue()
+        )
+
+    def test_ltsv_update_output___file_remove_with_multiple_dbs___sorts_and_emits_dbs(self):
+        stream = io.StringIO()
+        LtsvUpdateOutput(NoLogger(), stream).file_removed(['zdb', 'adb'], '/media/fat/foo.txt', [])
+
+        self.assertEqual(
+            'DLP1\tevent:file_remove\tdbs:adb,zdb\tpath:/media/fat/foo.txt\n',
             stream.getvalue()
         )
 
@@ -97,7 +142,7 @@ class TestUpdateOutput(unittest.TestCase):
     def test_human_update_output___file_start_with_existing_file___prints_same_human_line(self):
         logger = SpyLoggerDecorator(NoLogger())
 
-        HumanUpdateOutput(logger).file_started('distribution_mister', '_Console/Genesis.rbf', 131072, True)
+        HumanUpdateOutput(logger).file_started('distribution_mister', '_Console/Genesis.rbf', 131072, True, [])
 
         self.assertEqual([('_Console/Genesis.rbf',)], logger.printCalls)
 
