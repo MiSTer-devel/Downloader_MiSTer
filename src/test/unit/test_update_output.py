@@ -25,39 +25,48 @@ from test.fake_logger import NoLogger, SpyLoggerDecorator
 
 class TestUpdateOutput(unittest.TestCase):
 
-    def test_ltsv_update_output___file_start___emits_target_existing(self):
+    def test_ltsv_update_output___file_start___emits_dlp1_ltsv_line(self):
         stream = io.StringIO()
-        LtsvUpdateOutput(NoLogger(), stream).file_started('distribution_mister', '_Console/Genesis.rbf', 131072, True, [])
+        LtsvUpdateOutput(NoLogger(), stream).file_started('distribution_mister', '_Console/Genesis.rbf', 131072, [])
 
         self.assertEqual(
-            'DLP1\tevent:file_start\tdb:distribution_mister\tsize:131072\tpath:_Console/Genesis.rbf\ttarget:existing\n',
+            'DLP1\tevent:file_start\tdb:distribution_mister\tsize:131072\tpath:_Console/Genesis.rbf\n',
             stream.getvalue()
         )
 
-    def test_ltsv_update_output___file_start_with_tangle___emits_target_new_and_tangle(self):
+    def test_ltsv_update_output___file_start_with_tangle___emits_tangle(self):
         stream = io.StringIO()
-        LtsvUpdateOutput(NoLogger(), stream).file_started('distribution_mister', '_Console/PSX_20250202.rbf', 2915040, False, ['psx_core'])
+        LtsvUpdateOutput(NoLogger(), stream).file_started('distribution_mister', '_Console/PSX_20250202.rbf', 2915040, ['psx_core'])
 
         self.assertEqual(
-            'DLP1\tevent:file_start\tdb:distribution_mister\tsize:2915040\tpath:_Console/PSX_20250202.rbf\ttarget:new\ttangle:psx_core\n',
+            'DLP1\tevent:file_start\tdb:distribution_mister\tsize:2915040\tpath:_Console/PSX_20250202.rbf\ttangle:psx_core\n',
             stream.getvalue()
         )
 
     def test_ltsv_update_output___file_start_with_malformed_tangle___ignores_invalid_tangles(self):
         stream = io.StringIO()
-        LtsvUpdateOutput(NoLogger(), stream).file_started('distribution_mister', '_Console/PSX_20250202.rbf', 2915040, False, ['psx_core', 1])
+        LtsvUpdateOutput(NoLogger(), stream).file_started('distribution_mister', '_Console/PSX_20250202.rbf', 2915040, ['psx_core', 1])
 
         self.assertEqual(
-            'DLP1\tevent:file_start\tdb:distribution_mister\tsize:2915040\tpath:_Console/PSX_20250202.rbf\ttarget:new\ttangle:psx_core\n',
+            'DLP1\tevent:file_start\tdb:distribution_mister\tsize:2915040\tpath:_Console/PSX_20250202.rbf\ttangle:psx_core\n',
             stream.getvalue()
         )
 
-    def test_ltsv_update_output___file_done___emits_dlp1_ltsv_line(self):
+    def test_ltsv_update_output___file_done_for_existing_file___emits_target_existing(self):
         stream = io.StringIO()
-        LtsvUpdateOutput(NoLogger(), stream).file_completed('distribution_mister', '_Console/Genesis.rbf', 131072)
+        LtsvUpdateOutput(NoLogger(), stream).file_completed('distribution_mister', '_Console/Genesis.rbf', 131072, True)
 
         self.assertEqual(
-            'DLP1\tevent:file_done\tdb:distribution_mister\tsize:131072\tpath:_Console/Genesis.rbf\n',
+            'DLP1\tevent:file_done\tdb:distribution_mister\tsize:131072\tpath:_Console/Genesis.rbf\ttarget:existing\n',
+            stream.getvalue()
+        )
+
+    def test_ltsv_update_output___file_done_for_new_file___emits_target_new(self):
+        stream = io.StringIO()
+        LtsvUpdateOutput(NoLogger(), stream).file_completed('distribution_mister', '_Console/PSX_20250202.rbf', 2915040, False)
+
+        self.assertEqual(
+            'DLP1\tevent:file_done\tdb:distribution_mister\tsize:2915040\tpath:_Console/PSX_20250202.rbf\ttarget:new\n',
             stream.getvalue()
         )
 
@@ -90,10 +99,10 @@ class TestUpdateOutput(unittest.TestCase):
 
     def test_ltsv_update_output___file_done_from_zip___emits_zip_id(self):
         stream = io.StringIO()
-        LtsvUpdateOutput(NoLogger(), stream).file_completed('distribution_mister', '_Arcade/game.rom', 131072, 'arcade')
+        LtsvUpdateOutput(NoLogger(), stream).file_completed('distribution_mister', '_Arcade/game.rom', 131072, False, 'arcade')
 
         self.assertEqual(
-            'DLP1\tevent:file_done\tdb:distribution_mister\tsize:131072\tpath:_Arcade/game.rom\tzip:arcade\n',
+            'DLP1\tevent:file_done\tdb:distribution_mister\tsize:131072\tpath:_Arcade/game.rom\ttarget:new\tzip:arcade\n',
             stream.getvalue()
         )
 
@@ -139,10 +148,10 @@ class TestUpdateOutput(unittest.TestCase):
 
         self.assertEqual([('ERROR: Store failed',)], logger.printCalls)
 
-    def test_human_update_output___file_start_with_existing_file___prints_same_human_line(self):
+    def test_human_update_output___file_start___prints_same_human_line(self):
         logger = SpyLoggerDecorator(NoLogger())
 
-        HumanUpdateOutput(logger).file_started('distribution_mister', '_Console/Genesis.rbf', 131072, True, [])
+        HumanUpdateOutput(logger).file_started('distribution_mister', '_Console/Genesis.rbf', 131072, [])
 
         self.assertEqual([('_Console/Genesis.rbf',)], logger.printCalls)
 

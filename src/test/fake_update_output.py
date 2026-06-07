@@ -69,13 +69,13 @@ class SpyUpdateOutput:
         self.jobs_cancelled_calls.append((count,))
         self.events.append(('jobs_cancelled', count))
 
-    def file_started(self, db_id: str, path: str, size: int, already_exists: bool, tangles: list[str]) -> None:
-        self.file_started_calls.append((db_id, path, size, already_exists, tangles))
-        self.events.append(('file_start', db_id, path, size, already_exists, tangles))
+    def file_started(self, db_id: str, path: str, size: int, tangles: list[str]) -> None:
+        self.file_started_calls.append((db_id, path, size, tangles))
+        self.events.append(('file_start', db_id, path, size, tangles))
 
-    def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None:
-        self.file_completed_calls.append((db_id, path, size, zip_id))
-        self.events.append(('file_done', db_id, path, size, zip_id))
+    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '') -> None:
+        self.file_completed_calls.append((db_id, path, size, already_exists, zip_id))
+        self.events.append(('file_done', db_id, path, size, already_exists, zip_id))
 
     def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None:
         self.file_removed_calls.append((dbs, path, tangles))

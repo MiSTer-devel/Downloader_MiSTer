@@ -33,8 +33,8 @@ class UpdateOutput(Protocol):
     def work_in_progress(self) -> None: pass
     def flush_pending(self) -> None: pass
     def jobs_cancelled(self, count: int) -> None: pass
-    def file_started(self, db_id: str, path: str, size: int, already_exists: bool, tangles: list[str]) -> None: pass
-    def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None: pass
+    def file_started(self, db_id: str, path: str, size: int, tangles: list[str]) -> None: pass
+    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '') -> None: pass
     def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
     def not_overwritten(self, db_id: str, path: str) -> None: pass
@@ -56,8 +56,8 @@ class NoopUpdateOutput(UpdateOutput):
     def work_in_progress(self) -> None: pass
     def flush_pending(self) -> None: pass
     def jobs_cancelled(self, count: int) -> None: pass
-    def file_started(self, db_id: str, path: str, size: int, already_exists: bool, tangles: list[str]) -> None: pass
-    def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None: pass
+    def file_started(self, db_id: str, path: str, size: int, tangles: list[str]) -> None: pass
+    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '') -> None: pass
     def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
     def not_overwritten(self, db_id: str, path: str) -> None: pass
@@ -118,11 +118,11 @@ class HumanUpdateOutput(UpdateOutput):
     def jobs_cancelled(self, count: int) -> None:
         self._logger.print(f"Cancelled {count} jobs.")
 
-    def file_started(self, db_id: str, path: str, size: int, already_exists: bool, tangles: list[str]) -> None:
+    def file_started(self, db_id: str, path: str, size: int, tangles: list[str]) -> None:
         self._print_line(path)
         self._check_time = time.monotonic() + 2.0
 
-    def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None:
+    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '') -> None:
         self._symbols.append('.')
         if self._needs_newline or self._check_time < time.monotonic():
             self._print_symbols()
@@ -216,25 +216,25 @@ class LtsvUpdateOutput(UpdateOutput):
     def jobs_cancelled(self, count: int) -> None:
         self._human_output.jobs_cancelled(count)
 
-    def file_started(self, db_id: str, path: str, size: int, already_exists: bool, tangles: list[str]) -> None:
+    def file_started(self, db_id: str, path: str, size: int, tangles: list[str]) -> None:
         tangles = _valid_string_list(tangles)
         fields: dict[str, Union[str, int]] = {
             'db': db_id,
             'size': size,
             'path': path,
-            'target': 'existing' if already_exists else 'new',
         }
         if len(tangles) > 0:
             fields['tangle'] = ','.join(tangles)
         self._emit('file_start', **fields)
-        self._human_output.file_started(db_id, path, size, already_exists, tangles)
+        self._human_output.file_started(db_id, path, size, tangles)
 
-    def file_completed(self, db_id: str, path: str, size: int, zip_id: str = '') -> None:
+    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '') -> None:
         fields: dict[str, Union[str, int]] = {'db': db_id, 'size': size, 'path': path}
+        fields['target'] = 'existing' if already_exists else 'new'
         if zip_id:
             fields['zip'] = zip_id
         self._emit('file_done', **fields)
-        self._human_output.file_completed(db_id, path, size, zip_id)
+        self._human_output.file_completed(db_id, path, size, already_exists, zip_id)
 
     def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None:
         dbs = sorted(_valid_string_list(dbs))
