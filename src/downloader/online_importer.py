@@ -495,8 +495,9 @@ class OnlineImporter:
 
             for dbs, unlink_file, tangles in unlink_list:
                 if self._file_system.is_file(unlink_file):
-                    self._update_output.file_removed(dbs, unlink_file, tangles)
                     err = self._file_system.unlink(unlink_file, verbose=False)
+                    if err is None or not self._file_system.is_file(unlink_file, use_cache=False):
+                        self._update_output.file_removed(dbs, unlink_file, tangles)
                     if err is not None:
                         self._logger.debug('WARNING: Online Importer could not remove ', unlink_file, err)
 
