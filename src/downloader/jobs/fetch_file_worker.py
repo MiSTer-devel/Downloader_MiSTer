@@ -22,6 +22,7 @@ from downloader.http_gateway import HttpGateway
 from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.errors import GetFileError, FileDownloadError, FileValidationError
+from downloader.jobs.file_install import finalize_file_install, prepare_file_install
 import socket
 from urllib.error import URLError
 from http.client import HTTPException
@@ -44,15 +45,10 @@ class FetchFileWorker(DownloaderWorker):
 
     def operate_on(self, job: FetchFileJob) -> WorkerResult:  # type: ignore[override]
         source = job.source
-        temp_path = job.pkg.temp_path(job.already_exists)
-        backup_path = job.pkg.backup_path()
         target_path = job.pkg.full_path
         desc = job.pkg.description
 
-        if temp_path is None and backup_path is not None and self._file_system.is_file(target_path, use_cache=False):  # @TODO: See if use_cache is needed
-            self._file_system.copy(target_path, backup_path)
-
-        file_path = temp_path or target_path
+        file_path, temp_path, backup_path = prepare_file_install(self._file_system, job.pkg, job.already_exists)
         _file_size, error = self._fetcher.fetch_file(source, file_path, fsync=temp_path is not None)
         if error is not None:
             return [], error
@@ -68,10 +64,7 @@ class FetchFileWorker(DownloaderWorker):
                     self._logger.debug('WARNING: FetchFileWorker could not remove file_path ', file_path, err)
                 return [], FileValidationError(f"Bad hash on {job.pkg.rel_path} ({desc['hash']} != {file_hash})")
 
-            if file_path != target_path:
-                if backup_path is not None and self._file_system.is_file(target_path, use_cache=False):  # @TODO: See if use_cache is needed
-                    self._file_system.copy(target_path, backup_path)
-                self._file_system.move(file_path, target_path)
+            finalize_file_install(self._file_system, file_path, target_path, backup_path)
 
         except Exception as e:
             return [], FileDownloadError(f'Exception during validation! {job.pkg.rel_path}: {str(e)}')

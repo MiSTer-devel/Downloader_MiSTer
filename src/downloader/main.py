@@ -63,9 +63,10 @@ def main(env: Environment, start_time: float) -> int:
         update_output.error('unexpected')
         logger.print(traceback.format_exc())
         exit_code = 1
+    finally:
+        logger.bench('MAIN end.')
+        logger.file_logger.finalize()
 
-    logger.bench('MAIN end.')
-    logger.file_logger.finalize()
     return exit_code
 
 

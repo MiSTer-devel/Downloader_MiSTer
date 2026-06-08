@@ -23,7 +23,7 @@ import os
 
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.config import Config, AllowDelete
-from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY, MEDIA_FAT
+from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.error import DownloaderError
@@ -232,8 +232,6 @@ class OnlineImporter:
         self._job_system.register_workers({w.job_type_id(): w for w in self._worker_factory.create_workers()})
         self._job_system.push_jobs(self._make_jobs(db_pkgs))
 
-        file_mister_present = self._file_system.is_file(os.path.join(MEDIA_FAT, FILE_MiSTer), use_cache=False)
-
         logger.bench('OnlineImporter execute jobs start.')
         self._job_system.pending_jobs_amount()
         self._job_system.execute_jobs()
@@ -254,34 +252,12 @@ class OnlineImporter:
             box.add_downloaded_file(fetch_file_job.pkg.rel_path)
             box.add_validated_file(fetch_file_job.pkg, fetch_file_job.db_id)
 
-        for fetch_file_job, e in report.get_failed_jobs(FetchFileJob):
+        for fetch_file_job, _e in report.get_failed_jobs(FetchFileJob):
             box.add_failed_file(fetch_file_job.pkg.rel_path)
             if FILE_PROP_ENTANGLEMENTS in fetch_file_job.pkg.description:
                 box.add_failed_file_entanglements(fetch_file_job.pkg.description[FILE_PROP_ENTANGLEMENTS])
-            if fetch_file_job.pkg.rel_path != FILE_MiSTer or not file_mister_present:
-                continue
 
-            self._logger.debug(e)
-            full_path = fetch_file_job.pkg.full_path
-            if self._file_system.is_file(full_path, use_cache=False):
-                continue
-
-            backup_path = fetch_file_job.pkg.backup_path()
-            temp_path = fetch_file_job.pkg.temp_path(fetch_file_job.already_exists)
-            if backup_path is not None and self._file_system.is_file(backup_path, use_cache=False):
-                self._file_system.move(backup_path, full_path)
-            elif temp_path is not None and self._file_system.is_file(temp_path, use_cache=False) and self._file_system.hash(temp_path) == fetch_file_job.pkg.description['hash']:
-                self._file_system.move(temp_path, full_path)
-
-            if self._file_system.is_file(full_path, use_cache=False):
-                continue
-
-            # This error message should never happen.
-            # If it happens it would be an unexpected case where file_system is not moving files correctly
-            self._logger.print('CRITICAL ERROR!!! Could not restore the MiSTer binary!')
-            self._logger.print('Please manually rename the file MiSTer.new as MiSTer')
-            self._logger.print('Your system won\'nt be able to boot until you do so!')
-            sys.exit(EXIT_ERROR_BAD_NEW_BINARY)
+            self._recover_failed_file_from_backup_or_tmp(fetch_file_job.pkg, fetch_file_job.already_exists)
 
         db_fetch_success = 0
         for fetch_data_job in report.get_completed_jobs(FetchDataJob):
@@ -414,6 +390,8 @@ class OnlineImporter:
             box.add_failed_files(open_zip_job.failed_files)
             box.queue_directory_removal(open_zip_job.directories_to_remove, open_zip_job.db.db_id)
             box.queue_file_removal(open_zip_job.files_to_remove, open_zip_job.db.db_id)
+            for failed_pkg in open_zip_job.failed_files:
+                self._recover_failed_file_from_backup_or_tmp(failed_pkg, already_exists=True)
 
         for open_zip_job, _e in report.get_failed_jobs(OpenZipContentsJob):
             box.add_failed_files(open_zip_job.files_to_unzip)
@@ -615,6 +593,34 @@ class OnlineImporter:
 
     def needs_reboot(self) -> bool: return self._needs_reboot
     def _make_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]: return self._worker_factory.create_jobs(db_pkgs)
+
+    def _recover_failed_file_from_backup_or_tmp(self, pkg: PathPackage, already_exists: bool):
+        if not already_exists or ('backup' not in pkg.description and 'tmp' not in pkg.description):
+            return
+
+        full_path = pkg.full_path
+        if self._file_system.is_file(full_path, use_cache=False):
+            return
+
+        backup_path = pkg.backup_path()
+        temp_path = pkg.temp_path(True)
+        if backup_path is not None and self._file_system.is_file(backup_path, use_cache=False):
+            self._file_system.move(backup_path, full_path)
+        elif temp_path is not None and self._file_system.is_file(temp_path, use_cache=False) and self._file_system.hash(temp_path) == pkg.description['hash']:
+            self._file_system.move(temp_path, full_path)
+
+        if self._file_system.is_file(full_path, use_cache=False):
+            return
+
+        if pkg.rel_path != FILE_MiSTer:
+            return
+
+        # This error message should never happen.
+        # If it happens it would be an unexpected case where file_system is not moving files correctly
+        self._logger.print('CRITICAL ERROR!!! Could not restore the MiSTer binary!')
+        self._logger.print('Please manually rename the file MiSTer.new as MiSTer')
+        self._logger.print('Your system won\'nt be able to boot until you do so!')
+        sys.exit(EXIT_ERROR_BAD_NEW_BINARY)
 
     @staticmethod
     def _clean_store(store) -> None:

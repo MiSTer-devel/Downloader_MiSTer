@@ -21,6 +21,7 @@ from typing import Optional, Union
 
 from downloader.file_system import UnzipError
 from downloader.job_system import WorkerResult, ProgressReporter
+from downloader.jobs.file_install import FileInstallPaths, finalize_file_install, prepare_file_install
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob, ZipKind
 from downloader.jobs.process_db_index_worker import create_fetch_jobs, ProcessIndexCtx
 from downloader.jobs.worker_context import DownloaderWorker
@@ -40,18 +41,32 @@ class OpenZipContentsWorker(DownloaderWorker):
     def operate_on(self, job: OpenZipContentsJob) -> WorkerResult:  # type: ignore[override]
         self._logger.bench('OpenZipContentsWorker start: ', job.db.db_id, job.zip_id)
 
-        zip_paths: Optional[dict[str, str]]
+        zip_path_by_pkg: dict[PathPackage, str] = {}
         if job.zip_kind == ZipKind.EXTRACT_ALL_CONTENTS:
             should_extract_all = len(job.files_to_unzip) > (0.7 * job.total_amount_of_files_in_zip)
-            if should_extract_all:
-                zip_paths = None
-            else:
+            if not should_extract_all:
                 root_zip_path = os.path.join(job.target_folder.rel_path, '')  # type: ignore[union-attr]
-                zip_paths = {pkg.description.get('zip_path', None) or pkg.rel_path.removeprefix(root_zip_path): pkg.full_path for pkg in job.files_to_unzip}
+                zip_path_by_pkg = {pkg: pkg.description.get('zip_path', None) or pkg.rel_path.removeprefix(root_zip_path) for pkg in job.files_to_unzip}
         elif job.zip_kind == ZipKind.EXTRACT_SINGLE_FILES:
             should_extract_all = False
-            zip_paths = {pkg.description['zip_path']: pkg.full_path for pkg in job.files_to_unzip}
+            zip_path_by_pkg = {pkg: pkg.description['zip_path'] for pkg in job.files_to_unzip}
         else: raise ValueError(f"Impossible kind '{job.zip_kind}' for zip '{job.zip_id}' in db '{job.db.db_id}'")
+
+        # Safe install for every per-file extraction (i.e. should_extract_all is False): extract
+        # each file to its install path (a temp when the target already exists) and only move it
+        # into place after the hash is validated, taking a backup, so a bad extraction can never
+        # clobber a good file. This mirrors what FetchFileWorker does for downloads. When
+        # should_extract_all is True the whole zip is dumped into the folder and there are no
+        # per-file destinations to redirect, so this does not apply.
+        install_paths_by_pkg: dict[PathPackage, FileInstallPaths] = {}
+        zip_paths: Optional[dict[str, str]] = None
+        if not should_extract_all:
+            existing_pkgs, non_existing_pkgs = self._process_index_ctx.file_system.are_files(job.files_to_unzip)
+            for pkg in existing_pkgs:
+                install_paths_by_pkg[pkg] = prepare_file_install(self._process_index_ctx.file_system, pkg, True)
+            for pkg in non_existing_pkgs:
+                install_paths_by_pkg[pkg] = prepare_file_install(self._process_index_ctx.file_system, pkg, False)
+            zip_paths = {zip_path_by_pkg[pkg]: install_paths_by_pkg[pkg][0] for pkg in job.files_to_unzip}
 
         target_path: Union[str, dict[str, str]] = job.target_folder.full_path if should_extract_all else (zip_paths or {})  # type: ignore[union-attr]
         self._process_index_ctx.file_download_session_logger.print_progress_line(job.action_text)
@@ -82,7 +97,17 @@ class OpenZipContentsWorker(DownloaderWorker):
 
         self._logger.bench('OpenZipContentsWorker validating...', job.db.db_id, job.zip_id)
 
-        existing_files, missing_files = self._process_index_ctx.file_system.are_files(job.files_to_unzip)
+        if should_extract_all:
+            existing_files, missing_files = self._process_index_ctx.file_system.are_files(job.files_to_unzip)
+        else:
+            existing_files = []
+            missing_files = []
+            for pkg in job.files_to_unzip:
+                install_path = install_paths_by_pkg[pkg][0]
+                if self._process_index_ctx.file_system.is_file(install_path, use_cache=False):
+                    existing_files.append(pkg)
+                else:
+                    missing_files.append(pkg)
         if len(missing_files) > 0:
             self._logger.debug(
                 f'OpenZipContentsWorker missing extracted files for db "{job.db.db_id}" zip "{job.zip_id}". '
@@ -91,8 +116,11 @@ class OpenZipContentsWorker(DownloaderWorker):
 
         hash_mismatched_files: list[PathPackage] = []
         for file_pkg in existing_files:
-            fs_hash = self._process_index_ctx.file_system.hash(file_pkg.full_path)
+            install_path, _temp_path, backup_path = install_paths_by_pkg.get(file_pkg) or (file_pkg.full_path, None, None)
+
+            fs_hash = self._process_index_ctx.file_system.hash(install_path)
             if fs_hash == file_pkg.description['hash']:
+                finalize_file_install(self._process_index_ctx.file_system, install_path, file_pkg.full_path, backup_path)
                 job.validated_files.append(file_pkg)
             else:
                 self._logger.debug(
@@ -100,6 +128,8 @@ class OpenZipContentsWorker(DownloaderWorker):
                     f'rel_path: "{file_pkg.rel_path}" '
                     f'fs_hash: "{fs_hash}" desc_hash: "{file_pkg.description["hash"]}"'
                 )
+                if install_path != file_pkg.full_path:
+                    self._process_index_ctx.file_system.unlink(install_path, verbose=False)
                 hash_mismatched_files.append(file_pkg)
 
         invalid_files = missing_files + hash_mismatched_files
