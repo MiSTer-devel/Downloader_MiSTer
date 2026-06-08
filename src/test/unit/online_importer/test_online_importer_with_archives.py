@@ -17,9 +17,9 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import default_config
-from downloader.constants import K_BASE_PATH
+from downloader.constants import K_BASE_PATH, SUFFIX_file_in_progress
 from downloader.fail_policy import FailPolicy
-from test.fake_file_system_factory import fs_data
+from test.fake_file_system_factory import fs_data, fs_records
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
 from test.fake_logger import NoLogger, SpyLoggerDecorator
 from test.objects import db_test_descr, empty_zip_summary, folder_games_nes, store_descr, empty_test_store, media_fat, db_entity, file_a, archive_file_a_descr, archive_desc, zip_desc, archive_nes_palettes_id
@@ -334,6 +334,42 @@ class TestOnlineImporterWithArchives(OnlineImporterTestBase):
         self.assertEqual('extract_single_files', store['zips']['sel_bios']['kind'])
         self.assertSutReports(['games/NeoGeo/bios.rom'])
 
+    def test_download_selective_archive_with_backup_and_tmp___on_existing_file___installs_atomically_and_keeps_backup(self):
+        file_path = 'games/NeoGeo/bios.rom'
+        backup_path = 'games/NeoGeo/bios.old'
+        tmp_path = 'games/NeoGeo/bios.tmp'
+        old_hash = 'old-bios'
+        archive = _selective_bios_archive_desc()
+        archive['summary_file']['unzipped_json']['files'][file_path].update({
+            'backup': backup_path,
+            'tmp': tmp_path,
+        })
+        self.implicit_inputs.file_system_state \
+            .add_file(None, file_path, {'hash': old_hash, 'size': 1024}) \
+            .add_folder(None, 'games') \
+            .add_folder(None, 'games/NeoGeo')
+        store = store_descr(
+            files={file_path: {'hash': old_hash, 'size': 1024}},
+            folders={'games': {}, 'games/NeoGeo': {}},
+        )
+
+        self.download(db_test_descr(archives={'sel_bios': archive}), store)
+
+        self.assertEqual(fs_data(
+            files={
+                file_path: {'hash': 'aabb', 'size': 1024},
+                backup_path: {'hash': old_hash, 'size': 1024},
+            },
+            folders=['games', 'games/NeoGeo'],
+        ), self.sut.fs_data)
+        self.assertEqual(fs_records([
+            {'scope': 'make_dirs', 'data': media_fat('games')},
+            {'scope': 'make_dirs', 'data': media_fat('games/NeoGeo')},
+            {'scope': 'copy', 'data': (media_fat(file_path), media_fat(backup_path))},
+            {'scope': 'move', 'data': (media_fat(tmp_path), media_fat(file_path))},
+        ]), self.sut.file_system.write_records)
+        self.assertSutReports([file_path])
+
     def test_download_selective_archive_with_summary_file_and_no_file_urls_or_archive_base_files_url___on_empty_store___extracts_file_from_zip(self):
         selective_archive = _selective_bios_archive_desc()
         selective_archive.pop('base_files_url')
@@ -378,6 +414,81 @@ class TestOnlineImporterWithArchives(OnlineImporterTestBase):
         debug_messages = [''.join(str(part) for part in call) for call in logger.debugCalls]
         self.assertTrue(any('missing extracted files' in message and 'wrong/bios.rom' in message for message in debug_messages))
         self.assertTrue(any('unrecoverable extracted files' in message and 'base_files_url' in message for message in debug_messages))
+
+    def test_download_selective_archive_without_tmp_or_backup___on_existing_file___installs_via_safe_temp_and_moves_without_backup(self):
+        file_path = 'games/NeoGeo/bios.rom'
+        old_hash = 'old-bios'
+        self.implicit_inputs.file_system_state \
+            .add_file(None, file_path, {'hash': old_hash, 'size': 1024}) \
+            .add_folder(None, 'games') \
+            .add_folder(None, 'games/NeoGeo')
+        store = store_descr(
+            files={file_path: {'hash': old_hash, 'size': 1024}},
+            folders={'games': {}, 'games/NeoGeo': {}},
+        )
+
+        self.download(db_test_descr(archives={'sel_bios': _selective_bios_archive_desc()}), store)
+
+        # The existing file is extracted to an implicit ._downloader_in_progress temp and only
+        # moved into place after its hash validates. No backup is declared, so no copy happens.
+        self.assertEqual(fs_data(
+            files={file_path: {'hash': 'aabb', 'size': 1024}},
+            folders=['games', 'games/NeoGeo'],
+        ), self.sut.fs_data)
+        self.assertEqual(fs_records([
+            {'scope': 'make_dirs', 'data': media_fat('games')},
+            {'scope': 'make_dirs', 'data': media_fat('games/NeoGeo')},
+            {'scope': 'move', 'data': (media_fat(file_path) + SUFFIX_file_in_progress, media_fat(file_path))},
+        ]), self.sut.file_system.write_records)
+        self.assertSutReports([file_path])
+
+    def test_download_selective_archive_without_tmp_or_backup___on_existing_file_with_bad_extraction_and_no_recovery___discards_temp_and_keeps_original(self):
+        file_path = 'games/NeoGeo/bios.rom'
+        old_hash = 'old-bios'
+        archive = _selective_bios_archive_desc(zipped_file_hash='wrong')
+        archive.pop('base_files_url')
+        self.implicit_inputs.file_system_state \
+            .add_file(None, file_path, {'hash': old_hash, 'size': 1024}) \
+            .add_folder(None, 'games') \
+            .add_folder(None, 'games/NeoGeo')
+        store = store_descr(
+            files={file_path: {'hash': old_hash, 'size': 1024}},
+            folders={'games': {}, 'games/NeoGeo': {}},
+        )
+        db = db_test_descr(archives={'sel_bios': archive})
+        db.base_files_url = ''
+
+        self.download(db, store)
+
+        # The extracted temp fails validation and there is no recovery source, so the temp is
+        # discarded and the original on-disk file is left untouched (never clobbered).
+        self.assertEqual(fs_data(
+            files={file_path: {'hash': old_hash, 'size': 1024}},
+            folders=['games', 'games/NeoGeo'],
+        ), self.sut.fs_data)
+        self.assertEqual(fs_records([
+            {'scope': 'make_dirs', 'data': media_fat('games')},
+            {'scope': 'make_dirs', 'data': media_fat('games/NeoGeo')},
+            {'scope': 'unlink', 'data': media_fat(file_path) + SUFFIX_file_in_progress},
+        ]), self.sut.file_system.write_records)
+        self.assertSutReports([], errors=[file_path], save=True)
+
+    def test_download_selective_archive_without_tmp_or_backup___on_fresh_file___extracts_straight_to_target_without_temp_or_move(self):
+        file_path = 'games/NeoGeo/bios.rom'
+
+        self.download(db_test_descr(archives={'sel_bios': _selective_bios_archive_desc()}), empty_test_store())
+
+        # A fresh target has no temp: extraction writes straight to the final path and
+        # finalize_file_install no-ops, so there is no move/copy/unlink.
+        self.assertEqual(fs_data(
+            files={file_path: {'hash': 'aabb', 'size': 1024}},
+            folders=['games', 'games/NeoGeo'],
+        ), self.sut.fs_data)
+        self.assertEqual(fs_records([
+            {'scope': 'make_dirs', 'data': media_fat('games')},
+            {'scope': 'make_dirs', 'data': media_fat('games/NeoGeo')},
+        ]), self.sut.file_system.write_records)
+        self.assertSutReports([file_path])
 
     def download_zipped_cheats_folder(self, input_store, from_zip_content, is_internal_summary=False, save=True):
         summary_internal_archive_id = cheats_folder_id if is_internal_summary else None
