@@ -374,6 +374,12 @@ class FakeFileSystem(ProductionFileSystem):
         if 'unzip_error' in self._fake_failures:
             raise UnzipError(transfer)
 
+        recorded_target = (
+            {zip_path.lower(): dest.lower() for zip_path, dest in target_path.items()}
+            if isinstance(target_path, dict) else target_path.lower()
+        )
+        self._write_records.append(_Record('unzip_contents', recorded_target))
+
         target_path_by_relpath = None if isinstance(target_path, str) else target_path
 
         extracting = {}

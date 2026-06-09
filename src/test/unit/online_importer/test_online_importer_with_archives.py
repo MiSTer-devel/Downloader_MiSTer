@@ -365,6 +365,7 @@ class TestOnlineImporterWithArchives(OnlineImporterTestBase):
         self.assertEqual(fs_records([
             {'scope': 'make_dirs', 'data': media_fat('games')},
             {'scope': 'make_dirs', 'data': media_fat('games/NeoGeo')},
+            {'scope': 'unzip_contents', 'data': {'bios.rom': media_fat(tmp_path)}},
             {'scope': 'copy', 'data': (media_fat(file_path), media_fat(backup_path))},
             {'scope': 'move', 'data': (media_fat(tmp_path), media_fat(file_path))},
         ]), self.sut.file_system.write_records)
@@ -438,6 +439,7 @@ class TestOnlineImporterWithArchives(OnlineImporterTestBase):
         self.assertEqual(fs_records([
             {'scope': 'make_dirs', 'data': media_fat('games')},
             {'scope': 'make_dirs', 'data': media_fat('games/NeoGeo')},
+            {'scope': 'unzip_contents', 'data': {'bios.rom': media_fat(file_path) + SUFFIX_file_in_progress}},
             {'scope': 'move', 'data': (media_fat(file_path) + SUFFIX_file_in_progress, media_fat(file_path))},
         ]), self.sut.file_system.write_records)
         self.assertSutReports([file_path])
@@ -469,6 +471,7 @@ class TestOnlineImporterWithArchives(OnlineImporterTestBase):
         self.assertEqual(fs_records([
             {'scope': 'make_dirs', 'data': media_fat('games')},
             {'scope': 'make_dirs', 'data': media_fat('games/NeoGeo')},
+            {'scope': 'unzip_contents', 'data': {'bios.rom': media_fat(file_path) + SUFFIX_file_in_progress}},
             {'scope': 'unlink', 'data': media_fat(file_path) + SUFFIX_file_in_progress},
         ]), self.sut.file_system.write_records)
         self.assertSutReports([], errors=[file_path], save=True)
@@ -478,8 +481,9 @@ class TestOnlineImporterWithArchives(OnlineImporterTestBase):
 
         self.download(db_test_descr(archives={'sel_bios': _selective_bios_archive_desc()}), empty_test_store())
 
-        # A fresh target has no temp: extraction writes straight to the final path and
-        # finalize_file_install no-ops, so there is no move/copy/unlink.
+        # A fresh target has no temp: extraction writes straight to the final path (the
+        # unzip destination is the final path, not a ._downloader_in_progress temp) and
+        # finalize_file_install no-ops, so there is no move/copy/unlink afterwards.
         self.assertEqual(fs_data(
             files={file_path: {'hash': 'aabb', 'size': 1024}},
             folders=['games', 'games/NeoGeo'],
@@ -487,6 +491,7 @@ class TestOnlineImporterWithArchives(OnlineImporterTestBase):
         self.assertEqual(fs_records([
             {'scope': 'make_dirs', 'data': media_fat('games')},
             {'scope': 'make_dirs', 'data': media_fat('games/NeoGeo')},
+            {'scope': 'unzip_contents', 'data': {'bios.rom': media_fat(file_path)}},
         ]), self.sut.file_system.write_records)
         self.assertSutReports([file_path])
 
