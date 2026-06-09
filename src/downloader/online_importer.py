@@ -428,11 +428,13 @@ class OnlineImporter:
 
         if len(files_to_consume := box.consume_files()) > 0:
             logger.bench('OnlineImporter files_to_consume start.')
-            processed_file_names: set[str] = {file_pkg.rel_path for file_pkgs, db_id in box.non_duplicated_files() for file_pkg in file_pkgs}
+            # Case-insensitive bookkeeping because MiSTer partitions are FAT32/exFAT: when a db renames
+            # a file changing only its case, removing the old path would delete the just-installed file.
+            processed_file_names: set[str] = {file_pkg.rel_path.lower() for file_pkgs, db_id in box.non_duplicated_files() for file_pkg in file_pkgs}
             if len(skipped_db_ids) > 0:
-                file_names_to_consume: set[str] = {pkg.rel_path for pkg, _dbs in files_to_consume}
+                file_names_to_consume: set[str] = {pkg.rel_path.lower() for pkg, _dbs in files_to_consume}
                 for db_id in skipped_db_ids:
-                    processed_file_names.update(read_stores[db_id].all_files().keys() & file_names_to_consume)
+                    processed_file_names.update(lower_name for file_name in read_stores[db_id].all_files() if (lower_name := file_name.lower()) in file_names_to_consume)
             processed_files: dict[str, list[PathPackage]] = defaultdict(list)
             removed_files: list[tuple[PathPackage, list[str]]] = []
 
@@ -443,9 +445,10 @@ class OnlineImporter:
                     continue
                 dbs = list(dbs)
                 tangles = pkg.description.get(FILE_PROP_ENTANGLEMENTS, [])
+                lower_rel_path = pkg.rel_path.lower()
 
                 for db_id in dbs:
-                    if pkg.rel_path in processed_file_names: continue
+                    if lower_rel_path in processed_file_names: continue
                     for is_external, drive in read_stores[db_id].list_other_drives_for_file(pkg.rel_path, pkg.drive):
                         unlink_list.append((dbs, os.path.join(drive, pkg.rel_path), tangles))
 
@@ -453,13 +456,13 @@ class OnlineImporter:
                     write_stores[db_id].remove_file(pkg.rel_path)
                     write_stores[db_id].remove_file_from_zips(pkg.rel_path)
 
-                if pkg.rel_path in processed_file_names: continue
+                if lower_rel_path in processed_file_names: continue
                 if pkg.is_pext_external():
                     unlink_list.append((dbs, os.path.join(self._config['base_path'], pkg.rel_path), tangles))
 
                 unlink_list.append((dbs, pkg.full_path, tangles))
                 processed_files[dbs[0]].append(pkg)
-                processed_file_names.add(pkg.rel_path)
+                processed_file_names.add(lower_rel_path)
                 removed_files.append((pkg, dbs))
 
             if self._config['allow_delete'] == AllowDelete.ALL:

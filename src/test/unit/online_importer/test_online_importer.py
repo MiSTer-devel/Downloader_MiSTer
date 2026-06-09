@@ -230,6 +230,29 @@ class TestOnlineImporter(OnlineImporterTestBase):
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders={folder_a: {}}), sut.fs_data)
         self.assertReports(sut, [file_a])
 
+    # The following test documents a KNOWN LIMITATION, it is NOT the desired behavior:
+    # add_processed_files (reporters.py) matches paths case-sensitively, but MiSTer partitions (FAT32/exFAT)
+    # are not, so two dbs shipping paths differing only by case are not detected as duplicates and both write
+    # to the same physical file. On device, every following run flip-flops: one db finds the other db's hash
+    # on disk and re-downloads its own file, each time. The destructive sibling of this problem (case-only
+    # renames deleting the fresh install when the old path got removed) is fixed with the case-insensitive
+    # guards in OnlineImporter.download_dbs_contents. Fixing this one too would change which db wins a
+    # collision and the DUPLICATED warning output, so it deserves its own TDD pass.
+    def test_download_dbs_contents___with_case_variant_duplicated_file_across_two_dbs___misses_the_duplicate_and_last_db_overwrites_first_on_case_insensitive_fs(self):
+        sut = OnlineImporter()
+        store_test = empty_test_store()
+        store_bar = empty_test_store()
+
+        sut.add_db(db_with_file('test', file_a, file_a_descr()), store_test)
+        sut.add_db(db_with_file('bar', file_a.lower(), file_a_updated_descr()), store_bar)
+        sut.download()
+
+        self.assertEqual([], sut.box().duplicated_files())
+        self.assertEqual(store_test_with_file(file_a, file_a_descr()), store_test)
+        self.assertEqual(store_descr(files={file_a.lower(): file_a_updated_descr()}), store_bar)
+        self.assertEqual(fs_data(files={file_a.lower(): file_a_updated_descr()}, folders={folder_a: {}}), sut.fs_data)  # store_test's hash claim diverges from the fs here
+        self.assertReports(sut, [file_a, file_a.lower()])
+
     def test_download_dbs_contents___when_duplicated_stored_file_is_removed_from_one_db___keeps_file_on_fs(self):
         # See test_download_on_fastest___when_duplicated_stored_file_is_removed_from_one_db_and_other_db_is_skipped___keeps_file_on_fs.
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))
@@ -277,6 +300,29 @@ class TestOnlineImporter(OnlineImporterTestBase):
         self.assertEqual(empty_test_store(), store)
         self.assertEqual(fs_data(), sut.fs_data)
         self.assertReportsNothing(sut, save=True)
+
+    def test_download_dbs_contents___when_db_renames_file_a_changing_only_its_case___keeps_the_file_on_the_case_insensitive_fs(self):
+        # /media/fat is FAT32/exFAT, so removing the old-cased path would delete the renamed file (e.g. docs/Oric/ReadMe.md -> README.md).
+        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))
+        store = store_test_with_file_a_descr()
+
+        sut.add_db(db_entity(db_id=db_test, files={file_a.lower(): file_a_descr()}, folders={folder_a: {}}), store)
+        sut.download()
+
+        self.assertEqual(store_descr(files={file_a.lower(): file_a_descr()}, folders={folder_a: {}}), store)
+        self.assertEqual(fs_data(files={file_a.lower(): file_a_descr()}, folders=[folder_a]), sut.fs_data)
+        self.assertReports(sut, [file_a.lower()], save=True)
+
+    def test_download_dbs_contents___when_db_renames_file_a_changing_its_case_and_content___installs_the_new_file_on_the_case_insensitive_fs(self):
+        sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}, folders=[folder_a]))
+        store = store_test_with_file_a_descr()
+
+        sut.add_db(db_entity(db_id=db_test, files={file_a.lower(): file_a_updated_descr()}, folders={folder_a: {}}), store)
+        sut.download()
+
+        self.assertEqual(store_descr(files={file_a.lower(): file_a_updated_descr()}, folders={folder_a: {}}), store)
+        self.assertEqual(fs_data(files={file_a.lower(): file_a_updated_descr()}, folders=[folder_a]), sut.fs_data)
+        self.assertReports(sut, [file_a.lower()], save=True)
 
     def test_download_dbs_contents___when_file_is_already_there___does_nothing(self):
         sut = OnlineImporter.from_implicit_inputs(ImporterImplicitInputs(files={file_a: file_a_descr()}))
