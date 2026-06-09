@@ -17,11 +17,11 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 import unittest
-from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_FILTER
+from downloader.constants import K_ZIP_FILE_COUNT_THRESHOLD, K_FILTER, SUFFIX_file_in_progress
 from test.fake_importer_implicit_inputs import ImporterImplicitInputs
-from test.fake_file_system_factory import fs_data, FileSystemFactory
+from test.fake_file_system_factory import fs_data, fs_records, FileSystemFactory
 from test.objects import db_test_descr, store_descr, config_with_filter, empty_test_store, folder_games, \
-    folder_games_nes, file_nes_palette_a
+    folder_games_nes, file_nes_palette_a, media_fat
 from test.fake_online_importer import OnlineImporter
 from test.zip_objects import cheats_folder_archive_desc, cheats_folder_zip_desc, cheats_folder_tag_dictionary, cheats_folder_id, \
     cheats_folder_nes_file_path, cheats_folder_nes_folder_name, cheats_folder_sms_file_path, \
@@ -192,6 +192,31 @@ class TestOnlineImporterWithFiltersAndArchives(unittest.TestCase):
             },
             folders=[cheats_folder_name, cheats_folder_sms_folder_name, cheats_folder_nes_folder_name]
         ), self.sut.fs_data)
+
+    def test_download_extract_all_archive___with_minority_subset_needing_update___installs_via_safe_temp_and_move(self):
+        # The cheats archive is extract="all". The NES file is already installed correctly, so only
+        # the SMS file (pre-existing at an old hash) is a need_update: files_to_unzip is 1 of 2
+        # (<= 70%), so should_extract_all is False and the per-file safe-install path runs for SMS.
+        old_hash = 'old-sms-cheat'
+        implicit_inputs = ImporterImplicitInputs(files={
+            cheats_folder_nes_file_path: cheats_folder_nes_file_description(),
+            cheats_folder_sms_file_path: {'hash': old_hash, 'size': cheats_folder_sms_file_size},
+        }, folders=[cheats_folder_name, cheats_folder_nes_folder_name, cheats_folder_sms_folder_name])
+
+        store = self.download_zipped_cheats_folder(empty_test_store(), '', implicit_inputs=implicit_inputs)
+
+        # Both files end installed (NES untouched, SMS updated to the new hash)...
+        self.assertAllCheatsFilesAreInstalled()
+        # ...the store proves this was an extract_all archive (the gap that was previously uncovered)...
+        self.assertEqual('extract_all_contents', store['zips'][cheats_folder_id]['kind'])
+        # ...and SMS was updated via the per-file temp+move (only emitted on the should_extract_all
+        # == False path); no backup is declared, so there is no copy.
+        expected_move = fs_records([{'scope': 'move', 'data': (
+            media_fat(cheats_folder_sms_file_path) + SUFFIX_file_in_progress,
+            media_fat(cheats_folder_sms_file_path),
+        )}])[0]
+        self.assertIn(expected_move, self.sut.file_system.write_records)
+        self.assertNotIn('copy', [r['scope'] for r in self.sut.file_system.write_records])
 
     def test_download_zipped_nes_palettes_folder___with_empty_store_and_negative_nes_filter___installs_filtered_nes_zip_data_and_nothing_in_fs(self):
         actual_store = self.download_zipped_nes_palettes_folder(empty_test_store(), '!nes')
