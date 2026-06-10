@@ -155,31 +155,26 @@ class ProcessZipIndexWorker(DownloaderWorker):
 
     def _fill_fragment_with_zip_index(self, fragment: StoreFragmentDrivePaths, job: ProcessZipIndexJob) -> None:
         path = None
+        description = job.zip_index.description
         if 'target_folder_path' in job.zip_index.description:
             path = job.zip_index.description['target_folder_path']
         elif 'path' in job.zip_index.description:
             path = job.zip_index.description['path']
         elif 'internal_summary' in job.zip_index.description:
-            for file_path in job.zip_index.description['internal_summary']['files']:
-                path = file_path
-                break
-            for folder_path in job.zip_index.description['internal_summary']['folders']:
-                path = folder_path
+            summary = job.zip_index.description['internal_summary']
+            for entry_path, entry_description in (summary['files'] or summary['folders']).items():
+                path, description = entry_path, entry_description
                 break
         else:
-            for file_path in job.zip_index.files:
-                path = file_path
-                break
-
-            for folder_path in job.zip_index.folders:
-                path = folder_path
+            for entry_path, entry_description in (job.zip_index.files or job.zip_index.folders).items():
+                path, description = entry_path, entry_description
                 break
 
         if path is None:
             return
 
         path_pkg, path_error = self._target_paths_calculator_factory.target_paths_calculator(job.config)\
-            .deduce_target_path(path, job.zip_index.description, PathType.FOLDER)
+            .deduce_target_path(path, description, PathType.FOLDER)
 
         if path_error is not None:
             self._fail_ctx.swallow_error(path_error)

@@ -278,6 +278,62 @@ class TestOnlineImporterWithArchives(OnlineImporterTestBase):
 
         self.assertEverythingIsClean(sut, store, save=True)
 
+    """NeoGeo UniBios on CIFS Test cases (RED PHASE, the production fix is pending):
+
+    Reproduces a real-world report by davewongillies. Every single run of Downloader printed:
+        No changes: games/NEOGEO/uni-bios.rom
+        No changes: games/NeoGeo-CD/uni-bioscd.rom
+    His setup: the games folder lives on a NAS mounted via CIFS (/media/fat/cifs), with
+    storage_priority = prefer_external and file_checking = exhaustive. His logs also counted both
+    files under "Installed:" on every run, while nothing was actually changing on disk.
+
+    Diagnosis (derived from his logs plus downloading the real bios_db.json.zip):
+    - Those files come from "extract_single_files" zips carrying an "internal_summary". After the db
+      v0 migration, each FILE description gets "path": "pext", but the ZIP description has neither
+      "path" nor "target_folder_path" (db_entity only marks zips that have a "target_folder_path").
+    - ProcessZipIndexWorker._fill_fragment_with_zip_index deduces the fragment drive from the ZIP
+      description, so the zip contents are miscategorized into base_paths instead of external_paths.
+    - With that, the store entry annihilates itself on every run:
+        1. add_file_pkg writes the correct entry under store['external']['/media/fat/cifs'].
+        2. add_zip_summary processes the miscategorized fragment: add_file() sees the path in
+           _external_additions and REMOVES the external entry, adding a local one instead.
+        3. try_cleanup_externals then REMOVES that local entry too.
+      The file ends up registered nowhere, so the next run revalidates it again (hashing it over the
+      network!) and prints "No changes: ..." once more, forever.
+    """
+    def test_download_pext_unibios_archive___with_prefer_external_and_unibios_already_on_cifs___registers_the_file_in_the_external_store(self):
+        sut = OnlineImporter.from_implicit_inputs(_implicit_inputs_with_unibios_on_cifs())
+        store = empty_test_store()
+
+        sut.add_db(db_with_pext_unibios_archive(), store).download()
+
+        self.assertEqual(store_with_pext_unibios_on_cifs(), store)
+        self.assertEqual(fs_data(files=fs_files_unibios_on_cifs(), folders=fs_folders_unibios_on_cifs()), sut.fs_data)
+        self.assertReports(sut, [file_neogeo_pext_unibios])
+
+    def test_download_pext_unibios_archive___on_second_run_with_prefer_external_and_unibios_already_on_cifs___does_nothing(self):
+        sut = OnlineImporter.from_implicit_inputs(_implicit_inputs_with_unibios_on_cifs())
+        store = store_with_pext_unibios_on_cifs()
+
+        sut.add_db(db_with_pext_unibios_archive(), store).download()
+
+        self.assertEqual(store_with_pext_unibios_on_cifs(), store)
+        self.assertEqual(fs_data(files=fs_files_unibios_on_cifs(), folders=fs_folders_unibios_on_cifs()), sut.fs_data)
+        self.assertReportsNothing(sut)
+
+    def test_download_pext_unibios_archive___when_internal_summary_lists_the_parent_folder_first___still_registers_the_file_in_the_external_store(self):
+        # A folder entry must never be the representative for deducing the fragment drive while a file
+        # entry is available: a top-level parent folder like "games" deduces as PEXT_KIND_PARENT with
+        # drive = base_path, which would miscategorize the whole zip into base_paths again.
+        sut = OnlineImporter.from_implicit_inputs(_implicit_inputs_with_unibios_on_cifs())
+        store = empty_test_store()
+
+        sut.add_db(db_with_pext_unibios_archive(with_parent_folder=True), store).download()
+
+        self.assertEqual(store_with_pext_unibios_on_cifs(with_parent_folder=True), store)
+        self.assertEqual(fs_data(files=fs_files_unibios_on_cifs(), folders=fs_folders_unibios_on_cifs()), sut.fs_data)
+        self.assertReports(sut, [file_neogeo_pext_unibios])
+
     def test_download_two_zips_in_one_db___on_empty_store__installs_both_zips_in_the_store_and_reports_them(self):
         self.config['zip_file_count_threshold'] = 0  # This will cause to unzip the contents
 
@@ -620,3 +676,98 @@ def file_neogeo_000lo_descr():
 
 def fs_folders_neogeo_bios():
     return ['games', 'games/NeoGeo']
+
+
+""""Pext Uni Bios on CIFS Data Fixtures (davewongillies scenario):"""
+
+
+file_neogeo_pext_unibios = 'games/NEOGEO/uni-bios.rom'
+folder_games_pext_neogeo = 'games/NEOGEO'
+cifs_drive = '/media/fat/cifs'
+
+
+def db_with_pext_unibios_archive(with_parent_folder=False):
+    # Models bios_db after the v0 migration: file/folder descriptions carry "path": "pext",
+    # but the zip description itself has no "path" nor "target_folder_path" fields.
+    return db_entity(zips={
+        'neogeo_unibios': {
+            "format": "zip",
+            "kind": "extract_single_files",
+            "description": "Extracting NeoGeo UniBios from http://unibios.free.fr",
+            "internal_summary": {
+                "files": {
+                    file_neogeo_pext_unibios: {
+                        "hash": "4f0aeda8d2d145f596826b62d563c4ef",
+                        "size": 131072,
+                        "zip_id": "neogeo_unibios",
+                        "zip_path": "uni-bios.rom",
+                        "path": "pext",
+                    }
+                },
+                "folders": {
+                    **({'games': {"zip_id": "neogeo_unibios", "path": "pext"}} if with_parent_folder else {}),
+                    folder_games_pext_neogeo: {"zip_id": "neogeo_unibios", "path": "pext"},
+                },
+            },
+            "contents_file": {
+                "hash": "1986c39676354d19ae648a914bd914f7",
+                "size": 101498,
+                "url": "http://unibios.free.fr/download/uni-bios-40.zip",
+                "zipped_files": {
+                    "files": {"uni-bios.rom": {"hash": "4f0aeda8d2d145f596826b62d563c4ef", "size": 131072}},
+                    "folders": {}
+                }
+            },
+        }
+    })
+
+
+def _implicit_inputs_with_unibios_on_cifs():
+    config = default_config()
+    config['storage_priority'] = 'prefer_external'
+    return ImporterImplicitInputs(
+        config=config,
+        files=fs_files_unibios_on_cifs(),
+        folders=fs_folders_unibios_on_cifs(),
+    )
+
+
+def store_with_pext_unibios_on_cifs(with_parent_folder=False):
+    return {
+        'base_path': '/media/fat',
+        'files': {},
+        'folders': {},
+        'zips': {'neogeo_unibios': {
+            'format': 'zip',
+            'kind': 'extract_single_files',
+            'description': 'Extracting NeoGeo UniBios from http://unibios.free.fr',
+            'contents_file': {
+                'hash': '1986c39676354d19ae648a914bd914f7',
+                'size': 101498,
+                'url': 'http://unibios.free.fr/download/uni-bios-40.zip'
+            },
+        }},
+        'external': {cifs_drive: {
+            'files': {
+                file_neogeo_pext_unibios: {
+                    'hash': '4f0aeda8d2d145f596826b62d563c4ef',
+                    'size': 131072,
+                    'zip_id': 'neogeo_unibios',
+                    'zip_path': 'uni-bios.rom',
+                    'path': 'pext',
+                }
+            },
+            'folders': {
+                **({'games': {'zip_id': 'neogeo_unibios', 'path': 'pext'}} if with_parent_folder else {}),
+                folder_games_pext_neogeo: {'zip_id': 'neogeo_unibios', 'path': 'pext'},
+            },
+        }},
+    }
+
+
+def fs_files_unibios_on_cifs():
+    return {cifs_drive + '/' + file_neogeo_pext_unibios: {'hash': '4f0aeda8d2d145f596826b62d563c4ef', 'size': 131072}}
+
+
+def fs_folders_unibios_on_cifs():
+    return [cifs_drive, cifs_drive + '/games', cifs_drive + '/' + folder_games_pext_neogeo]
