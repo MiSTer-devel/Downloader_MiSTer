@@ -95,7 +95,7 @@ class FullRunServiceFactory:
 
         file_filter_factory = FileFilterFactory(self._logger)
         free_space_reservation = UnlimitedFreeSpaceReservation() if config['skip_free_space_checks'] else LinuxFreeSpaceReservation(logger=self._logger, config=config)
-        linux_updater = LinuxUpdater(self._logger, waiter, config, system_file_system, safe_file_fetcher)
+        linux_updater = LinuxUpdater(self._logger, waiter, config, system_file_system, safe_file_fetcher, self._update_output)
         base_path_relocator = BasePathRelocator(config, file_system_factory, waiter, self._logger)
 
         old_pext_paths: set[str] = set()  # @TODO: Should end up empty. Remove when we have 100% in not having pext paths anymore.
