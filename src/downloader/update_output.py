@@ -34,12 +34,20 @@ class UpdateOutput(Protocol):
     def flush_pending(self) -> None: pass
     def jobs_cancelled(self, count: int) -> None: pass
     def file_started(self, db_id: str, path: str, size: int, tangles: list[str]) -> None: pass
-    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '') -> None: pass
+    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '', reboot: bool = False) -> None: pass
     def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
+    # dbs are all the databases declaring the path; used_db_id is the one whose copy is used, the others were skipped as duplicates.
+    def file_duplicated(self, dbs: list[str], path: str, used_db_id: str) -> None: pass
     def not_overwritten(self, db_id: str, path: str) -> None: pass
     def full_partition(self, path: str, bytes_needed: int) -> None: pass
     def reboot_required(self, kind: str) -> None: pass
+    # url is the SD installer recovery url, needed if the flash phase gets interrupted.
+    def linux_update_started(self, db_id: str, current_version: str, new_version: str, url: str) -> None: pass
+    # phase is one of: 'fetch_image', 'fetch_7z', 'extract', 'user_files', 'flash'
+    def linux_update_phase(self, phase: str) -> None: pass
+    def linux_update_failed(self, phase: str, message: str = '') -> None: pass
+    def linux_update_completed(self) -> None: pass
     def warning(self, code: str, message: str) -> None: pass
     def error(self, code: str, message: str = '') -> None: pass
     def database_failed(self, db_id: str) -> None: pass
@@ -57,12 +65,17 @@ class NoopUpdateOutput(UpdateOutput):
     def flush_pending(self) -> None: pass
     def jobs_cancelled(self, count: int) -> None: pass
     def file_started(self, db_id: str, path: str, size: int, tangles: list[str]) -> None: pass
-    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '') -> None: pass
+    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '', reboot: bool = False) -> None: pass
     def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
+    def file_duplicated(self, dbs: list[str], path: str, used_db_id: str) -> None: pass
     def not_overwritten(self, db_id: str, path: str) -> None: pass
     def full_partition(self, path: str, bytes_needed: int) -> None: pass
     def reboot_required(self, kind: str) -> None: pass
+    def linux_update_started(self, db_id: str, current_version: str, new_version: str, url: str) -> None: pass
+    def linux_update_phase(self, phase: str) -> None: pass
+    def linux_update_failed(self, phase: str, message: str = '') -> None: pass
+    def linux_update_completed(self) -> None: pass
     def warning(self, code: str, message: str) -> None: pass
     def error(self, code: str, message: str = '') -> None: pass
     def database_failed(self, db_id: str) -> None: pass
@@ -79,6 +92,7 @@ class HumanUpdateOutput(UpdateOutput):
         self._need_clear_header: bool = False
         self._symbols: list[str] = []
         self._columns: int = screen_columns()
+        self._linux_recovery_url: str = ''
 
     def run_started(self, version: str, commit: str) -> None:
         self._logger.print('START!')
@@ -122,7 +136,7 @@ class HumanUpdateOutput(UpdateOutput):
         self._print_line(path)
         self._check_time = time.monotonic() + 2.0
 
-    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '') -> None:
+    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '', reboot: bool = False) -> None:
         self._symbols.append('.')
         if self._needs_newline or self._check_time < time.monotonic():
             self._print_symbols()
@@ -134,6 +148,9 @@ class HumanUpdateOutput(UpdateOutput):
         self._symbols.append('~')
         self._print_symbols()
 
+    def file_duplicated(self, dbs: list[str], path: str, used_db_id: str) -> None:
+        self._print_line(f'DUPLICATED: {path} in [{", ".join(dbs)}] [using {used_db_id} instead]')
+
     def not_overwritten(self, db_id: str, path: str) -> None:
         pass
 
@@ -141,6 +158,49 @@ class HumanUpdateOutput(UpdateOutput):
         pass
 
     def reboot_required(self, kind: str) -> None:
+        pass
+
+    def linux_update_started(self, db_id: str, current_version: str, new_version: str, url: str) -> None:
+        self._linux_recovery_url = url
+        self._print_line(f'Linux will be updated from {db_id}:')
+        self._logger.print(f'Current linux version -> {current_version}')
+        self._logger.print(f'Latest linux version -> {new_version}')
+        self._logger.print()
+
+    def linux_update_phase(self, phase: str) -> None:
+        if phase == 'fetch_image':
+            self._print_line('Fetching the new Linux image... (this can take a while)')
+        elif phase == 'fetch_7z':
+            self._print_line('Fetching 7za.gz file...')
+        elif phase == 'user_files':
+            self._print_line('Restoring user Linux configuration files:')
+        elif phase == 'flash':
+            self._print_line('')
+            self._logger.print("======================================================================================")
+            self._logger.print("Hold your breath: updating the Kernel, the Linux filesystem, the bootloader and stuff.")
+            self._logger.print("Stopping this will make your SD unbootable!")
+            self._logger.print()
+            self._logger.print("If something goes wrong, please download the SD Installer from")
+            self._logger.print(self._linux_recovery_url)
+            self._logger.print("and copy the content of the files/linux/ directory in the linux directory of the SD.")
+            self._logger.print("Reflash the bootloader with the SD Installer if needed.")
+            self._logger.print("======================================================================================")
+            self._logger.print(flush=True)
+
+    def linux_update_failed(self, phase: str, message: str = '') -> None:
+        errors = {
+            'fetch_image': 'ERROR! Could not fetch the Linux image.',
+            'fetch_7z': 'ERROR! Could not install 7z.',
+            'extract': 'ERROR! Could not uncompress the linux installer.',
+            'user_files': 'ERROR! Could not restore user Linux configuration files.',
+            'flash': 'ERROR! Something went wrong during the Linux update, try again later.',
+        }
+        self._print_line(errors.get(phase, f'ERROR! Linux update failed during {phase}.'))
+        if message:
+            self._logger.print(message)
+        self._logger.print()
+
+    def linux_update_completed(self) -> None:
         pass
 
     def warning(self, code: str, message: str) -> None:
@@ -228,13 +288,15 @@ class LtsvUpdateOutput(UpdateOutput):
         self._emit('file_start', **fields)
         self._human_output.file_started(db_id, path, size, tangles)
 
-    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '') -> None:
+    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '', reboot: bool = False) -> None:
         fields: dict[str, Union[str, int]] = {'db': db_id, 'size': size, 'path': path}
         fields['target'] = 'existing' if already_exists else 'new'
         if zip_id:
             fields['zip'] = zip_id
+        if reboot:
+            fields['reboot'] = 'true'
         self._emit('file_done', **fields)
-        self._human_output.file_completed(db_id, path, size, already_exists, zip_id)
+        self._human_output.file_completed(db_id, path, size, already_exists, zip_id, reboot)
 
     def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None:
         dbs = sorted(_valid_string_list(dbs))
@@ -249,6 +311,11 @@ class LtsvUpdateOutput(UpdateOutput):
         self._emit('file_fail', db=db_id, size=size, path=path, reason=reason)
         self._human_output.file_failed(db_id, path, size, reason)
 
+    def file_duplicated(self, dbs: list[str], path: str, used_db_id: str) -> None:
+        dbs = sorted(_valid_string_list(dbs))
+        self._emit('file_duplicate', dbs=','.join(dbs), path=path, used=used_db_id)
+        self._human_output.file_duplicated(dbs, path, used_db_id)
+
     def not_overwritten(self, db_id: str, path: str) -> None:
         self._emit('not_overwritten', db=db_id, path=path)
 
@@ -257,6 +324,25 @@ class LtsvUpdateOutput(UpdateOutput):
 
     def reboot_required(self, kind: str) -> None:
         self._emit('reboot_required', kind=kind)
+
+    def linux_update_started(self, db_id: str, current_version: str, new_version: str, url: str) -> None:
+        self._emit('linux_start', db=db_id, current=current_version, new=new_version, url=url)
+        self._human_output.linux_update_started(db_id, current_version, new_version, url)
+
+    def linux_update_phase(self, phase: str) -> None:
+        self._emit('linux_phase', phase=phase)
+        self._human_output.linux_update_phase(phase)
+
+    def linux_update_failed(self, phase: str, message: str = '') -> None:
+        fields: dict[str, Union[str, int]] = {'phase': phase}
+        if message:
+            fields['message'] = message
+        self._emit('linux_fail', **fields)
+        self._human_output.linux_update_failed(phase, message)
+
+    def linux_update_completed(self) -> None:
+        self._emit('linux_done')
+        self._human_output.linux_update_completed()
 
     def warning(self, code: str, message: str) -> None:
         self._emit('warning', code=code, message=message)

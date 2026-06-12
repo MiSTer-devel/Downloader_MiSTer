@@ -30,6 +30,7 @@ from test.objects import store_with_folders, db_distribution_mister, db_test_bei
     db_entity, file_c_descr, file_abc, folder_ab, path_system, file_system_abc_descr, store_reboot_descr, file_reboot, \
     file_reboot_descr, db_test, db_reboot_descr
 from test.fake_online_importer import OnlineImporter
+from test.fake_update_output import SpyUpdateOutput
 from test.unit.online_importer.online_importer_test_base import OnlineImporterTestBase
 
 
@@ -229,6 +230,18 @@ class TestOnlineImporter(OnlineImporterTestBase):
         self.assertEqual(empty_test_store(), store_bar)
         self.assertEqual(fs_data(files={file_a: file_a_descr()}, folders={folder_a: {}}), sut.fs_data)
         self.assertReports(sut, [file_a])
+
+    def test_download_dbs_contents___with_duplicated_file___emits_file_duplicated_event(self):
+        spy = SpyUpdateOutput()
+        sut = OnlineImporter(update_output=spy)
+        store_test = empty_test_store()
+        store_bar = empty_test_store()
+
+        sut.add_db(db_with_file('test', file_a, file_a_descr()), store_test)
+        sut.add_db(db_with_file('bar', file_a, file_a_updated_descr()), store_bar)
+        sut.download()
+
+        self.assertEqual([(['test', 'bar'], file_a, 'test')], spy.file_duplicated_calls)
 
     # The following test documents a KNOWN LIMITATION, it is NOT the desired behavior:
     # add_processed_files (reporters.py) matches paths case-sensitively, but MiSTer partitions (FAT32/exFAT)

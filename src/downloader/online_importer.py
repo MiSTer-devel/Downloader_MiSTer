@@ -493,10 +493,13 @@ class OnlineImporter:
                                 {file_pkg.rel_path: db_id for db_id, file_pkgs in processed_files.items() for file_pkg in file_pkgs}
             logger.bench('OnlineImporter calculating db_id_by_rel_path done.')
 
+            dbs_by_file: dict[str, list[str]] = {}
             for duplicates, db_id in duplicated_files:
-                logger.print(f'Warning! {len(duplicates)} duplicates found in [{db_id}]:')
                 for file in duplicates:
-                    logger.print(f'DUPLICATED: {file} [using {db_id_by_rel_path[file]} instead]')
+                    dbs_by_file.setdefault(file, []).append(db_id)
+            for file, dbs in dbs_by_file.items():
+                used_db_id = db_id_by_rel_path[file]
+                self._update_output.file_duplicated([used_db_id, *dbs], file, used_db_id)
 
         if len(directories_to_consume := box.consume_directories()) > 0:
             skipped_folder_names: set[str] = set()

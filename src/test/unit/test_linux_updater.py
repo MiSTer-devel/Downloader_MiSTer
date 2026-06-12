@@ -22,6 +22,7 @@ from downloader.constants import FILE_Linux_uninstalled, FILE_MiSTer_version
 from test.fake_file_system_factory import FileSystemFactory
 from test.fake_importer_implicit_inputs import NetworkState, FileSystemState
 from test.fake_linux_updater import LinuxUpdater
+from test.fake_update_output import SpyUpdateOutput
 from test.objects import db_entity
 
 
@@ -70,6 +71,55 @@ class TestLinuxUpdater(unittest.TestCase):
         self.sut.update()
         self.assertFalse(self.sut.needs_reboot())
         self.assertFalse(self.sut.file_system.is_file(FILE_MiSTer_version))
+
+    def test_update_linux___no_linux_databases___reports_no_linux_events(self):
+        update_output = SpyUpdateOutput()
+        self.sut = LinuxUpdater(update_output=update_output)
+        self.sut.add_db(db_entity(db_id='first'))
+        self.sut.update()
+        self.assertEqual([], update_output.events)
+
+    def test_update_linux___db_with_old_linux___reports_no_linux_events(self):
+        update_output = SpyUpdateOutput()
+        file_system_state = FileSystemState()
+        file_system_state.add_full_file_path(FILE_MiSTer_version, {'content': "210711"})
+        self.sut = LinuxUpdater(file_system_factory=FileSystemFactory(state=file_system_state), update_output=update_output)
+        self.sut.add_db(db_entity(db_id='new', linux=linux_description()))
+        self.sut.update()
+        self.assertEqual([], update_output.events)
+
+    def test_update_linux___db_with_new_linux___reports_started_fetch_phases_and_completed(self):
+        update_output = SpyUpdateOutput()
+        self.sut = LinuxUpdater(update_output=update_output)
+        self.sut.add_db(db_entity(db_id='new', linux=linux_description()))
+        self.sut.update()
+        self.assertEqual([
+            ('linux_start', 'new', 'unknown', '210711', linux_url),
+            ('linux_phase', 'fetch_image'),
+            ('linux_phase', 'fetch_7z'),
+            ('linux_done',),
+        ], update_output.events)
+
+    def test_update_linux___dbs_with_different_new_linux___reports_multiple_dbs_warning(self):
+        update_output = SpyUpdateOutput()
+        self.sut = LinuxUpdater(update_output=update_output)
+        self.sut.add_db(db_entity(db_id='new_2', linux=linux_description_with_version("222222")))
+        self.sut.add_db(db_entity(db_id='new_1', linux=linux_description_with_version("111111")))
+        self.sut.update()
+        self.assertEqual([('linux_multiple_dbs', 'Too many databases try to update linux. Only 1 can be processed. Ignoring: new_1')], update_output.warning_calls)
+
+    def test_update_linux___new_linux_but_failed_download___reports_fetch_image_failure_and_no_completion(self):
+        update_output = SpyUpdateOutput()
+        self.sut = LinuxUpdater(network_state=NetworkState(remote_failures={FILE_Linux_uninstalled: 99}), update_output=update_output)
+        self.sut.add_db(db_entity(db_id='new', linux=linux_description()))
+        self.sut.update()
+        self.assertEqual([
+            ('linux_start', 'new', 'unknown', '210711', linux_url),
+            ('linux_phase', 'fetch_image'),
+        ], update_output.events[:2])
+        self.assertEqual(1, len(update_output.linux_update_failed_calls))
+        self.assertEqual('fetch_image', update_output.linux_update_failed_calls[0][0])
+        self.assertEqual([], update_output.linux_update_completed_calls)
 
 
 def linux_description():

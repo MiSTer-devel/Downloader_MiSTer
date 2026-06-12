@@ -20,6 +20,7 @@ from downloader.config import default_config
 from downloader.constants import FILE_MiSTer_version, FILE_downloader_needs_reboot_after_linux_update
 from downloader.db_entity import DbEntity
 from downloader.linux_updater import LinuxUpdater as ProductionLinuxUpdater
+from downloader.update_output import NoopUpdateOutput
 from test.fake_waiter import NoWaiter
 from test.fake_logger import NoLogger
 from test.fake_file_fetcher import SafeFileFetcher
@@ -27,13 +28,13 @@ from test.fake_file_system_factory import FileSystemFactory
 
 
 class LinuxUpdater(ProductionLinuxUpdater):
-    def __init__(self, file_system=None, fetcher=None, file_system_factory=None, config=None, network_state=None):
+    def __init__(self, file_system=None, fetcher=None, file_system_factory=None, config=None, network_state=None, update_output=None):
         self._file_system_factory = FileSystemFactory() if file_system_factory is None else file_system_factory
         self.file_system = self._file_system_factory.create_for_system_scope() if file_system is None else file_system
         config = config or default_config()
         fetcher = fetcher or SafeFileFetcher(config, self.file_system, network_state)
         self._dbs = []
-        super().__init__(NoLogger(), NoWaiter(), config, self.file_system, fetcher)
+        super().__init__(NoLogger(), NoWaiter(), config, self.file_system, fetcher, update_output or NoopUpdateOutput())
 
     def add_db(self, db: DbEntity) -> 'LinuxUpdater':
         self._dbs.append(db)
@@ -46,3 +47,4 @@ class LinuxUpdater(ProductionLinuxUpdater):
     def _run_subprocesses(self, linux):
         self.file_system.write_file_contents(FILE_MiSTer_version, linux['version'])
         self.file_system.touch(FILE_downloader_needs_reboot_after_linux_update)
+        self._update_output.linux_update_completed()

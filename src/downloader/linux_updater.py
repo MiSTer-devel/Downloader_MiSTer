@@ -28,16 +28,18 @@ from downloader.db_entity import DbEntity
 from downloader.file_system import FileSystem
 from downloader.jobs.fetch_file_worker import SafeFileFetcher
 from downloader.logger import Logger
+from downloader.update_output import UpdateOutput
 from downloader.waiter import Waiter
 
 
 class LinuxUpdater:
-    def __init__(self, logger: Logger, waiter: Waiter, config: Config, file_system: FileSystem, fetcher: SafeFileFetcher) -> None:
+    def __init__(self, logger: Logger, waiter: Waiter, config: Config, file_system: FileSystem, fetcher: SafeFileFetcher, update_output: UpdateOutput) -> None:
         self._config = config
         self._logger = logger
         self._waiter = waiter
         self._file_system = file_system
         self._fetcher = fetcher
+        self._update_output = update_output
         self._linux_descriptions: list[dict[str, Any]] = []
         self._user_files: list[tuple[str, str]] = []
 
@@ -60,12 +62,8 @@ class LinuxUpdater:
             return
 
         if linux_descriptions_count > 1:
-            self._logger.print('Too many databases try to update linux.')
-            self._logger.print('Only 1 can be processed.')
-            self._logger.print('Ignoring:')
-            for ignored in self._linux_descriptions[1:]:
-                self._logger.print(' - %s' % ignored['id'])
-            self._logger.print()
+            ignored_ids = ', '.join(ignored['id'] for ignored in self._linux_descriptions[1:])
+            self._update_output.warning('linux_multiple_dbs', f'Too many databases try to update linux. Only 1 can be processed. Ignoring: {ignored_ids}')
 
         description = self._linux_descriptions[0]
 
@@ -82,26 +80,21 @@ class LinuxUpdater:
                 self._logger.print('Custom "%s" file will be installed to the updated Linux system from the "linux" folder.' % (os.path.basename(source)))
                 self._user_files.append((source, destination))
 
-        self._logger.print('Linux will be updated from %s:' % description['id'])
-        self._logger.print('Current linux version -> %s' % current_linux_version)
-        self._logger.print('Latest linux version -> %s' % linux['version'][-6:])
-        self._logger.print()
+        self._update_output.linux_update_started(description['id'], current_linux_version, linux['version'][-6:], linux['url'])
 
-        self._logger.print('Fetching the new Linux image... (this can take a while)', flush=True)
+        self._update_output.linux_update_phase('fetch_image')
         self._waiter.sleep(0.5)
 
         error = self._fetcher.fetch_file(linux, FILE_Linux_uninstalled)
         if error is not None:
-            self._logger.print('ERROR! Could not fetch the Linux image.')
-            self._logger.print(error)
+            self._update_output.linux_update_failed('fetch_image', str(error))
             return
 
         if not self._file_system.is_file(FILE_7z_util):
-            self._logger.print('Fetching 7za.gz file...')
+            self._update_output.linux_update_phase('fetch_7z')
             error = self._fetcher.fetch_file(FILE_7z_util_uninstalled_description(), FILE_7z_util_uninstalled)
             if error is not None:
-                self._logger.print('ERROR! Could not fetch the 7za.gz file.')
-                self._logger.print(error)
+                self._update_output.linux_update_failed('fetch_7z', str(error))
                 return
 
         self._run_subprocesses(linux)
@@ -115,17 +108,14 @@ class LinuxUpdater:
             result = subprocess.run(f'gunzip "{FILE_7z_util_uninstalled}"', shell=True, stderr=subprocess.STDOUT)
             self._file_system.unlink(FILE_7z_util_uninstalled)
             if result.returncode != 0:
-                self._logger.print('ERROR! Could not install 7z.')
-                self._logger.print('Error code: %d' % result.returncode)
-                self._logger.print()
+                self._update_output.linux_update_failed('fetch_7z', 'Error code: %d' % result.returncode)
                 return
 
         if not self._file_system.is_file(FILE_7z_util):
-            self._logger.print('ERROR! 7z is not present in the system.')
-            self._logger.print('Aborting Linux update.')
-            self._logger.print()
+            self._update_output.linux_update_failed('fetch_7z', '7z is not present in the system. Aborting Linux update.')
             return
 
+        self._update_output.linux_update_phase('extract')
         sys.stdout.flush()
         result = subprocess.run('''
                 sync
@@ -152,9 +142,7 @@ class LinuxUpdater:
         '''.format(FILE_7z_util, FILE_Linux_uninstalled), shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
-            self._logger.print('ERROR! Could not uncompress the linux installer.')
-            self._logger.print('Error code: %d' % result.returncode)
-            self._logger.print()
+            self._update_output.linux_update_failed('extract', 'Error code: %d' % result.returncode)
             return
 
         if len(self._user_files) > 0:
@@ -162,17 +150,7 @@ class LinuxUpdater:
             if not clean_restore:
                 return
 
-        self._logger.print()
-        self._logger.print("======================================================================================")
-        self._logger.print("Hold your breath: updating the Kernel, the Linux filesystem, the bootloader and stuff.")
-        self._logger.print("Stopping this will make your SD unbootable!")
-        self._logger.print()
-        self._logger.print("If something goes wrong, please download the SD Installer from")
-        self._logger.print(linux['url'])
-        self._logger.print("and copy the content of the files/linux/ directory in the linux directory of the SD.")
-        self._logger.print("Reflash the bootloader with the SD Installer if needed.")
-        self._logger.print("======================================================================================")
-        self._logger.print(flush=True)
+        self._update_output.linux_update_phase('flash')
         sys.stdout.flush()
         self._waiter.sleep(0.5)
 
@@ -190,9 +168,9 @@ class LinuxUpdater:
         ''', shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
-            self._logger.print('ERROR! Something went wrong during the Linux update, try again later.')
-            self._logger.print('Error code: %d' % result.returncode)
-            self._logger.print()
+            self._update_output.linux_update_failed('flash', 'Error code: %d' % result.returncode)
+        else:
+            self._update_output.linux_update_completed()
 
     def _restore_user_files(self) -> bool:
         temp_dir = tempfile.mkdtemp()
@@ -203,13 +181,11 @@ class LinuxUpdater:
         result = subprocess.run(mount_cmd, shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
-            self._logger.print('ERROR! Could not mount updated Linux image, try again later.')
-            self._logger.print('Error code: %d' % result.returncode)
-            self._logger.print()
+            self._update_output.linux_update_failed('user_files', 'Could not mount updated Linux image, try again later. Error code: %d' % result.returncode)
             return False
 
         copy_error = False
-        self._logger.print('Restoring user Linux configuration files:')
+        self._update_output.linux_update_phase('user_files')
         for source, destination in self._user_files:
             image_destination = temp_dir + destination
             self._logger.debug('Copying "%s" to "%s"' % (source, image_destination))
@@ -230,14 +206,11 @@ class LinuxUpdater:
         result = subprocess.run(unmount_cmd, shell=True, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
-            self._logger.print('ERROR! Could not unmount updated temporary Linux image.')
-            self._logger.print('Error code: %d' % result.returncode)
-            self._logger.print()
+            self._update_output.linux_update_failed('user_files', 'Could not unmount updated temporary Linux image. Error code: %d' % result.returncode)
             return False
 
         if copy_error:
-            self._logger.print('ERROR! Could not restore user Linux configuration files.')
-            self._logger.print()
+            self._update_output.linux_update_failed('user_files')
             return False
 
         return True

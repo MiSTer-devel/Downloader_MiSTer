@@ -302,10 +302,10 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
     def notify_job_completed(self, job: Job, next_jobs: list[Job]) -> None:
         self._report.add_job_completed(job, next_jobs)
         if isinstance(job, FetchFileJob) and job.db_id is not None:
-            self._update_output.file_completed(job.db_id, job.pkg.rel_path, job.pkg.description['size'], job.already_exists)
+            self._update_output.file_completed(job.db_id, job.pkg.rel_path, job.pkg.description['size'], job.already_exists, reboot=job.pkg.description.get('reboot', False) is True)
         if isinstance(job, OpenZipContentsJob):
             for pkg in job.validated_files:
-                self._update_output.file_completed(job.db.db_id, pkg.rel_path, pkg.description['size'], False, job.zip_id)
+                self._update_output.file_completed(job.db.db_id, pkg.rel_path, pkg.description['size'], False, job.zip_id, reboot=pkg.description.get('reboot', False) is True)
         if isinstance(job, FetchDataJob):
             self._logger.bench('FileDownloadProgressReporter FetchDataJob completed: ', job.source)
 

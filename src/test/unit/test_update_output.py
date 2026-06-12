@@ -97,6 +97,26 @@ class TestUpdateOutput(unittest.TestCase):
             stream.getvalue()
         )
 
+    def test_ltsv_update_output___file_duplicated_with_multiple_dbs___sorts_dbs_and_emits_machine_event_and_human_line(self):
+        stream = io.StringIO()
+        logger = SpyLoggerDecorator(NoLogger())
+        LtsvUpdateOutput(logger, stream).file_duplicated(['test', 'zdb', 'adb'], 'a/A', 'test')
+
+        self.assertEqual(
+            'DLP1\tevent:file_duplicate\tdbs:adb,test,zdb\tpath:a/A\tused:test\n',
+            stream.getvalue()
+        )
+        self.assertEqual([('DUPLICATED: a/A in [adb, test, zdb] [using test instead]',)], logger.printCalls)
+
+    def test_ltsv_update_output___file_done_with_reboot___emits_reboot_true(self):
+        stream = io.StringIO()
+        LtsvUpdateOutput(NoLogger(), stream).file_completed('distribution_mister', 'MiSTer', 131072, False, reboot=True)
+
+        self.assertEqual(
+            'DLP1\tevent:file_done\tdb:distribution_mister\tsize:131072\tpath:MiSTer\ttarget:new\treboot:true\n',
+            stream.getvalue()
+        )
+
     def test_ltsv_update_output___file_done_from_zip___emits_zip_id(self):
         stream = io.StringIO()
         LtsvUpdateOutput(NoLogger(), stream).file_completed('distribution_mister', '_Arcade/game.rom', 131072, False, 'arcade')
@@ -141,6 +161,76 @@ class TestUpdateOutput(unittest.TestCase):
             stream.getvalue()
         )
 
+    def test_ltsv_update_output___linux_update_lifecycle___emits_stable_linux_events(self):
+        stream = io.StringIO()
+        output = LtsvUpdateOutput(NoLogger(), stream)
+
+        output.linux_update_started('distribution_mister', '231030', '240507', 'https://example.com/sd-installer.img.7z')
+        output.linux_update_phase('fetch_image')
+        output.linux_update_phase('flash')
+        output.linux_update_completed()
+
+        self.assertEqual(
+            'DLP1\tevent:linux_start\tdb:distribution_mister\tcurrent:231030\tnew:240507\turl:https://example.com/sd-installer.img.7z\n'
+            'DLP1\tevent:linux_phase\tphase:fetch_image\n'
+            'DLP1\tevent:linux_phase\tphase:flash\n'
+            'DLP1\tevent:linux_done\n',
+            stream.getvalue()
+        )
+
+    def test_ltsv_update_output___linux_update_failed_with_message___emits_phase_and_message(self):
+        stream = io.StringIO()
+        LtsvUpdateOutput(NoLogger(), stream).linux_update_failed('extract', 'Error code: 101')
+
+        self.assertEqual(
+            'DLP1\tevent:linux_fail\tphase:extract\tmessage:Error code: 101\n',
+            stream.getvalue()
+        )
+
+    def test_ltsv_update_output___linux_update_failed_without_message___emits_phase_only(self):
+        stream = io.StringIO()
+        LtsvUpdateOutput(NoLogger(), stream).linux_update_failed('user_files')
+
+        self.assertEqual(
+            'DLP1\tevent:linux_fail\tphase:user_files\n',
+            stream.getvalue()
+        )
+
+    def test_human_update_output___linux_update_started___prints_version_transition(self):
+        logger = SpyLoggerDecorator(NoLogger())
+
+        HumanUpdateOutput(logger).linux_update_started('distribution_mister', '231030', '240507', 'https://example.com/sd-installer.img.7z')
+
+        self.assertEqual([
+            ('Linux will be updated from distribution_mister:',),
+            ('Current linux version -> 231030',),
+            ('Latest linux version -> 240507',),
+            (),
+        ], logger.printCalls)
+
+    def test_human_update_output___linux_update_flash_phase___prints_banner_with_recovery_url(self):
+        logger = SpyLoggerDecorator(NoLogger())
+        output = HumanUpdateOutput(logger)
+
+        output.linux_update_started('distribution_mister', '231030', '240507', 'https://example.com/sd-installer.img.7z')
+        logger.printCalls.clear()
+        output.linux_update_phase('flash')
+
+        printed = '\n'.join(call[0] if len(call) > 0 else '' for call in logger.printCalls)
+        self.assertIn('Stopping this will make your SD unbootable!', printed)
+        self.assertIn('https://example.com/sd-installer.img.7z', printed)
+
+    def test_human_update_output___linux_update_failed_with_message___prints_error_and_message(self):
+        logger = SpyLoggerDecorator(NoLogger())
+
+        HumanUpdateOutput(logger).linux_update_failed('flash', 'Error code: 1')
+
+        self.assertEqual([
+            ('ERROR! Something went wrong during the Linux update, try again later.',),
+            ('Error code: 1',),
+            (),
+        ], logger.printCalls)
+
     def test_human_update_output___error___adds_human_error_prefix(self):
         logger = SpyLoggerDecorator(NoLogger())
 
@@ -154,6 +244,13 @@ class TestUpdateOutput(unittest.TestCase):
         HumanUpdateOutput(logger).file_started('distribution_mister', '_Console/Genesis.rbf', 131072, [])
 
         self.assertEqual([('_Console/Genesis.rbf',)], logger.printCalls)
+
+    def test_human_update_output___file_duplicated___prints_duplicated_line_with_dbs_and_winner(self):
+        logger = SpyLoggerDecorator(NoLogger())
+
+        HumanUpdateOutput(logger).file_duplicated(['test', 'bar'], 'a/A', 'test')
+
+        self.assertEqual([('DUPLICATED: a/A in [test, bar] [using test instead]',)], logger.printCalls)
 
     def test_human_update_output___run_started___logs_human_message(self):
         logger = SpyLoggerDecorator(NoLogger())

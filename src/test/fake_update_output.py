@@ -31,9 +31,14 @@ class SpyUpdateOutput:
         self.file_completed_calls = []
         self.file_removed_calls = []
         self.file_failed_calls = []
+        self.file_duplicated_calls = []
         self.not_overwritten_calls = []
         self.full_partition_calls = []
         self.reboot_required_calls = []
+        self.linux_update_started_calls = []
+        self.linux_update_phase_calls = []
+        self.linux_update_failed_calls = []
+        self.linux_update_completed_calls = []
         self.warning_calls = []
         self.error_calls = []
         self.database_failed_calls = []
@@ -73,9 +78,9 @@ class SpyUpdateOutput:
         self.file_started_calls.append((db_id, path, size, tangles))
         self.events.append(('file_start', db_id, path, size, tangles))
 
-    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '') -> None:
-        self.file_completed_calls.append((db_id, path, size, already_exists, zip_id))
-        self.events.append(('file_done', db_id, path, size, already_exists, zip_id))
+    def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '', reboot: bool = False) -> None:
+        self.file_completed_calls.append((db_id, path, size, already_exists, zip_id, reboot))
+        self.events.append(('file_done', db_id, path, size, already_exists, zip_id, reboot))
 
     def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None:
         self.file_removed_calls.append((dbs, path, tangles))
@@ -84,6 +89,10 @@ class SpyUpdateOutput:
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None:
         self.file_failed_calls.append((db_id, path, size, reason))
         self.events.append(('file_fail', db_id, path, size, reason))
+
+    def file_duplicated(self, dbs: list[str], path: str, used_db_id: str) -> None:
+        self.file_duplicated_calls.append((dbs, path, used_db_id))
+        self.events.append(('file_duplicate', dbs, path, used_db_id))
 
     def not_overwritten(self, db_id: str, path: str) -> None:
         self.not_overwritten_calls.append((db_id, path))
@@ -96,6 +105,22 @@ class SpyUpdateOutput:
     def reboot_required(self, kind: str) -> None:
         self.reboot_required_calls.append((kind,))
         self.events.append(('reboot_required', kind))
+
+    def linux_update_started(self, db_id: str, current_version: str, new_version: str, url: str) -> None:
+        self.linux_update_started_calls.append((db_id, current_version, new_version, url))
+        self.events.append(('linux_start', db_id, current_version, new_version, url))
+
+    def linux_update_phase(self, phase: str) -> None:
+        self.linux_update_phase_calls.append((phase,))
+        self.events.append(('linux_phase', phase))
+
+    def linux_update_failed(self, phase: str, message: str = '') -> None:
+        self.linux_update_failed_calls.append((phase, message))
+        self.events.append(('linux_fail', phase, message))
+
+    def linux_update_completed(self) -> None:
+        self.linux_update_completed_calls.append(())
+        self.events.append(('linux_done',))
 
     def warning(self, code: str, message: str) -> None:
         self.warning_calls.append((code, message))
