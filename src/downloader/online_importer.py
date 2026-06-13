@@ -497,9 +497,9 @@ class OnlineImporter:
             for duplicates, db_id in duplicated_files:
                 for file in duplicates:
                     dbs_by_file.setdefault(file, []).append(db_id)
-            for file, dbs in dbs_by_file.items():
+            for file, duplicate_db_ids in dbs_by_file.items():
                 used_db_id = db_id_by_rel_path[file]
-                self._update_output.file_duplicated([used_db_id, *dbs], file, used_db_id)
+                self._update_output.file_duplicated([used_db_id, *duplicate_db_ids], file, used_db_id)
 
         if len(directories_to_consume := box.consume_directories()) > 0:
             skipped_folder_names: set[str] = set()
