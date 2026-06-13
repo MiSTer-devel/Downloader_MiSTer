@@ -382,5 +382,5 @@ def _sanitize(value: str) -> str:
     return value.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
 
 
-def _valid_string_list(values: list[str]) -> tuple[str, ...]:
-    return tuple(value for value in values if isinstance(value, str)) if isinstance(values, list) else ()
+def _valid_string_list(values: object) -> list[str]:
+    return [value for value in values if isinstance(value, str)] if isinstance(values, list) else []
