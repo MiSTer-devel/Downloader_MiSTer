@@ -19,6 +19,7 @@
 import unittest
 
 from downloader.config import default_config
+from downloader.constants import DISTRIBUTION_MISTER_DB_ID, FILE_downloader_launcher_script
 from downloader.jobs.errors import WrongDatabaseOptions
 from test.objects import db_test_descr, store_descr, file_descr, file_b, file_a, file_c, folder_a, folder_b, \
     folder_c, config_with_filter, file_one, empty_test_store
@@ -63,6 +64,9 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
 
     def test_download_db_with_essential_and_cheats_files___given_nes_filter___install_nes_and_essential_files(self):
         self.assertEqual(store_with_essential_and_nes_files(), self.download_db_with_essential_and_cheats_files(config_with_filter('nes')))
+
+    def test_download_db_with_scripts_and_nes_files___given_positive_filter___keeps_downloader_launcher_but_not_other_scripts(self):
+        self.assertEqual(store_with_downloader_launcher_and_nes_files(), self.download_db_with_scripts_and_nes_files(config_with_filter('essential nes')))
 
     def test_download_two_dbs_with_files_with_tags_a_b_c___using_filter_b___installs_only_b_files(self):
         first_store = empty_test_store()
@@ -136,6 +140,9 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
 
     def download_db_with_essential_and_cheats_files(self, config):
         return OnlineImporter(config=config).download_db(db_with_essential_and_cheats_files(), empty_test_store())
+
+    def download_db_with_scripts_and_nes_files(self, config):
+        return OnlineImporter(config=config).download_db(db_with_scripts_and_nes_files(), empty_test_store())
 
     def download_db_with_cheat_and_console_files_and_tag_dictionary(self, config):
         return OnlineImporter(config=config).download_db(db_with_cheats_and_console_files(), empty_test_store())
@@ -215,6 +222,8 @@ tag_nes = 1
 tag_gb = 2
 tag_console = 3
 tag_essential = 4
+tag_scripts = 5
+file_other_script = 'Scripts/other_script.sh'
 
 def db_with_cheats_and_console_files():
     return db_test_descr(files={
@@ -358,6 +367,25 @@ def store_with_essential_and_nes_files():
         'cheats': {},
         'cheats/nes': {},
     })
+
+
+def db_with_scripts_and_nes_files():
+    return db_test_descr(db_id=DISTRIBUTION_MISTER_DB_ID, files={
+        FILE_downloader_launcher_script: file_descr(tags=[tag_scripts]),
+        file_other_script: file_descr(tags=[tag_scripts]),
+        file_nes_game: file_descr(tags=[tag_nes]),
+    }, tag_dictionary={
+        'essential': tag_essential,
+        'scripts': tag_scripts,
+        'nes': tag_nes,
+    })
+
+
+def store_with_downloader_launcher_and_nes_files():
+    return store_descr(files={
+        FILE_downloader_launcher_script: file_descr(),
+        file_nes_game: file_descr(),
+    }, db_id=DISTRIBUTION_MISTER_DB_ID)
 
 
 def db_with_one_non_tagged_file_and_file_a():

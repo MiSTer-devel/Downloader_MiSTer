@@ -22,7 +22,7 @@ from typing import Optional, Any, Iterable, TypedDict, Union, Final
 from abc import ABC, abstractmethod
 
 from downloader.config import Config
-from downloader.constants import ESSENTIAL_TERM
+from downloader.constants import ESSENTIAL_TERM, FILE_downloader_launcher_script
 from downloader.db_entity import DbEntity
 from downloader.error import DownloaderError
 from downloader.jobs.index import Index
@@ -137,6 +137,8 @@ class FileFilterFactory:
         return list(self._unused - self._used)
 
     def _create_filter_calculator(self, db: DbEntity, index: Index, config: Config) -> Optional[FilterCalculator]:
+        _tag_downloader_launcher_as_essential(db, index)
+
         this_filter = config['filter']
         if this_filter == '':
             self._logger.debug('No filter for db %s.', db.db_id)
@@ -223,6 +225,21 @@ def _part_in_descriptions(alphanumeric_part: Union[str, int], descriptions: Iter
     return False
 
 
+def _tag_downloader_launcher_as_essential(db: DbEntity, index: Index) -> None:
+    if FILE_downloader_launcher_script not in index.files:
+        return
+
+    essential: Union[str, int]
+    if ESSENTIAL_TERM in db.tag_dictionary:
+        essential = db.tag_dictionary[ESSENTIAL_TERM]
+    else:
+        essential = ESSENTIAL_TERM
+
+    tags = index.files[FILE_downloader_launcher_script].setdefault('tags', [])
+    if essential not in tags:
+        tags.append(essential)
+
+
 def _remove(string: str, remove_list: Iterable[str]) -> str:
     for sub in remove_list:
         if sub in string:
@@ -250,4 +267,3 @@ class BadFileFilterPartException(DownloaderError):
             return f"Bad filter part: {base_message}"
         else:
             return f"Wrong custom download filter on database {self.db_id}. {base_message}"
-
