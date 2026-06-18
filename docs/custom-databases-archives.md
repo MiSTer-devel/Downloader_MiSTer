@@ -52,6 +52,8 @@ Every archive descriptor must include exactly one of `summary_inline` or `summar
 
 > **Note:** If both `summary_inline` and `summary_file` are provided, `summary_file` takes priority and `summary_inline` is ignored.
 
+Inline summaries use the parent database version. External summary files are loaded independently, so they should include their own top-level `v` field matching the summary format. For v1 archive summaries, set `"v": 1`; if omitted, Downloader treats the external summary as v0 and applies v0 migration rules before processing it.
+
 ### summary_inline
 
 Embeds the listing directly in the database JSON. Simpler to generate, avoids an extra network request, but increases database size. Best for archives with few files.
@@ -93,6 +95,7 @@ The file at the `url` must be a JSON with the same `files`/`folders` structure d
 
 ```js
 {
+    "v": 1,
     "files": { ... },  // as in summary_inline
     "folders": { ... }  // as in summary_inline
 }
