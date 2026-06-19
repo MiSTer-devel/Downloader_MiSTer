@@ -68,6 +68,9 @@ class TestOnlineImporterWithFilters(unittest.TestCase):
     def test_download_db_with_scripts_and_nes_files___given_positive_filter___keeps_downloader_launcher_but_not_other_scripts(self):
         self.assertEqual(store_with_downloader_launcher_and_nes_files(), self.download_db_with_scripts_and_nes_files(config_with_filter('essential nes')))
 
+    def test_download_db_with_scripts_and_nes_files___given_positive_filter_without_essential___keeps_downloader_launcher(self):
+        self.assertEqual(store_with_downloader_launcher_and_nes_files(), self.download_db_with_scripts_and_nes_files(config_with_filter('nes')))
+
     def test_download_two_dbs_with_files_with_tags_a_b_c___using_filter_b___installs_only_b_files(self):
         first_store = empty_test_store()
         second_store = empty_test_store()
