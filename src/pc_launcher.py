@@ -19,6 +19,7 @@
 
 import os
 import subprocess
+import sys
 from shutil import copy, copyfileobj
 from tempfile import NamedTemporaryFile
 from urllib.request import urlopen
@@ -44,7 +45,7 @@ def fetch_temp_downloader():
 def launch_downloader(filename):
     env = os.environ.copy()
     env['PC_LAUNCHER'] = os.path.realpath(__file__)
-    return subprocess.run(['python3', filename], env=env, stderr=subprocess.STDOUT).returncode
+    return subprocess.run([sys.executable, filename], env=env, stderr=subprocess.STDOUT).returncode
 
 
 def main():
