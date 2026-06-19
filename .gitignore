@@ -8,6 +8,7 @@ __pycache__
 # BUILD FILES:
 src/downloader.zip
 src/commit.py
+src/test/
 downloader_bin
 
 # DEBUG FILES:
