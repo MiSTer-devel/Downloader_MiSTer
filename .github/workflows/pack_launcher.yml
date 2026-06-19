@@ -6,6 +6,9 @@ on:
       - 'downloader.sh'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   pack:
     runs-on: ubuntu-latest

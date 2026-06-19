@@ -6,6 +6,9 @@ on:
       - '.github/downloader_test.py'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   pack:
     runs-on: ubuntu-latest
