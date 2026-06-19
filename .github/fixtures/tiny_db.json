@@ -1,0 +1,24 @@
+{
+    "db_id": "distribution_mister",
+    "base_files_url": "",
+    "zips": {},
+    "files": {
+        "MiSTer": {
+            "hash": "1ebbd3e34237af26da5dc08a4e440464",
+            "path": "system",
+            "reboot": true,
+            "size": 20,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/LICENSE"
+        },
+        "_Cores/core.rbf": {
+            "hash": "1ebbd3e34237af26da5dc08a4e440464",
+            "size": 20,
+            "url": "https://raw.githubusercontent.com/MiSTer-devel/Downloader_MiSTer/main/LICENSE"
+        }
+    },
+    "folders": {
+        "_Cores/": {}
+    },
+    "timestamp": 0,
+    "default_options": {}
+}

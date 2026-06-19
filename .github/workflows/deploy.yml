@@ -1,41 +1,22 @@
-name: Build
+name: Deploy
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit SHA that passed the private test suite.
+        required: true
+        type: string
 
 permissions:
   contents: write
   packages: write
 
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
 jobs:
-
-  unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v6
-    - uses: ./.github/actions/setup-python
-    - name: Unit Tests
-      run: cd src && python3 -m unittest discover -s test/unit
-
-  integration-tests:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v6
-    - uses: ./.github/actions/setup-python
-    - name: Integration Tests
-      run: cd src && python3 -m unittest discover -s test/integration
-
-  system-quick-tests:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v6
-    - uses: ./.github/actions/setup-python
-    - name: System Quick Tests
-      run: cd src && python3 -m unittest discover -s test/system/quick -v
-
   check-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -43,7 +24,27 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+        ref: ${{ inputs.sha }}
+
     - uses: ./.github/actions/setup-python
+
+    - name: Verify tested SHA is current main
+      run: |
+        set -euo pipefail
+
+        if [[ ! "${REQUESTED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "Invalid SHA: ${REQUESTED_SHA}" >&2
+          exit 1
+        fi
+
+        git fetch origin main
+
+        test "$(git rev-parse HEAD)" = "${REQUESTED_SHA}"
+        test "$(git rev-parse origin/main)" = "${REQUESTED_SHA}"
+      env:
+        REQUESTED_SHA: ${{ inputs.sha }}
 
     - name: Check for changes
       id: check-changes
@@ -52,8 +53,6 @@ jobs:
 
         SKIP_COMMIT=true ./src/build.sh | sha256sum > latest.id
         git add latest.id
-
-        git fetch origin main
 
         if ! git diff --exit-code \
                      --unified=0 \
@@ -67,23 +66,16 @@ jobs:
           echo "NEW_RELEASE=no" >> "$GITHUB_OUTPUT"
         fi
 
-  system-slow-tests:
+  build:
     runs-on: ubuntu-latest
     needs: check-changes
     if: needs.check-changes.outputs.NEW_RELEASE == 'yes'
-    steps:
-    - uses: actions/checkout@v6
-    - uses: ./.github/actions/setup-python
-    - name: System Slow Tests
-      run: cd src && python3 -m unittest discover -s test/system/slow -v
-
-  build:
-    runs-on: ubuntu-latest
-    needs: [unit-tests, integration-tests, system-quick-tests, system-slow-tests, check-changes]
-    if: needs.check-changes.outputs.NEW_RELEASE == 'yes'
 
     steps:
     - uses: actions/checkout@v6
+      with:
+        ref: ${{ inputs.sha }}
+
     - uses: ./.github/actions/setup-python
 
     - name: Build
@@ -95,7 +87,7 @@ jobs:
         cp src/downloader.zip downloader.zip
 
     - name: Build Test
-      run: ./.github/downloader_test.py distribution_mister $(pwd)/src/test/system/fixtures/workflows/tiny_db.json
+      run: ./.github/downloader_test.py distribution_mister $(pwd)/.github/fixtures/tiny_db.json
       env:
         DOWNLOADER_SOURCE: ./dont_download.sh
 
@@ -125,6 +117,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
+      with:
+        ref: ${{ inputs.sha }}
 
     - name: Download build artifacts
       uses: actions/download-artifact@v4
@@ -135,7 +129,7 @@ jobs:
       run: ${{ matrix.python-cmd }} src/pc_launcher.py
       env:
         DEFAULT_DB_ID: distribution_mister
-        DEFAULT_DB_URL: ${{ github.workspace }}/src/test/system/fixtures/workflows/tiny_db.json
+        DEFAULT_DB_URL: ${{ github.workspace }}/.github/fixtures/tiny_db.json
         DEBUG: true
         PC_LAUNCHER_NO_WAIT: '1'
         DOWNLOADER_SOURCE: ${{ github.workspace }}/dont_download.zip
@@ -149,6 +143,19 @@ jobs:
       id: vars
 
     - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+        ref: ${{ inputs.sha }}
+
+    - name: Prepare main branch
+      run: |
+        set -euo pipefail
+
+        git fetch origin main
+        test "$(git rev-parse origin/main)" = "${REQUESTED_SHA}"
+        git checkout -B main "${REQUESTED_SHA}"
+      env:
+        REQUESTED_SHA: ${{ inputs.sha }}
 
     - name: Download build artifacts
       uses: actions/download-artifact@v4

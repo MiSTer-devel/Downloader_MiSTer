@@ -1,0 +1,42 @@
+name: Request Tests
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  request-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Request private test run
+      run: |
+        set -euo pipefail
+
+        : "${TESTS_REPO:?TESTS_REPO secret is required}"
+        : "${TESTS_TOKEN:?TESTS_TOKEN secret is required}"
+
+        curl -fsSL -X POST \
+          -H "Authorization: Bearer ${TESTS_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          "https://api.github.com/repos/${TESTS_REPO}/dispatches" \
+          -d @- <<EOF
+        {
+          "event_type": "test-sha",
+          "client_payload": {
+            "repository": "${GITHUB_REPOSITORY}",
+            "sha": "${GITHUB_SHA}",
+            "ref": "${GITHUB_REF_NAME}",
+            "run_id": "${GITHUB_RUN_ID}",
+            "run_attempt": "${GITHUB_RUN_ATTEMPT}"
+          }
+        }
+        EOF
+      env:
+        TESTS_REPO: ${{ secrets.TESTS_REPO }}
+        TESTS_TOKEN: ${{ secrets.TESTS_TOKEN }}
