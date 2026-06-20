@@ -17,6 +17,7 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+import sys
 import os
 import subprocess
 from shutil import copy, copyfileobj
@@ -44,7 +45,7 @@ def fetch_temp_downloader():
 def launch_downloader(filename):
     env = os.environ.copy()
     env['PC_LAUNCHER'] = os.path.realpath(__file__)
-    return subprocess.run(['python3', filename], env=env, stderr=subprocess.STDOUT).returncode
+    return subprocess.run([sys.executable, filename], env=env, stderr=subprocess.STDOUT).returncode
 
 
 def main():
