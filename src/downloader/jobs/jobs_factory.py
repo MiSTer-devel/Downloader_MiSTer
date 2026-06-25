@@ -33,12 +33,12 @@ from downloader.jobs.transfer_job import TransferJob
 from downloader.local_store_wrapper import new_store_fragment_drive_paths, ReadOnlyStoreAdapter
 
 
-def make_transfer_job(source: str, description: dict[str, Any], do_calcs: bool, db_id: Optional[str], /) -> TransferJob:
+def make_transfer_job(source: str, description: dict[str, Any], do_calcs: bool, db_id: Optional[str], /, priority: bool = False) -> TransferJob:
     job: TransferJob
     if not source.startswith("http"):
-        job = CopyDataJob(source, description, {} if do_calcs else None, db_id)
+        job = CopyDataJob(source, description, {} if do_calcs else None, db_id, priority=priority)
     else:
-        job = FetchDataJob(source, description, {} if do_calcs else None, db_id)
+        job = FetchDataJob(source, description, {} if do_calcs else None, db_id, priority=priority)
     return job
 
 @dataclass
@@ -50,7 +50,7 @@ class ZipJobContext:
 
 def make_open_zip_summary_job(z: ZipJobContext, file_description: dict[str, Any], process_zip_backup: Optional[ProcessZipIndexJob]) -> TransferJob:
     zip_tag = make_zip_tag(z.job.db, z.zip_id)
-    transfer_job = make_transfer_job(file_description['url'], file_description, False, z.job.db.db_id)
+    transfer_job = make_transfer_job(file_description['url'], file_description, False, z.job.db.db_id, priority=True)
     transfer_job.add_tag(zip_tag)  # type: ignore[union-attr]
     open_zip_summary_job = OpenZipSummaryJob(
         zip_id=z.zip_id,

@@ -96,7 +96,7 @@ class OnlineImporterWorkersFactory:
         load_local_store_job = LoadLocalStoreJob(db_pkgs, self._config)
         load_local_store_job.add_tag(local_store_tag)
         for pkg in db_pkgs:
-            transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
+            transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id, priority=True)
             transfer_job.after_job = OpenDbJob(  # type: ignore[union-attr]
                 transfer_job=transfer_job,
                 section=pkg.db_id,

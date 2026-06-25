@@ -24,13 +24,14 @@ from downloader.jobs.transfer_job import Transferrer
 
 
 class CopyDataJob(Job, Transferrer):
-    __slots__ = ('_tags', 'source', 'description', 'calcs', 'db_id', 'after_job', 'data')
+    __slots__ = ('_tags', 'source', 'description', 'calcs', 'db_id', 'after_job', 'data', '_priority')
     type_id: int = JobSystem.get_job_type_id()
-    def __init__(self, source: str, description: dict[str, Any], calcs: Optional[dict[str, Any]], db_id: Optional[str], /) -> None:
+    def __init__(self, source: str, description: dict[str, Any], calcs: Optional[dict[str, Any]], db_id: Optional[str], /, priority: bool = False) -> None:
         self.source = source
         self.description = description
         self.calcs = calcs
         self.db_id = db_id
+        self._priority = priority
 
         # Next job
         self.after_job: Optional[Job] = None
@@ -45,3 +46,6 @@ class CopyDataJob(Job, Transferrer):
 
     def backup_job(self) -> Optional[Job]:
         return None if self.after_job is None else self.after_job.backup_job()
+
+    @property
+    def priority(self) -> bool: return self._priority

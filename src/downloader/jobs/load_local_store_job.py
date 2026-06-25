@@ -37,3 +37,5 @@ class LoadLocalStoreJob(Job):
         # It will also write on config.file_checking if last_successful_run is not set, but this is deprecated and set to be removed in a future version
 
     def backup_job(self) -> Optional[Job]: return AbortJob()
+    @property
+    def priority(self) -> bool: return True

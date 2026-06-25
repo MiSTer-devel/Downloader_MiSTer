@@ -42,6 +42,8 @@ class ProcessZipIndexJob(Job):
     has_new_zip_summary: bool
 
     def retry_job(self): return None
+    @property
+    def priority(self) -> bool: return True
 
     # Results
     result_zip_index: StoreFragmentDrivePaths

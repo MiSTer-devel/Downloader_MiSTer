@@ -45,3 +45,6 @@ class OpenZipSummaryJob(Job):
 
     def backup_job(self) -> Optional[Job]:
         return self.backup
+
+    @property
+    def priority(self) -> bool: return True

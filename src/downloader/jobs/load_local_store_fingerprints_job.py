@@ -31,3 +31,5 @@ class LoadLocalStoreFingerprintsJob(Job):
 
     def backup_job(self) -> Optional[Job]: return None
     def retry_job(self) -> Optional['Job']: return None
+    @property
+    def priority(self) -> bool: return True

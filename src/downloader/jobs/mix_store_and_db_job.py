@@ -37,6 +37,8 @@ class MixStoreAndDbJob(Job):
     db_size: int = field(default=DB_STATE_FINGERPRINT_NO_SIZE)
 
     def retry_job(self): return None
+    @property
+    def priority(self) -> bool: return True
 
     # Results
     skipped: bool = field(default=False)

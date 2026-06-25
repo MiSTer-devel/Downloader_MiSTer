@@ -30,7 +30,8 @@ def log_pull(ws='', **kwargs): scp_file(f'/media/fat/{ws}Scripts/.config/downloa
 def local_run(env=None, **_kwargs):
     drv = Path(__file__).parent.parent / '.local_drv'
     drv.mkdir(exist_ok=True)
-    local_env = {**(os.environ.copy() if env is None else env), 'DEFAULT_BASE_PATH': str(drv), 'DOWNLOADER_INI_PATH': str(drv / 'downloader.ini'), 'LOGFILE': str(drv / 'downloader.log'), 'CURL_SSL': '', 'DEBUG': 'true', 'UPDATE_LINUX': 'false', 'ALLOW_REBOOT': '0'}
+    base_env = os.environ.copy() if env is None else env
+    local_env = {**base_env, 'DEFAULT_BASE_PATH': str(drv), 'DOWNLOADER_INI_PATH': str(drv / 'downloader.ini'), 'LOGFILE': str(drv / 'downloader.log'), 'CURL_SSL': '', 'DEBUG': base_env.get('DEBUG', 'true'), 'UPDATE_LINUX': 'false', 'ALLOW_REBOOT': '0'}
     subprocess.run(['python3', './src/__main__.py'], env=local_env, check=True, cwd=str(Path(__file__).parent.parent))
 
 def _skip_send(env=None, **_kwargs): return env is None or not env.get('SKIP_SEND', True)

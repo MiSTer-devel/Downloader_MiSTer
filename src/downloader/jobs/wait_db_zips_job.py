@@ -35,3 +35,5 @@ class WaitDbZipsJob(Job):
     zip_job_tags: list[str]
 
     def retry_job(self): return None
+    @property
+    def priority(self) -> bool: return True

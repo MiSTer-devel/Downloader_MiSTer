@@ -69,7 +69,8 @@ class JobSystem(JobContext):
         self._max_cycle: int = max_cycle
         self._max_timeout: float = max_timeout
         self._fail_policy: JobFailPolicy = fail_policy
-        self._job_queue: Deque[_JobPackage] = deque()
+        self._priority_job_queue: Deque[_JobPackage] = deque()
+        self._normal_job_queue: Deque[_JobPackage] = deque()
         self._unhandled_errors: list[BaseException] = []
         self._notifications: queue.Queue[tuple[_JobState, _JobPackage, Optional[Exception]]] = queue.Queue()
         self._jobs_cancelled: list[Job] = []
@@ -130,8 +131,8 @@ class JobSystem(JobContext):
                 self._execute_without_threads()
 
             self._handle_notifications(False)
-            self._jobs_cancelled.extend([p.job for p in self._job_queue])
-            self._job_queue.clear()
+            self._jobs_cancelled.extend([p.job for p in self._pending_packages()])
+            self._clear_job_queues()
             if self._jobs_cancelled:
                 self._record_jobs_cancelled(self._jobs_cancelled)
             if self._fail_policy == JobFailPolicy.FAIL_GRACEFULLY:
@@ -172,21 +173,18 @@ class JobSystem(JobContext):
             parent=parent_package,
             next_jobs=[]
         )
-        if job.priority:
-            self._job_queue.appendleft(package)
-        else:
-            self._job_queue.append(package)
+        self._queue_package(package)
         self._pending_jobs_amount += 1
         return None
 
     def _execute_with_threads(self, max_threads: int) -> None:
         with self._temporary_signal_handlers(), ThreadPoolExecutor(max_workers=max_threads) as thread_executor:
-            futures: list[tuple['_JobPackage', Future[None]]] = [(package, thread_executor.submit(self._operate_on_next_job, package, self._notifications)) for package in self._job_queue]
-            max_futures = max(max_threads * 1.5, len(futures))
-            self._job_queue.clear()
+            futures: list[tuple['_JobPackage', Future[None]]] = []
+            max_futures = max_threads
             while (self._pending_jobs_amount > 0 or futures) and self._are_jobs_cancelled is False:
-                while self._job_queue and (len(futures) < max_futures):
-                    package = self._job_queue.popleft()
+                while self._has_queued_packages() and (len(futures) < max_futures):
+                    package = self._pop_package()
+                    if package is None: break
                     assert_success = self._assert_there_are_no_cycles(package)
                     if assert_success:
                         future = thread_executor.submit(self._operate_on_next_job, package, self._notifications)
@@ -206,7 +204,7 @@ class JobSystem(JobContext):
 
     def _execute_without_threads(self, just_one_tick: bool = False) -> None:
         while self._pending_jobs_amount > 0 and self._are_jobs_cancelled is False:
-            package = self._job_queue.popleft() if self._job_queue else None
+            package = self._pop_package()
             if package is not None:
                 assert_success = self._assert_there_are_no_cycles(package)
                 if assert_success:
@@ -275,12 +273,32 @@ class JobSystem(JobContext):
             parent=None,
             next_jobs=package.next_jobs
         )
-        if job.priority:
-            self._job_queue.appendleft(retry_package)
-        else:
-            self._job_queue.append(retry_package)
+        self._queue_package(retry_package)
 
         return job
+
+    def _queue_package(self, package: '_JobPackage') -> None:
+        if package.job.priority:
+            self._priority_job_queue.append(package)
+        else:
+            self._normal_job_queue.append(package)
+
+    def _pop_package(self) -> Optional['_JobPackage']:
+        if self._priority_job_queue:
+            return self._priority_job_queue.popleft()
+        if self._normal_job_queue:
+            return self._normal_job_queue.popleft()
+        return None
+
+    def _has_queued_packages(self) -> bool:
+        return len(self._priority_job_queue) > 0 or len(self._normal_job_queue) > 0
+
+    def _pending_packages(self) -> list['_JobPackage']:
+        return [*self._priority_job_queue, *self._normal_job_queue]
+
+    def _clear_job_queues(self) -> None:
+        self._priority_job_queue.clear()
+        self._normal_job_queue.clear()
 
     def _handle_notifications(self, block: bool) -> None:
         while True:

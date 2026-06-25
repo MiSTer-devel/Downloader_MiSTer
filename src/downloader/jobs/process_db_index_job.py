@@ -41,6 +41,8 @@ class ProcessDbIndexJob(Job):
     zip_id: Optional[str] = None
 
     def retry_job(self): return None
+    @property
+    def priority(self) -> bool: return True
 
     # Results
     present_not_validated_files: list[PathPackage] = field(default_factory=list)

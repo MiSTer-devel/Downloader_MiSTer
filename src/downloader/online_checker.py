@@ -43,7 +43,7 @@ class OnlineChecker:
         load_local_store_fingerprints_job = LoadLocalStoreFingerprintsJob()
         load_local_store_fingerprints_job.add_tag(local_store_fingerprints_tag)
         for pkg in db_pkgs:
-            transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id)
+            transfer_job = make_transfer_job(pkg.section['db_url'], {}, True, pkg.db_id, priority=True)
             transfer_job.after_job = CheckDbJob(  # type: ignore[union-attr]
                 transfer_job=transfer_job,
                 section=pkg.db_id,

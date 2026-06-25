@@ -35,6 +35,8 @@ class OpenDbJob(Job):
     load_local_store_job: LoadLocalStoreJob
 
     def retry_job(self): return self.transfer_job
+    @property
+    def priority(self) -> bool: return True
 
     # Results
     skipped: bool = field(default=False)
