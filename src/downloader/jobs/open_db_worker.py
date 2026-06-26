@@ -21,7 +21,7 @@ from threading import Lock
 from downloader.config import Config
 from downloader.constants import DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE
 from downloader.db_entity import DbEntity
-from downloader.db_utils import build_db_config, can_skip_db
+from downloader.db_utils import build_db_config, can_skip_db, filter_terms_from_ini
 from downloader.file_system import FileSystem
 from downloader.job_system import Job, WorkerResult, JobContext, ProgressReporter
 from downloader.jobs.load_local_store_fingerprints_job import local_store_fingerprints_tag
@@ -93,6 +93,7 @@ class OpenDbWorker(DownloaderWorker):
 
         self._logger.bench("OpenDbWorker Building db config: ", db.db_id)
         config = build_db_config(input_config=self._config, db=db, ini_description=ini_description)
+        job.filter_terms_from_ini = filter_terms_from_ini(input_config=self._config, ini_description=ini_description)
 
         fingerprints = job.load_local_store_fingerprints_job.local_store_fingerprints
         if fingerprints is not None:

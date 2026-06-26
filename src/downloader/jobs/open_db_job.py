@@ -40,3 +40,4 @@ class OpenDbJob(Job):
 
     # Results
     skipped: bool = field(default=False)
+    filter_terms_from_ini: set[str] = field(default_factory=set)

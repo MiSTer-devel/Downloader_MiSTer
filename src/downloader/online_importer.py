@@ -241,7 +241,6 @@ class OnlineImporter:
         report: InstallationReport = self._file_download_reporter.installation_report()
         box = InstallationBox()
 
-        box.set_unused_filter_tags(self._file_filter_factory.unused_filter_parts())
         box.set_old_pext_paths(self._old_pext_paths)
 
         for fetch_file_job in report.get_started_jobs(FetchFileJob):
@@ -285,9 +284,17 @@ class OnlineImporter:
             logger.bench('OnlineImporter could not progress with network problems.')
             return box, NetworkProblems(f'Network problems detected. db_fetch_success == {db_fetch_success} and db_fetch_errors == {db_fetch_errors}')
 
+        filter_terms_from_ini = set()
         for open_db_job in report.get_completed_jobs(OpenDbJob):
+            filter_terms_from_ini.update(open_db_job.filter_terms_from_ini)
             if open_db_job.skipped is True:
                 box.add_skipped_db(open_db_job.section)
+
+        box.set_unused_filter_tags([
+            part
+            for part in self._file_filter_factory.unused_filter_parts()
+            if part in filter_terms_from_ini
+        ])
 
         for open_db_job, _e in report.get_failed_jobs(OpenDbJob):
             box.add_failed_db(open_db_job.section)

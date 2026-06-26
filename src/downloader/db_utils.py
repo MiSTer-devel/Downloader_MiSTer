@@ -20,7 +20,8 @@
 from dataclasses import dataclass
 
 from downloader.config import Config, ConfigDatabaseSection, FileChecking
-from downloader.constants import DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE, DB_STATE_FINGERPRINT_NO_TIMESTAMP
+from downloader.constants import DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE, \
+    DB_STATE_FINGERPRINT_NO_TIMESTAMP, K_FILTER
 from downloader.db_entity import DbEntity
 from downloader.local_store_wrapper import DbStateFingerprint
 
@@ -63,6 +64,39 @@ def build_db_config(input_config: Config, db: DbEntity, ini_description: ConfigD
             result['filter'] = result['filter'].lower().replace('[mister]', mister_filter).strip()
 
     return result
+
+
+def filter_terms_from_ini(input_config: Config, ini_description: ConfigDatabaseSection) -> set[str]:
+    if 'options' in ini_description and ini_description['options'].filter is not None:
+        return _filter_terms(_expand_mister_filter(ini_description['options'].filter, _mister_filter(input_config)))
+
+    if K_FILTER in input_config['user_defined_options']:
+        return _filter_terms(_mister_filter(input_config))
+
+    return set()
+
+
+def _expand_mister_filter(filter_value: str, mister_filter: str) -> str:
+    return filter_value.lower().replace('[mister]', mister_filter.lower()).strip()
+
+
+def _mister_filter(config: Config) -> str:
+    return '' if K_FILTER not in config or config[K_FILTER] is None else config[K_FILTER].lower()
+
+
+def _filter_terms(filter_value: str) -> set[str]:
+    terms = set()
+    for part in filter_value.lower().split():
+        this_part = part.strip()
+        if this_part == '' or this_part == '[mister]':
+            continue
+        if this_part[0] == '!':
+            this_part = this_part[1:]
+        this_part = this_part.replace('-', '').replace('_', '')
+        if this_part != '' and this_part != 'all':
+            terms.add(this_part)
+    return terms
+
 
 def can_skip_db(file_checking: FileChecking, figp: DbStateFingerprint, db_hash: str, db_size: int, user_filter: str) -> bool:
     return file_checking == FileChecking.FASTEST \
