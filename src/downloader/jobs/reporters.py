@@ -23,6 +23,7 @@ from typing import Optional, Type, TypeVar, Generic, Protocol, Union
 
 from downloader.db_entity import DbEntity
 from downloader.interruptions import Interruptions
+from downloader.jobs.errors import FileValidationError
 from downloader.jobs.fetch_data_job import FetchDataJob
 from downloader.jobs.fetch_file_job import FetchFileJob
 from downloader.jobs.open_zip_contents_job import OpenZipContentsJob
@@ -306,6 +307,8 @@ class FileDownloadProgressReporter(ProgressReporter, FileDownloadSessionLogger):
         if isinstance(job, OpenZipContentsJob):
             for pkg in job.validated_files:
                 self._update_output.file_completed(job.db.db_id, pkg.rel_path, pkg.description['size'], False, job.zip_id, reboot=pkg.description.get('reboot', False) is True)
+            for pkg in job.failed_files:
+                self._update_output.file_failed(job.db.db_id, pkg.rel_path, pkg.description['size'], FileValidationError.__name__)
         if isinstance(job, FetchDataJob):
             self._logger.bench('FileDownloadProgressReporter FetchDataJob completed: ', job.source)
 
