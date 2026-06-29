@@ -53,7 +53,8 @@ class DownloaderProgressReporter(ProgressReporter):
             r.notify_work_in_progress()
 
     def notify_jobs_cancelled(self, _jobs: list[Job]) -> None:
-        pass
+        for r in self._other_reporters:
+            r.notify_jobs_cancelled(_jobs)
 
     def notify_job_completed(self, job: Job, next_jobs: list[Job]) -> None:
         pass

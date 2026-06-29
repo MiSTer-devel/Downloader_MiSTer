@@ -81,7 +81,7 @@ class JobSystem(JobContext):
         self._is_executing_jobs: bool = False
         self._timeout_clock: float = 0
         self._timed_out: bool = False
-        self._signals: list[signal.Signals] = [signal.SIGINT]
+        self._signals: list[signal.Signals] = [signal.SIGINT, signal.SIGTERM]
 
     def timed_out(self) -> bool: return self._timed_out
     def get_unhandled_exceptions(self) -> Iterable[BaseException]: return self._unhandled_errors

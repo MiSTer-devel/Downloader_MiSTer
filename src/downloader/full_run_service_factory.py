@@ -82,7 +82,7 @@ class FullRunServiceFactory:
         )
         atexit.register(http_gateway.cleanup)
         safe_file_fetcher = SafeFileFetcher(config, system_file_system, self._logger, http_gateway, waiter)
-        interrupts = Interruptions(file_system_factory)
+        interrupts = Interruptions(file_system_factory, http_gateway)
         file_download_reporter = FileDownloadProgressReporter(self._logger, interrupts, self._update_output)
         job_system = JobSystem(
             reporter=DownloaderProgressReporter(self._logger, [file_download_reporter]),
