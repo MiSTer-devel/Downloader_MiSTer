@@ -20,13 +20,15 @@
 import sys
 import os
 import locale
+import argparse
 from pathlib import Path
 from typing import Optional
 
 from downloader.config import Config, Environment, InvalidConfigParameter, default_config
 from downloader.config_reader import ConfigReader
 from downloader.constants import KENV_LOGLEVEL, KENV_DOWNLOADER_OUTPUT, KENV_LC_HTTP_PROXY, KENV_HTTP_PROXY, KENV_HTTPS_PROXY, \
-    KENV_LC_HTTPS_PROXY, KENV_ROTATE_LOGS, KENV_SKIP_FREE_SPACE_CHECKS, DOWNLOADER_OUTPUT_HUMAN, K_DOWNLOADER_OUTPUT
+    KENV_LC_HTTPS_PROXY, KENV_ROTATE_LOGS, KENV_SKIP_FREE_SPACE_CHECKS, DOWNLOADER_OUTPUT_HUMAN, K_DOWNLOADER_OUTPUT, \
+    DOWNLOADER_VERSION
 from downloader.logger import OffLogger, TopLogger
 from downloader.full_run_service_factory import FullRunServiceFactory
 from downloader.update_output import update_output_for_mode
@@ -107,11 +109,31 @@ def read_env(default_commit: Optional[str]) -> Environment:
 def execute_full_run(full_run_service_factory: FullRunServiceFactory, argv, config: Config) -> int:
     # The factory instance is just creating the components of the system and passing the appropriate
     # dependencies to each one. Check directly full_run_service.py to see the program execution flow.
+    try:
+        args = _parse_args(argv)
+    except SystemExit:
+        return 1
+
+    if args.command == 'version':
+        print(DOWNLOADER_VERSION)
+        return 0
+
     runner = full_run_service_factory.create(config)
-    if len(argv) == 2 and (argv[1] == '--print-drives' or argv[1] == '-pd'):
+    if args.command == 'print_drives':
         exit_code = runner.print_drives()
     else:
         # The heart of this execution is the method "download_dbs_contents" in online_importer.py
         exit_code = runner.full_run()
 
     return exit_code
+
+
+def _parse_args(argv):
+    prog = Path(argv[0]).name if len(argv) > 0 and argv[0] else 'downloader.sh'
+    parser = argparse.ArgumentParser(prog=prog, add_help=False, allow_abbrev=False)
+    parser.set_defaults(command='full_run')
+    commands = parser.add_mutually_exclusive_group()
+    commands.add_argument('--full-run', '-fr', action='store_const', const='full_run', dest='command', help='run Downloader')
+    commands.add_argument('--print-drives', '-pd', action='store_const', const='print_drives', dest='command', help='print detected external drives and exit')
+    commands.add_argument('--version', '-v', action='store_const', const='version', dest='command', help='print Downloader version and exit')
+    return parser.parse_args(argv[1:] if len(argv) > 0 else [])
