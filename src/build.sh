@@ -45,7 +45,7 @@ set -euo pipefail
 export DOWNLOADER_LAUNCHER_PATH="\${DOWNLOADER_LAUNCHER_PATH:-\${0}}"
 tail -n +8 "\${0}" | xzcat -d -c > "${BIN}"
 chmod a+x "${BIN}"
-"${BIN}" "\${1:-}"
+"${BIN}" "\$@"
 exit 0
 EOF
 

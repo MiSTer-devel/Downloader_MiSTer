@@ -136,4 +136,5 @@ def _parse_args(argv):
     commands.add_argument('--full-run', '-fr', action='store_const', const='full_run', dest='command', help='run Downloader')
     commands.add_argument('--print-drives', '-pd', action='store_const', const='print_drives', dest='command', help='print detected external drives and exit')
     commands.add_argument('--version', '-v', action='store_const', const='version', dest='command', help='print Downloader version and exit')
-    return parser.parse_args(argv[1:] if len(argv) > 0 else [])
+    args = [arg for arg in (argv[1:] if len(argv) > 0 else []) if arg != '']
+    return parser.parse_args(args)

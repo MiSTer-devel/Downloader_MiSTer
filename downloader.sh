@@ -164,7 +164,7 @@ if [[ -s "${LATEST_BIN_PATH}" && -x /usr/bin/python3.9 ]] ; then
     cp "${LATEST_BIN_PATH}" "${RUN_PATH}"
     chmod +x "${RUN_PATH}"
     set +e
-    "${RUN_PATH}" ; ERROR_CODE=$?
+    "${RUN_PATH}" "$@" ; ERROR_CODE=$?
     set -e
 
     if [[ -f /tmp/downloader_run_signal ]] ; then
@@ -192,7 +192,7 @@ else
 fi
 
 chmod +x "${RUN_PATH}"
-if ! "${RUN_PATH}" ; then
+if ! "${RUN_PATH}" "$@" ; then
     echo -e "Downloader failed!\n"
     exit 1
 fi
