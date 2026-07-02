@@ -21,7 +21,6 @@ from typing import Optional, Any
 from collections import defaultdict
 import os
 
-from downloader.base_path_relocator import BasePathRelocator
 from downloader.config import Config, AllowDelete
 from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY
 from downloader.db_entity import DbEntity
@@ -73,7 +72,7 @@ FILE_PROP_ENTANGLEMENTS = 'tangle'
 
 
 class OnlineImporterWorkersFactory:
-    def __init__(self, worker_context: JobContext, progress_reporter: ProgressReporter, file_system: FileSystem, http_gateway: HttpGateway, logger: Logger, file_download_reporter: FileDownloadProgressReporter, file_filter_factory: FileFilterFactory, target_paths_calculator_factory: TargetPathsCalculatorFactory, free_space_reservation: FreeSpaceReservation, local_repository: LocalRepository, base_path_relocator: BasePathRelocator, config: Config, fail_ctx: FailCtx, update_output: UpdateOutput):
+    def __init__(self, worker_context: JobContext, progress_reporter: ProgressReporter, file_system: FileSystem, http_gateway: HttpGateway, logger: Logger, file_download_reporter: FileDownloadProgressReporter, file_filter_factory: FileFilterFactory, target_paths_calculator_factory: TargetPathsCalculatorFactory, free_space_reservation: FreeSpaceReservation, local_repository: LocalRepository, config: Config, fail_ctx: FailCtx, update_output: UpdateOutput):
         self._worker_context = worker_context
         self._progress_reporter = progress_reporter
         self._file_system = file_system
@@ -84,7 +83,6 @@ class OnlineImporterWorkersFactory:
         self._target_paths_calculator_factory = target_paths_calculator_factory
         self._free_space_reservation = free_space_reservation
         self._local_repository = local_repository
-        self._base_path_relocator = base_path_relocator
         self._config = config
         self._fail_ctx = fail_ctx
         self._update_output = update_output
@@ -193,7 +191,6 @@ class OnlineImporterWorkersFactory:
             LoadLocalStoreWorker(
                 logger=self._logger,
                 local_repository=self._local_repository,
-                base_path_relocator=self._base_path_relocator,
                 progress_reporter=self._progress_reporter,
                 fail_ctx=self._fail_ctx,
             ),

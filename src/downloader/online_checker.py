@@ -19,7 +19,6 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from downloader.base_path_relocator import BasePathRelocator
 from downloader.config import Config, FileChecking
 from downloader.db_utils import DbSectionPackage
 from downloader.fail_policy import FailPolicy
@@ -72,7 +71,6 @@ class OnlineCheckerWorkersFactory:
             logger: Logger,
             file_download_reporter: FileDownloadProgressReporter,
             local_repository: LocalRepository,
-            base_path_relocator: BasePathRelocator,
             config: Config
     ):
         self._worker_context = worker_context
@@ -82,7 +80,6 @@ class OnlineCheckerWorkersFactory:
         self._logger = logger
         self._file_download_reporter = file_download_reporter
         self._local_repository = local_repository
-        self._base_path_relocator = base_path_relocator
         self._config = config
 
     def create_jobs(self, db_pkgs: list[DbSectionPackage]) -> OnlineCheckerJobs:
@@ -139,7 +136,6 @@ class OnlineCheckerWorkersFactory:
             LoadLocalStoreWorker(
                 logger=self._logger,
                 local_repository=self._local_repository,
-                base_path_relocator=self._base_path_relocator,
                 progress_reporter=self._progress_reporter,
                 fail_ctx=FailCtx(self._logger, fail_policy=FailPolicy.FAULT_TOLERANT),
             ),

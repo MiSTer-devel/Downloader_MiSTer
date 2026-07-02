@@ -16,7 +16,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config
 from downloader.constants import HTTP_SOCKET_TIMEOUT, JOB_SYSTEM_INACTIVITY_TIMEOUT
@@ -95,7 +94,6 @@ class FullRunServiceFactory:
         file_filter_factory = FileFilterFactory(self._logger)
         free_space_reservation = UnlimitedFreeSpaceReservation() if config['skip_free_space_checks'] else LinuxFreeSpaceReservation(logger=self._logger, config=config)
         linux_updater = LinuxUpdater(self._logger, waiter, config, system_file_system, safe_file_fetcher, self._update_output)
-        base_path_relocator = BasePathRelocator(config, file_system_factory, waiter, self._logger)
 
         old_pext_paths: set[str] = set()  # @TODO: Should end up empty. Remove when we have 100% in not having pext paths anymore.
         fail_ctx = FailCtx(self._logger)
@@ -106,7 +104,6 @@ class FullRunServiceFactory:
             file_system=system_file_system,
             progress_reporter=file_download_reporter,
             local_repository=local_repository,
-            base_path_relocator=base_path_relocator,
             file_download_reporter=file_download_reporter,
             free_space_reservation=free_space_reservation,
             file_filter_factory=file_filter_factory,
@@ -137,7 +134,6 @@ class FullRunServiceFactory:
             online_importer,
             linux_updater,
             RebootCalculator(config, self._logger, system_file_system),
-            base_path_relocator,
             CertificatesFix(config, system_file_system, waiter, self._logger),
             external_drives_repository,
             LinuxOsUtils(),

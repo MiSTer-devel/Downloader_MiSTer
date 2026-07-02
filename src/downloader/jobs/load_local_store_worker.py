@@ -16,7 +16,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from downloader.base_path_relocator import BasePathRelocator
 from downloader.job_system import WorkerResult, ProgressReporter
 from downloader.jobs.load_local_store_job import LoadLocalStoreJob
 from downloader.jobs.worker_context import DownloaderWorker, FailCtx
@@ -25,10 +24,9 @@ from downloader.logger import Logger
 
 
 class LoadLocalStoreWorker(DownloaderWorker):
-    def __init__(self, logger: Logger, local_repository: LocalRepository, base_path_relocator: BasePathRelocator, progress_reporter: ProgressReporter, fail_ctx: FailCtx) -> None:
+    def __init__(self, logger: Logger, local_repository: LocalRepository, progress_reporter: ProgressReporter, fail_ctx: FailCtx) -> None:
         self._logger = logger
         self._local_repository = local_repository
-        self._base_path_relocator = base_path_relocator
         self._progress_reporter = progress_reporter
         self._fail_ctx = fail_ctx
 
@@ -39,15 +37,6 @@ class LoadLocalStoreWorker(DownloaderWorker):
         self._logger.bench('LoadLocalStoreWorker start.')
         try:
             local_store = self._local_repository.load_store()
-
-            self._logger.bench('LoadLocalStoreWorker relocating base paths')
-            # @TODO: Remove this 1-2 years after the 2.0 release, which deprecated date base scoped base_paths
-            for relocation_package in self._base_path_relocator.relocating_base_paths(job.db_pkgs, local_store):
-                self._base_path_relocator.relocate_non_system_files(relocation_package)
-                err = self._local_repository.save_store(local_store)
-                if err is not None:
-                    self._logger.debug('WARNING! Base path relocation could not be saved in the store!')
-                    continue
         except Exception as e:
             self._fail_ctx.swallow_error(e)
             return [], e

@@ -21,7 +21,6 @@ import sys
 import time
 from typing import Optional
 
-from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config, FileChecking
 from downloader.constants import DOWNLOADER_VERSION, EXIT_ERROR_NO_CERTS, EXIT_ERROR_STORE_NOT_SAVED, EXIT_ERROR_FAILED_FILES, \
@@ -43,12 +42,11 @@ from downloader.update_output import UpdateOutput
 
 
 class FullRunService:
-    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, local_repository: LocalRepository, online_importer: OnlineImporter, linux_updater: LinuxUpdater, reboot_calculator: RebootCalculator, base_path_relocator: BasePathRelocator, certificates_fix: CertificatesFix, external_drives_repository: ExternalDrivesRepository, os_utils: OsUtils, waiter: Waiter, file_system: FileSystem, update_output: UpdateOutput) -> None:
+    def __init__(self, config: Config, logger: Logger, filelog_manager: FilelogManager, printlog_manager: ConfigLogManager, local_repository: LocalRepository, online_importer: OnlineImporter, linux_updater: LinuxUpdater, reboot_calculator: RebootCalculator, certificates_fix: CertificatesFix, external_drives_repository: ExternalDrivesRepository, os_utils: OsUtils, waiter: Waiter, file_system: FileSystem, update_output: UpdateOutput) -> None:
         self._waiter = waiter
         self._os_utils = os_utils
         self._external_drives_repository = external_drives_repository
         self._certificates_fix = certificates_fix
-        self._base_path_relocator = base_path_relocator
         self._reboot_calculator = reboot_calculator
         self._linux_updater = linux_updater
         self._online_importer = online_importer

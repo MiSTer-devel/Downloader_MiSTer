@@ -18,7 +18,6 @@
 
 import atexit
 
-from downloader.base_path_relocator import BasePathRelocator
 from downloader.check_service import CheckService
 from downloader.config import Config
 from downloader.constants import HTTP_SOCKET_TIMEOUT, JOB_SYSTEM_INACTIVITY_TIMEOUT
@@ -91,7 +90,6 @@ class CheckServiceFactory:
             logger=self._logger,
             file_download_reporter=file_download_reporter,
             local_repository=local_repository,
-            base_path_relocator=BasePathRelocator(config, file_system_factory, waiter, self._logger),
             config=config,
         )
         online_checker = OnlineChecker(

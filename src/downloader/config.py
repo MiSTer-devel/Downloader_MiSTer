@@ -142,12 +142,6 @@ class Config(ConfigRequired, total=False):
     environment: Environment  # This should never be used. It's there just to be debug-logged.
 
 
-def config_with_base_path(config: Config, base_path: str) -> Config:
-    result = config.copy()
-    result['base_path'] = base_path
-    return result
-
-
 def default_config() -> Config:
     return {
         'curl_ssl': '',
