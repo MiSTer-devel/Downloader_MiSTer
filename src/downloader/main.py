@@ -141,6 +141,8 @@ def execute_full_run(full_run_service_factory: 'FullRunServiceFactory', args, co
     runner = full_run_service_factory.create(config)
     if args.command == 'print_drives':
         exit_code = runner.print_drives()
+    elif args.command == 'run_only':
+        exit_code = runner.run_only(args.run_only_db_ids)
     else:
         # The heart of this execution is the method "download_dbs_contents" in online_importer.py
         exit_code = runner.full_run()
@@ -156,6 +158,10 @@ def _parse_args(argv):
     commands.add_argument('--full-run', '-fr', action='store_const', const='full_run', dest='command', help='run Downloader')
     commands.add_argument('--print-drives', '-pd', action='store_const', const='print_drives', dest='command', help='print detected external drives and exit')
     commands.add_argument('--check', '-c', action='store_const', const='check', dest='command', help='check for available updates and exit')
+    commands.add_argument('--run-only', nargs='+', dest='run_only_db_ids', help='run Downloader only for the listed database IDs')
     commands.add_argument('--version', '-v', action='store_const', const='version', dest='command', help='print Downloader version and exit')
     args = [arg for arg in (argv[1:] if len(argv) > 0 else []) if arg != '']
-    return parser.parse_args(args)
+    parsed_args = parser.parse_args(args)
+    if parsed_args.run_only_db_ids is not None:
+        parsed_args.command = 'run_only'
+    return parsed_args
