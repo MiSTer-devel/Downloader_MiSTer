@@ -83,7 +83,7 @@ class FullRunService:
         return self._run(None)
 
     def run_only(self, db_ids: list[str]) -> int:
-        return self._run(set(db_ids))
+        return self._run(set(db_id.lower() for db_id in db_ids))
 
     def _run(self, filter_db_ids: Optional[set[str]]) -> int:
         self._update_output.run_started(DOWNLOADER_VERSION, self._config['commit'])
