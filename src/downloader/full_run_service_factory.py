@@ -16,8 +16,6 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-import ssl
-from typing import Optional
 from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config
@@ -41,6 +39,7 @@ from downloader.local_repository import LocalRepository
 from downloader.migrations import migrations
 from downloader.online_importer import OnlineImporter, OnlineImporterWorkersFactory
 from downloader.reboot_calculator import RebootCalculator
+from downloader.ssl_context import context_from_curl_ssl
 from downloader.store_migrator import StoreMigrator
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.waiter import Waiter
@@ -148,19 +147,3 @@ class FullRunServiceFactory:
         )
         instance.configure_components()
         return instance
-
-
-def context_from_curl_ssl(curl_ssl) -> tuple[ssl.SSLContext, Optional[Exception]]:
-    try:
-        context = ssl.create_default_context()
-
-        if curl_ssl.startswith('--cacert '):
-            cacert_file = curl_ssl[len('--cacert '):]
-            context.load_verify_locations(cacert_file)
-        elif curl_ssl == '--insecure':
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-
-        return context, None
-    except Exception as e:
-        return ssl.create_default_context(), e

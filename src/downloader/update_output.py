@@ -54,6 +54,13 @@ class UpdateOutput(Protocol):
     def zip_failed(self, db_id: str, zip_id: str) -> None: pass
     def folder_failed(self, path: str) -> None: pass
     def run_finished(self, exit_code: int) -> None: pass
+    def check_started(self) -> None: pass
+    def check_file_space(self, path: str, previous: Optional[int], current: Optional[int]) -> None: pass
+    def check_database_up_to_date(self, db_id: str) -> None: pass
+    def check_database_needs_update(self, db_id: str) -> None: pass
+    def check_database_failed(self, db_id: str) -> None: pass
+    def check_fingerprint_failure(self, failure_id: str) -> None: pass
+    def check_finished(self, exit_code: int, status: str) -> None: pass
 
 
 class NoopUpdateOutput(UpdateOutput):
@@ -82,6 +89,13 @@ class NoopUpdateOutput(UpdateOutput):
     def zip_failed(self, db_id: str, zip_id: str) -> None: pass
     def folder_failed(self, path: str) -> None: pass
     def run_finished(self, exit_code: int) -> None: pass
+    def check_started(self) -> None: pass
+    def check_file_space(self, path: str, previous: Optional[int], current: Optional[int]) -> None: pass
+    def check_database_up_to_date(self, db_id: str) -> None: pass
+    def check_database_needs_update(self, db_id: str) -> None: pass
+    def check_database_failed(self, db_id: str) -> None: pass
+    def check_fingerprint_failure(self, failure_id: str) -> None: pass
+    def check_finished(self, exit_code: int, status: str) -> None: pass
 
 
 class HumanUpdateOutput(UpdateOutput):
@@ -221,6 +235,31 @@ class HumanUpdateOutput(UpdateOutput):
 
     def run_finished(self, exit_code: int) -> None:
         pass
+
+    def check_started(self) -> None:
+        self._logger.print('Checking for available updates...')
+
+    def check_file_space(self, path: str, previous: Optional[int], current: Optional[int]) -> None:
+        previous_text = 'unknown' if previous is None else str(previous)
+        current_text = 'unknown' if current is None else str(current)
+        self._logger.print(f'Free space: {path}: {previous_text} -> {current_text}')
+
+    def check_database_up_to_date(self, db_id: str) -> None:
+        self._logger.print(f'Up-to-date: [{db_id}]')
+
+    def check_database_needs_update(self, db_id: str) -> None:
+        self._logger.print(f'Update available: [{db_id}]')
+
+    def check_database_failed(self, db_id: str) -> None:
+        self._logger.print(f'Check failed: [{db_id}]')
+
+    def check_fingerprint_failure(self, failure_id: str) -> None:
+        self._logger.print(f'Check failed: {failure_id}')
+
+    def check_finished(self, exit_code: int, status: str) -> None:
+        self._logger.print(f'Check finished with code {exit_code}.')
+        if status:
+            print(status, file=sys.stdout, flush=True)
 
     def _print_symbols(self) -> None:
         if len(self._symbols) == 0:
@@ -366,6 +405,41 @@ class LtsvUpdateOutput(UpdateOutput):
 
     def run_finished(self, exit_code: int) -> None:
         self._emit('run_finish', code=exit_code)
+
+    def check_started(self) -> None:
+        self._emit('check_start')
+        self._human_output.check_started()
+
+    def check_file_space(self, path: str, previous: Optional[int], current: Optional[int]) -> None:
+        fields: dict[str, Union[str, int]] = {
+            'path': path,
+            'previous': 'unknown' if previous is None else previous,
+            'current': 'unknown' if current is None else current,
+        }
+        if previous is not None and current is not None:
+            fields['delta'] = current - previous
+        self._emit('check_file_space', **fields)
+        self._human_output.check_file_space(path, previous, current)
+
+    def check_database_up_to_date(self, db_id: str) -> None:
+        self._emit('check_db_up_to_date', db=db_id)
+        self._human_output.check_database_up_to_date(db_id)
+
+    def check_database_needs_update(self, db_id: str) -> None:
+        self._emit('check_db_need_update', db=db_id)
+        self._human_output.check_database_needs_update(db_id)
+
+    def check_database_failed(self, db_id: str) -> None:
+        self._emit('check_db_fail', db=db_id)
+        self._human_output.check_database_failed(db_id)
+
+    def check_fingerprint_failure(self, failure_id: str) -> None:
+        self._emit('check_fingerprint_fail', id=failure_id)
+        self._human_output.check_fingerprint_failure(failure_id)
+
+    def check_finished(self, exit_code: int, status: str) -> None:
+        self._emit('check_finish', code=exit_code, status=status)
+        self._human_output.check_finished(exit_code, '')
 
     def _emit(self, event: str, **fields: Union[str, int]) -> None:
         line = ['DLP1', f'event:{_sanitize(event)}']

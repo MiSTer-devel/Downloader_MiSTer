@@ -16,23 +16,21 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
-from dataclasses import dataclass, field
-
-from downloader.config import ConfigDatabaseSection
-from downloader.job_system import Job, JobSystem
-from downloader.jobs.load_local_store_fingerprints_job import LoadLocalStoreFingerprintsJob
-from downloader.jobs.transfer_job import TransferJob
+import ssl
+from typing import Optional
 
 
-@dataclass(eq=False, order=False)
-class CheckDbJob(Job):
-    type_id: int = field(init=False, default=JobSystem.get_job_type_id())
-    transfer_job: TransferJob # Job & Transferrer @TODO: Python 3.10
-    section: str
-    ini_description: ConfigDatabaseSection
-    load_local_store_fingerprints_job: LoadLocalStoreFingerprintsJob
+def context_from_curl_ssl(curl_ssl) -> tuple[ssl.SSLContext, Optional[Exception]]:
+    try:
+        context = ssl.create_default_context()
 
-    def retry_job(self): return self.transfer_job
+        if curl_ssl.startswith('--cacert '):
+            cacert_file = curl_ssl[len('--cacert '):]
+            context.load_verify_locations(cacert_file)
+        elif curl_ssl == '--insecure':
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
 
-    # Results
-    skipped: bool = field(default=False)
+        return context, None
+    except Exception as e:
+        return ssl.create_default_context(), e

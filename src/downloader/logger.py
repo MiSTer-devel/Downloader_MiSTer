@@ -127,6 +127,12 @@ class FileLogger(Logger, FilelogManager):
             _do_print(*args, sep=sep, end=end, file=self._logfile, flush=flush)
 
 
+class NoopFileLogger(FileLogger):
+    def __init__(self) -> None:
+        self._logfile = None
+        self._local_repository: Optional[FilelogSaver] = None
+
+
 class ConfigLogManager(Protocol):
     def configure(self, config: Config) -> None: pass
 
@@ -141,9 +147,11 @@ class TopLogger(Logger, ConfigLogManager):
 
     @staticmethod
     def for_main(config: Config, start_time: float) -> 'TopLogger':
-        downloader_output = config[K_DOWNLOADER_OUTPUT]
-        print_logger: Logger = DebugLtsvLogger() if downloader_output == DOWNLOADER_OUTPUT_DLP1_LTSV else PrintLogger()
-        return TopLogger(print_logger, FileLogger(), config['verbose'], config['bench'], start_time)
+        return TopLogger(_print_logger_for_mode(config), FileLogger(), config['verbose'], config['bench'], start_time)
+
+    @staticmethod
+    def for_print_only(config: Config, start_time: float) -> 'TopLogger':
+        return TopLogger(_print_logger_for_mode(config), NoopFileLogger(), config['verbose'], config['bench'], start_time)
 
     def configure(self, config: Config) -> None:
         self._bench_mode = config['bench']
@@ -187,6 +195,12 @@ def _create_config_msg(config: Config) -> str:
         )
     except Exception:
         return 'WARNING: Could not create message from config.'
+
+
+def _print_logger_for_mode(config: Config) -> Logger:
+    downloader_output = config[K_DOWNLOADER_OUTPUT]
+    return DebugLtsvLogger() if downloader_output == DOWNLOADER_OUTPUT_DLP1_LTSV else PrintLogger()
+
 
 def _transform_debug_args(args: tuple[Any, ...]) -> list[str]:
     exception_msgs: list[str] = []

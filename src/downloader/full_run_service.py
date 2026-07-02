@@ -25,7 +25,7 @@ from downloader.base_path_relocator import BasePathRelocator
 from downloader.certificates_fix import CertificatesFix
 from downloader.config import Config, FileChecking
 from downloader.constants import DOWNLOADER_VERSION, EXIT_ERROR_NO_CERTS, EXIT_ERROR_STORE_NOT_SAVED, EXIT_ERROR_FAILED_FILES, \
-    EXIT_ERROR_FAILED_DBS, EXIT_ERROR_STORE_NOT_LOADED, FILE_downloader_run_signal, REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE, \
+    EXIT_ERROR_FAILED_DBS, EXIT_ERROR_STORE_NOT_LOADED, REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE, \
     REBOOT_WAIT_TIME_STANDARD, FILE_CHECKING_SPACE_CHECK_TOLERANCE, MEDIA_FAT, EXIT_ERROR_NETWORK_PROBLEMS, \
     FILE_downloader_storage_backup_pext
 from downloader.db_utils import DbSectionPackage, sorted_db_sections
@@ -36,7 +36,7 @@ from downloader.local_repository import LocalRepository
 from downloader.logger import FilelogManager, Logger, ConfigLogManager
 from downloader.online_importer import OnlineImporter, InstallationBox, NetworkProblems
 from downloader.os_utils import OsUtils
-from downloader.other import format_files_message, format_folders_message, format_zips_message, screen_columns
+from downloader.other import format_files_message, format_folders_message, format_zips_message, remove_run_signal, screen_columns
 from downloader.reboot_calculator import RebootCalculator
 from downloader.waiter import Waiter
 from downloader.update_output import UpdateOutput
@@ -194,13 +194,7 @@ class FullRunService:
         return self._reboot_calculator.calc_needs_reboot(self._linux_updater.needs_reboot(), self._online_importer.needs_reboot())
 
     def _remove_run_signal(self) -> None:
-        if self._file_system.is_file(FILE_downloader_run_signal):
-            self._logger.debug('Removing run signal: ', FILE_downloader_run_signal)
-            err = self._file_system.unlink(FILE_downloader_run_signal)
-            if err is not None:
-                self._logger.debug('WARNING: Could not remove run signal: ', err)
-        else:
-            self._logger.debug('Run signal NOT removed.')
+        remove_run_signal(self._file_system, self._logger)
 
 
 class FileCheckingModeResolver:

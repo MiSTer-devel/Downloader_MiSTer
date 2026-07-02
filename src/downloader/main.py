@@ -26,23 +26,33 @@ from typing import Optional
 
 from downloader.config import Config, Environment, InvalidConfigParameter, default_config
 from downloader.config_reader import ConfigReader
-from downloader.constants import KENV_LOGLEVEL, KENV_DOWNLOADER_OUTPUT, KENV_LC_HTTP_PROXY, KENV_HTTP_PROXY, KENV_HTTPS_PROXY, \
-    KENV_LC_HTTPS_PROXY, KENV_ROTATE_LOGS, KENV_SKIP_FREE_SPACE_CHECKS, DOWNLOADER_OUTPUT_HUMAN, K_DOWNLOADER_OUTPUT, \
-    DOWNLOADER_VERSION
+from downloader.constants import CHECK_STATUS_FAILED, KENV_LOGLEVEL, KENV_DOWNLOADER_OUTPUT, KENV_LC_HTTP_PROXY, KENV_HTTP_PROXY, \
+    KENV_HTTPS_PROXY, KENV_LC_HTTPS_PROXY, KENV_ROTATE_LOGS, KENV_SKIP_FREE_SPACE_CHECKS, DOWNLOADER_OUTPUT_HUMAN, \
+    K_DOWNLOADER_OUTPUT, DOWNLOADER_VERSION
 from downloader.logger import OffLogger, TopLogger
-from downloader.full_run_service_factory import FullRunServiceFactory
 from downloader.update_output import update_output_for_mode
 
 
-def main(env: Environment, start_time: float) -> int:
+def main(env: Environment, start_time: float, argv=None) -> int:
     # This function should be called in __main__.py which just bootstraps the application.
     # It should receive an 'env' dictionary produced by calling the "read_env" function below.
 
     locale.setlocale(locale.LC_CTYPE, "")
+    argv = sys.argv if argv is None else argv
+    try:
+        args = _parse_args(argv)
+    except SystemExit:
+        return 1
+
+    if args.command == 'version':
+        print(DOWNLOADER_VERSION)
+        return 0
+
     config_reader = ConfigReader(OffLogger(), env, start_time)
     config = default_config()
     config_reader.read_initial_env(config)
-    logger = TopLogger.for_main(config, start_time)
+    is_check_command = args.command == 'check'
+    logger = TopLogger.for_print_only(config, start_time) if is_check_command else TopLogger.for_main(config, start_time)
     update_output = update_output_for_mode(config[K_DOWNLOADER_OUTPUT], logger)
     config_reader.set_logger(logger)
     logger.bench('MAIN start.')
@@ -51,22 +61,36 @@ def main(env: Environment, start_time: float) -> int:
     try:
         config_path = config_reader.calculate_config_path(str(Path().resolve()))
         config_reader.read_rest_env_and_config_file(config_path, config)
-        exit_code = execute_full_run(
-            FullRunServiceFactory.for_main(logger, update_output),
-            sys.argv,
-            config
-        )
+        if is_check_command:
+            from downloader.check_service_factory import CheckServiceFactory
+            exit_code = execute_check(
+                CheckServiceFactory.for_main(logger, update_output),
+                args,
+                config
+            )
+        else:
+            from downloader.full_run_service_factory import FullRunServiceFactory
+            exit_code = execute_full_run(
+                FullRunServiceFactory.for_main(logger, update_output),
+                args,
+                config
+            )
     except InvalidConfigParameter as e:
         logger.debug(e)
         update_output.error('config', 'Configuration error: %s' % str(e))
+        if is_check_command:
+            update_output.check_finished(1, CHECK_STATUS_FAILED)
         exit_code = 1
     except Exception as _:
         import traceback
         update_output.error('unexpected')
         logger.print(traceback.format_exc())
+        if is_check_command:
+            update_output.check_finished(1, CHECK_STATUS_FAILED)
         exit_code = 1
     finally:
-        logger.bench('MAIN end.')
+        if not is_check_command:
+            logger.bench('MAIN end.')
         logger.file_logger.finalize()
 
     return exit_code
@@ -106,18 +130,14 @@ def read_env(default_commit: Optional[str]) -> Environment:
     }
 
 
-def execute_full_run(full_run_service_factory: FullRunServiceFactory, argv, config: Config) -> int:
+def execute_check(check_service_factory: 'CheckServiceFactory', _args, config: Config) -> int:
+    check_service = check_service_factory.create(config)
+    return check_service.check_available_updates()
+
+
+def execute_full_run(full_run_service_factory: 'FullRunServiceFactory', args, config: Config) -> int:
     # The factory instance is just creating the components of the system and passing the appropriate
     # dependencies to each one. Check directly full_run_service.py to see the program execution flow.
-    try:
-        args = _parse_args(argv)
-    except SystemExit:
-        return 1
-
-    if args.command == 'version':
-        print(DOWNLOADER_VERSION)
-        return 0
-
     runner = full_run_service_factory.create(config)
     if args.command == 'print_drives':
         exit_code = runner.print_drives()
@@ -135,6 +155,7 @@ def _parse_args(argv):
     commands = parser.add_mutually_exclusive_group()
     commands.add_argument('--full-run', '-fr', action='store_const', const='full_run', dest='command', help='run Downloader')
     commands.add_argument('--print-drives', '-pd', action='store_const', const='print_drives', dest='command', help='print detected external drives and exit')
+    commands.add_argument('--check', '-c', action='store_const', const='check', dest='command', help='check for available updates and exit')
     commands.add_argument('--version', '-v', action='store_const', const='version', dest='command', help='print Downloader version and exit')
     args = [arg for arg in (argv[1:] if len(argv) > 0 else []) if arg != '']
     return parser.parse_args(args)

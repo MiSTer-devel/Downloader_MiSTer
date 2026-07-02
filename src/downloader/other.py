@@ -22,7 +22,9 @@ import urllib
 from typing import Optional, Any
 
 from pathlib import Path
-from downloader.constants import FILE_MiSTer
+from downloader.constants import FILE_MiSTer, FILE_downloader_run_signal
+from downloader.file_system import FileSystem
+from downloader.logger import Logger
 
 
 def screen_columns() -> int:
@@ -30,6 +32,16 @@ def screen_columns() -> int:
         return shutil.get_terminal_size().columns
     except Exception:
         return 40
+
+
+def remove_run_signal(file_system: FileSystem, logger: Logger) -> None:
+    if file_system.is_file(FILE_downloader_run_signal):
+        logger.debug('Removing run signal: ', FILE_downloader_run_signal)
+        err = file_system.unlink(FILE_downloader_run_signal)
+        if err is not None:
+            logger.debug('WARNING: Could not remove run signal: ', err)
+    else:
+        logger.debug('Run signal NOT removed.')
 
 
 def empty_store_without_base_path() -> dict[str, Any]:
