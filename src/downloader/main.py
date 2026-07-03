@@ -52,7 +52,8 @@ def main(env: Environment, start_time: float, argv=None) -> int:
     config = default_config()
     config_reader.read_initial_env(config)
     is_check_command = args.command == 'check'
-    logger = TopLogger.for_print_only(config, start_time) if is_check_command else TopLogger.for_main(config, start_time)
+    is_print_only_command = is_check_command or args.command == 'list_dbs'
+    logger = TopLogger.for_print_only(config, start_time) if is_print_only_command else TopLogger.for_main(config, start_time)
     update_output = update_output_for_mode(config[K_DOWNLOADER_OUTPUT], logger)
     config_reader.set_logger(logger)
     logger.bench('MAIN start.')
@@ -68,6 +69,9 @@ def main(env: Environment, start_time: float, argv=None) -> int:
                 args,
                 config
             )
+        elif args.command == 'list_dbs':
+            from downloader.list_dbs_service import ListDbsService
+            exit_code = ListDbsService(update_output).list_dbs(config)
         else:
             from downloader.full_run_service_factory import FullRunServiceFactory
             exit_code = execute_full_run(
@@ -89,7 +93,7 @@ def main(env: Environment, start_time: float, argv=None) -> int:
             update_output.check_finished(1, CHECK_STATUS_FAILED)
         exit_code = 1
     finally:
-        if not is_check_command:
+        if not is_print_only_command:
             logger.bench('MAIN end.')
         logger.file_logger.finalize()
 
@@ -159,6 +163,7 @@ def _parse_args(argv):
     commands.add_argument('--print-drives', '-pd', action='store_const', const='print_drives', dest='command', help='print detected external drives and exit')
     commands.add_argument('--check', '-c', action='store_const', const='check', dest='command', help='check for available updates and exit')
     commands.add_argument('--run-only', nargs='+', dest='run_only_db_ids', help='run Downloader only for the listed database IDs')
+    commands.add_argument('--list-dbs', action='store_const', const='list_dbs', dest='command', help='list configured database IDs and exit')
     commands.add_argument('--version', '-v', action='store_const', const='version', dest='command', help='print Downloader version and exit')
     args = [arg for arg in (argv[1:] if len(argv) > 0 else []) if arg != '']
     parsed_args = parser.parse_args(args)

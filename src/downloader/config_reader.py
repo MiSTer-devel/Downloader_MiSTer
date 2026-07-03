@@ -33,7 +33,7 @@ from downloader.constants import FILE_downloader_ini, FOLDER_downloader, DEFAULT
     K_MINIMUM_EXTERNAL_FREE_SPACE_MB, STORAGE_PRIORITY_OFF, STORAGE_PRIORITY_PREFER_SD, \
     STORAGE_PRIORITY_PREFER_EXTERNAL, EXIT_ERROR_WRONG_SETUP, K_BENCH, K_HTTP_PROXY, FILE_CHECKING_FASTEST, \
     FILE_CHECKING_BALANCED, FILE_CHECKING_EXHAUSTIVE, FILE_CHECKING_VERIFY_INTEGRITY, KENV_EXTRA_DROP_IN_DATABASE_FILES, \
-    DOWNLOADER_OUTPUTS, DOWNLOADER_OUTPUT_HUMAN, K_DOWNLOADER_OUTPUT
+    DOWNLOADER_OUTPUTS, DOWNLOADER_OUTPUT_HUMAN, K_DOWNLOADER_OUTPUT, K_DESCRIPTION
 from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
 from downloader.http_gateway import http_config, HttpGatewayException
 from downloader.logger import Logger
@@ -291,6 +291,9 @@ class ConfigReader:
             'db_url': ini_config['DEFAULT'].get(K_DB_URL, default_db['db_url']),
             'section': default_db['section']
         }
+        default_description = ini_config['DEFAULT'].get(K_DESCRIPTION, '').strip()
+        if default_description:
+            db_section[K_DESCRIPTION] = default_description
         result['databases'][default_db['section']] = db_section
 
     def _parse_database_section(self, default_db: ConfigDatabaseSection, parser: 'IniParser', section_id: str) -> ConfigDatabaseSection:
@@ -304,6 +307,10 @@ class ConfigReader:
             'db_url': db_url,
             'section': section_id
         }
+
+        description_text = parser.get_string(K_DESCRIPTION, '').strip()
+        if description_text:
+            description[K_DESCRIPTION] = description_text
 
         options = self._parse_database_options(parser, section_id)
         if options.any():

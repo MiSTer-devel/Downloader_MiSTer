@@ -20,9 +20,12 @@ import sys
 import time
 from typing import Optional, Protocol, TextIO, Union
 
+from downloader.config import ConfigDatabaseSection
 from downloader.constants import DOWNLOADER_OUTPUT_DLP1_LTSV
 from downloader.logger import Logger
 from downloader.other import screen_columns
+
+ConfiguredDatabase = tuple[str, ConfigDatabaseSection]
 
 
 class UpdateOutput(Protocol):
@@ -61,6 +64,7 @@ class UpdateOutput(Protocol):
     def check_database_failed(self, db_id: str) -> None: pass
     def check_fingerprint_failure(self, failure_id: str) -> None: pass
     def check_finished(self, exit_code: int, status: str) -> None: pass
+    def configured_databases(self, dbs: list[ConfiguredDatabase]) -> None: pass
 
 
 class NoopUpdateOutput(UpdateOutput):
@@ -96,6 +100,7 @@ class NoopUpdateOutput(UpdateOutput):
     def check_database_failed(self, db_id: str) -> None: pass
     def check_fingerprint_failure(self, failure_id: str) -> None: pass
     def check_finished(self, exit_code: int, status: str) -> None: pass
+    def configured_databases(self, dbs: list[ConfiguredDatabase]) -> None: pass
 
 
 class HumanUpdateOutput(UpdateOutput):
@@ -260,6 +265,12 @@ class HumanUpdateOutput(UpdateOutput):
         self._logger.print(f'Check finished with code {exit_code}.')
         if status:
             print(status, file=sys.stdout, flush=True)
+
+    def configured_databases(self, dbs: list[ConfiguredDatabase]) -> None:
+        for db_id, section in dbs:
+            fields = _configured_db_extra_fields(section)
+            option_text = ''.join(f' {key}={value}' for key, value in fields.items())
+            self._logger.print(f"{db_id} {section['db_url']}{option_text}")
 
     def _print_symbols(self) -> None:
         if len(self._symbols) == 0:
@@ -441,6 +452,12 @@ class LtsvUpdateOutput(UpdateOutput):
         self._emit('check_finish', code=exit_code, status=status)
         self._human_output.check_finished(exit_code, '')
 
+    def configured_databases(self, dbs: list[ConfiguredDatabase]) -> None:
+        for db_id, section in dbs:
+            fields: dict[str, Union[str, int]] = {'db': db_id, 'url': section['db_url']}
+            fields.update(_configured_db_extra_fields(section))
+            self._emit('configured_db', **fields)
+
     def _emit(self, event: str, **fields: Union[str, int]) -> None:
         line = ['DLP1', f'event:{_sanitize(event)}']
         for key, value in fields.items():
@@ -458,3 +475,23 @@ def _sanitize(value: str) -> str:
 
 def _valid_string_list(values: object) -> list[str]:
     return [value for value in values if isinstance(value, str)] if isinstance(values, list) else []
+
+
+def _configured_db_extra_fields(section: ConfigDatabaseSection) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    if 'description' in section:
+        fields['description'] = section['description']
+
+    fields.update(_db_options_fields(section))
+    return fields
+
+
+def _db_options_fields(section: ConfigDatabaseSection) -> dict[str, str]:
+    if 'options' not in section:
+        return {}
+
+    props = section['options'].unwrap_props()
+    if not isinstance(props, dict):
+        return {}
+
+    return {str(key): str(value) for key, value in sorted(props.items())}

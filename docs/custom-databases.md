@@ -234,9 +234,10 @@ Options for a repository can be defined in `/media/fat/downloader.ini` following
 ```ini
 [*custom_db_id*]
 db_url = 'https://url_to_db.json.zip'
+description = 'My custom database'
 filter = arcade
 ```
-For now only the option `filter` can be defined.
+For now only the option `filter` can be defined. You can also add the optional metadata field `description`; it is reported by `--list-dbs` but does not affect downloads.
 
 Database maintainers can also set new default options [for any users haven't set themselves] that will only apply to their repository; think of these as **database-scoped defaults**.
 

@@ -26,7 +26,7 @@ Drop-in files use the exact same format as database sections in `downloader.ini`
 db_url = https://url.to/db.json.zip
 ```
 
-Since it's the same format, you can also add other supported database options like `filter`, and the `database_id` must match the `db_id` inside the JSON file it points to. See [Custom Databases](custom-databases.md) for more details.
+Since it's the same format, you can also add supported database metadata like `description` and options like `filter`, and the `database_id` must match the `db_id` inside the JSON file it points to. See [Custom Databases](custom-databases.md) for more details.
 
 ## One Database per File
 

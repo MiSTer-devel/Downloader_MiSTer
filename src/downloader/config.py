@@ -94,6 +94,7 @@ class ConfigDatabaseSectionRequired(TypedDict):
 
 
 class ConfigDatabaseSection(ConfigDatabaseSectionRequired, total=False):
+    description: str
     options: DbOptions
 
 
