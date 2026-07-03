@@ -263,8 +263,7 @@ class HumanUpdateOutput(UpdateOutput):
 
     def check_finished(self, exit_code: int, status: str) -> None:
         self._logger.print(f'Check finished with code {exit_code}.')
-        if status:
-            print(status, file=sys.stdout, flush=True)
+        self._logger.print(status)
 
     def configured_databases(self, dbs: list[ConfiguredDatabase]) -> None:
         for db_id, section in dbs:
@@ -450,7 +449,7 @@ class LtsvUpdateOutput(UpdateOutput):
 
     def check_finished(self, exit_code: int, status: str) -> None:
         self._emit('check_finish', code=exit_code, status=status)
-        self._human_output.check_finished(exit_code, '')
+        self._human_output.check_finished(exit_code, status)
 
     def configured_databases(self, dbs: list[ConfiguredDatabase]) -> None:
         for db_id, section in dbs:

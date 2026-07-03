@@ -28,13 +28,13 @@ from downloader.constants import DOWNLOADER_OUTPUT_DLP1_LTSV, K_DOWNLOADER_OUTPU
 
 
 class Logger(Protocol):
-    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=True) -> None: """print always"""
+    def print(self, *args: Any, sep: str='', end: str='\n', file: Optional[TextIO]=None, flush: bool=True) -> None: """print always"""
     def debug(self, *args: Any, sep: str='', end: str='\n', flush: bool=True) -> None: """print only to debug target"""
     def bench(self, *args: Any) -> None: """print only to debug target"""
 
 
 class PrintLogger(Logger):
-    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=True) -> None:
+    def print(self, *args: Any, sep: str='', end: str='\n', file: Optional[TextIO]=None, flush: bool=True) -> None:
         _do_print(*args, sep=sep, end=end, file=file, flush=flush)
 
     def debug(self, *args: Any, sep: str='', end: str='\n', flush: bool=True) -> None:
@@ -43,7 +43,8 @@ class PrintLogger(Logger):
     def bench(self, *args: Any) -> None:
         _do_print(*args, sep='', end='\n', file=sys.stdout, flush=True)
 
-def _do_print(*args: Any, sep: str, end: str, file: TextIO, flush: bool) -> None:
+def _do_print(*args: Any, sep: str, end: str, file: Optional[TextIO], flush: bool) -> None:
+    file = sys.stdout if file is None else file
     try:
         print(*args, sep=sep, end=end, file=file, flush=flush)
     except UnicodeEncodeError:
@@ -56,13 +57,13 @@ def _do_print(*args: Any, sep: str, end: str, file: TextIO, flush: bool) -> None
 
 
 class OffLogger(Logger):
-    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=False) -> None: pass
+    def print(self, *args: Any, sep: str='', end: str='\n', file: Optional[TextIO]=None, flush: bool=False) -> None: pass
     def debug(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=False) -> None: pass
     def bench(self, *args: Any) -> None: pass
 
 
 class DebugLtsvLogger(Logger):
-    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=False) -> None: pass
+    def print(self, *args: Any, sep: str='', end: str='\n', file: Optional[TextIO]=None, flush: bool=False) -> None: pass
 
     def debug(self, *args: Any, sep: str='', end: str='\n', flush: bool=True) -> None:
         message = sep.join(['DEBUG| ', *(str(arg) for arg in args)])
@@ -113,7 +114,7 @@ class FileLogger(Logger, FilelogManager):
         if self._logfile is not None:
             self._local_repository.set_temp_log_name(self._logfile.name)
 
-    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=True) -> None:
+    def print(self, *args: Any, sep: str='', end: str='\n', file: Optional[TextIO]=None, flush: bool=True) -> None:
         self._do_print_in_file(*args, sep=sep, end=end, flush=flush)
 
     def debug(self, *args: Any, sep: str='', end: str='\n', flush: bool=True) -> None:
@@ -162,7 +163,7 @@ class TopLogger(Logger, ConfigLogManager):
         else:
             self.file_logger.debug(config_msg)
 
-    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=False) -> None:
+    def print(self, *args: Any, sep: str='', end: str='\n', file: Optional[TextIO]=None, flush: bool=False) -> None:
         self.print_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
         self.file_logger.print(*args, sep=sep, end=end, file=file, flush=flush)
 
@@ -245,7 +246,7 @@ class DebugOnlyLoggerDecorator(Logger):
     def __init__(self, decorated_logger: Logger) -> None:
         self._decorated_logger = decorated_logger
 
-    def print(self, *args: Any, sep: str='', end: str='\n', file: TextIO=sys.stdout, flush: bool=True) -> None:
+    def print(self, *args: Any, sep: str='', end: str='\n', file: Optional[TextIO]=None, flush: bool=True) -> None:
         """Calls debug instead of print"""
         self._decorated_logger.debug(*args, sep=sep, end=end, flush=flush)
 

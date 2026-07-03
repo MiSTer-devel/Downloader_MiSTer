@@ -40,7 +40,7 @@ def main(env: Environment, start_time: float, argv=None) -> int:
     locale.setlocale(locale.LC_CTYPE, "")
     argv = sys.argv if argv is None else argv
     try:
-        args = _parse_args(argv)
+        args = parse_args(argv)
     except SystemExit:
         return 1
 
@@ -154,7 +154,7 @@ def execute_full_run(full_run_service_factory: 'FullRunServiceFactory', args, co
     return exit_code
 
 
-def _parse_args(argv):
+def parse_args(argv):
     prog = Path(argv[0]).name if len(argv) > 0 and argv[0] else 'downloader.sh'
     parser = argparse.ArgumentParser(prog=prog, add_help=False, allow_abbrev=False)
     parser.set_defaults(command='full_run')
