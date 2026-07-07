@@ -77,6 +77,7 @@ FILE_downloader_storage_sigs_json: Final[str] = 'Scripts/.config/downloader/down
 FILE_downloader_storage_fingerprints_json: Final[str] = 'Scripts/.config/downloader/downloader_fingerprints.json'
 FILE_downloader_previous_free_space_json: Final[str] = 'Scripts/.config/downloader/previous_free_space.json'
 FILE_downloader_external_storage: Final[str] = '.downloader_db.json'
+FILE_downloader_external_store_fingerprints_json: Final[str] = '.downloader_db_fingerprints.json'
 FILE_downloader_last_successful_run: Final[str] = 'Scripts/.config/downloader/%s.last_successful_run'
 FILE_downloader_log: Final[str] = 'Scripts/.config/downloader/%s.log'
 FILE_downloader_ini: Final[str] = '/media/fat/downloader.ini'

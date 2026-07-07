@@ -91,6 +91,7 @@ class CheckServiceFactory:
             file_download_reporter=file_download_reporter,
             local_repository=local_repository,
             config=config,
+            external_drives_repository=external_drives_repository,
         )
         online_checker = OnlineChecker(
             logger=self._logger,

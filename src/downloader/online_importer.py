@@ -22,7 +22,8 @@ from collections import defaultdict
 import os
 
 from downloader.config import Config, AllowDelete
-from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY
+from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY, FILE_downloader_storage_fingerprints_json, \
+    FILE_downloader_storage_sigs_json
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.error import DownloaderError
@@ -158,6 +159,7 @@ class OnlineImporterWorkersFactory:
                 installation_report=installation_report,
                 worker_context=self._worker_context,
                 progress_reporter=self._progress_reporter,
+                external_drives_repository=self._target_paths_calculator_factory.external_drives_repository,
             ),
             ProcessDbIndexWorker(
                 logger=self._logger,
@@ -296,14 +298,22 @@ class OnlineImporter:
         for open_db_job, _e in report.get_failed_jobs(OpenDbJob):
             box.add_failed_db(open_db_job.section)
 
+        skipped_after_store_load = False
         for mount_store_db_job in report.get_completed_jobs(MixStoreAndDbJob):
             if mount_store_db_job.skipped is True:
+                skipped_after_store_load = True
                 box.add_skipped_db(mount_store_db_job.db.db_id)
 
         for mount_store_db_job, _e in report.get_failed_jobs(MixStoreAndDbJob):
             box.add_failed_db(mount_store_db_job.db.db_id)
 
         if len(box.skipped_dbs()) == len(db_pkgs):
+            if skipped_after_store_load and len(load_local_store_jobs := report.get_completed_jobs(LoadLocalStoreJob)) >= 1:
+                skipped_local_store = load_local_store_jobs[0].local_store
+                if skipped_local_store is not None and skipped_local_store.needs_save():
+                    self._remove_store_fingerprints()
+                    box.set_local_store(skipped_local_store)
+                    box.set_needs_save(True)
             logger.bench('OnlineImporter early end.')
             logger.debug('Skipping all dbs!')
             return box, None
@@ -420,6 +430,13 @@ class OnlineImporter:
             write_stores[db.db_id] = store.write_only()
             read_stores[db.db_id] = store.read_only()
             stores.append(store)
+        non_current_db_ids = [db_id for db_id in local_store.db_ids() if db_id not in read_stores]
+        non_current_stores = {}
+
+        def non_current_store(db_id):
+            if db_id not in non_current_stores:
+                non_current_stores[db_id] = local_store.store_by_id(db_id)
+            return non_current_stores[db_id]
 
         for db_entity, config, db_hash, db_size in box.installed_db_fingerprints():
             write_stores[db_entity.db_id].set_db_state_fingerprint(db_hash, db_size, db_entity.timestamp, config['filter'])
@@ -427,7 +444,6 @@ class OnlineImporter:
         for db_id, zip_id in box.removed_zips():
             write_stores[db_id].remove_zip_id(zip_id)
 
-        self._file_system = self._file_system
         skipped_db_ids = box.skipped_dbs()
 
         if len(files_to_consume := box.consume_files()) > 0:
@@ -435,10 +451,18 @@ class OnlineImporter:
             # Case-insensitive bookkeeping because MiSTer partitions are FAT32/exFAT: when a db renames
             # a file changing only its case, removing the old path would delete the just-installed file.
             processed_file_names: set[str] = {file_pkg.rel_path.lower() for file_pkgs, db_id in box.non_duplicated_files() for file_pkg in file_pkgs}
-            if len(skipped_db_ids) > 0:
-                file_names_to_consume: set[str] = {pkg.rel_path.lower() for pkg, _dbs in files_to_consume}
-                for db_id in skipped_db_ids:
-                    processed_file_names.update(lower_name for file_name in read_stores[db_id].all_files() if (lower_name := file_name.lower()) in file_names_to_consume)
+            # Claim backstop following the case-sensitivity policy: never unlink a path that
+            # case-insensitively matches a path ANY store still claims, whatever its db state
+            # (processed, skipped, failed mid-run or dormant). A db dropping a path this run is
+            # excluded for that path, so its own stale claim cannot veto its own deletion.
+            lowered_file_consumers: dict[str, set[str]] = {}
+            for pkg, dbs in files_to_consume:
+                lowered_file_consumers.setdefault(pkg.rel_path.lower(), set()).update(dbs)
+            for db_id in local_store.db_ids():
+                claiming_store = read_stores[db_id] if db_id in read_stores else non_current_store(db_id).read_only()
+                for lowered_claim in claiming_store.matching_paths_ci('files', lowered_file_consumers):
+                    if db_id not in lowered_file_consumers[lowered_claim]:
+                        processed_file_names.add(lowered_claim)
             processed_files: dict[str, list[PathPackage]] = defaultdict(list)
             removed_files: list[tuple[PathPackage, list[str]]] = []
 
@@ -506,15 +530,20 @@ class OnlineImporter:
                 self._update_output.file_duplicated([used_db_id, *duplicate_db_ids], file, used_db_id)
 
         if len(directories_to_consume := box.consume_directories()) > 0:
-            skipped_folder_names: set[str] = set()
-            if len(skipped_db_ids) > 0:
-                folder_names_to_consume: set[str] = {pkg.rel_path for pkg, _dbs in directories_to_consume}
-                for db_id in skipped_db_ids:
-                    skipped_folder_names.update(read_stores[db_id].all_folders().keys() & folder_names_to_consume)
+            # Claim backstop for folders, same shape as the files one above.
+            lowered_folder_consumers: dict[str, set[str]] = {}
+            for pkg, dbs in directories_to_consume:
+                lowered_folder_consumers.setdefault(pkg.rel_path.lower(), set()).update(dbs)
+            protected_folder_names: set[str] = set()
+            for db_id in local_store.db_ids():
+                claiming_store = read_stores[db_id] if db_id in read_stores else non_current_store(db_id).read_only()
+                for lowered_claim in claiming_store.matching_paths_ci('folders', lowered_folder_consumers):
+                    if db_id not in lowered_folder_consumers[lowered_claim]:
+                        protected_folder_names.add(lowered_claim)
 
             for pkg, dbs in sorted(directories_to_consume, key=lambda x: len(x[0].full_path), reverse=True):
-                if box.is_folder_installed(pkg.rel_path) or pkg.rel_path in skipped_folder_names:
-                    # If a folder is still owned by any processed or skipped db...
+                if box.is_folder_installed(pkg.rel_path) or pkg.rel_path.lower() in protected_folder_names:
+                    # If a folder is still owned by any processed, skipped, or otherwise stored db...
                     # assert len(dbs) >=1
                     # The for-loop is for when two+ dbs used to have the same folder but one of them has removed it, it should be kept because
                     # one db still uses it. But it should be removed from the store in the other dbs.
@@ -563,7 +592,42 @@ class OnlineImporter:
                 else:
                     self._logger.debug('Not removing empty folders because of != AllowDelete.ALL', removing_folders)
 
-        for db_id, file_pkgs in box.installed_file_pkgs().items():
+        installed_file_pkgs = box.installed_file_pkgs()
+        displaced_non_current_db_ids: list[str] = []
+        if len(skipped_db_ids) > 0 or len(non_current_db_ids) > 0:
+            installed_file_names = {file_pkg.rel_path for file_pkgs in installed_file_pkgs.values() for file_pkg in file_pkgs}
+
+            if len(installed_file_names) > 0:
+                lowered_installed_file_names = {name.lower() for name in installed_file_names}
+                lowered_downloaded_file_names = {name.lower() for name in box.downloaded_files()}
+
+                def displace_file_ownership(read_store, write_store) -> bool:
+                    # Ownership transfer following the case-sensitivity policy: case-insensitive on
+                    # the base drive, exact-case on externals; only from non-running stores.
+                    displaced_file_names = read_store.matching_files(installed_file_names, lowered_installed_file_names)
+                    if len(displaced_file_names) == 0:
+                        return False
+
+                    for file_name in displaced_file_names:
+                        write_store.remove_file(file_name)
+                        write_store.remove_file_from_zips(file_name)
+                    if any(name.lower() in lowered_downloaded_file_names for name in displaced_file_names):
+                        # New content was physically written over a path this store recorded, so its
+                        # view of the disk is now wrong: it must reconcile next run. A mere revalidation
+                        # (identical content already on disk) transfers the claim without invalidation,
+                        # so overlapping dbs converge instead of alternating full runs forever.
+                        write_store.invalidate_db_state_fingerprint()
+                    return True
+
+                for db_id in skipped_db_ids:
+                    displace_file_ownership(read_stores[db_id], write_stores[db_id])
+
+                for db_id in non_current_db_ids:
+                    store = non_current_store(db_id)
+                    if displace_file_ownership(store.read_only(), store.write_only()):
+                        displaced_non_current_db_ids.append(db_id)
+
+        for db_id, file_pkgs in installed_file_pkgs.items():
             for file_pkg in file_pkgs:
                 if 'reboot' in file_pkg.description and file_pkg.description['reboot'] == True:
                     box.set_needs_reboot(True)
@@ -588,12 +652,18 @@ class OnlineImporter:
         for w_store in write_stores.values():
             w_store.cleanup_externals()
 
-        box.set_needs_save(local_store.needs_save())
+        needs_save = local_store.needs_save()
+        if needs_save:
+            self._remove_store_fingerprints()
+        box.set_needs_save(needs_save)
         if box.needs_reboot():
             self._needs_reboot = True
 
         for store in stores:
             self._clean_store(store.unwrap_store())
+
+        for db_id in displaced_non_current_db_ids:
+            self._clean_store(non_current_store(db_id).unwrap_store())
 
         for wrong_db_opts_err in box.wrong_db_options():
             self._fail_ctx.swallow_error(wrong_db_opts_err)
@@ -603,6 +673,19 @@ class OnlineImporter:
 
     def needs_reboot(self) -> bool: return self._needs_reboot
     def _make_jobs(self, db_pkgs: list[DbSectionPackage]) -> list[Job]: return self._worker_factory.create_jobs(db_pkgs)
+
+    def _remove_store_fingerprints(self) -> None:
+        for file_name in [FILE_downloader_storage_fingerprints_json, FILE_downloader_storage_sigs_json]:
+            self._remove_store_fingerprint_file(file_name)
+
+    def _remove_store_fingerprint_file(self, file_name: str) -> None:
+        path = os.path.join(self._config['base_system_path'], file_name)
+        if not self._file_system.is_file(path):
+            return
+
+        err = self._file_system.unlink(path, verbose=False)
+        if err is not None:
+            self._logger.debug('WARNING: Online Importer could not remove store fingerprints ', path, err)
 
     def _recover_failed_file_from_backup_or_tmp(self, pkg: PathPackage, already_exists: bool):
         if not already_exists or ('backup' not in pkg.description and 'tmp' not in pkg.description):

@@ -38,6 +38,10 @@ class TargetPathsCalculatorFactory:
         self._old_pext_paths = old_pext_paths
         self._lock = threading.Lock()
 
+    @property
+    def external_drives_repository(self) -> ExternalDrivesRepository:
+        return self._external_drives_repository
+
     def target_paths_calculator(self, config: Config) -> 'TargetPathsCalculator':
         drives = list(self._external_drives_repository.connected_drives_except_base_path_drives(config))
         return TargetPathsCalculator(self._file_system, config, drives, self._old_pext_paths, self._lock)

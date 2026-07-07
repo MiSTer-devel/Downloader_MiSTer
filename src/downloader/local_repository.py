@@ -16,13 +16,17 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 import os
+from collections import defaultdict
 from typing import Optional
 
 from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_log, \
     FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json, \
     FILE_downloader_storage_sigs_json, FILE_downloader_previous_free_space_json, \
-    FILE_downloader_storage_backup_pext, FILE_downloader_storage_fingerprints_json
+    FILE_downloader_storage_backup_pext, FILE_downloader_storage_fingerprints_json, \
+    FILE_downloader_external_store_fingerprints_json
 from downloader.external_drives_repository import ExternalDrivesRepository
+from downloader.external_store_fingerprints import EXTERNAL_STORE_FINGERPRINTS, external_store_manifest, \
+    external_store_manifest_fragments
 from downloader.fail_policy import FailPolicy
 from downloader.file_system import FileSystem, FsError
 from downloader.local_store_wrapper import LocalStoreWrapper, DbStateFingerprint
@@ -187,6 +191,35 @@ class LocalRepository(FilelogSaver):
         finally:
             self._logger.bench('LocalRepository Load store sigs done.')
 
+    def load_external_store_fingerprints(self) -> dict[str, set[str]]:
+        self._logger.bench('LocalRepository Load external store fingerprints start.')
+        try:
+            fingerprints: dict[str, set[str]] = defaultdict(set)
+            for drive in self._store_drives():
+                manifest_path = self._external_store_fingerprints_path(drive)
+                if not self._file_system.is_file(manifest_path):
+                    continue
+
+                try:
+                    manifest = self._file_system.load_dict_from_file(manifest_path)
+                    for db_id, fingerprint in external_store_manifest_fragments(manifest).items():
+                        fingerprints[db_id].add(fingerprint)
+                except Exception as e:
+                    if self._fail_policy == FailPolicy.FAIL_FAST:
+                        raise e
+                    self._logger.debug(e)
+                    self._logger.print('Could not load external store fingerprints for drive "%s"' % drive)
+
+            return dict(fingerprints)
+        except Exception as e:
+            if self._fail_policy == FailPolicy.FAIL_FAST:
+                raise e
+            self._logger.debug(e)
+            self._logger.print('WARNING: Could not load external store fingerprints')
+            return {}
+        finally:
+            self._logger.bench('LocalRepository Load external store fingerprints done.')
+
     def load_previous_free_spaces(self) -> dict[str, int]:
         self._logger.bench('LocalRepository Load previous free spaces start.')
         try:
@@ -235,6 +268,10 @@ class LocalRepository(FilelogSaver):
     def _store_drives(self):
         return self._external_drives_repository.connected_drives_except_base_path_drives(self._config)
 
+    @staticmethod
+    def _external_store_fingerprints_path(drive: str) -> str:
+        return os.path.join(drive, FILE_downloader_external_store_fingerprints_json)
+
     def has_store_for_pext_error(self) -> bool:
         return self._file_system.is_file(self._storage_backup_pext_path)
 
@@ -281,6 +318,19 @@ class LocalRepository(FilelogSaver):
 
             del store['external']
 
+        external_fingerprints_by_drive = self._external_fingerprints_by_drive(
+            external_stores,
+            set(local_store.get('db_fingerprints', {}))
+        )
+        expected_external_fingerprints_by_db: dict[str, list[str]] = defaultdict(list)
+        for manifest in external_fingerprints_by_drive.values():
+            for db_id, fingerprint in manifest.items():
+                expected_external_fingerprints_by_db[db_id].append(fingerprint)
+
+        for db_id, fingerprint in local_store.get('db_fingerprints', {}).items():
+            if db_id in local_store['dbs']:
+                fingerprint[EXTERNAL_STORE_FINGERPRINTS] = sorted(expected_external_fingerprints_by_db.get(db_id, []))
+
         try:
             self._file_system.make_dirs_parent(self._storage_save_path)
             self._logger.bench('LocalRepository Write store json start.')
@@ -297,12 +347,20 @@ class LocalRepository(FilelogSaver):
             for drive, store in external_stores.items():
                 self._logger.bench('LocalRepository Write external json start: ', drive)
                 external_store_path = os.path.join(drive, FILE_downloader_external_storage)
+                external_store_fingerprints_path = self._external_store_fingerprints_path(drive)
                 try:
                     self._file_system.save_json(store, external_store_path)
+                    manifest = external_fingerprints_by_drive.get(drive, {})
+                    if len(manifest) > 0:
+                        self._file_system.save_json(manifest, external_store_fingerprints_path)
+                    elif self._file_system.is_file(external_store_fingerprints_path):
+                        self._file_system.unlink(external_store_fingerprints_path)
                 except OSError as e:
                     self._logger.debug(e)
                     self._logger.print(f'ERROR: Could not save "{external_store_path}"\n'
                                        f'       Is your drive "{drive}" connected and writable?')
+                    if self._file_system.is_file(external_store_fingerprints_path):
+                        self._file_system.unlink(external_store_fingerprints_path)
                 self._logger.bench('LocalRepository Write external json done: ', drive)
                 external_drives.discard(drive)
 
@@ -310,6 +368,9 @@ class LocalRepository(FilelogSaver):
                 db_to_clean = os.path.join(drive, FILE_downloader_external_storage)
                 if self._file_system.is_file(db_to_clean):
                     self._file_system.unlink(db_to_clean)
+                fingerprints_to_clean = self._external_store_fingerprints_path(drive)
+                if self._file_system.is_file(fingerprints_to_clean):
+                    self._file_system.unlink(fingerprints_to_clean)
 
             self._file_system.touch(self._last_successful_run)
         except FsError as e:
@@ -319,6 +380,13 @@ class LocalRepository(FilelogSaver):
             return None
         finally:
             self._logger.bench('LocalRepository Save store end.')
+
+    @staticmethod
+    def _external_fingerprints_by_drive(external_stores: dict[str, dict], db_ids: set[str]) -> dict[str, dict]:
+        return {
+            drive: external_store_manifest(drive, external_store, db_ids)
+            for drive, external_store in external_stores.items()
+        }
 
     def rotate_logs(self) -> None:
         if not self._config['rotate_logs']:

@@ -22,6 +22,7 @@ from typing import Optional
 from downloader.config import Config, FileChecking
 from downloader.db_utils import DbSectionPackage
 from downloader.fail_policy import FailPolicy
+from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
 from downloader.http_gateway import HttpGateway
 from downloader.job_system import JobSystem, Worker, Job, JobContext, ProgressReporter
@@ -71,7 +72,8 @@ class OnlineCheckerWorkersFactory:
             logger: Logger,
             file_download_reporter: FileDownloadProgressReporter,
             local_repository: LocalRepository,
-            config: Config
+            config: Config,
+            external_drives_repository: Optional[ExternalDrivesRepository] = None
     ):
         self._worker_context = worker_context
         self._progress_reporter = progress_reporter
@@ -81,6 +83,7 @@ class OnlineCheckerWorkersFactory:
         self._file_download_reporter = file_download_reporter
         self._local_repository = local_repository
         self._config = config
+        self._external_drives_repository = external_drives_repository
 
     def create_jobs(self, db_pkgs: list[DbSectionPackage]) -> OnlineCheckerJobs:
         jobs: list[Job] = []
@@ -154,6 +157,7 @@ class OnlineCheckerWorkersFactory:
                 installation_report=installation_report,
                 worker_context=self._worker_context,
                 progress_reporter=self._progress_reporter,
+                external_drives_repository=self._external_drives_repository,
             ),
         ]
         return OnlineCheckerWorkers(workers=workers, installation_report=installation_report)

@@ -21,7 +21,8 @@ from threading import Lock
 from downloader.config import Config
 from downloader.constants import DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE
 from downloader.db_entity import DbEntity
-from downloader.db_utils import build_db_config, can_skip_db, filter_terms_from_ini
+from downloader.db_utils import build_db_config, can_skip_db, can_skip_db_with_external_store_fingerprints, \
+    filter_terms_from_ini
 from downloader.file_system import FileSystem
 from downloader.job_system import Job, WorkerResult, JobContext, ProgressReporter
 from downloader.jobs.load_local_store_fingerprints_job import local_store_fingerprints_tag
@@ -95,14 +96,21 @@ class OpenDbWorker(DownloaderWorker):
         config = build_db_config(input_config=self._config, db=db, ini_description=ini_description)
         job.filter_terms_from_ini = filter_terms_from_ini(input_config=self._config, ini_description=ini_description)
 
+        fingerprint_metadata_required = False
         fingerprints = job.load_local_store_fingerprints_job.local_store_fingerprints
         if fingerprints is not None:
             figp = fingerprints.get(job.section, None)
             if figp is not None:
-                if can_skip_db(self._config['file_checking'], figp, db_hash, db_size, config['filter']):
+                available_external_fingerprints = job.load_local_store_fingerprints_job.available_external_store_fingerprints.get(job.section, set())
+                if can_skip_db_with_external_store_fingerprints(
+                        config['file_checking'], figp, db_hash, db_size, config['filter'], available_external_fingerprints
+                ):
                     self._logger.debug('Skipping db process. No changes detected for: ', db.db_id)
                     job.skipped = True
                     return [], None
+
+                fingerprint_metadata_required = job.load_local_store_fingerprints_job.external_store_fingerprints_supported \
+                    and can_skip_db(config['file_checking'], figp, db_hash, db_size, config['filter'])
 
         jobs: list[Job] = []
         if not job.load_local_store_job.local_store and not self._returned_load_local_store_job:
@@ -117,7 +125,8 @@ class OpenDbWorker(DownloaderWorker):
             db_size=db_size,
             ini_description=ini_description,
             config=config,
-            load_local_store_job=job.load_local_store_job
+            load_local_store_job=job.load_local_store_job,
+            fingerprint_metadata_required=fingerprint_metadata_required,
         ))
 
         self._logger.bench('OpenDbWorker done: ', job.section)

@@ -35,5 +35,7 @@ class LoadLocalStoreFingerprintsWorker(DownloaderWorker):
     def operate_on(self, job: LoadLocalStoreFingerprintsJob) -> WorkerResult:  # type: ignore[override]
         self._logger.bench('LoadLocalStoreFingerprintsWorker start.')
         job.local_store_fingerprints = self._local_repository.load_store_fingerprints()
+        job.available_external_store_fingerprints = self._local_repository.load_external_store_fingerprints()
+        job.external_store_fingerprints_supported = True
         self._logger.bench('LoadLocalStoreFingerprintsWorker done.')
         return [], None

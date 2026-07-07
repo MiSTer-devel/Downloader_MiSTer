@@ -1,5 +1,6 @@
 # Copyright (c) 2021-2026 José Manuel Barroso Galindo <theypsilon@gmail.com>
 import os
+from collections.abc import KeysView
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,10 +24,11 @@ from downloader.db_entity import ZipIndexEntity
 
 from downloader.error import DownloaderError
 from downloader.other import empty_store_without_base_path
-from typing import Any, Optional, TypedDict, cast
+from typing import Any, Collection, Optional, TypedDict, cast
 from types import MappingProxyType
 from collections import defaultdict, ChainMap
 
+from downloader.external_store_fingerprints import external_store_fragment_fingerprint
 from downloader.path_package import PathPackage, PathType
 
 NO_HASH_IN_STORE_CODE = 'file_does_not_exist_so_cant_get_hash'
@@ -70,6 +72,9 @@ class LocalStoreWrapper:
 
     def unwrap_local_store(self) -> LocalStore:
         return self._local_store
+
+    def db_ids(self) -> KeysView[str]:
+        return self._local_store['dbs'].keys()
 
     def mark_force_save(self) -> None:
         self._dirty = True
@@ -348,6 +353,9 @@ class WriteOnlyStoreAdapter:
             self._db_state_fingerprint['filter'] = filter
             self._top_wrapper.mark_force_save()
 
+    def invalidate_db_state_fingerprint(self) -> None:
+        figp = empty_db_state_fingerprint()
+        self.set_db_state_fingerprint(figp['hash'], figp['size'], figp['timestamp'], figp['filter'])
 
     def remove_zip_id(self, zip_id) -> None:
         self.remove_zip_ids([zip_id])
@@ -596,6 +604,19 @@ class ReadOnlyStoreAdapter:
 
         return ChainMap(self._store['files'], *[external['files'] for external in self._store['external'].values() if 'files' in external])
 
+    def matching_files(self, file_names: set[str], lowered_file_names: Optional[set[str]] = None) -> set[str]:
+        """Ownership-transfer matcher following the case-sensitivity policy: case-insensitive on
+        the base section, exact-case on external sections. Returns store-cased keys."""
+        if lowered_file_names is None:
+            lowered_file_names = {name.lower() for name in file_names}
+        matching = {key for key in self._store['files'] if key.lower() in lowered_file_names}
+        if 'external' in self._store:
+            for external in self._store['external'].values():
+                if 'files' in external:
+                    # dict.keys() & set intersects at C speed iterating over the smaller operand
+                    matching |= external['files'].keys() & file_names
+        return matching
+
     @property
     def folders(self) -> dict[str, dict[str, Any]]:
         return self._store['folders']
@@ -606,6 +627,17 @@ class ReadOnlyStoreAdapter:
 
         return ChainMap(self._store['folders'], *[external['folders'] for external in self._store['external'].values() if 'folders' in external])
 
+    def matching_paths_ci(self, kind: str, lowered_candidates: Collection[str]) -> set[str]:
+        """Claim-backstop matcher following the case-sensitivity policy: case-insensitive across
+        base AND external sections. Veto-only usage, so a case-variant guess can never
+        destroy anything. Returns LOWERED paths."""
+        matching = {lowered_key for key in self._store[kind] if (lowered_key := key.lower()) in lowered_candidates}
+        if 'external' in self._store:
+            for external in self._store['external'].values():
+                if kind in external:
+                    matching.update(lowered_key for key in external[kind] if (lowered_key := key.lower()) in lowered_candidates)
+        return matching
+
     @property
     def has_externals(self) -> bool:
         return 'external' in self._store
@@ -613,6 +645,14 @@ class ReadOnlyStoreAdapter:
     @property
     def external_drives(self) -> list[str]:
         return list(self._store['external'])
+
+    def external_fragment_fingerprints(self) -> set[str]:
+        if 'external' not in self._store:
+            return set()
+        return {
+            external_store_fragment_fingerprint(drive, external)
+            for drive, external in self._store['external'].items()
+        }
 
     @property
     def base_path(self):

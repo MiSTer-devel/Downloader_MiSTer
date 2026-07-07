@@ -231,15 +231,20 @@ class FileCheckingModeResolver:
 
             prev_free_spaces = self._local_repository.load_previous_free_spaces()
             actual_free_spaces = self._file_system.free_spaces()
-            if MEDIA_FAT not in prev_free_spaces or MEDIA_FAT not in actual_free_spaces:
+            prev_partitions = set(prev_free_spaces)
+            actual_partitions = set(actual_free_spaces)
+            if MEDIA_FAT not in prev_partitions or MEDIA_FAT not in actual_partitions:
+                return FileChecking.EXHAUSTIVE
+
+            if prev_partitions != actual_partitions:
                 return FileChecking.EXHAUSTIVE
 
             for partition, cur_free_space in actual_free_spaces.items():
-                if partition not in prev_free_spaces:
-                    continue
-
                 if cur_free_space > (prev_free_spaces[partition] + FILE_CHECKING_SPACE_CHECK_TOLERANCE):
                     return FileChecking.EXHAUSTIVE  # Free space as increased substantially... Did the user remove installed files? Assume yes.
+
+                if partition != MEDIA_FAT and cur_free_space < (prev_free_spaces[partition] - FILE_CHECKING_SPACE_CHECK_TOLERANCE):
+                    return FileChecking.EXHAUSTIVE
 
             return FileChecking.FASTEST
 

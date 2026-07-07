@@ -35,6 +35,7 @@ class MixStoreAndDbJob(Job):
     config: Config = field(default_factory=default_config)
     db_hash: str = field(default=DB_STATE_FINGERPRINT_NO_HASH)
     db_size: int = field(default=DB_STATE_FINGERPRINT_NO_SIZE)
+    fingerprint_metadata_required: bool = field(default=False)
 
     def retry_job(self): return None
     @property
