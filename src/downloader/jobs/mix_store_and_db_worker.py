@@ -62,6 +62,7 @@ class MixStoreAndDbWorker(DownloaderWorker):
         figp = read_only_store.db_state_fingerprint()
         if can_skip_db_after_store_load(job, figp, read_only_store, self._external_drives_repository):
             if job.fingerprint_metadata_required and has_expected_external_store_fingerprints(figp):
+                self._logger.debug('Forcing store save to rebuild external fingerprint artifacts for: ', job.db.db_id)
                 local_store.mark_force_save()
             self._logger.debug('Skipping db process. No changes detected for: ', job.db.db_id)
             job.skipped = True
@@ -71,6 +72,7 @@ class MixStoreAndDbWorker(DownloaderWorker):
             # Processing was forced only to establish the external store fingerprints metadata,
             # which is stamped at save time: the run may otherwise produce no store changes, so
             # guarantee the save now or the store never converges and reprocesses every run.
+            self._logger.debug('Forcing store save to stamp missing external fingerprint metadata for: ', job.db.db_id)
             local_store.mark_force_save()
 
         self._logger.bench('MixStoreAndDbWorker done: ', job.db.db_id)
