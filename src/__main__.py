@@ -23,7 +23,7 @@ start_time = time.monotonic()
 from sys import exit
 
 try:
-    from downloader.main import main, read_env
+    from downloader.main import main, read_env, ensure_utf8_filesystem_encoding
 except (ImportError, SyntaxError) as e:
     print(e)
     print('\n')
@@ -39,5 +39,6 @@ except ImportError as e:
     default_commit = None  # type: ignore[assignment]
 
 if __name__ == '__main__':
+    ensure_utf8_filesystem_encoding()
     exit_code = main(read_env(default_commit), start_time)
     exit(exit_code)

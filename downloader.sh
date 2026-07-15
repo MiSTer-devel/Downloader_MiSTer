@@ -157,6 +157,7 @@ download_file() {
 rm ${RUN_PATH} 2> /dev/null || true
 
 export DOWNLOADER_LAUNCHER_PATH="${BASH_SOURCE[0]}"
+export PYTHONUTF8=1
 
 if [[ -s "${LATEST_BIN_PATH}" && -x /usr/bin/python3.9 ]] ; then
     echo "Running MiSTer Downloader" ; echo

@@ -45,6 +45,7 @@ def fetch_temp_downloader():
 def launch_downloader(filename):
     env = os.environ.copy()
     env['PC_LAUNCHER'] = os.path.realpath(__file__)
+    env['PYTHONUTF8'] = '1'
     return subprocess.run([sys.executable, filename], env=env, stderr=subprocess.STDOUT).returncode
 
 

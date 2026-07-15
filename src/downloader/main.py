@@ -33,6 +33,9 @@ from downloader.logger import OffLogger, TopLogger
 from downloader.update_output import update_output_for_mode
 
 
+_UTF8_RELAUNCH_ATTEMPTED_ENV = '_DOWNLOADER_UTF8_RELAUNCH_ATTEMPTED'
+
+
 def main(env: Environment, start_time: float, argv=None) -> int:
     # This function should be called in __main__.py which just bootstraps the application.
     # It should receive an 'env' dictionary produced by calling the "read_env" function below.
@@ -98,6 +101,37 @@ def main(env: Environment, start_time: float, argv=None) -> int:
         logger.file_logger.finalize()
 
     return exit_code
+
+
+def ensure_utf8_filesystem_encoding() -> None:
+    # Filesystem encoding is fixed at startup. Relaunch source builds for non-ASCII paths;
+    # Nuitka enables UTF-8 Mode at build time and must not relaunch itself.
+    if os.name == 'nt' or sys.flags.utf8_mode != 0 or not sys.executable:
+        return
+    if getattr(sys, 'frozen', False) or hasattr(sys.modules['__main__'], '__compiled__'):
+        return
+    if sys.getfilesystemencoding().lower() in ('utf-8', 'utf8'):
+        return
+    # Avoid looping if the replacement ignored -X utf8.
+    if os.getenv(_UTF8_RELAUNCH_ATTEMPTED_ENV) == '1':
+        print(
+            'WARNING! Restarting Downloader did not enable UTF-8 Mode. Continuing without it.',
+            file=sys.stderr,
+            flush=True,
+        )
+        return
+
+    relaunch_env = os.environ.copy()
+    relaunch_env[_UTF8_RELAUNCH_ATTEMPTED_ENV] = '1'
+    try:
+        os.execve(sys.executable, [sys.executable, '-X', 'utf8', *sys.argv], relaunch_env)
+    except OSError as error:
+        # Relaunching is best effort; the normal run must continue.
+        print(
+            'WARNING! Could not restart Downloader in UTF-8 Mode: %s. Continuing without it.' % error,
+            file=sys.stderr,
+            flush=True,
+        )
 
 
 def read_env(default_commit: Optional[str]) -> Environment:
