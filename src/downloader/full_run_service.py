@@ -27,7 +27,7 @@ from downloader.constants import DOWNLOADER_VERSION, EXIT_ERROR_NO_CERTS, EXIT_E
     EXIT_ERROR_FAILED_DBS, EXIT_ERROR_STORE_NOT_LOADED, REBOOT_WAIT_TIME_AFTER_LINUX_UPDATE, \
     REBOOT_WAIT_TIME_STANDARD, FILE_CHECKING_SPACE_CHECK_TOLERANCE, MEDIA_FAT, EXIT_ERROR_NETWORK_PROBLEMS, \
     FILE_downloader_storage_backup_pext, EXIT_ERROR_WRONG_SETUP
-from downloader.db_utils import DbSectionPackage, sorted_db_sections
+from downloader.db_utils import DbSectionPackage, filter_db_sections, sorted_db_sections
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.file_system import FileSystem
 from downloader.linux_updater import LinuxUpdater
@@ -83,9 +83,9 @@ class FullRunService:
         return self._run(None)
 
     def run_only(self, db_ids: list[str]) -> int:
-        return self._run(set(db_id.lower() for db_id in db_ids))
+        return self._run(db_ids)
 
-    def _run(self, filter_db_ids: Optional[set[str]]) -> int:
+    def _run(self, filter_db_ids: Optional[list[str]]) -> int:
         self._update_output.run_started(DOWNLOADER_VERSION, self._config['commit'])
         self._logger.bench('FullRunService Full Run start.')
         result = self._run_impl(filter_db_ids)
@@ -118,7 +118,7 @@ class FullRunService:
 
         return result
 
-    def _run_impl(self, filter_db_ids: Optional[set[str]] = None):
+    def _run_impl(self, filter_db_ids: Optional[list[str]] = None):
         self._logger.debug('Linux Version: %s' % self._linux_updater.get_current_linux_version())
 
         self._local_repository.ensure_base_paths()
@@ -129,18 +129,16 @@ class FullRunService:
             self._logger.debug(f'File checking changed from "{file_checking_opt}" to "{new_file_checking}".')
             self._config['file_checking'] = new_file_checking
 
-        db_sections = sorted_db_sections(self._config)
-        if filter_db_ids is not None:
-            configured_db_ids = set(db_id for db_id, _ in db_sections)
-            invalid_db_ids = sorted(filter_db_ids - configured_db_ids)
-            if len(filter_db_ids) == 0 or len(invalid_db_ids) > 0:
-                if len(filter_db_ids) == 0:
-                    self._update_output.error('run_only_empty_db_ids', 'No database ids were provided.')
-                else:
-                    self._update_output.error('run_only_invalid_db_ids', 'Invalid database ids: ' + ', '.join(invalid_db_ids))
+        if filter_db_ids is None:
+            db_sections = sorted_db_sections(self._config)
+        elif len(filter_db_ids) == 0:
+            self._update_output.error('run_only_empty_db_ids', 'No database ids were provided.')
+            return EXIT_ERROR_WRONG_SETUP
+        else:
+            db_sections, invalid_db_ids = filter_db_sections(self._config, filter_db_ids)
+            if len(invalid_db_ids) > 0:
+                self._update_output.error('run_only_invalid_db_ids', 'Invalid database ids: ' + ', '.join(invalid_db_ids))
                 return EXIT_ERROR_WRONG_SETUP
-
-            db_sections = [(db_id, section) for db_id, section in db_sections if db_id in filter_db_ids]
 
         db_pkgs = [DbSectionPackage(db_id, section) for db_id, section in db_sections]
         #db_pkgs = [db_pkg for db_pkg in db_pkgs  if db_pkg.db_id == 'distribution_mister']

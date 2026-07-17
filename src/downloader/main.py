@@ -168,9 +168,9 @@ def read_env(default_commit: Optional[str]) -> Environment:
     }
 
 
-def execute_check(check_service_factory: 'CheckServiceFactory', _args, config: Config) -> int:
+def execute_check(check_service_factory: 'CheckServiceFactory', args, config: Config) -> int:
     check_service = check_service_factory.create(config)
-    return check_service.check_available_updates()
+    return check_service.check_available_updates(args.check_db_ids)
 
 
 def execute_full_run(full_run_service_factory: 'FullRunServiceFactory', args, config: Config) -> int:
@@ -195,12 +195,14 @@ def parse_args(argv):
     commands = parser.add_mutually_exclusive_group()
     commands.add_argument('--full-run', '-fr', action='store_const', const='full_run', dest='command', help='run Downloader')
     commands.add_argument('--print-drives', '-pd', action='store_const', const='print_drives', dest='command', help='print detected external drives and exit')
-    commands.add_argument('--check', '-c', action='store_const', const='check', dest='command', help='check for available updates and exit')
+    commands.add_argument('--check', '-c', nargs='*', dest='check_db_ids', metavar='DB_ID', help='check for available updates and exit')
     commands.add_argument('--run-only', nargs='+', dest='run_only_db_ids', help='run Downloader only for the listed database IDs')
     commands.add_argument('--list-dbs', action='store_const', const='list_dbs', dest='command', help='list configured database IDs and exit')
     commands.add_argument('--version', '-v', action='store_const', const='version', dest='command', help='print Downloader version and exit')
     args = [arg for arg in (argv[1:] if len(argv) > 0 else []) if arg != '']
     parsed_args = parser.parse_args(args)
-    if parsed_args.run_only_db_ids is not None:
+    if parsed_args.check_db_ids is not None:
+        parsed_args.command = 'check'
+    elif parsed_args.run_only_db_ids is not None:
         parsed_args.command = 'run_only'
     return parsed_args

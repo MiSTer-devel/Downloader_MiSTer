@@ -16,10 +16,12 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from typing import Optional
+
 from downloader.config import Config
 from downloader.constants import CHECK_STATUS_FAILED, CHECK_STATUS_UPDATE_AVAILABLE, CHECK_STATUS_UP_TO_DATE, EXIT_CHECK_FAILED, \
-    EXIT_CHECK_SUCCESS
-from downloader.db_utils import DbSectionPackage, sorted_db_sections
+    EXIT_CHECK_SUCCESS, EXIT_ERROR_WRONG_SETUP
+from downloader.db_utils import DbSectionPackage, filter_db_sections, sorted_db_sections
 from downloader.file_system import FileSystem
 from downloader.local_repository import LocalRepository
 from downloader.logger import Logger
@@ -37,13 +39,25 @@ class CheckService:
         self._update_output = update_output
         self._logger = logger
 
-    def check_available_updates(self) -> int:
+    def check_available_updates(self, db_ids: Optional[list[str]] = None) -> int:
         self._update_output.check_started()
-        self._emit_file_space_state()
+
+        if db_ids:
+            db_sections, invalid_db_ids = filter_db_sections(self._config, db_ids)
+            if len(invalid_db_ids) > 0:
+                self._update_output.error('check_invalid_db_ids', 'Invalid database ids: ' + ', '.join(invalid_db_ids))
+                self._remove_run_signal()
+                self._update_output.check_finished(EXIT_ERROR_WRONG_SETUP, CHECK_STATUS_FAILED)
+                return EXIT_ERROR_WRONG_SETUP
+        else:
+            db_sections = sorted_db_sections(self._config)
+
         db_pkgs = [
             DbSectionPackage(db_id, section)
-            for db_id, section in sorted_db_sections(self._config)
+            for db_id, section in db_sections
         ]
+
+        self._emit_file_space_state()
         check_box = self._online_checker.check_dbs(db_pkgs)
         self._emit_check_box(check_box)
         status = _check_status(check_box, len(db_pkgs))

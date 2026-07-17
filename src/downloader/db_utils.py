@@ -18,7 +18,7 @@
 
 
 from dataclasses import dataclass
-from typing import Any, Mapping, cast
+from typing import Any, Iterable, Mapping, cast
 
 from downloader.config import Config, ConfigDatabaseSection, FileChecking
 from downloader.constants import DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE, \
@@ -47,6 +47,15 @@ def sorted_db_sections(config: Config) -> list[tuple[str, ConfigDatabaseSection]
         result = [first, *result]
 
     return result
+
+
+def filter_db_sections(config: Config, db_ids: Iterable[str]) -> tuple[list[tuple[str, ConfigDatabaseSection]], list[str]]:
+    selected_db_ids = set(db_id.lower() for db_id in db_ids)
+    db_sections = sorted_db_sections(config)
+    configured_db_ids = set(db_id for db_id, _ in db_sections)
+    invalid_db_ids = sorted(selected_db_ids - configured_db_ids)
+    selected_sections = [(db_id, section) for db_id, section in db_sections if db_id in selected_db_ids]
+    return selected_sections, invalid_db_ids
 
 
 def build_db_config(input_config: Config, db: DbEntity, ini_description: ConfigDatabaseSection) -> Config:
