@@ -16,7 +16,10 @@
 # You can download the latest version of this tool from:
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
+from pathlib import Path
+
 from downloader.config import Config
+from downloader.constants import FILE_downloader_run_signal
 from downloader.db_utils import sorted_db_sections
 from downloader.update_output import UpdateOutput
 
@@ -27,4 +30,12 @@ class ListDbsService:
 
     def list_dbs(self, config: Config) -> int:
         self._update_output.configured_databases(sorted_db_sections(config))
+        self._remove_run_signal()
         return 0
+
+    @staticmethod
+    def _remove_run_signal() -> None:
+        try:
+            Path(FILE_downloader_run_signal).unlink(missing_ok=True)
+        except OSError:
+            pass
