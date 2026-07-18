@@ -191,10 +191,10 @@ class LocalRepository(FilelogSaver):
         finally:
             self._logger.bench('LocalRepository Load store sigs done.')
 
-    def load_external_store_fingerprints(self) -> dict[str, set[str]]:
+    def load_external_store_fingerprints(self) -> dict[str, list[str]]:
         self._logger.bench('LocalRepository Load external store fingerprints start.')
         try:
-            fingerprints: dict[str, set[str]] = defaultdict(set)
+            fingerprints: dict[str, list[str]] = defaultdict(list)
             for drive in self._store_drives():
                 manifest_path = self._external_store_fingerprints_path(drive)
                 if not self._file_system.is_file(manifest_path):
@@ -203,7 +203,7 @@ class LocalRepository(FilelogSaver):
                 try:
                     manifest = self._file_system.load_dict_from_file(manifest_path)
                     for db_id, fingerprint in external_store_manifest_fragments(manifest).items():
-                        fingerprints[db_id].add(fingerprint)
+                        fingerprints[db_id].append(fingerprint)
                 except Exception as e:
                     if self._fail_policy == FailPolicy.FAIL_FAST:
                         raise e
@@ -384,7 +384,7 @@ class LocalRepository(FilelogSaver):
     @staticmethod
     def _external_fingerprints_by_drive(external_stores: dict[str, dict], db_ids: set[str]) -> dict[str, dict]:
         return {
-            drive: external_store_manifest(drive, external_store, db_ids)
+            drive: external_store_manifest(external_store, db_ids)
             for drive, external_store in external_stores.items()
         }
 

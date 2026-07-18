@@ -18,20 +18,22 @@
 
 import hashlib
 import json
+from collections import Counter
 from typing import Any, Mapping, Optional
 
 
 EXTERNAL_STORE_FINGERPRINTS = 'external_store_fingerprints'
 
 
-def external_store_fragment_fingerprint(drive: str, fragment: dict[str, Any]) -> str:
+def external_store_fragment_fingerprint(fragment: dict[str, Any]) -> str:
+    # Content-only hash: drives cannot be identified by mount path, so there is no drive salt.
     canonical_fragment = json.dumps(fragment, sort_keys=True, separators=(',', ':'), ensure_ascii=True)
-    return hashlib.md5(f'{drive}\0{canonical_fragment}'.encode()).hexdigest()
+    return hashlib.md5(canonical_fragment.encode()).hexdigest()
 
 
-def external_store_manifest(drive: str, external_store: dict[str, Any], db_ids: set[str]) -> dict[str, str]:
+def external_store_manifest(external_store: dict[str, Any], db_ids: set[str]) -> dict[str, str]:
     return {
-        db_id: external_store_fragment_fingerprint(drive, fragment)
+        db_id: external_store_fragment_fingerprint(fragment)
         for db_id, fragment in external_store.get('dbs', {}).items()
         if db_id in db_ids
     }
@@ -44,11 +46,21 @@ def external_store_manifest_fragments(manifest: Mapping[str, Any]) -> dict[str, 
     return {db_id: fingerprint for db_id, fingerprint in manifest.items() if isinstance(fingerprint, str)}
 
 
-def expected_external_store_fingerprints(figp: Mapping[str, Any]) -> Optional[set[str]]:
+def expected_external_store_fingerprints(figp: Mapping[str, Any]) -> Optional[list[str]]:
     expected = figp.get(EXTERNAL_STORE_FINGERPRINTS)
     if not isinstance(expected, list):
         return None
-    return set(expected)
+    return list(expected)
+
+
+def external_store_fingerprints_covered(expected: list[str], available: list[str]) -> bool:
+    # Mirror drives repeat the same fingerprint, so compare amounts, not just membership.
+    expected_amounts = Counter(expected)
+    available_amounts = Counter(available)
+    for fingerprint, amount in expected_amounts.items():
+        if available_amounts[fingerprint] < amount:
+            return False
+    return True
 
 
 def has_external_store_fingerprint_metadata(figp: Mapping[str, Any]) -> bool:

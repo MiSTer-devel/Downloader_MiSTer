@@ -646,13 +646,14 @@ class ReadOnlyStoreAdapter:
     def external_drives(self) -> list[str]:
         return list(self._store['external'])
 
-    def external_fragment_fingerprints(self) -> set[str]:
+    def external_fragment_fingerprints(self) -> list[str]:
         if 'external' not in self._store:
-            return set()
-        return {
-            external_store_fragment_fingerprint(drive, external)
-            for drive, external in self._store['external'].items()
-        }
+            return []
+        # List, not set: repeated fingerprints from mirror drives must keep their count.
+        return [
+            external_store_fragment_fingerprint(external)
+            for external in self._store['external'].values()
+        ]
 
     @property
     def base_path(self):

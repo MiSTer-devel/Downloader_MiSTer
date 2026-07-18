@@ -101,7 +101,7 @@ class OpenDbWorker(DownloaderWorker):
         if fingerprints is not None:
             figp = fingerprints.get(job.section, None)
             if figp is not None:
-                available_external_fingerprints = job.load_local_store_fingerprints_job.available_external_store_fingerprints.get(job.section, set())
+                available_external_fingerprints = job.load_local_store_fingerprints_job.available_external_store_fingerprints.get(job.section, [])
                 if can_skip_db_with_external_store_fingerprints(
                         config['file_checking'], figp, db_hash, db_size, config['filter'], available_external_fingerprints
                 ):

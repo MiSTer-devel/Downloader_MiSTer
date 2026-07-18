@@ -28,7 +28,7 @@ class LoadLocalStoreFingerprintsJob(Job):
     def __init__(self, /) -> None:
         # Results
         self.local_store_fingerprints: Optional[dict[str, DbStateFingerprint]] = None
-        self.available_external_store_fingerprints: dict[str, set[str]] = {}
+        self.available_external_store_fingerprints: dict[str, list[str]] = {}
         self.external_store_fingerprints_supported: bool = False
 
     def backup_job(self) -> Optional[Job]: return None

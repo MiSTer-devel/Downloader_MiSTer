@@ -24,7 +24,8 @@ from downloader.config import Config, ConfigDatabaseSection, FileChecking
 from downloader.constants import DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE, \
     DB_STATE_FINGERPRINT_NO_TIMESTAMP, K_FILTER
 from downloader.db_entity import DbEntity
-from downloader.external_store_fingerprints import expected_external_store_fingerprints
+from downloader.external_store_fingerprints import expected_external_store_fingerprints, \
+    external_store_fingerprints_covered
 from downloader.local_store_wrapper import DbStateFingerprint
 
 
@@ -123,11 +124,11 @@ def can_skip_db_with_external_store_fingerprints(
         db_hash: str,
         db_size: int,
         user_filter: str,
-        available_external_store_fingerprints: set[str],
+        available_external_store_fingerprints: list[str],
 ) -> bool:
     if not can_skip_db(file_checking, cast(DbStateFingerprint, figp), db_hash, db_size, user_filter):
         return False
 
     expected_external_fingerprints = expected_external_store_fingerprints(figp)
     return expected_external_fingerprints is not None \
-        and expected_external_fingerprints.issubset(available_external_store_fingerprints)
+        and external_store_fingerprints_covered(expected_external_fingerprints, available_external_store_fingerprints)
