@@ -28,7 +28,7 @@ from downloader.config import Config, Environment, InvalidConfigParameter, defau
 from downloader.config_reader import ConfigReader
 from downloader.constants import CHECK_STATUS_FAILED, KENV_LOGLEVEL, KENV_DOWNLOADER_OUTPUT, KENV_LC_HTTP_PROXY, KENV_HTTP_PROXY, \
     KENV_HTTPS_PROXY, KENV_LC_HTTPS_PROXY, KENV_ROTATE_LOGS, KENV_SKIP_FREE_SPACE_CHECKS, DOWNLOADER_OUTPUT_HUMAN, \
-    K_DOWNLOADER_OUTPUT, DOWNLOADER_VERSION
+    K_DOWNLOADER_OUTPUT
 from downloader.logger import OffLogger, TopLogger
 from downloader.update_output import update_output_for_mode
 
@@ -48,8 +48,8 @@ def main(env: Environment, start_time: float, argv=None) -> int:
         return 1
 
     if args.command == 'version':
-        print(version_for_cli(env['RELEASE_PATCH']))
-        return 0
+        from downloader.version_service import VersionService
+        return VersionService().print_version(env['RELEASE_PATCH'])
 
     config_reader = ConfigReader(OffLogger(), env, start_time)
     config = default_config()
@@ -101,11 +101,6 @@ def main(env: Environment, start_time: float, argv=None) -> int:
         logger.file_logger.finalize()
 
     return exit_code
-
-
-def version_for_cli(release_patch: Optional[int]) -> str:
-    suffix = str(release_patch) if release_patch is not None else 'dev'
-    return f'{DOWNLOADER_VERSION}.{suffix}'
 
 
 def ensure_utf8_filesystem_encoding() -> None:
