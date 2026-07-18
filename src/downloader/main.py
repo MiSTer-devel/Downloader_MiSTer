@@ -48,7 +48,7 @@ def main(env: Environment, start_time: float, argv=None) -> int:
         return 1
 
     if args.command == 'version':
-        print(DOWNLOADER_VERSION)
+        print(version_for_cli(env['RELEASE_PATCH']))
         return 0
 
     config_reader = ConfigReader(OffLogger(), env, start_time)
@@ -103,6 +103,11 @@ def main(env: Environment, start_time: float, argv=None) -> int:
     return exit_code
 
 
+def version_for_cli(release_patch: Optional[int]) -> str:
+    suffix = str(release_patch) if release_patch is not None else 'dev'
+    return f'{DOWNLOADER_VERSION}.{suffix}'
+
+
 def ensure_utf8_filesystem_encoding() -> None:
     # Filesystem encoding is fixed at startup. Relaunch source builds for non-ASCII paths;
     # Nuitka enables UTF-8 Mode at build time and must not relaunch itself.
@@ -134,9 +139,9 @@ def ensure_utf8_filesystem_encoding() -> None:
         )
 
 
-def read_env(default_commit: Optional[str]) -> Environment:
-    # The default_commit should be coming from the commit.py file which is produced by the building process.
-    # It's not under version control, so if it's not present, it will come as "None".
+def read_env(default_commit: Optional[str], default_release_patch: Optional[int] = None) -> Environment:
+    # The defaults should be coming from the commit.py file which is produced by the building process.
+    # It's not under version control, so if it's not present, they will come as "None".
     from downloader.constants import DISTRIBUTION_MISTER_DB_ID, DISTRIBUTION_MISTER_DB_URL, DEFAULT_CURL_SSL_OPTIONS, \
     KENV_DOWNLOADER_INI_PATH, KENV_DOWNLOADER_LAUNCHER_PATH, KENV_EXTRA_DROP_IN_DATABASE_FILES, KENV_CURL_SSL, KENV_COMMIT, KENV_ALLOW_REBOOT, \
     KENV_UPDATE_LINUX, KENV_DEFAULT_DB_URL, KENV_DEFAULT_DB_ID, KENV_DEFAULT_BASE_PATH, KENV_DEBUG, \
@@ -151,6 +156,7 @@ def read_env(default_commit: Optional[str]) -> Environment:
         'DOWNLOADER_OUTPUT': os.getenv(KENV_DOWNLOADER_OUTPUT, DOWNLOADER_OUTPUT_HUMAN).lower(),
         'CURL_SSL': os.getenv(KENV_CURL_SSL, DEFAULT_CURL_SSL_OPTIONS),
         'COMMIT': os.getenv(KENV_COMMIT, default_commit or 'unknown'),
+        'RELEASE_PATCH': default_release_patch,
         'ALLOW_REBOOT': os.getenv(KENV_ALLOW_REBOOT, None),
         'UPDATE_LINUX': os.getenv(KENV_UPDATE_LINUX, DEFAULT_UPDATE_LINUX_ENV).lower(),
         'DEFAULT_DB_URL': os.getenv(KENV_DEFAULT_DB_URL, DISTRIBUTION_MISTER_DB_URL),

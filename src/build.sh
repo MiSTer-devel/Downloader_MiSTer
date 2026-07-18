@@ -16,7 +16,7 @@ cd src
 
 cp -r downloader "${TEMPDIR}/downloader"
 if [[ "${SKIP_COMMIT:-false}" != "true" ]] ; then
-  echo "default_commit = '$(git rev-parse --short HEAD)'" > "${TEMPDIR}/commit.py"
+  bash ./generate_build_metadata.sh > "${TEMPDIR}/commit.py"
   COMMIT_FILE="commit.py"
 else
   COMMIT_FILE=""

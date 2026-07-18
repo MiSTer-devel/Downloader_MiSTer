@@ -9,9 +9,9 @@ TARGET_FILE="$(pwd)/${1}"
 
 cd src
 
-NEW_COMMIT="default_commit = '$(git rev-parse --short HEAD)'"
-if [[ ! -f "commit.py" ]] || [[ "$(cat commit.py 2>/dev/null || echo '')" != "${NEW_COMMIT}" ]]; then
-  echo "${NEW_COMMIT}" > "commit.py"
+NEW_METADATA="$(bash ./generate_build_metadata.sh)"
+if [[ ! -f "commit.py" ]] || [[ "$(cat commit.py 2>/dev/null || echo '')" != "${NEW_METADATA}" ]]; then
+  printf '%s\n' "${NEW_METADATA}" > "commit.py"
 fi
 if [[ "${NUITKA_IMAGE:-}" == "" ]] ; then
   docker buildx build --platform=linux/arm/v7 --load -t arm32v7-nuitka -f Dockerfile.nuitka  .

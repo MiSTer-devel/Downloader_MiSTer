@@ -34,11 +34,12 @@ except (ImportError, SyntaxError) as e:
     exit(10)  # Same exit value as: downloader.constants.EXIT_ERROR_WRONG_SETUP
 
 try:
-    from commit import default_commit  # type: ignore[import-not-found]
-except ImportError as e:
+    from commit import default_commit, default_release_patch  # type: ignore[import-not-found]
+except ImportError:
     default_commit = None  # type: ignore[assignment]
+    default_release_patch = None  # type: ignore[assignment]
 
 if __name__ == '__main__':
     ensure_utf8_filesystem_encoding()
-    exit_code = main(read_env(default_commit), start_time)
+    exit_code = main(read_env(default_commit, default_release_patch), start_time)
     exit(exit_code)

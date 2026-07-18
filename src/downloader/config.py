@@ -37,6 +37,7 @@ class Environment(TypedDict):
     DOWNLOADER_OUTPUT: str
     CURL_SSL: str
     COMMIT: str
+    RELEASE_PATCH: Optional[int]
     ALLOW_REBOOT: Optional[str]
     UPDATE_LINUX: str
     DEFAULT_DB_URL: str

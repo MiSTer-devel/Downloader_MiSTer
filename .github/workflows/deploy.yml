@@ -82,9 +82,23 @@ jobs:
       run: |
         set -euo pipefail
 
+        CURRENT_RELEASE_PATCH="$(< .github/release_patch)"
+        if [[ ! "${CURRENT_RELEASE_PATCH}" =~ ^(0|[1-9][0-9]*)$ ]]; then
+          echo "Invalid release patch: ${CURRENT_RELEASE_PATCH}" >&2
+          exit 1
+        fi
+        RELEASE_PATCH="$((CURRENT_RELEASE_PATCH + 1))"
+        printf '%s\n' "${RELEASE_PATCH}" > release_patch
+
         SKIP_COMMIT=true ./src/build.sh | sha256sum > latest.id
-        ZIP_FILE="$(pwd)/dont_download.zip" ./src/build.sh > dont_download.sh
+        RELEASE_PATCH="${RELEASE_PATCH}" ZIP_FILE="$(pwd)/dont_download.zip" ./src/build.sh > dont_download.sh
         cp src/downloader.zip downloader.zip
+
+        BASE_VERSION="$(PYTHONPATH=src python3 -c 'from downloader.constants import DOWNLOADER_VERSION; print(DOWNLOADER_VERSION)')"
+        EXPECTED_VERSION="${BASE_VERSION}.${RELEASE_PATCH}"
+        test "$(/bin/bash ./dont_download.sh --version)" = "${EXPECTED_VERSION}"
+        test "$(python3 ./dont_download.zip --version)" = "${EXPECTED_VERSION}"
+        test "$(python3 ./downloader.zip --version)" = "${EXPECTED_VERSION}"
 
     - name: Build Test
       run: ./.github/downloader_test.py distribution_mister $(pwd)/.github/fixtures/tiny_db.json
@@ -100,6 +114,7 @@ jobs:
           dont_download.zip
           dont_download.sh
           downloader.zip
+          release_patch
 
   pc-launcher-test:
     runs-on: ${{ matrix.os }}
@@ -186,7 +201,7 @@ jobs:
         cache-to: type=registry,ref=ghcr.io/${{ steps.vars.outputs.owner_lc }}/arm32v7-nuitka:cache,mode=max
 
     - name: Compile
-      run: ./src/compile.sh downloader_bin
+      run: RELEASE_PATCH="$(< release_patch)" ./src/compile.sh downloader_bin
       env:
         NUITKA_IMAGE: ghcr.io/${{ steps.vars.outputs.owner_lc }}/arm32v7-nuitka:latest
 
