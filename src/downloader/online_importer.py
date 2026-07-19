@@ -466,19 +466,20 @@ class OnlineImporter:
             processed_files: dict[str, list[PathPackage]] = defaultdict(list)
             removed_files: list[tuple[PathPackage, list[str]]] = []
 
-            unlink_list: list[tuple[list[str], str, list[str]]] = []
+            unlink_list: list[tuple[list[str], str, list[str], int]] = []
             failed_entanglements = box.failed_file_entanglements()
             for pkg, dbs in files_to_consume:
                 if is_entangled_with(pkg, failed_entanglements):
                     continue
                 db_ids = list(dbs)
                 tangles = pkg.description.get(FILE_PROP_ENTANGLEMENTS, [])
+                size = pkg.description.get('size', 0)
                 lower_rel_path = pkg.rel_path.lower()
 
                 for db_id in db_ids:
                     if lower_rel_path in processed_file_names: continue
                     for is_external, drive in read_stores[db_id].list_other_drives_for_file(pkg.rel_path, pkg.drive):
-                        unlink_list.append((db_ids, os.path.join(drive, pkg.rel_path), tangles))
+                        unlink_list.append((db_ids, os.path.join(drive, pkg.rel_path), tangles, size))
 
                 for db_id in db_ids:
                     write_stores[db_id].remove_file(pkg.rel_path)
@@ -486,9 +487,9 @@ class OnlineImporter:
 
                 if lower_rel_path in processed_file_names: continue
                 if pkg.is_pext_external():
-                    unlink_list.append((db_ids, os.path.join(self._config['base_path'], pkg.rel_path), tangles))
+                    unlink_list.append((db_ids, os.path.join(self._config['base_path'], pkg.rel_path), tangles, size))
 
-                unlink_list.append((db_ids, pkg.full_path, tangles))
+                unlink_list.append((db_ids, pkg.full_path, tangles, size))
                 processed_files[db_ids[0]].append(pkg)
                 processed_file_names.add(lower_rel_path)
                 removed_files.append((pkg, db_ids))
@@ -502,11 +503,11 @@ class OnlineImporter:
                 self._logger.debug('Not deleted files because AllowDelete.NONE: ', unlink_list)
                 unlink_list = []
 
-            for db_ids, unlink_file, tangles in unlink_list:
+            for db_ids, unlink_file, tangles, size in unlink_list:
                 if self._file_system.is_file(unlink_file):
                     err = self._file_system.unlink(unlink_file, verbose=False)
                     if err is None or not self._file_system.is_file(unlink_file, use_cache=False):
-                        self._update_output.file_removed(db_ids, unlink_file, tangles)
+                        self._update_output.file_removed(db_ids, unlink_file, tangles, size)
                     if err is not None:
                         self._logger.debug('WARNING: Online Importer could not remove ', unlink_file, err)
 

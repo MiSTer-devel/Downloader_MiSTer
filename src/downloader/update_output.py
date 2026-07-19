@@ -38,7 +38,7 @@ class UpdateOutput(Protocol):
     def jobs_cancelled(self, count: int) -> None: pass
     def file_started(self, db_id: str, path: str, size: int, tangles: list[str]) -> None: pass
     def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '', reboot: bool = False) -> None: pass
-    def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None: pass
+    def file_removed(self, dbs: list[str], path: str, tangles: list[str], size: int) -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
     # dbs are all the databases declaring the path; used_db_id is the one whose copy is used, the others were skipped as duplicates.
     def file_duplicated(self, dbs: list[str], path: str, used_db_id: str) -> None: pass
@@ -77,7 +77,7 @@ class NoopUpdateOutput(UpdateOutput):
     def jobs_cancelled(self, count: int) -> None: pass
     def file_started(self, db_id: str, path: str, size: int, tangles: list[str]) -> None: pass
     def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '', reboot: bool = False) -> None: pass
-    def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None: pass
+    def file_removed(self, dbs: list[str], path: str, tangles: list[str], size: int) -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
     def file_duplicated(self, dbs: list[str], path: str, used_db_id: str) -> None: pass
     def not_overwritten(self, db_id: str, path: str) -> None: pass
@@ -160,7 +160,7 @@ class HumanUpdateOutput(UpdateOutput):
         if self._needs_newline or self._check_time < time.monotonic():
             self._print_symbols()
 
-    def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None:
+    def file_removed(self, dbs: list[str], path: str, tangles: list[str], size: int) -> None:
         self._print_line(f'Removing {path}')
 
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None:
@@ -347,14 +347,14 @@ class LtsvUpdateOutput(UpdateOutput):
         self._emit('file_done', **fields)
         self._human_output.file_completed(db_id, path, size, already_exists, zip_id, reboot)
 
-    def file_removed(self, dbs: list[str], path: str, tangles: list[str]) -> None:
+    def file_removed(self, dbs: list[str], path: str, tangles: list[str], size: int) -> None:
         dbs = sorted(_valid_string_list(dbs))
         tangles = _valid_string_list(tangles)
         fields: dict[str, Union[str, int]] = {'dbs': ','.join(dbs), 'path': path}
         if len(tangles) > 0:
             fields['tangle'] = ','.join(tangles)
         self._emit('file_remove', **fields)
-        self._human_output.file_removed(dbs, path, tangles)
+        self._human_output.file_removed(dbs, path, tangles, size)
 
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None:
         self._emit('file_fail', db=db_id, size=size, path=path, reason=reason)
