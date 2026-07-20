@@ -31,7 +31,11 @@ fi
 find "${TEMPDIR}" -type f ! -name '*.py' -exec rm -f {} +
 find "${TEMPDIR}" -type f -print0 | while IFS= read -r -d '' file ; do pin_metadata "${file}" ; done
 pushd "${TEMPDIR}" >/dev/null 2>&1
-zip -q -0 -D -X -A -r "${DOWNLOADER_ZIP}" __main__.py "${COMMIT_FILE}" downloader -x "*/__pycache__/*"
+{
+  printf '%s\n' __main__.py
+  if [[ -n "${COMMIT_FILE}" ]] ; then printf '%s\n' "${COMMIT_FILE}" ; fi
+  find downloader -type f ! -path '*/__pycache__/*'
+} | LC_ALL=C sort | zip -q -0 -D -X -A "${DOWNLOADER_ZIP}" -@
 pin_metadata "${DOWNLOADER_ZIP}"
 echo '#!/usr/bin/env python3' | cat - "${DOWNLOADER_ZIP}" > "${TEMP_ZIP2}"
 pin_metadata "${TEMP_ZIP2}"
