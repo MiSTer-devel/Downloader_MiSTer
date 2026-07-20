@@ -62,6 +62,13 @@ class LinuxUpdater:
             return
 
         if linux_descriptions_count > 1:
+            ini_positions = {}
+            for position, db_id in enumerate(self._config['databases']):
+                ini_positions[db_id] = position
+
+            position_for_unlisted = len(ini_positions)
+            self._linux_descriptions.sort(key=lambda desc: ini_positions.get(desc['id'], position_for_unlisted))
+
             ignored_ids = ', '.join(ignored['id'] for ignored in self._linux_descriptions[1:])
             self._update_output.warning('linux_multiple_dbs', f'Too many databases try to update linux. Only 1 can be processed. Ignoring: {ignored_ids}')
 
