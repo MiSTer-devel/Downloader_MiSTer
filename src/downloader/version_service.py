@@ -24,9 +24,9 @@ from downloader.constants import DOWNLOADER_VERSION, FILE_downloader_run_signal
 
 class VersionService:
     def print_version(self, release_patch: Optional[int]) -> int:
-        self._remove_run_signal()
         suffix = str(release_patch) if release_patch is not None else 'dev'
         print(f'{DOWNLOADER_VERSION}.{suffix}')
+        self._remove_run_signal()
         return 0
 
     @staticmethod

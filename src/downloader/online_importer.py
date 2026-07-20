@@ -23,7 +23,7 @@ import os
 
 from downloader.config import Config, AllowDelete
 from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY, FILE_downloader_storage_fingerprints_json, \
-    FILE_downloader_storage_sigs_json
+    FILE_downloader_storage_sigs_json, FILE_PROP_ENTANGLEMENTS
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.error import DownloaderError
@@ -68,8 +68,6 @@ from downloader.local_store_wrapper import LocalStoreWrapper, StoreFragmentDrive
 from downloader.path_package import PathPackage
 from downloader.target_path_calculator import TargetPathsCalculatorFactory
 from downloader.update_output import UpdateOutput
-
-FILE_PROP_ENTANGLEMENTS = 'tangle'
 
 
 class OnlineImporterWorkersFactory:

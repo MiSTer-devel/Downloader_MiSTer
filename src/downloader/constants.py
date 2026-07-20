@@ -152,6 +152,9 @@ JOB_SYSTEM_INACTIVITY_TIMEOUT: Final[int] = 600
 # Filters
 ESSENTIAL_TERM: Final[str] = 'essential'
 
+# File Description Property Keys
+FILE_PROP_ENTANGLEMENTS: Final[str] = 'tangle'
+
 # Config Dictionary Keys
 K_BASE_PATH: Final[str] = 'base_path'
 K_BASE_SYSTEM_PATH: Final[str] = 'base_system_path'

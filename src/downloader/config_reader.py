@@ -128,6 +128,7 @@ class ConfigReader:
 
             self._logger.debug("Reading db section:", section)
             config['databases'][section_id] = self._parse_database_section(default_db, parser, section_id)
+            config['database_sources'][section_id] = config_path
 
         self._logger.debug('Read sections done.')
 
@@ -219,7 +220,7 @@ class ConfigReader:
             return
 
         self._logger.bench('ConfigReader Read drop-in databases start.')
-        db_sources = {db_id: config_path for db_id in result['databases']}
+        db_sources = result['database_sources']
         for drop_in_path in drop_in_files:
             self._logger.debug('Reading drop-in:', drop_in_path)
             drop_in_config = self._load_drop_in_ini(drop_in_path)
@@ -240,8 +241,10 @@ class ConfigReader:
                     raise InvalidConfigParameter("Drop-in file '%s' contains a [%s] section. The main distribution database is only allowed in the base downloader.ini." % (drop_in_path, DISTRIBUTION_MISTER_DB_ID))
 
                 if section_id in result['databases']:
-                    self._logger.print("WARNING: Drop-in file '%s' defines database '%s' which is already defined in '%s', skipping." % (drop_in_path, section_id, db_sources[section_id]))
-                    result['ignored_databases'].append({'file': drop_in_path, 'db_id': section_id, 'reason': 'duplicate', 'ctx': db_sources[section_id]})
+                    source = db_sources.get(section_id)
+                    origin = source if source is not None else 'the environment default database'
+                    self._logger.print("WARNING: Drop-in file '%s' defines database '%s' which is already defined in '%s', skipping." % (drop_in_path, section_id, origin))
+                    result['ignored_databases'].append({'file': drop_in_path, 'db_id': section_id, 'reason': 'duplicate', 'ctx': origin})
                     continue
 
                 parser = IniParser(drop_in_config[section])

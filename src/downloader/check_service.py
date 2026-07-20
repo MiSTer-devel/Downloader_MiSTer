@@ -41,14 +41,20 @@ class CheckService:
 
     def check_available_updates(self, db_ids: Optional[list[str]] = None) -> int:
         self._update_output.check_started()
+        result, status = self._check_available_updates(db_ids)
+        self._remove_run_signal()
+        self._update_output.check_finished(result, status)
+        return result
 
+    def _check_available_updates(
+            self,
+            db_ids: Optional[list[str]],
+    ) -> tuple[int, str]:
         if db_ids:
             db_sections, invalid_db_ids = filter_db_sections(self._config, db_ids)
             if len(invalid_db_ids) > 0:
                 self._update_output.error('check_invalid_db_ids', 'Invalid database ids: ' + ', '.join(invalid_db_ids))
-                self._remove_run_signal()
-                self._update_output.check_finished(EXIT_ERROR_WRONG_SETUP, CHECK_STATUS_FAILED)
-                return EXIT_ERROR_WRONG_SETUP
+                return EXIT_ERROR_WRONG_SETUP, CHECK_STATUS_FAILED
         else:
             db_sections = sorted_db_sections(self._config)
 
@@ -61,10 +67,7 @@ class CheckService:
         check_box = self._online_checker.check_dbs(db_pkgs)
         self._emit_check_box(check_box)
         status = _check_status(check_box, len(db_pkgs))
-        result = _check_result(status)
-        self._remove_run_signal()
-        self._update_output.check_finished(result, status)
-        return result
+        return _check_result(status), status
 
     def _emit_file_space_state(self) -> None:
         previous_free_spaces = self._local_repository.load_previous_free_spaces()
@@ -77,6 +80,8 @@ class CheckService:
             )
 
     def _emit_check_box(self, check_box: CheckBox) -> None:
+        if check_box.error() is not None:
+            self._update_output.error('unexpected')
         for db_id in sorted(check_box.up_to_date_dbs()):
             self._update_output.check_database_up_to_date(db_id)
         for db_id in sorted(check_box.need_update_dbs()):
@@ -91,7 +96,7 @@ class CheckService:
 
 
 def _check_status(check_box: CheckBox, db_count: int) -> str:
-    if len(check_box.failed_dbs()) > 0 or len(check_box.fingerprint_failures()) > 0:
+    if check_box.error() is not None or len(check_box.failed_dbs()) > 0 or len(check_box.fingerprint_failures()) > 0:
         return CHECK_STATUS_FAILED
     checked_dbs = len(check_box.up_to_date_dbs()) + len(check_box.need_update_dbs())
     if checked_dbs != db_count:

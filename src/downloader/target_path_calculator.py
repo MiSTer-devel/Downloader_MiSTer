@@ -46,6 +46,9 @@ class TargetPathsCalculatorFactory:
         drives = list(self._external_drives_repository.connected_drives_except_base_path_drives(config))
         return TargetPathsCalculator(self._file_system, config, drives, self._old_pext_paths, self._lock)
 
+    def stored_paths_calculator(self, config: Config) -> 'TargetPathsCalculator':
+        return TargetPathsCalculator(self._file_system, config, [], self._old_pext_paths, self._lock)
+
 
 class TargetPathsCalculator:
     def __init__(self, file_system: FileSystem, config: Config, drives: list[str], old_pext_paths: set[str], lock: threading.Lock) -> None:
@@ -121,6 +124,43 @@ class TargetPathsCalculator:
                 pkg.pext_props = None
 
         return result_pkgs, errors
+
+    def create_stored_path_packages(
+            self,
+            packages: Union[ItemsView[str, dict[str, Any]], list[tuple[str, dict[str, Any]]]],
+            ty: PathType,
+            stored_drive: Optional[str],
+    ) -> list[PathPackage]:
+        # Stored-location resolution is identical to create_path_packages except that pext
+        # files land on the KNOWN stored drive instead of a deduced install target. So reuse
+        # that pass and overwrite only the pext placement. This is a stored-paths calculator,
+        # built with no drives, so the deduction it runs does no filesystem probing.
+        result_pkgs, _errors = self.create_path_packages(packages, ty)
+        for pkg in result_pkgs:
+            if pkg._full_path is not None:
+                continue
+            if stored_drive is not None:
+                self._set_stored_pext_path(pkg, stored_drive, PEXT_KIND_EXTERNAL)
+            elif pkg.description.get('path') == 'pext':
+                self._set_stored_pext_path(pkg, self._config['base_path'], PEXT_KIND_STANDARD)
+        return result_pkgs
+
+    @staticmethod
+    def _set_stored_pext_path(pkg: PathPackage, drive: str, kind: PextKind) -> None:
+        parts = Path(pkg.rel_path).parts
+        parent = parts[0] if len(parts) > 0 else ''
+        if kind == PEXT_KIND_STANDARD and pkg.ty == PATH_TYPE_FOLDER and len(parts) <= 1:
+            kind = PEXT_KIND_PARENT
+            parent = pkg.rel_path
+        pkg.drive = drive
+        pkg.kind = PATH_PACKAGE_KIND_PEXT
+        pkg.pext_props = PextPathProps(
+            kind,
+            parent,
+            drive,
+            (),
+            pkg.ty == PATH_TYPE_FOLDER and len(parts) == 2,
+        )
 
     def _deduce_possible_external_target_path(self, path: str, path_type: PathType) -> tuple[tuple[str, PextPathProps], Optional['StoragePriorityError']]:
         path_obj = Path(path)

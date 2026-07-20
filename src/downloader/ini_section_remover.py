@@ -17,5 +17,19 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 
+import re
+
+
 def remove_ini_section(content: bytes, section: str) -> tuple[bytes, bool]:
-    raise NotImplementedError('GREEN phase pending')
+    header = re.compile(
+        rb'^[ \t]*\[([^\]\r\n]+)\][ \t]*(?:[;#][^\r\n]*)?(?:\r\n|\n|\r|$)',
+        re.MULTILINE,
+    )
+    matches = list(header.finditer(content))
+    section_bytes = section.encode('utf-8').lower()
+    for index, match in enumerate(matches):
+        if match.group(1).strip().lower() != section_bytes:
+            continue
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
+        return content[:match.start()] + content[end:], True
+    return content, False

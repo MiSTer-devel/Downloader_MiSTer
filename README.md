@@ -98,16 +98,17 @@ http_proxy = ''
 ### Feature Roadmap
 
 - [x] Initial Release
-- [x] [Cheats](https://gamehacking.org/mister/) fetching
+- [x] [Cheats](https://gamehacking.org/mister/) fetching with [ZIP archive support](docs/custom-databases-archives.md)
 - [x] First-run optimisations
-- [x] Configurable custom download filters
+- [x] [Configurable custom download filters](docs/download-filters.md)
 - [x] Storage Priority Resolution for automatically detecting connected drives
 - [x] Free space checks
 - [x] Opt-in parameter to bypass strict file checks
-- [ ] Fast check for update availability (without triggering an actual update)
+- [x] [Fast check for update availability (without triggering an actual update)](docs/check.md)
 - [ ] HTTP cookie support
-- [ ] Uninstall database feature
+- [x] [Uninstall database feature](docs/uninstall.md)
 - [ ] Firmware integration
+- [ ] Support for signed databases
 
 Check the [CHANGELOG](CHANGELOG.md) for more information about past releases.
 

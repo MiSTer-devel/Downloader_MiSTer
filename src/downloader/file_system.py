@@ -22,6 +22,7 @@ import hashlib
 import shutil
 import json
 import socket
+import tempfile
 import threading
 import time
 import zipfile
@@ -125,6 +126,10 @@ class FileSystem(ABC):
 
     @abstractmethod
     def write_file_contents(self, path: str, content: str) -> int:
+        """interface"""
+
+    @abstractmethod
+    def write_file_bytes_atomically(self, path: str, content: bytes) -> Optional[Exception]:
         """interface"""
 
     @abstractmethod
@@ -359,6 +364,33 @@ class _FileSystem(FileSystem):
         self._debug_log('Writing file contents', (path, full_path))
         with open(full_path, 'w') as f:
             return f.write(content)
+
+    def write_file_bytes_atomically(self, path: str, content: bytes) -> Optional[Exception]:
+        full_path = self._path(path)
+        parent = os.path.dirname(full_path) or '.'
+        temporary_path: Optional[str] = None
+        try:
+            descriptor, temporary_path = tempfile.mkstemp(
+                prefix=f'.{os.path.basename(full_path)}.',
+                suffix='.tmp',
+                dir=parent,
+            )
+            with os.fdopen(descriptor, 'wb') as temporary_file:
+                temporary_file.write(content)
+                temporary_file.flush()
+                if os.path.exists(full_path):
+                    shutil.copystat(full_path, temporary_path)
+                os.fsync(temporary_file.fileno())
+            os.replace(temporary_path, full_path)
+            self._shared_state.add_file(full_path)
+            return None
+        except Exception as error:
+            if temporary_path is not None:
+                try:
+                    os.unlink(temporary_path)
+                except OSError:
+                    pass
+            return error
 
     def touch(self, path: str) -> None:
         full_path = self._path(path)

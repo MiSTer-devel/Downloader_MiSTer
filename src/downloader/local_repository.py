@@ -133,12 +133,15 @@ class LocalRepository(FilelogSaver):
     def load_store(self):
         self._logger.bench('LocalRepository Load store start.')
         try:
-            if self._file_system.is_file(self._storage_load_path):
+            has_main_store = self._file_system.is_file(self._storage_load_path)
+            if has_main_store:
                 local_store = self._file_system.load_dict_from_file(self._storage_load_path)
                 self._store_migrator.migrate(local_store)
             else:
                 local_store = make_new_local_store(self._store_migrator)
 
+            main_db_ids = set(local_store['dbs'])
+            configured_db_ids = set(self._config['databases'])
             external_drives = self._store_drives()
 
             for drive in external_drives:
@@ -157,6 +160,8 @@ class LocalRepository(FilelogSaver):
                     continue
 
                 for db_id, external in external_store['dbs'].items():
+                    if has_main_store and db_id not in main_db_ids and db_id not in configured_db_ids:
+                        continue
                     if db_id not in local_store['dbs'] or len(local_store['dbs'][db_id]) == 0:
                         local_store['dbs'][db_id] = empty_store_without_base_path()
                     local_store['dbs'][db_id]['external'] = local_store['dbs'][db_id].get('external', {})

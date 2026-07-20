@@ -129,6 +129,7 @@ class ConfigRequired(ConfigMisterSection):
     is_pc_launcher: bool
     skip_free_space_checks: bool
     databases: dict[str, ConfigDatabaseSection]
+    database_sources: dict[str, str]
     ignored_databases: list[IgnoredDatabase]
     config_path: Path
     commit: str
@@ -150,6 +151,7 @@ def default_config() -> Config:
         'ssl_cert_file': '',
         'http_logging': False,
         'databases': {},
+        'database_sources': {},
         'ignored_databases': [],
         'config_path': Path(FILE_downloader_ini),
         'base_path': MEDIA_FAT,

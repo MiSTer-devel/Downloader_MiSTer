@@ -184,6 +184,16 @@ class OnlineChecker:
         return jobs.jobs
 
     def check_dbs(self, db_pkgs: list[DbSectionPackage]) -> 'CheckBox':
+        try:
+            return self._check_dbs(db_pkgs)
+        except Exception as error:
+            self._logger.debug(error)
+            check_box = CheckBox()
+            check_box.set_error(error)
+            self._logger.bench('OnlineChecker end.')
+            return check_box
+
+    def _check_dbs(self, db_pkgs: list[DbSectionPackage]) -> 'CheckBox':
         self._logger.bench('OnlineChecker start.')
 
         self._job_system.register_workers(self._make_workers())
@@ -231,6 +241,7 @@ class CheckBox:
         self._failed_dbs: set[str] = set()
         self._up_to_date_dbs: set[str] = set()
         self._fingerprint_failures: set[str] = set()
+        self._error: Optional[Exception] = None
 
     def add_need_update_db(self, db_id: str) -> None:
         self._need_update_dbs.add(db_id)
@@ -244,7 +255,11 @@ class CheckBox:
     def add_fingerprint_failure(self, failure_id: str) -> None:
         self._fingerprint_failures.add(failure_id)
 
+    def set_error(self, error: Exception) -> None:
+        self._error = error
+
     def need_update_dbs(self) -> list[str]: return list(self._need_update_dbs)
     def failed_dbs(self) -> list[str]: return list(self._failed_dbs)
     def up_to_date_dbs(self) -> list[str]: return list(self._up_to_date_dbs)
     def fingerprint_failures(self) -> list[str]: return list(self._fingerprint_failures)
+    def error(self) -> Optional[Exception]: return self._error

@@ -40,6 +40,7 @@ class UpdateOutput(Protocol):
     def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '', reboot: bool = False) -> None: pass
     def file_removed(self, dbs: list[str], path: str, tangles: list[str], size: int) -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
+    def file_skipped(self, db_id: str, path: str, size: int, reason: str) -> None: pass
     # dbs are all the databases declaring the path; used_db_id is the one whose copy is used, the others were skipped as duplicates.
     def file_duplicated(self, dbs: list[str], path: str, used_db_id: str) -> None: pass
     def not_overwritten(self, db_id: str, path: str) -> None: pass
@@ -65,6 +66,8 @@ class UpdateOutput(Protocol):
     def check_fingerprint_failure(self, failure_id: str) -> None: pass
     def check_finished(self, exit_code: int, status: str) -> None: pass
     def configured_databases(self, dbs: list[ConfiguredDatabase]) -> None: pass
+    def uninstall_started(self, total_bytes: int, total_files: int, total_dbs: int) -> None: pass
+    def uninstall_finished(self, exit_code: int, removed_bytes: int, removed_files: int) -> None: pass
 
 
 class NoopUpdateOutput(UpdateOutput):
@@ -79,6 +82,7 @@ class NoopUpdateOutput(UpdateOutput):
     def file_completed(self, db_id: str, path: str, size: int, already_exists: bool, zip_id: str = '', reboot: bool = False) -> None: pass
     def file_removed(self, dbs: list[str], path: str, tangles: list[str], size: int) -> None: pass
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None: pass
+    def file_skipped(self, db_id: str, path: str, size: int, reason: str) -> None: pass
     def file_duplicated(self, dbs: list[str], path: str, used_db_id: str) -> None: pass
     def not_overwritten(self, db_id: str, path: str) -> None: pass
     def full_partition(self, path: str, bytes_needed: int) -> None: pass
@@ -101,6 +105,8 @@ class NoopUpdateOutput(UpdateOutput):
     def check_fingerprint_failure(self, failure_id: str) -> None: pass
     def check_finished(self, exit_code: int, status: str) -> None: pass
     def configured_databases(self, dbs: list[ConfiguredDatabase]) -> None: pass
+    def uninstall_started(self, total_bytes: int, total_files: int, total_dbs: int) -> None: pass
+    def uninstall_finished(self, exit_code: int, removed_bytes: int, removed_files: int) -> None: pass
 
 
 class HumanUpdateOutput(UpdateOutput):
@@ -166,6 +172,10 @@ class HumanUpdateOutput(UpdateOutput):
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None:
         self._symbols.append('~')
         self._print_symbols()
+
+    def file_skipped(self, db_id: str, path: str, size: int, reason: str) -> None:
+        if reason == 'drive_disconnected':
+            self._print_line(f'Skipping {path}: external drive disconnected.')
 
     def file_duplicated(self, dbs: list[str], path: str, used_db_id: str) -> None:
         self._print_line(f'DUPLICATED: {path} in [{", ".join(dbs)}] [using {used_db_id} instead]')
@@ -271,6 +281,12 @@ class HumanUpdateOutput(UpdateOutput):
             option_text = ''.join(f' {key}={value}' for key, value in fields.items())
             self._logger.print(f"{db_id} {section['db_url']}{option_text}")
 
+    def uninstall_started(self, total_bytes: int, total_files: int, total_dbs: int) -> None:
+        self._logger.print(f'{total_files} files ({_megabytes(total_bytes)}) to remove.')
+
+    def uninstall_finished(self, exit_code: int, removed_bytes: int, removed_files: int) -> None:
+        self._logger.print(f'Removed {removed_files} files ({_megabytes(removed_bytes)}).')
+
     def _print_symbols(self) -> None:
         if len(self._symbols) == 0:
             return
@@ -350,7 +366,10 @@ class LtsvUpdateOutput(UpdateOutput):
     def file_removed(self, dbs: list[str], path: str, tangles: list[str], size: int) -> None:
         dbs = sorted(_valid_string_list(dbs))
         tangles = _valid_string_list(tangles)
-        fields: dict[str, Union[str, int]] = {'dbs': ','.join(dbs), 'path': path}
+        fields: dict[str, Union[str, int]] = {'dbs': ','.join(dbs)}
+        if size:
+            fields['size'] = size
+        fields['path'] = path
         if len(tangles) > 0:
             fields['tangle'] = ','.join(tangles)
         self._emit('file_remove', **fields)
@@ -359,6 +378,10 @@ class LtsvUpdateOutput(UpdateOutput):
     def file_failed(self, db_id: str, path: str, size: int, reason: str) -> None:
         self._emit('file_fail', db=db_id, size=size, path=path, reason=reason)
         self._human_output.file_failed(db_id, path, size, reason)
+
+    def file_skipped(self, db_id: str, path: str, size: int, reason: str) -> None:
+        self._emit('file_skip', db=db_id, size=size, path=path, reason=reason)
+        self._human_output.file_skipped(db_id, path, size, reason)
 
     def file_duplicated(self, dbs: list[str], path: str, used_db_id: str) -> None:
         dbs = sorted(_valid_string_list(dbs))
@@ -457,6 +480,12 @@ class LtsvUpdateOutput(UpdateOutput):
             fields.update(_configured_db_extra_fields(section))
             self._emit('configured_db', **fields)
 
+    def uninstall_started(self, total_bytes: int, total_files: int, total_dbs: int) -> None:
+        self._emit('uninstall_start', bytes=total_bytes, files=total_files, dbs=total_dbs)
+
+    def uninstall_finished(self, exit_code: int, removed_bytes: int, removed_files: int) -> None:
+        self._emit('uninstall_finish', code=exit_code, bytes=removed_bytes, files=removed_files)
+
     def _emit(self, event: str, **fields: Union[str, int]) -> None:
         line = ['DLP1', f'event:{_sanitize(event)}']
         for key, value in fields.items():
@@ -470,6 +499,10 @@ def update_output_for_mode(mode: str, logger: Logger) -> UpdateOutput:
 
 def _sanitize(value: str) -> str:
     return value.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
+
+
+def _megabytes(size: int) -> str:
+    return f'{size / (1024 * 1024):.1f} MB'
 
 
 def _valid_string_list(values: object) -> list[str]:
