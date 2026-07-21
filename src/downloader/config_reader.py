@@ -19,6 +19,7 @@
 
 import configparser
 import glob
+import io
 import os
 import re
 from pathlib import Path
@@ -37,6 +38,7 @@ from downloader.constants import FILE_downloader_ini, FOLDER_downloader, DEFAULT
 from downloader.db_options import DbOptions, DbOptionsProps, DbOptionsValidationException
 from downloader.http_gateway import http_config, HttpGatewayException
 from downloader.logger import Logger
+from downloader.update_output import UpdateOutput
 
 
 class ConfigReader:
@@ -132,6 +134,8 @@ class ConfigReader:
 
         self._logger.debug('Read sections done.')
 
+        self._register_skipped_duplicated_sections(ini_config, config_path, config)
+
         if len(config['databases']) == 0:
             self._logger.debug('Reading default db')
             self._add_default_database(ini_config, config)
@@ -198,20 +202,32 @@ class ConfigReader:
 
         self._logger.bench('ConfigReader Read config done.')
 
+    def report_findings(self, config: Config, update_output: UpdateOutput) -> None:
+        for ignored in config['ignored_databases']:
+            if ignored['file'] == ignored['ctx']:
+                line = ignored['line'] if 'line' in ignored else 0
+                update_output.warning('db_ignored_duplicate', "WARNING: ini file '%s' defines section '%s' again at line %d, only the first one is used." % (ignored['file'], ignored['db_id'], line))
+            else:
+                update_output.warning('db_ignored_duplicate', "WARNING: Drop-in file '%s' defines database '%s' which is already defined in '%s', skipping." % (ignored['file'], ignored['db_id'], ignored['ctx']))
+
     @staticmethod
     def _abort_pc_launcher_wrong_paths(path_kind: str, path_variable: str, section: str) -> None:
         print('Can not run the PC Launcher with custom "%s" under the [%s] section of the downloader.ini file.' % (path_variable, section))
         print('PC Launcher and custom %s paths are not possible simultaneously.' % path_kind)
         exit(EXIT_ERROR_WRONG_SETUP)
 
-    def _load_ini_config(self, config_path) -> configparser.ConfigParser:
-        ini_config = configparser.ConfigParser(inline_comment_prefixes=(';', '#'))
+    def _load_ini_config(self, config_path) -> 'IniConfig':
+        ini_config = IniConfig()
         try:
             ini_config.read(config_path)
         except Exception as e:
             self._logger.debug(e)
             self._logger.print('Could not read ini file %s' % config_path)
             raise e
+        for section, duplicated_line, first_line in ini_config.skipped_duplicated_sections:
+            # [MiSTer] duplicates are not recorded in ignored_databases, so they are only reported here.
+            if section.lower() == 'mister':
+                self._logger.print("WARNING: ini file '%s' contains a duplicated section [%s] at line %d (first defined at line %d), only the first one is used." % (config_path, section, duplicated_line, first_line))
         return ini_config
 
     def _load_drop_in_databases(self, config_path: str, result: Config, default_db: ConfigDatabaseSection) -> None:
@@ -228,7 +244,6 @@ class ConfigReader:
             sections = drop_in_config.sections()
             if len(sections) == 0:
                 self._logger.print('WARNING: Drop-in file %s contains no sections, skipping.' % drop_in_path)
-                result['ignored_databases'].append({'file': drop_in_path, 'reason': 'empty'})
                 continue
 
             for section in sections:
@@ -243,7 +258,6 @@ class ConfigReader:
                 if section_id in result['databases']:
                     source = db_sources.get(section_id)
                     origin = source if source is not None else 'the environment default database'
-                    self._logger.print("WARNING: Drop-in file '%s' defines database '%s' which is already defined in '%s', skipping." % (drop_in_path, section_id, origin))
                     result['ignored_databases'].append({'file': drop_in_path, 'db_id': section_id, 'reason': 'duplicate', 'ctx': origin})
                     continue
 
@@ -251,7 +265,19 @@ class ConfigReader:
                 result['databases'][section_id] = self._parse_database_section(default_db, parser, section_id)
                 db_sources[section_id] = drop_in_path
 
+            self._register_skipped_duplicated_sections(drop_in_config, drop_in_path, result)
+
         self._logger.bench('ConfigReader Read drop-in databases end.')
+
+    @staticmethod
+    def _register_skipped_duplicated_sections(ini_config: 'IniConfig', config_path: str, result: Config) -> None:
+        for section, duplicated_line, _first_line in ini_config.skipped_duplicated_sections:
+            section_id = section.lower()
+            if section_id == 'mister':
+                continue
+            if any(entry['file'] == config_path and entry.get('db_id') == section_id for entry in result['ignored_databases']):
+                continue
+            result['ignored_databases'].append({'file': config_path, 'db_id': section_id, 'reason': 'duplicate', 'ctx': config_path, 'line': duplicated_line})
 
     def _discover_drop_in_files(self, config_path: str) -> list[str]:
         return _deduplicate_drop_in_files(self._discover_fs_drop_in_files(config_path) + self._discover_extra_drop_in_files())
@@ -285,10 +311,10 @@ class ConfigReader:
         self._logger.debug(f'Extra drop-in database files:', extra_drop_ins)
         return extra_drop_ins
 
-    def _load_drop_in_ini(self, drop_in_path: str) -> configparser.ConfigParser:
+    def _load_drop_in_ini(self, drop_in_path: str) -> 'IniConfig':
         return self._load_ini_config(drop_in_path)
 
-    def _add_default_database(self, ini_config: configparser.ConfigParser, result: Config) -> None:
+    def _add_default_database(self, ini_config: 'IniConfig', result: Config) -> None:
         default_db = self._default_db_config()
         db_section: ConfigDatabaseSection = {
             'db_url': ini_config['DEFAULT'].get(K_DB_URL, default_db['db_url']),
@@ -430,6 +456,62 @@ class ConfigReader:
         else:
             self._logger.print(f'WARNING: file_checking value "{parameter}" is not recognized. Defaulting to "balanced".\n      See the documentation for valid options.')
             return FileChecking.BALANCED
+
+
+class IniConfig:
+    """Adapter over ConfigParser that tolerates duplicated sections within a single ini file:
+    the first occurrence wins and later ones are collected in skipped_duplicated_sections
+    as (section, duplicated_line, first_line) tuples."""
+
+    def __init__(self) -> None:
+        self._parser = configparser.ConfigParser(inline_comment_prefixes=(';', '#'))
+        self.skipped_duplicated_sections: list[tuple[str, int, int]] = []
+
+    def read(self, config_path: str) -> None:
+        try:
+            with open(config_path, 'r') as fp:
+                content = fp.read()
+        except OSError:
+            return
+        self.read_string(content, source=config_path)
+
+    def read_string(self, content: str, source: str = '<string>') -> None:
+        deduplicated = ''.join(self._lines_without_duplicated_sections(io.StringIO(content)))
+        self._parser.read_string(deduplicated, source=source)
+
+    def sections(self) -> list[str]:
+        return self._parser.sections()
+
+    def __getitem__(self, key: str) -> configparser.SectionProxy:
+        return self._parser[key]
+
+    def _lines_without_duplicated_sections(self, fp):
+        seen_sections: dict[str, int] = {}
+        option_indent = None
+        skipping = False
+        for lineno, line in enumerate(fp, start=1):
+            stripped = line.strip()
+            if not stripped or stripped.startswith(('#', ';')):
+                if not skipping:
+                    yield line
+                continue
+            # A header-looking line indented deeper than the current option line is a
+            # multiline value continuation, not a section header (mirrors configparser).
+            indent = len(line) - len(line.lstrip())
+            mo = self._parser.SECTCRE.match(stripped)
+            if mo is not None and (option_indent is None or indent <= option_indent):
+                header = mo.group('header')
+                option_indent = None
+                if header != self._parser.default_section and header in seen_sections:
+                    self.skipped_duplicated_sections.append((header, lineno, seen_sections[header]))
+                    skipping = True
+                    continue
+                seen_sections[header] = lineno
+                skipping = False
+            elif option_indent is None or indent <= option_indent:
+                option_indent = indent
+            if not skipping:
+                yield line
 
 
 def _is_eligible_drop_in(path: str) -> bool:

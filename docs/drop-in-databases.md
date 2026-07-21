@@ -44,6 +44,8 @@ Drop-in files cannot contain a `[MiSTer]` section.
 
 If a database ID already exists in `downloader.ini` or in an earlier drop-in file (alphabetical order), the duplicate is skipped with a warning. The first occurrence always wins.
 
+The same applies within a single file: a section repeated in the same `.ini` file is skipped with a warning, and only the first occurrence is used.
+
 ### Hidden files are ignored
 
 Files starting with `.` (like `.backup.ini`) are skipped.

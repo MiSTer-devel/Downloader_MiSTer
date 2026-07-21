@@ -74,19 +74,18 @@ class FileChecking(IntEnum):
     EXHAUSTIVE = 2
     VERIFY_INTEGRITY = 3
 
-class IgnoredDatabaseDuplicate(TypedDict):
+class IgnoredDatabaseDuplicateOptional(TypedDict, total=False):
+    line: int
+
+
+class IgnoredDatabaseDuplicate(IgnoredDatabaseDuplicateOptional):
     file: str
     db_id: str
     reason: Literal['duplicate']
     ctx: str
 
 
-class IgnoredDatabaseEmpty(TypedDict):
-    file: str
-    reason: Literal['empty']
-
-
-IgnoredDatabase = Union[IgnoredDatabaseDuplicate, IgnoredDatabaseEmpty]
+IgnoredDatabase = IgnoredDatabaseDuplicate
 
 
 class ConfigDatabaseSectionRequired(TypedDict):

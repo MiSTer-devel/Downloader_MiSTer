@@ -64,6 +64,7 @@ def main(env: Environment, start_time: float, argv=None) -> int:
     try:
         config_path = config_reader.calculate_config_path(str(Path().resolve()))
         config_reader.read_rest_env_and_config_file(config_path, config)
+        config_reader.report_findings(config, update_output)
         exit_code = execute_command(args, config, logger, update_output)
     except InvalidConfigParameter as e:
         logger.debug(e)
