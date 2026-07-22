@@ -36,12 +36,12 @@ class ListDbsService:
     def list_dbs(self, config: Config, db_filter: str = 'all') -> int:
         if db_filter in ('all', 'configured'):
             self._update_output.configured_databases(sorted_db_sections(config))
-        if db_filter in ('all', 'stored'):
-            self._update_output.stored_databases(self._stored_db_ids(config))
+        if db_filter in ('all', 'installed'):
+            self._update_output.installed_databases(self._installed_db_ids(config))
         self._remove_run_signal()
         return 0
 
-    def _stored_db_ids(self, config: Config) -> list[str]:
+    def _installed_db_ids(self, config: Config) -> list[str]:
         fingerprints_path = os.path.join(config['base_system_path'], FILE_downloader_storage_fingerprints_json)
         try:
             if not self._file_system.is_file(fingerprints_path):

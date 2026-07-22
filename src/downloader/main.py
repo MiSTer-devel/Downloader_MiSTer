@@ -187,8 +187,8 @@ def parse_args(argv):
     commands.add_argument('--uninstall', nargs='+', dest='uninstall_db_ids', metavar='DB_ID',
                           help='uninstall the listed databases')
     commands.add_argument('--list-dbs', nargs='?', const='all', default=None, dest='list_dbs_filter',
-                          metavar='SOURCE', choices=('all', 'configured', 'stored'),
-                          help='list database IDs and exit (optionally only "configured" or "stored")')
+                          metavar='SOURCE', choices=('all', 'configured', 'installed'),
+                          help='list database IDs and exit (optionally only "configured" or "installed")')
     commands.add_argument('--version', '-v', action='store_const', const='version', dest='command',
                           help='print Downloader version and exit')
     parser.add_argument('--force', action='store_true', help='accept unverifiable external content during uninstall')
