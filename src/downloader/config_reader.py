@@ -27,7 +27,7 @@ from typing import Optional, TypeVar, Union, SupportsInt
 
 
 from downloader.config import Environment, Config, default_config, InvalidConfigParameter, AllowReboot, \
-    ConfigDatabaseSection, ConfigMisterSection, AllowDelete, FileChecking
+    ConfigDatabaseSection, ConfigMisterSection, AllowDelete, FileChecking, IgnoredDatabase
 from downloader.constants import FILE_downloader_ini, FOLDER_downloader, DEFAULT_UPDATE_LINUX_ENV, K_DEFAULT_DB_ID, K_BASE_PATH, DISTRIBUTION_MISTER_DB_ID, \
     K_DB_URL, K_DOWNLOADER_THREADS_LIMIT, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, K_FILTER, K_BASE_SYSTEM_PATH, \
     K_STORAGE_PRIORITY, K_ALLOW_DELETE, K_ALLOW_REBOOT, K_VERBOSE, K_UPDATE_LINUX, K_MINIMUM_SYSTEM_FREE_SPACE_MB, \
@@ -46,6 +46,7 @@ class ConfigReader:
         self._logger = logger
         self._env = env
         self._start_time = start_time
+        self._section_lines_by_file: dict[str, dict[str, int]] = {}
 
     def set_logger(self, logger: Logger) -> None:
         self._logger = logger
@@ -107,6 +108,10 @@ class ConfigReader:
         self._logger.debug('Reading file:', config_path)
         self._logger.bench('ConfigReader Read config start.')
 
+        # Section line numbers are scoped to this single config read, so a reused
+        # ConfigReader never carries stale per-file maps across calls.
+        self._section_lines_by_file = {}
+
         if self._env['DEFAULT_BASE_PATH'] is not None:
             config['base_path'] = self._env['DEFAULT_BASE_PATH']
             config['base_system_path'] = self._env['DEFAULT_BASE_PATH']
@@ -134,13 +139,15 @@ class ConfigReader:
 
         self._logger.debug('Read sections done.')
 
-        self._register_skipped_duplicated_sections(ini_config, config_path, config)
+        base_ini_has_databases = len(config['databases']) > 0
 
-        if len(config['databases']) == 0:
-            self._logger.debug('Reading default db')
-            self._add_default_database(ini_config, config)
+        config['ignored_databases'] += ini_config.ignored_sections(config_path)
 
         self._load_drop_in_databases(config_path, config, default_db)
+
+        if not base_ini_has_databases and default_db['section'] not in config['databases']:
+            self._logger.debug('Reading default db')
+            self._add_default_database(ini_config, config)
 
         if self._env['ALLOW_REBOOT'] is not None:
             config['allow_reboot'] = AllowReboot(int(self._env['ALLOW_REBOOT']))
@@ -203,12 +210,20 @@ class ConfigReader:
         self._logger.bench('ConfigReader Read config done.')
 
     def report_findings(self, config: Config, update_output: UpdateOutput) -> None:
+        mister_duplicates = []
         for ignored in config['ignored_databases']:
-            if ignored['file'] == ignored['ctx']:
-                line = ignored['line'] if 'line' in ignored else 0
-                update_output.warning('db_ignored_duplicate', "WARNING: ini file '%s' defines section '%s' again at line %d, only the first one is used." % (ignored['file'], ignored['db_id'], line))
+            if ignored.file == ignored.ctx:
+                if ignored.section.lower() == 'mister':
+                    mister_duplicates.append((ignored.file, ignored.line, ignored.first_line))
+                    update_output.error('mister_section_duplicated', "ini file '%s' defines section '%s' again at line %d (first defined at line %d)." % (ignored.file, ignored.section, ignored.line, ignored.first_line))
+                else:
+                    update_output.warning('db_ignored_duplicate', "WARNING: ini file '%s' defines section '%s' again at line %d (first defined at line %d), only the first one is used." % (ignored.file, ignored.section, ignored.line, ignored.first_line))
             else:
-                update_output.warning('db_ignored_duplicate', "WARNING: Drop-in file '%s' defines database '%s' which is already defined in '%s', skipping." % (ignored['file'], ignored['db_id'], ignored['ctx']))
+                update_output.warning('db_ignored_duplicate', "WARNING: Drop-in file '%s' defines database '%s' at line %d which is already defined in '%s', skipping." % (ignored.file, ignored.section, ignored.line, ignored.ctx))
+        if mister_duplicates:
+            config_path, _, first_line = mister_duplicates[0]
+            lines = ', '.join(str(line) for _, line, _ in mister_duplicates)
+            raise InvalidConfigParameter("Duplicated [MiSTer] section in ini file '%s' at line %s (first defined at line %d). Global settings must be defined only once." % (config_path, lines, first_line))
 
     @staticmethod
     def _abort_pc_launcher_wrong_paths(path_kind: str, path_variable: str, section: str) -> None:
@@ -217,17 +232,13 @@ class ConfigReader:
         exit(EXIT_ERROR_WRONG_SETUP)
 
     def _load_ini_config(self, config_path) -> 'IniConfig':
-        ini_config = IniConfig()
+        ini_config = IniConfig(self._section_lines_by_file)
         try:
             ini_config.read(config_path)
         except Exception as e:
             self._logger.debug(e)
             self._logger.print('Could not read ini file %s' % config_path)
             raise e
-        for section, duplicated_line, first_line in ini_config.skipped_duplicated_sections:
-            # [MiSTer] duplicates are not recorded in ignored_databases, so they are only reported here.
-            if section.lower() == 'mister':
-                self._logger.print("WARNING: ini file '%s' contains a duplicated section [%s] at line %d (first defined at line %d), only the first one is used." % (config_path, section, duplicated_line, first_line))
         return ini_config
 
     def _load_drop_in_databases(self, config_path: str, result: Config, default_db: ConfigDatabaseSection) -> None:
@@ -256,29 +267,16 @@ class ConfigReader:
                     raise InvalidConfigParameter("Drop-in file '%s' contains a [%s] section. The main distribution database is only allowed in the base downloader.ini." % (drop_in_path, DISTRIBUTION_MISTER_DB_ID))
 
                 if section_id in result['databases']:
-                    source = db_sources.get(section_id)
-                    origin = source if source is not None else 'the environment default database'
-                    result['ignored_databases'].append({'file': drop_in_path, 'db_id': section_id, 'reason': 'duplicate', 'ctx': origin})
+                    result['ignored_databases'].append(drop_in_config.ignored_section(drop_in_path, section, db_sources[section_id]))
                     continue
 
                 parser = IniParser(drop_in_config[section])
                 result['databases'][section_id] = self._parse_database_section(default_db, parser, section_id)
                 db_sources[section_id] = drop_in_path
 
-            self._register_skipped_duplicated_sections(drop_in_config, drop_in_path, result)
+            result['ignored_databases'] += drop_in_config.ignored_sections(drop_in_path)
 
         self._logger.bench('ConfigReader Read drop-in databases end.')
-
-    @staticmethod
-    def _register_skipped_duplicated_sections(ini_config: 'IniConfig', config_path: str, result: Config) -> None:
-        for section, duplicated_line, _first_line in ini_config.skipped_duplicated_sections:
-            section_id = section.lower()
-            if section_id == 'mister':
-                continue
-            if any(entry['file'] == config_path and entry.get('db_id') == section_id for entry in result['ignored_databases']):
-                continue
-            result['ignored_databases'].append({'file': config_path, 'db_id': section_id, 'reason': 'duplicate', 'ctx': config_path, 'line': duplicated_line})
-
     def _discover_drop_in_files(self, config_path: str) -> list[str]:
         return _deduplicate_drop_in_files(self._discover_fs_drop_in_files(config_path) + self._discover_extra_drop_in_files())
 
@@ -459,13 +457,11 @@ class ConfigReader:
 
 
 class IniConfig:
-    """Adapter over ConfigParser that tolerates duplicated sections within a single ini file:
-    the first occurrence wins and later ones are collected in skipped_duplicated_sections
-    as (section, duplicated_line, first_line) tuples."""
-
-    def __init__(self) -> None:
+    def __init__(self, section_lines_by_file: Optional[dict[str, dict[str, int]]] = None) -> None:
         self._parser = configparser.ConfigParser(inline_comment_prefixes=(';', '#'))
         self.skipped_duplicated_sections: list[tuple[str, int, int]] = []
+        self.section_lines: dict[str, int] = {}
+        self._section_lines_by_file = section_lines_by_file if section_lines_by_file is not None else {}
 
     def read(self, config_path: str) -> None:
         try:
@@ -478,6 +474,7 @@ class IniConfig:
     def read_string(self, content: str, source: str = '<string>') -> None:
         deduplicated = ''.join(self._lines_without_duplicated_sections(io.StringIO(content)))
         self._parser.read_string(deduplicated, source=source)
+        self._section_lines_by_file[source] = self.section_lines
 
     def sections(self) -> list[str]:
         return self._parser.sections()
@@ -485,8 +482,24 @@ class IniConfig:
     def __getitem__(self, key: str) -> configparser.SectionProxy:
         return self._parser[key]
 
+    def ignored_sections(self, config_path: str) -> list[IgnoredDatabase]:
+        return [
+            IgnoredDatabase(config_path, section, config_path, duplicated_line, first_line)
+            for section, duplicated_line, first_line in self.skipped_duplicated_sections
+        ]
+
+    def ignored_section(self, config_path: str, section: str, ctx: str) -> IgnoredDatabase:
+        first_line = self._find_section_line(self._section_lines_by_file[ctx], section)
+        return IgnoredDatabase(config_path, section, ctx, self.section_lines[section], first_line)
+
+    @staticmethod
+    def _find_section_line(section_lines: dict[str, int], section: str) -> int:
+        for name, line in section_lines.items():
+            if name.lower() == section.lower():
+                return line
+        raise KeyError("Section '%s' not found in section_lines; the winning definition should always be in its file's map." % section)
+
     def _lines_without_duplicated_sections(self, fp):
-        seen_sections: dict[str, int] = {}
         option_indent = None
         skipping = False
         for lineno, line in enumerate(fp, start=1):
@@ -502,11 +515,11 @@ class IniConfig:
             if mo is not None and (option_indent is None or indent <= option_indent):
                 header = mo.group('header')
                 option_indent = None
-                if header != self._parser.default_section and header in seen_sections:
-                    self.skipped_duplicated_sections.append((header, lineno, seen_sections[header]))
+                if header != self._parser.default_section and header in self.section_lines:
+                    self.skipped_duplicated_sections.append((header, lineno, self.section_lines[header]))
                     skipping = True
                     continue
-                seen_sections[header] = lineno
+                self.section_lines[header] = lineno
                 skipping = False
             elif option_indent is None or indent <= option_indent:
                 option_indent = indent

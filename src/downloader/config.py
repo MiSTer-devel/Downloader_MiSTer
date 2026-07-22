@@ -18,7 +18,7 @@
 
 from enum import IntEnum, unique
 from pathlib import Path
-from typing import Literal, TypedDict, Optional, Union
+from typing import NamedTuple, TypedDict, Optional
 
 from downloader.constants import FILE_downloader_ini, K_BASE_PATH, K_DOWNLOADER_TIMEOUT, K_DOWNLOADER_RETRIES, \
     MEDIA_FAT, DISTRIBUTION_MISTER_DB_ID, K_DOWNLOADER_THREADS_LIMIT, STORAGE_PRIORITY_PREFER_SD, \
@@ -74,18 +74,12 @@ class FileChecking(IntEnum):
     EXHAUSTIVE = 2
     VERIFY_INTEGRITY = 3
 
-class IgnoredDatabaseDuplicateOptional(TypedDict, total=False):
-    line: int
-
-
-class IgnoredDatabaseDuplicate(IgnoredDatabaseDuplicateOptional):
+class IgnoredDatabase(NamedTuple):
     file: str
-    db_id: str
-    reason: Literal['duplicate']
+    section: str
     ctx: str
-
-
-IgnoredDatabase = IgnoredDatabaseDuplicate
+    line: int
+    first_line: int
 
 
 class ConfigDatabaseSectionRequired(TypedDict):

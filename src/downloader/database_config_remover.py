@@ -107,14 +107,8 @@ class DatabaseConfigRemover:
             if source_db_id.lower() == db_id.lower() and path not in files:
                 files.append(path)
         for ignored in self._config['ignored_databases']:
-            ignored_db_id = ignored.get('db_id')
-            if (
-                    isinstance(ignored_db_id, str)
-                    and ignored_db_id.lower() == db_id.lower()
-            ):
-                path = ignored['file']
-                if path not in files:
-                    files.append(path)
+            if ignored.section.lower() == db_id.lower() and ignored.file not in files:
+                files.append(ignored.file)
         return files
 
     def _base_ini_has_other_database(
