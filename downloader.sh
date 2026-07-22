@@ -160,7 +160,9 @@ export DOWNLOADER_LAUNCHER_PATH="${BASH_SOURCE[0]}"
 export PYTHONUTF8=1
 
 if [[ -s "${LATEST_BIN_PATH}" && -x /usr/bin/python3.9 ]] ; then
-    echo "Running MiSTer Downloader" ; echo
+    if (( $# == 0 )) ; then
+        echo "Running MiSTer Downloader" ; echo
+    fi
     touch /tmp/downloader_run_signal
     cp "${LATEST_BIN_PATH}" "${RUN_PATH}"
     chmod +x "${RUN_PATH}"
@@ -181,7 +183,9 @@ if [[ -s "${LATEST_BIN_PATH}" && -x /usr/bin/python3.9 ]] ; then
         exit 0
     fi
 else
-    echo "Running MiSTer Downloader!" ; echo
+    if (( $# == 0 )) ; then
+        echo "Running MiSTer Downloader!" ; echo
+    fi
 fi
 
 if [ -s "${LATEST_BUILD_PATH}" ] ; then

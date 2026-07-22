@@ -66,6 +66,7 @@ class UpdateOutput(Protocol):
     def check_fingerprint_failure(self, failure_id: str) -> None: pass
     def check_finished(self, exit_code: int, status: str) -> None: pass
     def configured_databases(self, dbs: list[ConfiguredDatabase]) -> None: pass
+    def stored_databases(self, db_ids: list[str]) -> None: pass
     def uninstall_started(self, total_bytes: int, total_files: int, total_dbs: int) -> None: pass
     def uninstall_finished(self, exit_code: int, removed_bytes: int, removed_files: int) -> None: pass
 
@@ -105,6 +106,7 @@ class NoopUpdateOutput(UpdateOutput):
     def check_fingerprint_failure(self, failure_id: str) -> None: pass
     def check_finished(self, exit_code: int, status: str) -> None: pass
     def configured_databases(self, dbs: list[ConfiguredDatabase]) -> None: pass
+    def stored_databases(self, db_ids: list[str]) -> None: pass
     def uninstall_started(self, total_bytes: int, total_files: int, total_dbs: int) -> None: pass
     def uninstall_finished(self, exit_code: int, removed_bytes: int, removed_files: int) -> None: pass
 
@@ -276,10 +278,16 @@ class HumanUpdateOutput(UpdateOutput):
         self._logger.print(status)
 
     def configured_databases(self, dbs: list[ConfiguredDatabase]) -> None:
+        self._logger.print('Configured databases:')
         for db_id, section in dbs:
             fields = _configured_db_extra_fields(section)
             option_text = ''.join(f' {key}={value}' for key, value in fields.items())
             self._logger.print(f"{db_id} {section['db_url']}{option_text}")
+
+    def stored_databases(self, db_ids: list[str]) -> None:
+        self._logger.print('Databases in store:')
+        for db_id in db_ids:
+            self._logger.print(db_id)
 
     def uninstall_started(self, total_bytes: int, total_files: int, total_dbs: int) -> None:
         self._logger.print(f'{total_files} files ({_megabytes(total_bytes)}) to remove.')
@@ -479,6 +487,10 @@ class LtsvUpdateOutput(UpdateOutput):
             fields: dict[str, Union[str, int]] = {'db': db_id, 'url': section['db_url']}
             fields.update(_configured_db_extra_fields(section))
             self._emit('configured_db', **fields)
+
+    def stored_databases(self, db_ids: list[str]) -> None:
+        for db_id in db_ids:
+            self._emit('stored_db', db=db_id)
 
     def uninstall_started(self, total_bytes: int, total_files: int, total_dbs: int) -> None:
         self._emit('uninstall_start', bytes=total_bytes, files=total_files, dbs=total_dbs)

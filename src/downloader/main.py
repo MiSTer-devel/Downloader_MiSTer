@@ -93,8 +93,9 @@ def execute_command(args, config: Config, logger: TopLogger, update_output: Upda
         uninstall_service = UninstallServiceFactory.for_main(logger, update_output).create(config)
         return uninstall_service.uninstall(args.uninstall_db_ids, args.force)
     if args.command == 'list_dbs':
-        from downloader.list_dbs_service import ListDbsService
-        return ListDbsService(update_output).list_dbs(config)
+        from downloader.list_dbs_service_factory import ListDbsServiceFactory
+        list_dbs_service = ListDbsServiceFactory.for_main(logger, update_output).create(config)
+        return list_dbs_service.list_dbs(config, args.list_dbs_filter)
     if args.command == 'print_drives':
         from downloader.full_run_service_factory import FullRunServiceFactory
         runner = FullRunServiceFactory.for_main(logger, update_output).create(config)
@@ -185,8 +186,9 @@ def parse_args(argv):
                           help='run Downloader only for the listed database IDs')
     commands.add_argument('--uninstall', nargs='+', dest='uninstall_db_ids', metavar='DB_ID',
                           help='uninstall the listed databases')
-    commands.add_argument('--list-dbs', action='store_const', const='list_dbs', dest='command',
-                          help='list configured database IDs and exit')
+    commands.add_argument('--list-dbs', nargs='?', const='all', default=None, dest='list_dbs_filter',
+                          metavar='SOURCE', choices=('all', 'configured', 'stored'),
+                          help='list database IDs and exit (optionally only "configured" or "stored")')
     commands.add_argument('--version', '-v', action='store_const', const='version', dest='command',
                           help='print Downloader version and exit')
     parser.add_argument('--force', action='store_true', help='accept unverifiable external content during uninstall')
@@ -198,6 +200,8 @@ def parse_args(argv):
         parsed_args.command = 'run_only'
     elif parsed_args.uninstall_db_ids is not None:
         parsed_args.command = 'uninstall'
+    elif parsed_args.list_dbs_filter is not None:
+        parsed_args.command = 'list_dbs'
     if parsed_args.force and parsed_args.command != 'uninstall':
         parser.error('--force requires --uninstall')
     return parsed_args
