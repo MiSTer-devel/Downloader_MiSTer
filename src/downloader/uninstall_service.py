@@ -17,12 +17,13 @@
 # https://github.com/MiSTer-devel/Downloader_MiSTer
 
 from downloader.config import Config
-from downloader.constants import EXIT_ERROR_WRONG_SETUP
+from downloader.constants import EXIT_ERROR_UNINSTALL_DRIVE_DISCONNECTED, \
+    EXIT_ERROR_UNINSTALL_EXTERNALS_UNVERIFIED, EXIT_ERROR_WRONG_SETUP
 from downloader.database_config_remover import DatabaseConfigRemover, \
     DatabaseConfigRemovalResult, DatabaseReappearanceReason
 from downloader.file_system import FileSystem
 from downloader.logger import Logger
-from downloader.offline_uninstaller import OfflineUninstaller
+from downloader.offline_uninstaller import OfflineUninstaller, UninstallBox
 from downloader.other import remove_run_signal
 from downloader.update_output import UpdateOutput
 
@@ -67,9 +68,7 @@ class UninstallService:
             )
             return EXIT_ERROR_WRONG_SETUP, removed_bytes, removed_files
 
-        result = 1 if (
-            box.refused_db_ids() or box.failed_db_ids() or box.save_failed()
-        ) else 0
+        result = self._result_for_box(box)
         if not box.save_failed():
             for db_id in box.uninstalled_db_ids():
                 removal = self._database_config_remover.remove(db_id)
@@ -77,6 +76,21 @@ class UninstallService:
                 if removal.failures:
                     result = 1
         return result, removed_bytes, removed_files
+
+    @staticmethod
+    def _result_for_box(box: UninstallBox) -> int:
+        refused = box.refused_db_ids()
+        failed = box.failed_db_ids()
+        disconnected = box.drive_disconnected_db_ids()
+        if box.save_failed():
+            return 1
+        if refused and not failed:
+            return EXIT_ERROR_UNINSTALL_EXTERNALS_UNVERIFIED
+        if disconnected and set(disconnected) == set(failed) and not refused:
+            return EXIT_ERROR_UNINSTALL_DRIVE_DISCONNECTED
+        if refused or failed:
+            return 1
+        return 0
 
     def _normalize_db_ids(self, db_ids: list[str]) -> list[str]:
         configured = {db_id.lower(): db_id for db_id in self._config['databases']}

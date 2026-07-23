@@ -144,7 +144,7 @@ class OfflineUninstaller:
                 continue
 
             changed = True
-            failed = self._remove_db(
+            failed, drive_disconnected = self._remove_db(
                 db_id,
                 box,
                 local_store,
@@ -153,7 +153,10 @@ class OfflineUninstaller:
                 reachable_fragments,
             )
             if failed:
-                box.add_failed_db(db_id)
+                if drive_disconnected:
+                    box.add_drive_disconnected_db(db_id)
+                else:
+                    box.add_failed_db(db_id)
             else:
                 local_store['dbs'].pop(db_id, None)
                 local_store['db_fingerprints'].pop(db_id, None)
@@ -222,10 +225,10 @@ class OfflineUninstaller:
             fragments: list[_StoredFragmentPackages],
             claimants_by_kind_and_path: dict[str, dict[str, list[str]]],
             reachable_fragments: set[tuple[str, Optional[str]]],
-    ) -> bool:
+    ) -> tuple[bool, bool]:
         store = local_store['dbs'][db_id]
         disconnected_drives: set[str] = set()
-        failed = False
+        other_failure = False
 
         for stored_fragment in fragments:
             drive = stored_fragment.drive
@@ -233,11 +236,9 @@ class OfflineUninstaller:
             if (db_id, drive) not in reachable_fragments:
                 if drive is not None:
                     disconnected_drives.add(drive)
-                    failed = True
                 continue
             if drive is not None and not self._file_system.is_folder(drive):
                 disconnected_drives.add(drive)
-                failed = True
                 for stored_path in stored_fragment.files:
                     pkg = stored_path.package
                     self._update_output.file_skipped(
@@ -263,7 +264,6 @@ class OfflineUninstaller:
                 if not self._file_system.is_file(pkg.full_path):
                     if drive is not None and not self._file_system.is_folder(drive):
                         disconnected_drives.add(drive)
-                        failed = True
                         self._update_output.file_skipped(
                             db_id, pkg.rel_path, size, 'drive_disconnected')
                         continue
@@ -279,11 +279,10 @@ class OfflineUninstaller:
                     self._update_output.file_removed([db_id], pkg.rel_path, tangles, size)
                 elif drive is not None and not self._file_system.is_folder(drive):
                     disconnected_drives.add(drive)
-                    failed = True
                     self._update_output.file_skipped(
                         db_id, pkg.rel_path, size, 'drive_disconnected')
                 else:
-                    failed = True
+                    other_failure = True
                     self._update_output.file_failed(
                         db_id, pkg.rel_path, size, str(error))
 
@@ -304,20 +303,21 @@ class OfflineUninstaller:
                     continue
                 if drive is not None and not self._file_system.is_folder(drive):
                     disconnected_drives.add(drive)
-                    failed = True
                     break
                 if self._file_system.is_folder(pkg.full_path) and not self._file_system.folder_has_items(pkg.full_path):
                     error = self._file_system.remove_folder(pkg.full_path)
                     if error is not None:
                         if drive is not None and not self._file_system.is_folder(drive):
                             disconnected_drives.add(drive)
-                            failed = True
                             break
-                        failed = True
+                        other_failure = True
                         continue
                 folders.pop(stored_path.store_path, None)
 
-        return failed or self._has_leftovers(store)
+        has_leftovers = self._has_leftovers(store)
+        failed = bool(disconnected_drives) or other_failure or has_leftovers
+        only_drive_disconnected = bool(disconnected_drives) and not other_failure
+        return failed, only_drive_disconnected
 
     @staticmethod
     def _claimants_by_kind_and_path(
@@ -439,6 +439,7 @@ class UninstallBox:
         self._invalid_db_ids: list[str] = []
         self._refused_dbs: list[tuple[str, str]] = []
         self._failed_db_ids: list[str] = []
+        self._drive_disconnected_db_ids: list[str] = []
         self._uninstalled_db_ids: list[str] = []
         self._save_failed: bool = False
         self._removed_bytes: int = 0
@@ -453,6 +454,10 @@ class UninstallBox:
 
     def add_failed_db(self, db_id: str) -> None:
         self._failed_db_ids.append(db_id)
+
+    def add_drive_disconnected_db(self, db_id: str) -> None:
+        self._failed_db_ids.append(db_id)
+        self._drive_disconnected_db_ids.append(db_id)
 
     def add_uninstalled_db(self, db_id: str) -> None:
         self._uninstalled_db_ids.append(db_id)
@@ -470,6 +475,7 @@ class UninstallBox:
     def invalid_db_ids(self) -> list[str]: return list(self._invalid_db_ids)
     def refused_db_ids(self) -> list[str]: return [db_id for db_id, _reason in self._refused_dbs]
     def failed_db_ids(self) -> list[str]: return list(self._failed_db_ids)
+    def drive_disconnected_db_ids(self) -> list[str]: return list(self._drive_disconnected_db_ids)
     def uninstalled_db_ids(self) -> list[str]: return list(self._uninstalled_db_ids)
     def save_failed(self) -> bool: return self._save_failed
     def removed_bytes(self) -> int: return self._removed_bytes

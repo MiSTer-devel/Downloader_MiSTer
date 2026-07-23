@@ -27,3 +27,13 @@ Content on a truly absent drive is left orphaned.
 If a drive disconnects while files are being removed, reconnect it and retry with
 `--force`. Successfully removed files are already gone, and the remaining store records
 are retried.
+
+## Exit codes
+
+- `0`: every selected database was uninstalled successfully.
+- `1`: uninstall failed and no single recovery-specific exit code applies.
+- `22`: uninstall was refused because external content could not be verified. Reconnect
+  all drives or run a full update to refresh legacy metadata; use `--force` only when
+  accepting potentially orphaned external content.
+- `23`: an external drive disconnected during removal. Reconnect it before retrying.
+- Other non-zero values retain their existing Downloader-wide meanings.
