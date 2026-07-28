@@ -30,6 +30,7 @@ from downloader.migrations.migration_v9 import MigrationV9
 from downloader.migrations.migration_v10 import MigrationV10
 from downloader.migrations.migration_v11 import MigrationV11
 from downloader.migrations.migration_v12 import MigrationV12
+from downloader.migrations.migration_v13 import MigrationV13
 
 def migrations(config: Config):
     return [
@@ -44,5 +45,6 @@ def migrations(config: Config):
         MigrationV9(),
         MigrationV10(),
         MigrationV11(),
-        MigrationV12()
+        MigrationV12(),
+        MigrationV13()
     ]
