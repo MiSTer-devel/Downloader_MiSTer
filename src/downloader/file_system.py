@@ -625,6 +625,7 @@ class _FileSystem(FileSystem):
                     return
 
                 files_to_unzip = target_path
+                prepared_parent_paths: set[str] = set()
                 for member in zipf.infolist():
                     if member.filename not in files_to_unzip:
                         continue
@@ -633,6 +634,11 @@ class _FileSystem(FileSystem):
                         raise FsOperationsError("File system operations have been disabled.")
 
                     file_path = files_to_unzip[member.filename]
+                    parent_path = self._parent_folder(file_path)
+                    if parent_path not in prepared_parent_paths:
+                        self._makedirs(parent_path)
+                        prepared_parent_paths.add(parent_path)
+
                     with zipf.open(member) as source, open(file_path, 'wb') as target:
                         while True:
                             buf = source.read(COPY_BUFSIZE)
