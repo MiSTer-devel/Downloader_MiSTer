@@ -23,7 +23,7 @@ import os
 
 from downloader.config import Config, AllowDelete
 from downloader.constants import FILE_MiSTer, EXIT_ERROR_BAD_NEW_BINARY, FILE_downloader_storage_fingerprints_json, \
-    FILE_downloader_storage_sigs_json, FILE_PROP_ENTANGLEMENTS
+    FILE_downloader_storage_sigs_json, FILE_PROP_ENTANGLEMENTS, UNREPORTED_UNUSED_TERMS
 from downloader.db_entity import DbEntity
 from downloader.db_utils import DbSectionPackage
 from downloader.error import DownloaderError
@@ -290,7 +290,7 @@ class OnlineImporter:
         box.set_unused_filter_tags([
             part
             for part in self._file_filter_factory.unused_filter_parts()
-            if part in filter_terms_from_ini
+            if part in filter_terms_from_ini and part not in UNREPORTED_UNUSED_TERMS
         ])
 
         for open_db_job, _e in report.get_failed_jobs(OpenDbJob):

@@ -151,6 +151,7 @@ JOB_SYSTEM_INACTIVITY_TIMEOUT: Final[int] = 600
 
 # Filters
 ESSENTIAL_TERM: Final[str] = 'essential'
+UNREPORTED_UNUSED_TERMS: Final[set[str]] = {'misterexampleini'}  # normalized form of 'mister_example-ini'
 
 # File Description Property Keys
 FILE_PROP_ENTANGLEMENTS: Final[str] = 'tangle'
