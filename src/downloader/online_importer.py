@@ -158,6 +158,7 @@ class OnlineImporterWorkersFactory:
                 worker_context=self._worker_context,
                 progress_reporter=self._progress_reporter,
                 external_drives_repository=self._target_paths_calculator_factory.external_drives_repository,
+                file_system=self._file_system,
             ),
             ProcessDbIndexWorker(
                 logger=self._logger,
@@ -438,6 +439,7 @@ class OnlineImporter:
 
         for db_entity, config, db_hash, db_size in box.installed_db_fingerprints():
             write_stores[db_entity.db_id].set_db_state_fingerprint(db_hash, db_size, db_entity.timestamp, config['filter'])
+            write_stores[db_entity.db_id].set_not_overwritten_files(box.not_overwritten_files().get(db_entity.db_id, []))
 
         for db_id, zip_id in box.removed_zips():
             write_stores[db_id].remove_zip_id(zip_id)
@@ -763,6 +765,7 @@ class InstallationBox:
         self._removed_folders: list[tuple[str, PathPackage]] = []
         self._removed_zips: list[tuple[str, str]] = []
         self._skipped_updated_files: dict[str, list[str]] = dict()
+        self._not_overwritten_files: dict[str, list[str]] = dict()
         self._filtered_zip_data: dict[str, dict[str, FileFoldersHolder]] = defaultdict(dict)
         self._installed_zip_summary: list[tuple[str, str, StoreFragmentDrivePaths, dict[str, Any]]] = []
         self._installed_folders: list[tuple[str, PathPackage]] = []
@@ -831,7 +834,9 @@ class InstallationBox:
         if len(paths) == 0: return
         if db_id not in self._skipped_updated_files:
             self._skipped_updated_files[db_id] = []
+            self._not_overwritten_files[db_id] = []
         self._skipped_updated_files[db_id].extend([p.rel_path for p in paths])
+        self._not_overwritten_files[db_id].extend([p.full_path for p in paths])
     def add_skipped_db(self, db_id: str) -> None:
         self._skipped_dbs.append(db_id)
     def add_file_fetch_started(self, path: str) -> None:
@@ -908,6 +913,7 @@ class InstallationBox:
     def repeated_store_presence(self): return self._repeated_store_presence
     def installed_zip_summary(self): return self._installed_zip_summary
     def skipped_updated_files(self): return self._skipped_updated_files
+    def not_overwritten_files(self): return self._not_overwritten_files
     def filtered_zip_data(self): return self._filtered_zip_data
     def full_partitions(self) -> dict[str, int]: return self._full_partitions
     def installed_db_fingerprints(self): return self._installed_db_fingerprints

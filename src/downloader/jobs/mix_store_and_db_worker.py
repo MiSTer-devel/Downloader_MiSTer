@@ -18,8 +18,10 @@
 
 from typing import Any, Mapping, Optional, cast
 
-from downloader.db_utils import can_skip_db, can_skip_db_with_external_store_fingerprints
+from downloader.db_utils import can_skip_db, can_skip_db_with_external_store_fingerprints, \
+    not_overwritten_files_are_present
 from downloader.external_drives_repository import ExternalDrivesRepository
+from downloader.file_system import FileSystem
 from downloader.external_store_fingerprints import expected_external_store_fingerprints, has_external_store_fingerprint_metadata
 from downloader.local_store_wrapper import DbStateFingerprint, ReadOnlyStoreAdapter
 from downloader.job_system import WorkerResult, JobContext, ProgressReporter
@@ -32,12 +34,13 @@ from downloader.logger import Logger
 
 
 class MixStoreAndDbWorker(DownloaderWorker):
-    def __init__(self, logger: Logger, installation_report: InstallationReportImpl, worker_context: JobContext, progress_reporter: ProgressReporter, external_drives_repository: ExternalDrivesRepository) -> None:
+    def __init__(self, logger: Logger, installation_report: InstallationReportImpl, worker_context: JobContext, progress_reporter: ProgressReporter, external_drives_repository: ExternalDrivesRepository, file_system: Optional[FileSystem] = None) -> None:
         self._logger = logger
         self._installation_report = installation_report
         self._worker_context = worker_context
         self._progress_reporter = progress_reporter
         self._external_drives_repository = external_drives_repository
+        self._file_system = file_system
 
     def job_type_id(self) -> int: return MixStoreAndDbJob.type_id
     def reporter(self): return self._progress_reporter
@@ -60,7 +63,7 @@ class MixStoreAndDbWorker(DownloaderWorker):
             store.write_only().set_base_path(job.config['base_path'])  # After that, all worker stores will be read-only.
 
         figp = read_only_store.db_state_fingerprint()
-        if can_skip_db_after_store_load(job, figp, read_only_store, self._external_drives_repository):
+        if can_skip_db_after_store_load(job, figp, read_only_store, self._external_drives_repository, self._file_system):
             if job.fingerprint_metadata_required and has_expected_external_store_fingerprints(figp):
                 self._logger.debug('Forcing store save to rebuild external fingerprint artifacts for: ', job.db.db_id)
                 local_store.mark_force_save()
@@ -90,7 +93,11 @@ def can_skip_db_after_store_load(
         figp: Mapping[str, Any],
         read_only_store: ReadOnlyStoreAdapter,
         external_drives_repository: Optional[ExternalDrivesRepository],
+        file_system: Optional[FileSystem] = None,
 ) -> bool:
+    if not not_overwritten_files_are_present(figp, file_system):
+        return False
+
     if has_external_store_fingerprint_metadata(figp):
         return can_skip_db_with_external_store_fingerprints(
             job.config['file_checking'],

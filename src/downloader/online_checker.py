@@ -158,6 +158,7 @@ class OnlineCheckerWorkersFactory:
                 worker_context=self._worker_context,
                 progress_reporter=self._progress_reporter,
                 external_drives_repository=self._external_drives_repository,
+                file_system=self._file_system,
             ),
         ]
         return OnlineCheckerWorkers(workers=workers, installation_report=installation_report)

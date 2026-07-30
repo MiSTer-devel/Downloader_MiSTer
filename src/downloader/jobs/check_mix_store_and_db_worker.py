@@ -19,6 +19,7 @@
 from typing import Optional
 
 from downloader.external_drives_repository import ExternalDrivesRepository
+from downloader.file_system import FileSystem
 from downloader.job_system import JobContext, ProgressReporter, WorkerResult
 from downloader.jobs.load_local_store_job import local_store_tag
 from downloader.jobs.mix_store_and_db_job import MixStoreAndDbJob
@@ -30,12 +31,13 @@ from downloader.logger import Logger
 
 
 class CheckMixStoreAndDbWorker(DownloaderWorker):
-    def __init__(self, logger: Logger, installation_report: InstallationReport, worker_context: JobContext, progress_reporter: ProgressReporter, external_drives_repository: Optional[ExternalDrivesRepository] = None) -> None:
+    def __init__(self, logger: Logger, installation_report: InstallationReport, worker_context: JobContext, progress_reporter: ProgressReporter, external_drives_repository: Optional[ExternalDrivesRepository] = None, file_system: Optional[FileSystem] = None) -> None:
         self._logger = logger
         self._installation_report = installation_report
         self._worker_context = worker_context
         self._progress_reporter = progress_reporter
         self._external_drives_repository = external_drives_repository
+        self._file_system = file_system
 
     def job_type_id(self) -> int: return MixStoreAndDbJob.type_id
     def reporter(self): return self._progress_reporter
@@ -54,7 +56,7 @@ class CheckMixStoreAndDbWorker(DownloaderWorker):
         figp = _fingerprint_from_full_store(job)
         read_only_store = _read_only_store_from_full_store(job)
         if figp is not None and read_only_store is not None \
-                and can_skip_db_after_store_load(job, figp, read_only_store, self._external_drives_repository):
+                and can_skip_db_after_store_load(job, figp, read_only_store, self._external_drives_repository, self._file_system):
             self._logger.debug('Online check: no changes detected for: ', job.db.db_id)
             job.skipped = True
 

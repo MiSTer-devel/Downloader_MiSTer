@@ -18,7 +18,7 @@
 
 
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, cast
+from typing import Any, Iterable, Mapping, Optional, cast
 
 from downloader.config import Config, ConfigDatabaseSection, FileChecking
 from downloader.constants import DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE, \
@@ -26,7 +26,9 @@ from downloader.constants import DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPR
 from downloader.db_entity import DbEntity
 from downloader.external_store_fingerprints import expected_external_store_fingerprints, \
     external_store_fingerprints_covered
-from downloader.local_store_wrapper import DbStateFingerprint
+from downloader.file_system import FileSystem
+from downloader.local_store_wrapper import DbStateFingerprint, NOT_OVERWRITTEN_FILES
+from downloader.path_package import PathPackage, PathType, PATH_PACKAGE_KIND_STANDARD
 
 
 @dataclass
@@ -132,3 +134,18 @@ def can_skip_db_with_external_store_fingerprints(
     expected_external_fingerprints = expected_external_store_fingerprints(figp)
     return expected_external_fingerprints is not None \
         and external_store_fingerprints_covered(expected_external_fingerprints, available_external_store_fingerprints)
+
+
+def not_overwritten_files_are_present(figp: Mapping[str, Any], file_system: Optional[FileSystem]) -> bool:
+    full_paths = figp.get(NOT_OVERWRITTEN_FILES, None)
+    if not full_paths:
+        return True
+
+    if file_system is None:
+        return False
+
+    _present, missing = file_system.are_files([
+        PathPackage(full_path, None, {}, PathType.FILE, PATH_PACKAGE_KIND_STANDARD, None)
+        for full_path in full_paths
+    ])
+    return len(missing) == 0

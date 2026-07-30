@@ -22,7 +22,7 @@ from downloader.config import Config
 from downloader.constants import DB_STATE_FINGERPRINT_NO_HASH, DB_STATE_FINGERPRINT_NO_SIZE
 from downloader.db_entity import DbEntity
 from downloader.db_utils import build_db_config, can_skip_db, can_skip_db_with_external_store_fingerprints, \
-    filter_terms_from_ini
+    filter_terms_from_ini, not_overwritten_files_are_present
 from downloader.file_system import FileSystem
 from downloader.job_system import Job, WorkerResult, JobContext, ProgressReporter
 from downloader.jobs.load_local_store_fingerprints_job import local_store_fingerprints_tag
@@ -104,7 +104,7 @@ class OpenDbWorker(DownloaderWorker):
                 available_external_fingerprints = job.load_local_store_fingerprints_job.available_external_store_fingerprints.get(job.section, [])
                 if can_skip_db_with_external_store_fingerprints(
                         config['file_checking'], figp, db_hash, db_size, config['filter'], available_external_fingerprints
-                ):
+                ) and not_overwritten_files_are_present(figp, self._file_system):
                     self._logger.debug('Skipping db process. No changes detected for: ', db.db_id)
                     job.skipped = True
                     return [], None

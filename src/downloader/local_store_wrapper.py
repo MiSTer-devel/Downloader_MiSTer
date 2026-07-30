@@ -24,7 +24,7 @@ from downloader.db_entity import ZipIndexEntity
 
 from downloader.error import DownloaderError
 from downloader.other import empty_store_without_base_path
-from typing import Any, Collection, Optional, TypedDict, cast
+from typing import Any, Collection, Final, Optional, TypedDict, cast
 from types import MappingProxyType
 from collections import defaultdict, ChainMap
 
@@ -57,6 +57,9 @@ class DbStateFingerprint(TypedDict):
     filter: str
 
 def empty_db_state_fingerprint() -> DbStateFingerprint: return {'hash': DB_STATE_FINGERPRINT_NO_HASH, 'size': DB_STATE_FINGERPRINT_NO_SIZE, 'timestamp': DB_STATE_FINGERPRINT_NO_TIMESTAMP, 'filter': DB_STATE_FINGERPRINT_NO_FILTER}
+
+# Only written when the db was not allowed to overwrite something, so fingerprints stay as they are for every other db.
+NOT_OVERWRITTEN_FILES: Final[str] = 'not_overwritten'
 
 class LocalStore(TypedDict):
     dbs: dict[str, Any]
@@ -352,6 +355,19 @@ class WriteOnlyStoreAdapter:
         if self._db_state_fingerprint['filter'] != filter:
             self._db_state_fingerprint['filter'] = filter
             self._top_wrapper.mark_force_save()
+
+    def set_not_overwritten_files(self, full_paths: list[str]) -> None:
+        previous = self._db_state_fingerprint.get(NOT_OVERWRITTEN_FILES, None)
+        current = sorted(full_paths) if len(full_paths) > 0 else None
+        if previous == current:
+            return
+
+        if current is None:
+            del self._db_state_fingerprint[NOT_OVERWRITTEN_FILES]  # type: ignore[misc]
+        else:
+            self._db_state_fingerprint[NOT_OVERWRITTEN_FILES] = current  # type: ignore[literal-required]
+
+        self._top_wrapper.mark_force_save()
 
     def invalidate_db_state_fingerprint(self) -> None:
         figp = empty_db_state_fingerprint()
