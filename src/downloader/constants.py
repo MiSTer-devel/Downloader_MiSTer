@@ -37,6 +37,12 @@ REBOOT_WAIT_TIME_STANDARD: Final[int] = 5
 
 # File Checking minimal check parameters:
 FILE_CHECKING_SPACE_CHECK_TOLERANCE = 128 * 1024  # 128kb
+LOG_TAIL_AFTER_FREE_SPACE_CHECK: Final[int] = 4 * 1024  # 4kb
+
+# Cluster sizes that MiSTer cards are formatted with, to know how much space a file really takes
+SD_BIG_CARD_TOTAL_SPACE: Final[int] = 32 * 1024 * 1024 * 1024  # 32gb
+SD_SMALL_CARD_CLUSTER_SIZE: Final[int] = 32 * 1024  # 32kb
+SD_BIG_CARD_CLUSTER_SIZE: Final[int] = 128 * 1024  # 128kb
 
 # File System affixes
 SUFFIX_file_in_progress: Final[str] = '._downloader_in_progress'

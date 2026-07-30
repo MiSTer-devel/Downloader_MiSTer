@@ -23,7 +23,8 @@ from downloader.constants import FILE_downloader_storage_zip, FILE_downloader_lo
     FILE_downloader_last_successful_run, FILE_downloader_external_storage, FILE_downloader_storage_json, \
     FILE_downloader_storage_sigs_json, FILE_downloader_previous_free_space_json, \
     FILE_downloader_storage_backup_pext, FILE_downloader_storage_fingerprints_json, \
-    FILE_downloader_external_store_fingerprints_json
+    FILE_downloader_external_store_fingerprints_json, SD_BIG_CARD_TOTAL_SPACE, SD_SMALL_CARD_CLUSTER_SIZE, \
+    SD_BIG_CARD_CLUSTER_SIZE, LOG_TAIL_AFTER_FREE_SPACE_CHECK
 from downloader.external_drives_repository import ExternalDrivesRepository
 from downloader.external_store_fingerprints import EXTERNAL_STORE_FINGERPRINTS, external_store_manifest, \
     external_store_manifest_fragments
@@ -250,13 +251,61 @@ class LocalRepository(FilelogSaver):
         self._logger.bench('LocalRepository Save free spaces start.')
         try:
             self._file_system.make_dirs_parent(self._previous_free_spaces_path)
-            self._file_system.save_json(free_spaces, self._previous_free_spaces_path)
+            self._file_system.save_json(self._discount_pending_log_write(free_spaces), self._previous_free_spaces_path)
         except Exception as e:
             self._logger.debug(e)
             return e
         finally:
             self._logger.bench('LocalRepository Save free spaces done.')
         return None
+
+    def _discount_pending_log_write(self, free_spaces: dict[str, int]) -> dict[str, int]:
+        # The log is copied out of the temp folder after this snapshot (see FileLogger.finalize).
+        if self._temp_log_name is None:
+            return free_spaces
+
+        partition = self._log_partition(free_spaces)
+        if partition is None:
+            return free_spaces
+
+        cluster_size = self._log_partition_cluster_size(partition)
+        incoming = _space_taken(self._file_size(self._temp_log_name) + LOG_TAIL_AFTER_FREE_SPACE_CHECK, cluster_size)
+        dropped_log = self._rotated_log_paths()[-1] if self._config['rotate_logs'] else self.logfile_path
+        reclaimed = _space_taken(self._file_size(dropped_log), cluster_size)
+        if incoming == reclaimed:
+            return free_spaces
+
+        self._logger.debug('LocalRepository pending log write on ', partition, ': incoming ', incoming, ', reclaimed ', reclaimed)
+        discounted_free_spaces = dict(free_spaces)
+        discounted_free_spaces[partition] = max(0, free_spaces[partition] - incoming + reclaimed)
+        return discounted_free_spaces
+
+    def _log_partition(self, free_spaces: dict[str, int]) -> Optional[str]:
+        result = None
+        for partition in free_spaces:
+            if not self.logfile_path.startswith(partition + '/'):
+                continue
+            if result is None or len(partition) > len(result):
+                result = partition
+        return result
+
+    def _log_partition_cluster_size(self, partition: str) -> int:
+        total_space = self._file_system.total_space(partition)
+        if 0 < total_space < SD_BIG_CARD_TOTAL_SPACE:
+            return SD_SMALL_CARD_CLUSTER_SIZE
+
+        return SD_BIG_CARD_CLUSTER_SIZE
+
+    def _file_size(self, path: str) -> int:
+        if not self._file_system.is_file(path):
+            return 0
+
+        size = self._file_system.size(path)
+        return size if size > 0 else 0
+
+    def _rotated_log_paths(self) -> list[str]:
+        log_root, log_ext = os.path.splitext(self.logfile_path)
+        return [self.logfile_path] + [f'{log_root}_old{i}{log_ext}' for i in range(1, 6)]
 
     def remove_free_spaces(self) -> Optional[Exception]:
         self._logger.bench('LocalRepository Remove free spaces start.')
@@ -401,8 +450,7 @@ class LocalRepository(FilelogSaver):
         self._logger.bench('LocalRepository rotate logs start.')
         try:
             self._file_system.make_dirs_parent(self.logfile_path)
-            log_root, log_ext = os.path.splitext(self.logfile_path)
-            log_paths = [self.logfile_path] + [f'{log_root}_old{i}{log_ext}' for i in range(1, 6)]
+            log_paths = self._rotated_log_paths()
             for i in range(5, 0, -1):  # equivalent to: reversed(range(1, 6))
                 src_log = log_paths[i - 1]
                 dst_log = log_paths[i]
@@ -427,3 +475,14 @@ class LocalRepository(FilelogSaver):
             import traceback
             print(f'ERROR: Could not copy log file from "{path}" to "{self.logfile_path}"')
             traceback.print_exc()
+
+
+def _space_taken(size: int, cluster_size: int) -> int:
+    if size <= 0:
+        return 0
+
+    clusters = size // cluster_size
+    if size % cluster_size != 0:
+        clusters += 1
+
+    return clusters * cluster_size

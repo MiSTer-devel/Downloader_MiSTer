@@ -97,6 +97,10 @@ class FileSystem(ABC):
         """interface"""
 
     @abstractmethod
+    def total_space(self, partition: str) -> int:
+        """interface"""
+
+    @abstractmethod
     def resolve(self, path: str) -> str:
         """interface"""
 
@@ -300,6 +304,12 @@ class _FileSystem(FileSystem):
         except FileNotFoundError:
             pass
         return mounts
+
+    def total_space(self, partition: str) -> int:
+        try:
+            return shutil.disk_usage(partition).total
+        except OSError:
+            return -1
 
     def resolve(self, path: str) -> str:
         return str(Path(path).resolve())
