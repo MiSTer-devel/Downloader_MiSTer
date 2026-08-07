@@ -6,7 +6,7 @@ This is useful for database maintainers who want to distribute a ready-to-use fi
 
 # How It Works
 
-The downloader looks for additional INI files in two places:
+Downloader looks for additional INI files in two places:
 
 1. **Files named `downloader_*.ini`** next to `downloader.ini`
 2. **Files inside the `downloader/` folder** next to `downloader.ini`
